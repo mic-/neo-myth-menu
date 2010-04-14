@@ -1,0 +1,32 @@
+CC = $(GENDEV)/sh2/bin/gcc
+AR = $(GENDEV)/sh2/bin/ar
+RANLIB = $(GENDEV)/sh2/bin/ranlib
+RM = rm -rf
+
+libff.a_OBJS = ff.o diskio.o option/ccsbcs.o
+
+INCS = -I. -I$(GENDEV)/sh2/include  -I$(GENDEV)/sh2/sdk/include
+FLAGS = -m2 -mb -O2 -Wall -g -fomit-frame-pointer -D_GCC_LIMITS_H_ $(INCS)
+
+all: $(libff.a_OBJS) libff.a
+
+%.a: $(libff.a_OBJS)
+	$(RM) $@
+	$(AR) cru $@ $($@_OBJS)
+	$(RANLIB) $@
+
+%.o: %.c
+	$(CC) $(FLAGS) -c $< -o $@
+
+clean:
+	$(RM) *.o *.a option/*.o
+
+install: all
+	mkdir -p $(GENDEV)/sh2/sdk
+	mkdir -p $(GENDEV)/sh2/sdk/include
+	mkdir -p $(GENDEV)/sh2/sdk/lib
+	cp ff.h $(GENDEV)/sh2/sdk/include
+	cp ffconf.h $(GENDEV)/sh2/sdk/include
+	cp integer.h $(GENDEV)/sh2/sdk/include
+	cp diskio.h $(GENDEV)/sh2/sdk/include
+	cp libff.a $(GENDEV)/sh2/sdk/lib
