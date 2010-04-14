@@ -148,6 +148,8 @@ InitData:
         .byte   0xdf
         .byte   0xff
 
+        .align  2
+
 | Note - the data section below MUST match that used when running from rom
 
 | put redirection vectors and gTicks at start of Work RAM
@@ -352,6 +354,8 @@ InitData:
         .byte   0xdf
         .byte   0xff
 
+        .align  2
+
 continue:
         tst.w    0x00C00004
 
@@ -439,7 +443,16 @@ _setup_md_myth:
         lea     0xA10000,a1
         move.w  #0x0000,RST_SEL(a1)
         move.w  #0x00FF,RST_IO(a1)
-
+        move.w  #0x00FF,CPLD_ID(a1)
+        cmpi.b  #0x63,0x300002
+        bne.b   0f
+        cmpi.b  #0x63,0x30000A
+        bne.b   0f
+        cmpi.b  #0x04,0x300000
+        bne.b   0f
+| V12 hardware
+        move.w  #0x0000,CPLD_ID(a1)
+0:
         move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
         move.w  #0x0000,GBAC_ZIO(a1)    /* clear bank size */
 

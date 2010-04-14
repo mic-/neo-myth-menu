@@ -3750,6 +3750,7 @@ void run_rom(int reset_mode)
         if (f_open(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
         {
             // couldn't open file
+            setStatusMessage("Couldn't open game file");
             path[eos] = 0;
             return;
         }

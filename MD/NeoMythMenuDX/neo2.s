@@ -274,6 +274,7 @@ FMReset:
         .byte   2,0xB6
         .byte   3,0x00
 
+        .align 2
 
 | clear screen
         .global clear_screen
@@ -1127,7 +1128,4 @@ neo2_recv_sd:
         move.l  (sp)+,d2
         rts
 
-        .align 2
-
         .text
-
