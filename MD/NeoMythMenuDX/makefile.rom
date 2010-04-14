@@ -1,0 +1,39 @@
+CC = $(GENDEV)/m68k/bin/gcc
+AS = $(GENDEV)/m68k/bin/as
+RM = rm -f
+OBJC = $(GENDEV)/m68k/bin/objcopy
+ASMZ80 = $(GENDEV)/bin/zasm
+BINTOC = $(GENDEV)/bin/bin2c
+
+OBJS = main.o neo2.o font.o disk_io.o rom_io.o deluxe/conf.o deluxe/utility.o deluxe/cheat.o deluxe/vgmplayer.o
+INC_OBJS = 
+
+OPTION = 
+INCS = -I$(GENDEV)/m68k/include -I$(GENDEV)/m68k/sdk/include -I.
+FLAGS = $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer $(INCS)
+#FLAGS = $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -Wno-return-type $(INCS)
+FLAGSZ80 = -vb2
+LIBS = -L$(GENDEV)/m68k/lib -L$(GENDEV)/m68k/sdk/lib -lff -lc -lgcc
+
+all: crt0_rom.o MDBIOS.BIN
+
+MDBIOS.BIN: MDBIOS.OUT
+	$(OBJC) --pad-to 524288 -O binary MDBIOS.OUT MDBIOS.BIN
+
+MDBIOS.OUT: $(OBJS) $(INC_OBJS) crt0_rom.o
+	$(CC) -T $(GENDEV)/m68k/lib/md-neo.ld -nostdlib crt0_rom.o $(OBJS) $(LIBS) $(INC_OBJS) -o MDBIOS.OUT
+
+%.o80: %.s80
+	$(ASMZ80) $(FLAGSZ80) -o $@ $<
+
+%.c: %.o80
+	$(BINTOC) $<
+
+%.o: %.c
+	$(CC) $(FLAGS) -c $< -o $@
+
+%.o: %.s
+	$(AS) -m68000 --register-prefix-optional $< -o $@
+
+clean:
+	$(RM) *.o deluxe/*.o *.a *.o80 *.out *.BIN *.bin *.OUT *.log
