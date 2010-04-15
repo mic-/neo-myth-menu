@@ -736,6 +736,7 @@ void get_sd_ips(int entry)
 
     if(!gSDFile.fsize)
     {
+		f_close(&gSDFile);
         ipsPath[0] = 0; // disable
         return;
     }
@@ -746,10 +747,12 @@ void get_sd_ips(int entry)
     ints_on();
     if(f_read(&gSDFile, pa, 5, &bytesWritten) != FR_OK)
     {
+		f_close(&gSDFile);
         ipsPath[0] = 0; // disable
         return;
     }
 
+	f_close(&gSDFile);
     ints_off();
     pa[6] = 0; // make sure null terminated
     if(strncasecmp((const char *)pa, "patch", 5) == 0)
