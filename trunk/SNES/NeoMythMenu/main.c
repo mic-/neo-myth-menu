@@ -5,6 +5,7 @@
 
 #include "snes.h"
 #include "dma.h"
+#include "hw_math.h"
 #include "lzss_decode.h"
 #include "myth.h"
 #include "neo2.h"
