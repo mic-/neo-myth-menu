@@ -242,9 +242,9 @@ WCHAR *lfnames = (WCHAR *)(0x400000 - MAX_ENTRIES * 512); /* space for long file
 
 unsigned char rtc[8];                   /* RTC from Neo2/3 flash cart */
 
-unsigned char rom_hdr[256];             /* rom header from selected rom (if loaded) */
+unsigned char __attribute__((aligned(16))) rom_hdr[256];             /* rom header from selected rom (if loaded) */
 
-unsigned char buffer[XFER_SIZE*2];      /* Work RAM buffer - big enough for SMD decoding */
+unsigned char __attribute__((aligned(16))) buffer[XFER_SIZE*2];      /* Work RAM buffer - big enough for SMD decoding */
 
 selEntry_t gSelections[MAX_ENTRIES];    /* entries for flash or current SD directory */
 
@@ -3831,6 +3831,7 @@ void run_rom(int reset_mode)
         else
         {
             int pstart = (gSelections[gCurEntry].run == 0x27) ? 0x700000 : 0;
+
             // copy file to myth psram
             copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
 
@@ -4330,18 +4331,22 @@ int main(void)
     ints_on();                     /* allow interrupts */
 
 	//inputBox((char*)buffer,"Enter cheat code","NNNN-NNNN",20,5,0x4000,0x2000,0x0,0x2000,10);
+
     // set long file name pointers
     for (ix=0; ix<MAX_ENTRIES; ix++)
+    {
         gSelections[ix].name = &lfnames[ix * 256];
+        lfnames[ix * 256] = (WCHAR)0;
+    }
 
 #ifndef RUN_IN_PSRAM
     {
         WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE];
 
-        c2wstrcpy(fss,"MDEBIOS.BIN");
-
         neo2_enable_sd();
         get_sd_directory(-1);           /* get root directory of sd card */
+
+        c2wstrcpy(fss,"MDEBIOS.BIN");
 
         for (ix=0; ix<gMaxEntry; ix++)
 		{

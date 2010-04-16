@@ -265,8 +265,6 @@ unsigned char crc7 (unsigned char *buf)
 	    r4 = (r4 >> 1) | (r4 << 31);
   	} while (--i > 0);
 
-	//crc = (crc << 1) | 1;
-
   return crc;
 }
 
@@ -312,14 +310,20 @@ void debugPrint( char *str ) __attribute__ ((section (".data")));
 void debugPrint( char *str )
 {
 	char temp[44];
+    static int dbgX = 0;
+    static int dbgY = 0;
 	neo2_post_sd();
 	snprintf(temp, 40, "%s", str);
-	gCursorX = 0;
-	gCursorY++;
-	if (gCursorY > 27)
-		gCursorY = 0;
+	gCursorX = dbgX;
+	gCursorY = dbgY;
+    dbgY++;
+	if (dbgY > 27)
+    {
+		dbgY = 0;
+        dbgX = (dbgX + 8) % 40;
+    }
 	put_str(temp, 0);
-	delay(60);
+	delay(20);
 	neo2_pre_sd();
 }
 
@@ -604,8 +608,6 @@ BOOL sdInit(void)
 #if 1
 	sendMmcCmd(9, (((rca>>8)&0xFF)<<24) | ((rca&0xFF)<<16) | 0xFFFF); // SEND_CSD
 	recvMmcCmdResp(sd_csd, R2_LEN, 1);
-#else
-    memset(sd_csd, 0, 17);
 #endif
 
 	sendMmcCmd(7, (((rca>>8)&0xFF)<<24) | ((rca&0xFF)<<16) | 0xFFFF); // SELECT_DESELECT_CARD
@@ -711,13 +713,8 @@ DRESULT MMC_disk_read (
 
 #if 0
     char temp[40];
-    sprintf(temp, "Read %d SD block(s) from %d", count, (int)sector);
-    gCursorX = 0;
-    gCursorY++;
-    if (gCursorY > 27)
-        gCursorY = 0;
-    put_str(temp, 0);
-    delay(60);
+    sprintf(temp, "%d:%d > %x", (int)sector, count, (unsigned int)buff);
+    debugPrint(temp);
 #endif
 
     if (count == 1)
@@ -732,6 +729,7 @@ DRESULT MMC_disk_read (
                 // read failed
                 neo2_post_sd();
                 sec_tags[ix] = 0xFFFFFFFF;
+                //debugPrint("Read failed!");
                 return RES_ERROR;
             }
             neo2_post_sd();
@@ -748,6 +746,7 @@ DRESULT MMC_disk_read (
             {
                 // read failed
                 neo2_post_sd();
+                //debugPrint("Read failed!");
                 return RES_ERROR;
             }
             neo2_post_sd();
