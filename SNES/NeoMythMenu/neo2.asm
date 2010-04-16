@@ -9,76 +9,6 @@
 
 .section ".text_neo2" superfree
 
-; Divide a 16-bit number by an 8-bit number and return the 16-bit quotient
-hw_div16_8_quot16:
-	sep	#$20
-	lda	4,s
-	sta.l 	$4204   	; Dividend low
-	lda 	5,s
-	sta.l 	$4205 		; Dividend high
-	lda 	6,s
-	sta.l 	$4206
-	nop			; Wait for the division to finish
-	nop			; ...
-	nop	
-	nop
-	nop
-	nop
-	nop
-	nop
-	rep	#$20
-	lda.l	$4214		; Quotient
-	sta.b 	tcc__r0		; Store return value
-	rtl
-	
-
-; Divide a 16-bit number by an 8-bit number and return the 16-bit remainder	
-hw_div16_8_rem16:
-	sep	#$20
-	lda	4,s
-	sta.l 	$4204   	; Dividend low
-	lda 	5,s
-	sta.l 	$4205 		; Dividend high
-	lda 	6,s
-	sta.l 	$4206
-	nop			; Wait for the division to finish
-	nop			; ...
-	nop	
-	nop
-	nop
-	nop
-	nop
-	nop
-	rep	#$20
-	lda.l	$4216		; Remainder
-	sta.b 	tcc__r0		; Store return value
-	rtl
-
-; Divide a 16-bit number by an 8-bit number and return the 8-bit quotient and 8-bit remainder
-hw_div16_8_quot8_rem8:
-	sep	#$20
-	lda	4,s
-	sta.l 	$4204   	; Dividend low
-	lda 	5,s
-	sta.l 	$4205 		; Dividend high
-	lda 	6,s
-	sta.l 	$4206
-	nop			; Wait for the division to finish
-	nop			; ...
-	nop	
-	nop
-	nop
-	nop
-	nop
-	nop
-	lda.l	$4216		; Remainder
-	xba			; put remainder in high byte
-	lda.l	$4214		; Quotient in low byte
-	rep	#$20
-	sta.b 	tcc__r0		; Store return value
-	rtl
-
-
 
 copy_ram_code:
 	php
@@ -253,11 +183,69 @@ CHEAT:
         RTL
         
 
+; Enable the mosaic effect for BG0 (the text layer), and slide the mosaic size up from 0 to
+; the maximum in 16 frames.
+mosaic_up:
+	php
+	rep	#$10
+	sep	#$20
+	ldx	#0
+-:
+	jsr.w	_wait_nmi
+	txa
+	asl	a
+	asl	a
+	asl	a
+	asl	a		; Mosaic size in d4-d7
+	ora	#1		; Enable effect for BG0
+	sta.l	REG_MOSAIC
+	inx
+	cpx	#$10
+	bne	-
+	plp
+	rtl
+
+
+; Enable the mosaic effect for BG0 (the text layer), and slide the mosaic size down from the maximum
+; to 0 in 16 frames.
+mosaic_down:
+	php
+	rep	#$10
+	sep	#$20
+	ldx	#14
+-:
+	jsr.w	_wait_nmi
+	txa
+	asl	a
+	asl	a
+	asl	a
+	asl	a		; Mosaic size in d4-d7
+	ora	#1		; Enable effect for BG0
+	sta.l	REG_MOSAIC
+	dex
+	bpl	-
+	plp
+	rtl
+	
+	
+_wait_nmi:
+	php
+	sep	#$20
+-:
+	lda.l	REG_RDNMI
+	bmi	-
+-:
+	lda.l	REG_RDNMI
+	bpl	-
+	plp
+	rts
+	
+	
 run_secondary_cart:
 	rep	#$30
 	phx
 
-	jsr.w	mosaic_up
+	jsl	mosaic_up + $7D0000
 	
 	jsl	clear_screen
 	
@@ -324,7 +312,7 @@ run_secondary_cart:
 	
 	jsl	dma_bg0_buffer
 
-	jsr.w	mosaic_down
+	jsl	mosaic_down + $7D0000
 	
 	; Wait until B or Y is pressed	
 -:
@@ -340,7 +328,7 @@ run_secondary_cart:
 	lda	#0
 	sep	#$20
 	sta.l	$00c017
-	jsr.w	mosaic_up
+	jsl	mosaic_up + $7D0000
 	rep	#$20
 	jsl	clear_screen
 	pea	0
@@ -352,7 +340,7 @@ run_secondary_cart:
 	jsl	print_hw_card_rev
 	jsl	print_games_list
 	jsl	dma_bg0_buffer
-	jsr.w	mosaic_down
+	jsl	mosaic_down + $7D0000
 	plx
 	rtl
 	
@@ -377,63 +365,6 @@ run_secondary_cart:
 	rtl
 	
 
-; Enable the mosaic effect for BG0 (the text layer), and slide the mosaic size up from 0 to
-; the maximum in 16 frames.
-mosaic_up:
-	php
-	rep	#$10
-	sep	#$20
-	ldx	#0
--:
-	jsr.w	_wait_nmi
-	txa
-	asl	a
-	asl	a
-	asl	a
-	asl	a		; Mosaic size in d4-d7
-	ora	#1		; Enable effect for BG0
-	sta.l	REG_MOSAIC
-	inx
-	cpx	#$10
-	bne	-
-	plp
-	rts
-
-
-; Enable the mosaic effect for BG0 (the text layer), and slide the mosaic size down from the maximum
-; to 0 in 16 frames.
-mosaic_down:
-	php
-	rep	#$10
-	sep	#$20
-	ldx	#14
--:
-	jsr.w	_wait_nmi
-	txa
-	asl	a
-	asl	a
-	asl	a
-	asl	a		; Mosaic size in d4-d7
-	ora	#1		; Enable effect for BG0
-	sta.l	REG_MOSAIC
-	dex
-	bpl	-
-	plp
-	rts
-	
-	
-_wait_nmi:
-	php
-	sep	#$20
--:
-	lda.l	REG_RDNMI
-	bmi	-
--:
-	lda.l	REG_RDNMI
-	bpl	-
-	plp
-	rts
-	
 	
 
 ; Updates and displays the "LOADING......(nn)" string 
@@ -510,7 +441,6 @@ show_loading_progress:
  
 	rts
  
-
          
 
 load_progress:
@@ -718,22 +648,22 @@ MOV_PSRAM_LOOP:
          INC    tcc__r2
          INC    tcc__r2+1
 
-	jsr	show_loading_progress
+	 jsr	show_loading_progress
 
 	 LDA	tcc__r1h
 	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$07		
 	 
          LDA    tcc__r2
-	sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$18	; First bank to write to
-	sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$1f	; ...
-	sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$26
-	sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$2d
-	sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$34
-	sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$3b 
-	sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$42 
-	sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$49 
-	ina
-	sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$54
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$18	; First bank to write to
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$1f	; ...
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$26
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$2d
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$34
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$3b 
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$42 
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$49 
+	 ina
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$54
 	
 
          DEC    tcc__r0+1
