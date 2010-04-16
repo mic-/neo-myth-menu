@@ -328,9 +328,6 @@ put_str:
 
         .align 2
 
-neo_mode:
-        .word   0
-
 | do a Neo Flash ASIC command
 | entry: d0 = Neo Flash ASIC command
 |        a1 = hardware base (0xA10000)
@@ -1127,5 +1124,10 @@ neo2_recv_sd:
         move.w  #0x0080,GBAC_LIO(a1)
         move.l  (sp)+,d2
         rts
+
+
+neo_mode:
+        .word   0
+
 
         .text
