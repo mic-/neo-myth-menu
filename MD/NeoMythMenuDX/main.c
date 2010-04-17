@@ -4402,6 +4402,16 @@ int main(void)
 //  neo_get_rtc(rtc);                   /* get current time from Neo2/3 flash cart */
 //  ints_on();                     /* enable interrupts */
 
+    //do some shady stuff
+    //ints_off(); /* disable interrupts */
+    //read flash
+    neo_copy_game(buffer, 0, 256);
+    //read flash entries
+    get_menu_flash();
+    //write psram
+    neo_copyto_myth_psram(buffer,0,256);
+    //ints_on(); /* enable interrupts */
+
 	ints_on();
 	clear_screen();
 	printToScreen("Loading cache & configuration...",(40 >> 1) - (strlen("Loading cache & configuration...") >>1),12,0x0000);
