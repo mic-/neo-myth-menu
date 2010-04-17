@@ -4328,9 +4328,7 @@ int main(void)
 #endif
     gCardType = *(short int *)0x00FFF0; /* get flash card type from menu flash */
 
-    ints_on();                     /* allow interrupts */
-
-	//inputBox((char*)buffer,"Enter cheat code","NNNN-NNNN",20,5,0x4000,0x2000,0x0,0x2000,10);
+    ints_on();                          /* allow interrupts */
 
     // set long file name pointers
     for (ix=0; ix<MAX_ENTRIES; ix++)
@@ -4362,55 +4360,9 @@ int main(void)
     }
 #endif
 
-#if 0
-    {
-        int ix;
-        UINT fbr = 0;
-        WCHAR fss[16];
-
-        c2wstrcpy(fss,"/sram.dump");
-
-        neo2_enable_sd();
-        get_sd_directory(-1);             /* get root directory of sd card */
-
-        f_close(&gSDFile);
-        if(f_open(&gSDFile, fss, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
-        {
-            debugText("Open failed!",2,10,0x2000);
-        }
-        else
-        {
-            debugText("Writing...",2,10,0x2000);
-            for (ix=0; ix<262144; ix+=XFER_SIZE)
-            {
-                ints_off();
-                neo_copyfrom_sram(buffer, ix, XFER_SIZE);
-                ints_on();
-                f_write(&gSDFile, buffer, XFER_SIZE, &fbr);
-            }
-            debugText(" done",12,10,0x2000);
-            f_close(&gSDFile);
-        }
-        neo2_disable_sd();
-    }
-#endif
-
-
-               /* starts in flash mode, so set gSelections from menu flash */
-
-//  ints_off();                     /* disable interrupts */
+//  ints_off();                         /* disable interrupts */
 //  neo_get_rtc(rtc);                   /* get current time from Neo2/3 flash cart */
-//  ints_on();                     /* enable interrupts */
-
-    //do some shady stuff
-    //ints_off(); /* disable interrupts */
-    //read flash
-    neo_copy_game(buffer, 0, 256);
-    //read flash entries
-    get_menu_flash();
-    //write psram
-    neo_copyto_myth_psram(buffer,0,256);
-    //ints_on(); /* enable interrupts */
+//  ints_on();                          /* enable interrupts */
 
 	ints_on();
 	clear_screen();
@@ -4423,7 +4375,7 @@ int main(void)
 	gManageSaves = 0;
 	gCurMode = MODE_SD;
 	neo2_enable_sd();
-	get_sd_directory(-1);             /* get root directory of sd card */
+	get_sd_directory(-1);               /* get root directory of sd card */
 	loadConfig();
 
 	{
@@ -4459,29 +4411,6 @@ int main(void)
 		}
 	}
 
-
-	/*FIL out; UINT fbr;
-	WCHAR outP[32];
-	c2wstrcpy(outP,"/DEBUG.TXT");
-
-	f_open(&out,outP , FA_CREATE_ALWAYS | FA_WRITE);
-
-	f_write(&out,config_getS("romName"),strlen(config_getS("romName")), &fbr);
-	f_write(&out,"\n",1, &fbr);
-	f_write(&out,config_getS("ipsPath"),strlen(config_getS("ipsPath")), &fbr);
-	f_write(&out,"\n",1, &fbr);
-	f_write(&out,config_getS("cheatsPath"),strlen(config_getS("cheatsPath")), &fbr);
-	f_write(&out,"\n",1, &fbr);
-	f_write(&out,config_getS("savesPath"),strlen(config_getS("savesPath")), &fbr);
-	f_write(&out,"\n",1, &fbr);
-	f_write(&out,config_getS("cachePath"),strlen(config_getS("cachePath")), &fbr);
-	f_write(&out,"\n",1, &fbr);
-
-	char sf[64];
-	sprintf(sf,"%d , %d \n",gSRAMSize,gSRAMBank);
-	f_write(&out,sf,strlen(sf), &fbr);
-	f_close(&out);*/
-
 	memcpy(gCacheBlock.sig,"DXCS",4);
 	gCacheBlock.sig[4] = '\0';
 	gCacheBlock.processed = 0;
@@ -4490,78 +4419,14 @@ int main(void)
 	cache_invalidate_pointers();
 
 	neo2_disable_sd();
-	gCurMode = MODE_FLASH;
 
 	ints_on();
 	printToScreen("Loading cache & configuration...OK",(40 >> 1) - (strlen("Loading cache & configuration...OK") >>1),12,0x2000);
 	delay(30);
 
+    /* starts in flash mode, so set gSelections from menu flash */
+	gCurMode = MODE_FLASH;
     get_menu_flash();
-
-#if 0
-    {
-        UINT fbr = 0;
-        char *text = "The quick brown fox jumped over the lazy hound dog.";
-        WCHAR fss[16];
-
-        c2wstrcpy(fss,"/test.txt");
-
-        neo2_enable_sd();
-        get_sd_directory(-1);             /* get root directory of sd card */
-
-        f_close(&gSDFile);
-        if(f_open(&gSDFile, fss, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
-        {
-            debugText("Open failed!",2,10,0x2000);
-        }
-        else
-        {
-            debugText("Writing...",2,10,0x2000);
-            f_write(&gSDFile, text, strlen(text), &fbr);
-            debugText(" done",2,10,0x2000);
-            f_close(&gSDFile);
-        }
-        while (1) ;
-    }
-#endif
-
-#if 0
-    {
-        int i, j, k = 2, l = 2;
-
-        // check 16 blocks of 16KB
-        for (j=0; j<16; j++)
-        {
-            int *p = (int *)buffer;
-            for (i=0; i<XFER_SIZE/4; i++)
-                p[i] = i + (j<<16);
-            ints_off();
-            neo_copyto_sram(buffer, j*XFER_SIZE, XFER_SIZE);
-            debugText("Wrote SRAM",l,k,0);
-            k++;
-            neo_copyfrom_sram(&buffer[XFER_SIZE], j*XFER_SIZE, XFER_SIZE);
-            debugText("Read SRAM",l,k,0);
-            k++;
-            ints_on();
-            if (memcmp(buffer, &buffer[XFER_SIZE], XFER_SIZE))
-            {
-                debugText("Compare failed!",l,k,0x4000);
-                k++;
-            }
-            else
-            {
-                debugText("Compare passed!",l,k,0x2000);
-                k++;
-            }
-            if (k > 23)
-            {
-                k = 2;
-                l += 16;
-            }
-            delay(60);
-        }
-    }
-#endif
 
     while(1)
     {

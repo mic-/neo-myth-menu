@@ -971,6 +971,7 @@ neo_copyfrom_myth_psram:
         .global neo_copyto_sram
 neo_copyto_sram:
         lea     0xA10000,a1
+        bsr     _neo_select_game        /* select Game Flash */
 
         move.l  #0x00E00000,d0
         move.l  8(sp),d1                /* sstart */
@@ -1004,6 +1005,7 @@ neo_copyto_sram:
         .global neo_copyfrom_sram
 neo_copyfrom_sram:
         lea     0xA10000,a1
+        bsr     _neo_select_game        /* select Game Flash */
 
         move.l  #0x00E00000,d0
         move.l  8(sp),d1                /* sstart */
