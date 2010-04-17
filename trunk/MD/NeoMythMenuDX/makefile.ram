@@ -5,7 +5,7 @@ OBJC = $(GENDEV)/m68k/bin/objcopy
 ASMZ80 = $(GENDEV)/bin/zasm
 BINTOC = $(GENDEV)/bin/bin2c
 
-OBJS = main.o neo2.o font.o disk_io.o rom_io.o deluxe/conf.o deluxe/utility.o deluxe/cheat.o deluxe/vgmplayer.o
+OBJS = main_ram.o neo2.o font.o disk_io.o rom_io.o deluxe/conf.o deluxe/utility.o deluxe/cheat.o deluxe/vgmplayer.o
 INC_OBJS = 
 
 OPTION = -DRUN_IN_PSRAM
@@ -30,6 +30,9 @@ MDEBIOS.OUT: $(OBJS) $(INC_OBJS) crt0_ram.o
 	$(BINTOC) $<
 
 %.o: %.c
+	$(CC) $(FLAGS) -c $< -o $@
+
+main_ram.o: main.c
 	$(CC) $(FLAGS) -c $< -o $@
 
 %.o: %.s
