@@ -3149,30 +3149,6 @@ void do_options(void)
     put_str("C", 0x4000);
     gCursorX = 19;
     put_str("=Call current option", 0);
-    /*gCursorX = 1;
-    gCursorY += 1;
-    put_str("START", 0x4000);
-    gCursorX += 5;
-    put_str("=SRAM Manager", 0);*/
-
-/*  gCursorY = 26;
-    gCursorX = 1;
-    put_str("Up", 0x4000);
-    gCursorX = 3;
-    put_str("=Prev", 0);
-    gCursorX = 9;
-    put_str("Dn", 0x4000);
-    gCursorX = 11;
-    put_str("=Next", 0);
-    gCursorX = 24;
-    put_str("Lt", 0x4000);
-    gCursorX = 26;
-    put_str("=Prev", 0);
-    gCursorX = 32;
-    put_str("Rt", 0x4000);
-    gCursorX = 34;
-    put_str("=Next", 0); */
-
 
     // insert options into gOptions array
     if (gSelections[gCurEntry].run < 7)
@@ -3325,35 +3301,27 @@ void do_options(void)
         {
             update = 0;
             gCursorY = 3;
-            for (ix=start; ix<end; ix++, gCursorY++)
+            for (ix=0; ix<PAGE_ENTRIES; ix++, gCursorY++)
             {
                 // erase line
                 gCursorX = 1;
                 put_str(gFEmptyLine, 0x2000);
-                // print current value
-
-                if(gOptions[ix].value != NULL)
-                    gCursorX = 20 - (strlen(gOptions[ix].name) + strlen(gOptions[ix].value) + 2)/2;
+                if (start + ix >= maxOptions)
+                    continue;   // past end, skip line
+                // put centered name
+                if(gOptions[start+ix].value != NULL)
+                    gCursorX = 20 - (strlen(gOptions[start+ix].name) + strlen(gOptions[start+ix].value) + 2)/2;
                 else
-                    gCursorX = 20 - (strlen(gOptions[ix].name) /2);
+                    gCursorX = 20 - (strlen(gOptions[start+ix].name) /2);
 
-                /*if(gOptions[ix].name)
+                put_str(gOptions[start+ix].name, ((start+ix) == currOption) ? 0x2000 : 0);
+                gCursorX += strlen(gOptions[start+ix].name);
+
+                if(gOptions[start+ix].value != NULL)
                 {
-                    if(gOptions[ix].name[0] == '\x82')
-                    {
-                        put_str(gOptions[ix].name,0x2000);
-                        continue;
-                    }
-                }*/
-
-                put_str(gOptions[ix].name, (ix == currOption) ? 0x2000 : 0);
-                gCursorX += strlen(gOptions[ix].name);
-
-                if(gOptions[ix].value != NULL)
-                {
-                    put_str(":", (ix == currOption) ? 0x2000 : 0);
+                    put_str(":", ((start+ix) == currOption) ? 0x2000 : 0);
                     gCursorX += 2;
-                    put_str(gOptions[ix].value, (ix == currOption) ? 0x2000 : 0);
+                    put_str(gOptions[start+ix].value, ((start+ix) == currOption) ? 0x2000 : 0);
                 }
             }
         }
@@ -3381,7 +3349,16 @@ void do_options(void)
                 // UP pressed, go one entry back
                 currOption--;
                 if (currOption < 0)
-                    currOption = maxOptions - 1;
+                {
+                    currOption = maxOptions - 1; // wrap around to bottom
+                    start = maxOptions - (maxOptions % PAGE_ENTRIES);
+                }
+                if (currOption < start)
+                {
+                    start -= PAGE_ENTRIES;
+                    if (start < 0)
+                        start = 0;
+                }
                 update = 1;
                 continue;
             }
@@ -3396,7 +3373,9 @@ void do_options(void)
                 // DOWN pressed, go one entry forward
                 currOption++;
                 if (currOption >= maxOptions)
-                    currOption = 0;
+                    currOption = start = 0; // wrap around to top
+                if ((currOption - start) >= PAGE_ENTRIES)
+                    start += PAGE_ENTRIES;
                 update = 1;
                 continue;
             }
