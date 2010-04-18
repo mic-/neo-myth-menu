@@ -1,8 +1,6 @@
 /* Neo Super 32X/MD/SMS Flash Cart Menu by Chilly Willy, based on Dr. Neo's Menu code */
 /* The license on this code is the same as the original menu code - MIT/X11 */
 
-#define INPUTBOX_FRAME_SKIP (4)
-
 #include <string.h>
 #include <stdio.h>
 
@@ -299,6 +297,8 @@ void run_rom(int reset_mode);
 
 int inputBox(char* result,const char* caption,const char* defaultText,short int  boxX,short int  boxY,
             short int  captionColor,short int boxColor,short int textColor,short int hlTextColor,short int maxChars);
+
+#define INPUTBOX_DELAY 6
 
 //macros
 
@@ -4027,7 +4027,6 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
     short int lines = 0;
     short int visPerLine = (x + len + 10) - 2;
     short int inputOffs;
-    int t1,t2;
 
     ints_on();
     clear_screen();
@@ -4074,10 +4073,6 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
         printToScreen(buf,cx,cy,textColor);
     }
 
-    len2 = strlen(defaultText);
-
-    x2 = boxX - (len2 >> 1);
-
     //Fill rect
     for(i = x - 10; i < x + len + 10; i++)
     {
@@ -4101,10 +4096,12 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
     cursorAbsoluteOffset = 0;
     lastCursorAbsoluteOffset = 0;
 
+    len2 = strlen(defaultText);
     if(len2 < maxChars)
         i = len2;
     else
         i = maxChars;
+    x2 = (40 - i) >> 1;
 
     inputOffs = i;
     memset(buf,'\0',maxChars);
@@ -4116,25 +4113,19 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
     printToScreen("C",19 + 5,y + 17,0); printToScreen("=Cancel",20 + 5,y + 17,0x4000);
     printToScreen("START",14,y + 18,0); printToScreen("=Submit",19,y + 18,0x4000);
 
-    t1 = t2 = 0;
-
     while(1)
     {
-        t1 = gTicks;
-
-        if(t2 > t1)
-            continue;
-
-        t2 = t1 + INPUTBOX_FRAME_SKIP;
+        delay(INPUTBOX_DELAY);
 
         if(sync)
         {
             sync = 0;
 
-            printToScreen(buf,x2,y + 4,textColor);
+            printToScreen(gEmptyLine,1,y+4,0);
+            printToScreen(buf,(40 - strlen(buf)) >> 1,y + 4,textColor);
 
             if(inputOffs < maxChars)
-                printToScreen("_",x2 + inputOffs,y + 4,0x4000);
+                printToScreen("_",(40 + inputOffs) >> 1,y + 4,0x4000);
 
             if(cursorAbsoluteOffset-lastCursorAbsoluteOffset)
             {
@@ -4148,11 +4139,8 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
             in[0] = chars[cursorZ * (numChars >> 1) + (1 * cursorAbsoluteOffset)];
             in[1] = '\0';
             printToScreen(in,cursorX + (1 * cursorAbsoluteOffset),cursorY + cursorZ,hlTextColor);
-
-            //delay(6);
         }
 
-        //delay(2);
         buttons = get_pad(0);
         if ((buttons & SEGA_CTRL_TYPE) == SEGA_CTRL_NONE)
         {
@@ -4185,7 +4173,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
                     buf[--inputOffs] = '\0';
 
                 continue;
-            }//B
+            }
 
             if ((changed & SEGA_CTRL_C) && (buttons & SEGA_CTRL_C))//cancel
                 return 0;
@@ -4207,12 +4195,15 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
                 buf[inputOffs] = '\0';
 
                 continue;
-            }//A
+            }
 
             if ((changed & SEGA_CTRL_START) && (buttons & SEGA_CTRL_START))//start
                 break;
+        }
 
-            if ((changed & SEGA_CTRL_UP) && (buttons & SEGA_CTRL_UP))
+        // always check dpad, not just when changed
+        {
+            if (buttons & SEGA_CTRL_UP)
             {
                 sync = 1;
 
@@ -4235,7 +4226,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
                 continue;
             }//up
 
-            if ((changed & SEGA_CTRL_DOWN) && (buttons & SEGA_CTRL_DOWN))
+            if (buttons & SEGA_CTRL_DOWN)
             {
                 sync = 1;
 
@@ -4257,7 +4248,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
                 continue;
             }//down
 
-            if ((changed & SEGA_CTRL_LEFT) && (buttons & SEGA_CTRL_LEFT))
+            if (buttons & SEGA_CTRL_LEFT)
             {
                 sync = 1;
 
@@ -4282,7 +4273,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
                 continue;
             }//left
 
-            if ((changed & SEGA_CTRL_RIGHT) && (buttons & SEGA_CTRL_RIGHT))
+            if (buttons & SEGA_CTRL_RIGHT)
             {
                 sync = 1;
 
