@@ -31,8 +31,8 @@ unsigned int num_sectors;
 
 #define CACHE_SIZE 16					/* number sectors in cache */
 unsigned int sec_tags[CACHE_SIZE];
-unsigned char sec_cache[CACHE_SIZE*512 + 8];
-unsigned char sec_buf[520];				/* for uncached reads */
+unsigned char __attribute__((aligned(16))) sec_cache[CACHE_SIZE*512 + 8];
+unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads */
 
 #define R1_LEN (48/8)
 #define	R2_LEN (136/8)
@@ -726,11 +726,15 @@ DRESULT MMC_disk_read (
             neo2_pre_sd();
             if (!sdReadSingleBlock(&sec_cache[ix*512], sector << ((cardType & 1) ? 0 : 9)))
             {
-                // read failed
-                neo2_post_sd();
-                sec_tags[ix] = 0xFFFFFFFF;
-                //debugPrint("Read failed!");
-                return RES_ERROR;
+                // read failed, retry once
+                if (!sdReadSingleBlock(&sec_cache[ix*512], sector << ((cardType & 1) ? 0 : 9)))
+                {
+                    // read failed
+                    neo2_post_sd();
+                    sec_tags[ix] = 0xFFFFFFFF;
+                    //debugPrint("Read failed!");
+                    return RES_ERROR;
+                }
             }
             neo2_post_sd();
             sec_tags[ix] = sector;
@@ -744,10 +748,14 @@ DRESULT MMC_disk_read (
             neo2_pre_sd();
             if (!sdReadSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
             {
-                // read failed
-                neo2_post_sd();
-                //debugPrint("Read failed!");
-                return RES_ERROR;
+                // read failed, retry once
+                if (!sdReadSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
+                {
+                    // read failed
+                    neo2_post_sd();
+                    //debugPrint("Read failed!");
+                    return RES_ERROR;
+                }
             }
             neo2_post_sd();
             memcpy((void *)((unsigned int)buff + ix*512), sec_buf, 512);
@@ -805,9 +813,12 @@ DRESULT MMC_disk_write (
         neo2_pre_sd();
         if (!sdWriteSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
         {
-            // write failed
-            neo2_post_sd();
-            return RES_ERROR;
+            // write failed, retry once
+            if (!sdWriteSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
+            {
+                neo2_post_sd();
+                return RES_ERROR;
+            }
         }
         neo2_post_sd();
     }
