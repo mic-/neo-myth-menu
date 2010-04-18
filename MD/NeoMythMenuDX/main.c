@@ -1976,19 +1976,19 @@ int cache_process()
     unsigned int a = 0 , b = 0;
     short int i;
 
-	if(gSelections[gCurEntry].type == 128)//dir
+	if(gSelections[gCurEntry].type == 128) //dir
 		return 0;
-	else if(gSelections[gCurEntry].type == 127)//Uknown
+	else if(gSelections[gCurEntry].type == 127) //Uknown
 		return 0;
 
-    if(rom_hdr[0] == 0xFF)
+    if((rom_hdr[0] == 0xFF) && (rom_hdr[1] != 0x04))
 	{
 		setStatusMessage("Fetching header...");
 		get_sd_info(gCurEntry);
 		clearStatusMessage();
 
-		if(rom_hdr[0] == 0xFF)//bad!
-        return 0;
+		if((rom_hdr[0] == 0xFF) && (rom_hdr[1] != 0x04)) //bad!
+            return 0;
 	}
 
     clear_screen();
@@ -2011,6 +2011,8 @@ int cache_process()
     else
 			gSRAMSize = (short int)(( (b-a+2) / 1024) / 8);
 	}
+    if((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04))
+        gSRAMSize = 16; // BRAM file
 		
 	gSRAMType = 0x0000;
 
@@ -3188,6 +3190,36 @@ void do_options(void)
             gOptions[maxOptions].value = "Off";
 
         gOptions[maxOptions].callback = &toggleYM2413;
+        gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
+        maxOptions++;
+    }
+    else if ((gSelections[gCurEntry].run == 9) || (gSelections[gCurEntry].run == 10))
+    {
+        // options for BRAM or CDBIOS+BRAM
+        gOptions[maxOptions].exclusiveFCall = 0;
+        gOptions[maxOptions].name = "Reset Mode";
+
+        if(gResetMode == 0x0000)
+            gOptions[maxOptions].value = "Reset to Menu";
+        else
+            gOptions[maxOptions].value = "Reset to Game";
+
+        gOptions[maxOptions].callback = &toggleResetMode;
+        gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
+        maxOptions++;
+
+        gOptions[maxOptions].exclusiveFCall = 0;
+        sprintf(gSRAMBankStr, "%d", gSRAMBank);
+        gOptions[maxOptions].name = "Save RAM Bank";
+        gOptions[maxOptions].value = gSRAMBankStr;
+        gOptions[maxOptions].callback = &incSaveRAMBank;
+        gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
+        maxOptions++;
+
+        gOptions[maxOptions].exclusiveFCall = 1; //Exclusive function! jump back to source caller
+        gOptions[maxOptions].name = "Save RAM Manager";
+        gOptions[maxOptions].value = NULL;
+        gOptions[maxOptions].callback = &runSRAMMgr;
         gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
         maxOptions++;
     }
@@ -4408,7 +4440,7 @@ int main(void)
             // decrement time to try loading rom header
             gRomDly--;
             if (gRomDly)
-                rom_hdr[0] = 0xFF;
+                rom_hdr[0] = rom_hdr[1] = 0xFF;
             else
                 gUpdate = 1;            /* minor update - load rom header */
         }
