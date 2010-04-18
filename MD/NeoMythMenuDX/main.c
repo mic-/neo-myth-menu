@@ -70,6 +70,8 @@ static const char* EEPROM_MAPPERS[EEPROM_MAPPERS_COUNT] =  //shared from genplus
 
 #define XFER_SIZE 16384
 
+#define OPTION_ENTRIES 30               /* two screen's worth for now */
+
 /*Save manager service status*/
 enum
 {
@@ -78,10 +80,10 @@ enum
 };
 
 /*For the GG/Hex cheats*/
+#define CHEAT_ENTRIES_COUNT (OPTION_ENTRIES - 6)
+#define CHEAT_SUBPAIR_COUNT 12          //12 pairs per entry
 enum
 {
-	CHEAT_ENTRIES_COUNT = 10, //10 entries max for now
-	CHEAT_SUBPAIR_COUNT = 12, //12 pairs per entry
 	CT_NULL = 0xF,//null cheat entry
 	CT_MASTER = 0x1,//master code!
 	CT_REGION,//Will trigger all master codes
@@ -207,8 +209,6 @@ typedef struct {
     void* userData;                     /* added for cheat support*/
     short exclusiveFCall;               /* required for the new exclusive function calls */
 } optionEntry;
-
-#define OPTION_ENTRIES (15 * 2)               /* one screen's worth for now */
 
 #define WORK_RAM_SIZE (XFER_SIZE*2)
 
