@@ -973,6 +973,10 @@ neo_copyto_sram:
         lea     0xA10000,a1
         bsr     _neo_select_game        /* select Game Flash */
 
+        move.w  #0x0000,GBAC_LIO(a1)    /* clear low bank select reg */
+        move.w  #0x0000,GBAC_HIO(a1)    /* clear high bank select reg */
+        move.w  #0x00F8,GBAC_ZIO(a1)    /* bank size = 1MB */
+
         move.l  #0x00E00000,d0
         move.l  8(sp),d1                /* sstart */
         swap    d1
@@ -1006,6 +1010,10 @@ neo_copyto_sram:
 neo_copyfrom_sram:
         lea     0xA10000,a1
         bsr     _neo_select_game        /* select Game Flash */
+
+        move.w  #0x0000,GBAC_LIO(a1)    /* clear low bank select reg */
+        move.w  #0x0000,GBAC_HIO(a1)    /* clear high bank select reg */
+        move.w  #0x00F8,GBAC_ZIO(a1)    /* bank size = 1MB */
 
         move.l  #0x00E00000,d0
         move.l  8(sp),d1                /* sstart */
