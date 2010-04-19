@@ -2011,11 +2011,11 @@ int cache_process()
 
 	gSRAMSize = 0;
 
-    if(b-a)
+    if((b-a) > 2)
 	{
 		if(b-a +2 <= 8192)
 			gSRAMSize = 1;
-    else
+    	else
 			gSRAMSize = (short int)(( (b-a+2) / 1024) / 8);
 	}
 
