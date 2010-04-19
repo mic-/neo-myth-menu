@@ -1137,6 +1137,8 @@ void get_sd_directory(int entry)
             break;                      /* no more entries in directory (or some other error) */
         if (fno.fname[0] == '.')
             continue;                   /* skip links */
+        if (fno.lfname[0] == (WCHAR)'.')
+            continue;                   /* skip "hidden" files and directories */
 
         if (fno.fattrib & AM_DIR)
         {
@@ -1672,6 +1674,9 @@ void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(u
         (dst)(&buffer[gFileType ? XFER_SIZE : 0], doffset + iy, XFER_SIZE);
         update_progress(str1, str2, iy, length);
     }
+    memset(buffer, 0x00, XFER_SIZE);
+    for (iy=length; iy<(length + 0x020000); iy+=XFER_SIZE)
+        (dst)(buffer, doffset + iy, XFER_SIZE);
 }
 
 void toggleResetMode(int index)
@@ -3498,6 +3503,9 @@ void do_options(void)
                         //int ix;
                         // copy flash to myth psram
                         copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
+                        // check for raw S&K
+                        if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
+                            fsize = 0x300000;
                         // do patch callbacks
                         //for (ix=0; ix<maxOptions; ix++)
                         //  if (gOptions[ix].patch)
@@ -3537,6 +3545,10 @@ void do_options(void)
                     {
                         // copy file to flash cart psram
                         copyGame(&neo_copyto_psram, &neo_copy_sd, 0, 0, fsize, "Loading ", temp);
+
+                        // check for raw S&K
+                        if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
+                            fsize = 0x300000;
 
                         if(gManageSaves)
                         {
@@ -3736,6 +3748,9 @@ void run_rom(int reset_mode)
             int pstart = (gSelections[gCurEntry].run == 0x27) ? 0x700000 : 0;
             // copy flash to myth psram
             copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
+            // check for raw S&K
+            if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
+                fsize = 0x300000;
             neo_run_myth_psram(fsize, bbank, bsize, gSelections[gCurEntry].run); // never returns
         }
     }
@@ -3881,6 +3896,10 @@ void run_rom(int reset_mode)
 
             // copy file to myth psram
             copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
+
+            // check for raw S&K
+            if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
+                fsize = 0x300000;
 
             if(gManageSaves)
             {
