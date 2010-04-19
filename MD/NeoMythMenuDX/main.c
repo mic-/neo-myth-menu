@@ -2028,7 +2028,7 @@ int cache_process()
         //intense scan
         for(i = 0; i < EEPROM_MAPPERS_COUNT; i++)
         {
-            if(!memcmp(rom_hdr + 0x80,EEPROM_MAPPERS[i],strlen(EEPROM_MAPPERS[i])))
+            if(!memcmp(rom_hdr + 0x83,EEPROM_MAPPERS[i],strlen(EEPROM_MAPPERS[i])))
             {
                 gSRAMType = 0x0001;
                 break;
