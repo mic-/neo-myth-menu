@@ -2011,31 +2011,39 @@ int cache_process()
 
 	gSRAMSize = 0;
 
-    if((b-a) > 2)
+	if(b-a == 1)
 	{
-		if(b-a +2 <= 8192)
-			gSRAMSize = 1;
-    	else
-			gSRAMSize = (short int)(( (b-a+2) / 1024) / 8);
+		gSRAMType = 0;
+		gSRAMSize = 0;
 	}
+	else
+	{
+		if((b-a) > 2)
+		{
+			if(b-a +2 <= 8192)
+				gSRAMSize = 1;
+			else
+				gSRAMSize = (short int)(( (b-a+2) / 1024) / 8);
+		}
 
-    if((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04))
-        gSRAMSize = 16; // BRAM file
+		if((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04))
+		    gSRAMSize = 16; // BRAM file
 		
-	gSRAMType = 0x0000;
+		gSRAMType = 0x0000;
 
-    if(!gSRAMSize)//check for eeprom
-    {
-        //intense scan
-        for(i = 0; i < EEPROM_MAPPERS_COUNT; i++)
-        {
-            if(!memcmp(rom_hdr + 0x83,EEPROM_MAPPERS[i],strlen(EEPROM_MAPPERS[i])))
-            {
-                gSRAMType = 0x0001;
-                break;
-            }
-        }
-    }
+		if(!gSRAMSize)//check for eeprom
+		{
+		    //intense scan
+		    for(i = 0; i < EEPROM_MAPPERS_COUNT; i++)
+		    {
+		        if(!memcmp(rom_hdr + 0x83,EEPROM_MAPPERS[i],strlen(EEPROM_MAPPERS[i])))
+		        {
+		            gSRAMType = 0x0001;
+		            break;
+		        }
+		    }
+		}
+	}
 
     sprintf(gSRAMBankStr, "%d", gSRAMBank);
     sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
