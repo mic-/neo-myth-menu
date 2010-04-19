@@ -2013,7 +2013,7 @@ int cache_process()
 
 	if(b-a == 1)
 	{
-		gSRAMType = 0;
+		gSRAMType = 0x0001;
 		gSRAMSize = 0;
 	}
 	else
