@@ -3503,13 +3503,16 @@ void do_options(void)
                         //int ix;
                         // copy flash to myth psram
                         copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
+ 
                         // check for raw S&K
                         if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
                             fsize = 0x300000;
+
                         // do patch callbacks
-                        //for (ix=0; ix<maxOptions; ix++)
-                        //  if (gOptions[ix].patch)
-                        //      (gOptions[ix].patch)(ix);
+                        for (ix=0; ix<maxOptions; ix++)
+                          if (gOptions[ix].patch)
+                              (gOptions[ix].patch)(ix);
+ 
                         neo_run_myth_psram(fsize, bbank, bsize, runmode); // never returns
                     }
                 }
@@ -3546,10 +3549,6 @@ void do_options(void)
                         // copy file to flash cart psram
                         copyGame(&neo_copyto_psram, &neo_copy_sd, 0, 0, fsize, "Loading ", temp);
 
-                        // check for raw S&K
-                        if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
-                            fsize = 0x300000;
-
                         if(gManageSaves)
                         {
                             f_close(&gSDFile);
@@ -3575,6 +3574,10 @@ void do_options(void)
                         //int ix;
                         // copy file to myth psram
                         copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
+
+                        // check for raw S&K
+                        if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
+                            fsize = 0x300000;
 
                         gSelectionSize = fsize;
                         // do patch callbacks
@@ -3748,9 +3751,11 @@ void run_rom(int reset_mode)
             int pstart = (gSelections[gCurEntry].run == 0x27) ? 0x700000 : 0;
             // copy flash to myth psram
             copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
+
             // check for raw S&K
             if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
                 fsize = 0x300000;
+
             neo_run_myth_psram(fsize, bbank, bsize, gSelections[gCurEntry].run); // never returns
         }
     }
