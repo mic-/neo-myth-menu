@@ -18,9 +18,10 @@
 #define max(x,y) (((x)>(y))?(x):(y))
 
 /*tables*/
-#define EEPROM_MAPPERS_COUNT (25)
+#define EEPROM_MAPPERS_COUNT (26)
 static const char* EEPROM_MAPPERS[EEPROM_MAPPERS_COUNT] =  //shared from genplus gx
 {
+	"T-8104B",//new - nba jam 32x
 	"T-120106",
 	"T-50176",
 	"T-50396",
