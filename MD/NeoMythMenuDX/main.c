@@ -122,12 +122,24 @@ static CacheBlock gCacheBlock;/*common cache block*/
 
 static CheatEntry cheatEntries[CHEAT_ENTRIES_COUNT];
 static short registeredCheatEntries = 0;
-static char* CHEATS_DIR = "cheats";
-static char* IPS_DIR = "ips";
-static char* SAVES_DIR  = "saves";
-static char* CACHE_DIR  = "cache";
-static char* MD_32X_SAVE_EXT = ".srm";
-static char* SMS_SAVE_EXT = ".ssm";
+
+#define dxconf_cfg "/.menu/md/DXCONF.CFG"
+
+#define cheats_dir_default ".menu/md/cheats"
+#define ips_dir_default ".menu/md/ips"
+#define saves_dir_default ".menu/md/saves"
+#define cache_dir_default ".menu/md/cache"
+#define md_32x_save_ext_default ".srm"
+#define sms_save_ext_default ".ssm"
+#define brm_save_ext_default ".brm"
+
+static char* CHEATS_DIR = cheats_dir_default;
+static char* IPS_DIR = ips_dir_default;
+static char* SAVES_DIR = saves_dir_default;
+static char* CACHE_DIR = cache_dir_default;
+static char* MD_32X_SAVE_EXT = md_32x_save_ext_default;
+static char* SMS_SAVE_EXT = sms_save_ext_default;
+static char* BRM_SAVE_EXT = brm_save_ext_default;
 
 static short int gManageSaves = 0;
 static short int gSRAMgrServiceStatus = SMGR_STATUS_NULL;
@@ -335,12 +347,37 @@ inline int fileExists(const XCHAR* fss)
     return 1;
 }
 
+int wstrlen(const WCHAR *ws);
+
+void MakeDir(XCHAR*path)
+{
+    XCHAR X;
+    int i,l;
+    i=0;
+    l=wstrlen(path);
+    while(i<l)
+    {
+        while(i<l && path[i]!='/')
+        {
+            i++;
+        }
+        X=path[i];
+        path[i]=0;
+        if(!directoryExists(path))
+        {
+            f_mkdir(path);
+        }
+        path[i]=X;
+        i++;
+    }
+}
+
 inline int createDirectory(const XCHAR* fps)
 {
     if(directoryExists(fps))
         return 1;
 
-    f_mkdir(fps);
+    MakeDir(fps);
 
     return directoryExists(fps);
 }
@@ -530,7 +567,7 @@ int wstrcmp(WCHAR *ws1, WCHAR *ws2)
     return (int)ws1[ix] - (int)ws2[ix];
 }
 
-int wstrlen(WCHAR *ws)
+int wstrlen(const WCHAR *ws)
 {
     int ix = 0;
     while (ws[ix]) ix++;
@@ -1017,7 +1054,7 @@ void get_sd_info(int entry)
     }
     else
     {
-        if ((jump[3] == 0x88) || (jump[3] == 0x90))
+        if((jump[0x0]!=0)&&((jump[0x3]==0x88)||(jump[0x3]==0x90)||(jump[0x3]==0x91)||(memcmp(rom_hdr+0x20,"MARS SAMPLE PROGRAM",19)==0)))
         {
             gSelections[entry].type = 1; // 32X
             gSelections[entry].run = 3;
@@ -2301,7 +2338,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
         }
         else*/
         {
-            c2wstrcat(fnbuf,".brm");//or .crm
+            c2wstrcat(fnbuf,BRM_SAVE_EXT);//or .crm
         }
     }
     else
@@ -2402,7 +2439,7 @@ void sram_mgr_restoreGame(int index)
         }
         else
         {
-            c2wstrcat(fnbuf,".brm");//or .crm
+            c2wstrcat(fnbuf,BRM_SAVE_EXT);//or .crm
         }
     }
     else
@@ -3945,7 +3982,7 @@ void updateConfig()
         return;
     }
 
-    c2wstrcpy(fss,"/DXCONF.CFG");
+    c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
 	deleteFile(fss);
@@ -3973,11 +4010,17 @@ void loadConfig()
 
     setStatusMessage("Reading config...");
     ints_on();
-    CHEATS_DIR = "cheats"; IPS_DIR = "ips"; SAVES_DIR = "saves";
-    CACHE_DIR = "cache"; MD_32X_SAVE_EXT = ".srm"; SMS_SAVE_EXT = ".ssm";
+    CHEATS_DIR = cheats_dir_default;
+    IPS_DIR = ips_dir_default;
+    SAVES_DIR = saves_dir_default;
+    CACHE_DIR = cache_dir_default;
+    MD_32X_SAVE_EXT = md_32x_save_ext_default;
+    SMS_SAVE_EXT = sms_save_ext_default;
+    BRM_SAVE_EXT = brm_save_ext_default;
 
     config_init();
-    c2wstrcpy(fss,"/DXCONF.CFG");
+	c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
+    c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
 
@@ -3999,6 +4042,12 @@ void loadConfig()
             CACHE_DIR = config_getS("cachePath");
             MD_32X_SAVE_EXT = config_getS("md32xSaveExt");
             SMS_SAVE_EXT = config_getS("smsSaveExt");
+            BRM_SAVE_EXT = config_getS("brmSaveExt");
+
+            if(CHEATS_DIR[0]=='/')CHEATS_DIR++;
+            if(IPS_DIR[0]=='/')IPS_DIR++;
+            if(SAVES_DIR[0]=='/')SAVES_DIR++;
+            if(CACHE_DIR[0]=='/')CACHE_DIR++;
         }
 
         f_close(&gSDFile);
@@ -4007,12 +4056,13 @@ void loadConfig()
     }
     else
     {
-        config_push("ipsPath","ips");
-        config_push("cheatsPath","cheats");
-        config_push("savesPath","saves");
-        config_push("cachePath","cache");
-        config_push("md32xSaveExt",".srm");
-        config_push("smsSaveExt",".ssm");
+        config_push("ipsPath",ips_dir_default);
+        config_push("cheatsPath",cheats_dir_default);
+        config_push("savesPath",saves_dir_default);
+        config_push("cachePath",cache_dir_default);
+        config_push("md32xSaveExt",md_32x_save_ext_default);
+        config_push("smsSaveExt",sms_save_ext_default);
+        config_push("brmSaveExt",brm_save_ext_default);
         config_push("romName","*");
 
         if(f_open(&gSDFile, fss, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
@@ -4032,38 +4082,44 @@ void loadConfig()
 	//BAd config? - fix it
 	if(!CHEATS_DIR)
 	{
-		CHEATS_DIR = "cheats"; 
-		config_push("cheatsPath","cheats");
+		CHEATS_DIR = cheats_dir_default; 
+		config_push("cheatsPath",cheats_dir_default);
 	}
 
 	if(!IPS_DIR)
 	{
-		IPS_DIR = "ips";
-		config_push("ipsPath","ips");
+		IPS_DIR = ips_dir_default;
+		config_push("ipsPath",ips_dir_default);
 	}
 
 	if(!SAVES_DIR)
 	{
-		SAVES_DIR = "saves"; 
- 		config_push("savesPath","saves");
+		SAVES_DIR = saves_dir_default; 
+ 		config_push("savesPath",saves_dir_default);
 	}
 
 	if(!CACHE_DIR)
 	{
-		CACHE_DIR = "cache"; 
-		config_push("cachePath","cache");
+		CACHE_DIR = cache_dir_default; 
+		config_push("cachePath",cache_dir_default);
 	}
 
 	if(!MD_32X_SAVE_EXT)
 	{
-		MD_32X_SAVE_EXT = ".srm";
-		config_push("md32xSaveExt",".srm");
+		MD_32X_SAVE_EXT = md_32x_save_ext_default;
+		config_push("md32xSaveExt",md_32x_save_ext_default);
 	}
 
 	if(!SMS_SAVE_EXT)
 	{
-		SMS_SAVE_EXT = ".ssm";
-		config_push("smsSaveExt",".ssm");
+		SMS_SAVE_EXT = sms_save_ext_default;
+		config_push("smsSaveExt",sms_save_ext_default);
+	}
+
+	if(!BRM_SAVE_EXT)
+	{
+		BRM_SAVE_EXT = brm_save_ext_default;
+		config_push("brmSaveExt",brm_save_ext_default);
 	}
 
 	WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE + 24];
@@ -4408,16 +4464,21 @@ int main(void)
         neo2_enable_sd();
         get_sd_directory(-1);           /* get root directory of sd card */
 
-        c2wstrcpy(fss,"MDEBIOS.BIN");
-
-        for (ix=0; ix<gMaxEntry; ix++)
-		{
-            if (!wstrcmp(fss, gSelections[ix].name))
-            {
-                gCurEntry = ix;
-                gCurMode = MODE_SD;
-                run_rom(0x0000);        /* never returns */
-            }
+        c2wstrcpy(fss, "/.menu/md/MDEBIOS.BIN");
+        if(f_open(&gSDFile, fss, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+        {
+            gCurEntry = 0;
+            c2wstrcpy(path, "/.menu/md");
+            c2wstrcpy(gSelections[gCurEntry].name, "MDEBIOS.BIN");
+            gSelections[gCurEntry].type = 0;
+            gSelections[gCurEntry].bbank = 0;
+            gSelections[gCurEntry].bsize = 0;
+            gSelections[gCurEntry].offset = 0;
+            gSelections[gCurEntry].length = gSDFile.fsize;
+            gSelections[gCurEntry].run = 0x27;
+            f_close(&gSDFile);
+            gCurMode = MODE_SD;
+            run_rom(0x0000);        /* never returns */
 		}
 
         neo2_disable_sd();
