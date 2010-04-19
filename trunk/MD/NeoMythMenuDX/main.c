@@ -1981,6 +1981,9 @@ int cache_process()
 	else if(gSelections[gCurEntry].type == 127) //Uknown
 		return 0;
 
+	if(gSelections[gCurEntry].run == 0x27)
+		return 0;
+
     if((rom_hdr[0] == 0xFF) && (rom_hdr[1] != 0x04))
 	{
 		setStatusMessage("Fetching header...");
@@ -1989,6 +1992,9 @@ int cache_process()
 
 		if((rom_hdr[0] == 0xFF) && (rom_hdr[1] != 0x04)) //bad!
             return 0;
+
+		if(gSelections[gCurEntry].run == 0x27)
+			return 0;
 	}
 
     clear_screen();
@@ -2011,6 +2017,7 @@ int cache_process()
     else
 			gSRAMSize = (short int)(( (b-a+2) / 1024) / 8);
 	}
+
     if((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04))
         gSRAMSize = 16; // BRAM file
 		
@@ -2046,6 +2053,12 @@ void cache_loadPA(WCHAR* sss)
 
     if(gCurMode != MODE_SD)
         return;
+
+	if(*get_file_ext(sss) != '.')
+		return;
+
+	if(gSelections[gCurEntry].run == 0x27)
+		return;
 
     setStatusMessage("Reading cache...");
 	memset(fnbuf,0,512);
@@ -2112,6 +2125,14 @@ void cache_loadPA(WCHAR* sss)
 
 void cache_load()
 {
+	if(gSelections[gCurEntry].type == 128) //dir
+		return;
+	else if(gSelections[gCurEntry].type == 127) //Uknown
+		return;
+
+	if(gSelections[gCurEntry].run == 0x27)
+		return;
+
     cache_loadPA(gSelections[gCurEntry].name);
 }
 
@@ -2122,6 +2143,12 @@ void cache_sync()
 
     if(gCurMode != MODE_SD)
         return;
+
+	if(*get_file_ext(gSelections[gCurEntry].name) != '.')
+		return;
+
+	if(gSelections[gCurEntry].run == 0x27)
+		return;
 
     ints_on();
 	memset(fnbuf,0,512);
@@ -3888,6 +3915,8 @@ void updateConfig()
     c2wstrcpy(fss,"/DXCONF.CFG");
 
     f_close(&gSDFile);
+	deleteFile(fss);
+
     if(f_open(&gSDFile, fss, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
     {
         clearStatusMessage();
@@ -3977,31 +4006,31 @@ void loadConfig()
 	if(!IPS_DIR)
 	{
 		IPS_DIR = "ips";
-        config_push("ipsPath","ips");
+		config_push("ipsPath","ips");
 	}
 
 	if(!SAVES_DIR)
 	{
 		SAVES_DIR = "saves"; 
-        config_push("savesPath","saves");
+ 		config_push("savesPath","saves");
 	}
 
 	if(!CACHE_DIR)
 	{
 		CACHE_DIR = "cache"; 
-        config_push("cachePath","cache");
+		config_push("cachePath","cache");
 	}
 
 	if(!MD_32X_SAVE_EXT)
 	{
 		MD_32X_SAVE_EXT = ".srm";
-        config_push("md32xSaveExt",".srm");
+		config_push("md32xSaveExt",".srm");
 	}
 
 	if(!SMS_SAVE_EXT)
 	{
 		SMS_SAVE_EXT = ".ssm";
-        config_push("smsSaveExt",".ssm");
+		config_push("smsSaveExt",".ssm");
 	}
 
 	WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE + 24];
