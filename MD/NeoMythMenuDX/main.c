@@ -725,6 +725,7 @@ void get_smd_hdr(unsigned char *jump)
     if (!memcmp(rom_hdr, "SEGA", 4))
     {
         gFileType = 1; // SMD LSB 1ST
+        jump[0] = buffer[0x2300];
         jump[3] = buffer[0x0301];
     }
     else
@@ -737,6 +738,7 @@ void get_smd_hdr(unsigned char *jump)
         if (!memcmp(rom_hdr, "SEGA", 4))
         {
             gFileType = 2; // SMD MSB 1ST
+            jump[0] = buffer[0x0300];
             jump[3] = buffer[0x2301];
         }
     }
@@ -1037,7 +1039,7 @@ void get_sd_info(int entry)
         gSelections[entry].run = (rom_hdr[0xCC]-'0')*10 + (rom_hdr[0xCD]-'0');
         gSelections[entry].bbank = 0;
         gSelections[entry].bsize = (rom_hdr[0xCE]-'0')*10 + (rom_hdr[0xCF]-'0');
-        gSelections[entry].type = ((jump[3] == 0x88) || (jump[3] == 0x90)) ? 1 : 0;
+        gSelections[entry].type = (jump[0]!=0)&&((jump[3]==0x88)||(jump[3]==0x90)||(jump[3]==0x91)||(memcmp(rom_hdr+0x20,"MARS",4)==0)) ? 1 : 0;
         gMythHdr = 1;
     }
     else if (memcmp(rom_hdr, "SEGA", 4))
@@ -1054,7 +1056,7 @@ void get_sd_info(int entry)
     }
     else
     {
-        if((jump[0x0]!=0)&&((jump[0x3]==0x88)||(jump[0x3]==0x90)||(jump[0x3]==0x91)||(memcmp(rom_hdr+0x20,"MARS SAMPLE PROGRAM",19)==0)))
+        if((jump[0]!=0)&&((jump[3]==0x88)||(jump[3]==0x90)||(jump[3]==0x91)||(memcmp(rom_hdr+0x20,"MARS",4)==0)))
         {
             gSelections[entry].type = 1; // 32X
             gSelections[entry].run = 3;
@@ -1383,7 +1385,7 @@ void update_display(void)
                 {
                     unsigned char jump[4];
                     neo_copy_game(jump, 0x200, 4);
-                    if ((jump[3] == 0x88) || (jump[3] == 0x90))
+                    if ((jump[0]!=0)&&((jump[3]==0x88)||(jump[3]==0x90)||(jump[3]==0x91)||(memcmp(rom_hdr+0x20,"MARS",4)==0)))
                         gSelections[0].type = 1; // 32X
                     else
                         gSelections[0].type = 0; // MD
