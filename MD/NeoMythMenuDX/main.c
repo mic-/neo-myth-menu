@@ -413,6 +413,33 @@ inline UINT getFileSize(const XCHAR* fss)
     return r;
 }
 
+inline void shortenName(char *dst, char *src, int max)
+{
+    if (strlen(src) <= max)
+    {
+        // string fits, just copy it
+        strcpy(dst, src);
+        return;
+    }
+
+    // string must be shortened
+    short ix, iy;
+    short right = max/2;
+    short len = strlen(src);
+
+    // check right side of string for important name cues
+    for (ix=iy=len-1; ix>(len-right); ix--)
+        if ((src[ix] == '.') || (src[ix] == '[') || (src[ix] == '(') || (src[ix] == '-') || ((src[ix] >= '0')&&(src[ix] <= '9')))
+            iy = ix;
+    if (right > (len - iy))
+        right = len - iy; // split at last cue
+
+    memcpy(dst, src, max);
+    dst[max - right - 1] = '~';
+    memcpy(&dst[max - right], &src[iy], right);
+    dst[max] = '\0';
+}
+
 // needed for GCC 4.x libc
 int atexit(void (*function)(void))
 {
@@ -1274,8 +1301,9 @@ void update_display(void)
                 }
                 else
                 {
-                    strncpy(temp, (const char *)buffer, 36);
-                    temp[36] = '\0';
+                    //strncpy(temp, (const char *)buffer, 36);
+                    //temp[36] = '\0';
+                    shortenName(temp, (char *)buffer, 36);
                 }
                 gCursorX = 20 - strlen(temp)/2; // center the name
                 put_str(temp, ((gStartEntry + ix) == gCurEntry) ? 0x2000 : 0); // hilite name if currently selected entry
@@ -3517,8 +3545,9 @@ void do_options(void)
                 char temp[32];
 
                 w2cstrcpy((char*)buffer, gSelections[gCurEntry].name);
-                strncpy(temp, (const char *)buffer, 30);
-                temp[30] = '\0';
+                //strncpy(temp, (const char *)buffer, 30);
+                //temp[30] = '\0';
+                shortenName(temp, (char *)buffer, 30);
 
                 if (gCurMode == MODE_FLASH)
                 {
@@ -3766,8 +3795,9 @@ void run_rom(int reset_mode)
     char temp[32];
 
     w2cstrcpy((char*)buffer, gSelections[gCurEntry].name);
-    strncpy(temp, (const char *)buffer, 30);
-    temp[30] = '\0';
+    //strncpy(temp, (const char *)buffer, 30);
+    //temp[30] = '\0';
+    shortenName(temp, (char *)buffer, 30);
 
     gResetMode = reset_mode;
 
