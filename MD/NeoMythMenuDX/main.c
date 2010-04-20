@@ -7,6 +7,9 @@
 #include <diskio.h>
 #include <ff.h>
 
+/*M68000 optimized code*/
+#include "deluxe/util_68k_interface.h"
+
 /*lib config*/
 #include "deluxe/conf.h"
 
@@ -318,7 +321,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
 inline void setStatusMessage(const char* msg)
 {
 	printToScreen(gEmptyLine, 1, 23, 0x0000);
-	printToScreen(msg, (40 - strlen(msg))>>1, 23, 0x0000);
+	printToScreen(msg, (40 - utility_strlen(msg))>>1, 23, 0x0000);
 }
 
 inline void clearStatusMessage()
@@ -354,7 +357,7 @@ void makeDir(const XCHAR* fps)
     WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
     int i,l,j,di;
 
-	setStatusMessage("Creating directory tree...");
+	//setStatusMessage("Creating directory tree...");
 
     i = j = 0;
     l = wstrlen(fps);
@@ -384,7 +387,7 @@ void makeDir(const XCHAR* fps)
         ss[j++] = (WCHAR)fps[i++];
     }
 
-	clearStatusMessage();
+	//clearStatusMessage();
 }
 
 inline int createDirectory(const XCHAR* fps)
@@ -802,12 +805,12 @@ void get_sd_ips(int entry)
 
     gImportIPS = 0;
 
-    c2wstrcpy(ipsPath, "/");
-    c2wstrcat(ipsPath, IPS_DIR);
-    c2wstrcat(ipsPath, "/");
-    wstrcat(ipsPath, gSelections[entry].name);
-    *get_file_ext(ipsPath) = 0;
-    c2wstrcat(ipsPath, ".ips");
+    utility_c2wstrcpy(ipsPath, "/");
+    utility_c2wstrcat(ipsPath, IPS_DIR);
+    utility_c2wstrcat(ipsPath, "/");
+    utility_wstrcat(ipsPath, gSelections[entry].name);
+    *utility_getFileExtW(ipsPath) = 0;
+    utility_c2wstrcat(ipsPath, ".ips");
 
     f_close(&gSDFile);
     if(f_open(&gSDFile, ipsPath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
@@ -857,12 +860,12 @@ void get_sd_cheat(WCHAR* sss)
     ints_on();
     cheat_invalidate();
 
-    c2wstrcpy(cheatPath,"/");
-    c2wstrcat(cheatPath, CHEATS_DIR);
-    c2wstrcat(cheatPath, "/");
-    wstrcat(cheatPath, sss);
-    *get_file_ext(cheatPath) = 0; // cut off the extension
-    c2wstrcat(cheatPath, ".cht");
+    utility_c2wstrcpy(cheatPath,"/");
+    utility_c2wstrcat(cheatPath, CHEATS_DIR);
+    utility_c2wstrcat(cheatPath, "/");
+    utility_wstrcat(cheatPath, sss);
+    *utility_getFileExtW(cheatPath) = 0; // cut off the extension
+    utility_c2wstrcat(cheatPath, ".cht");
 
     f_close(&gSDFile);
     if(f_open(&gSDFile, cheatPath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
@@ -875,8 +878,8 @@ void get_sd_cheat(WCHAR* sss)
         if(!bytesToRead)
             return;
 
-        if(bytesToRead > XFER_SIZE) //16K are more than enough
-            bytesToRead = XFER_SIZE;
+        if(bytesToRead > WORK_RAM_SIZE) //32K are more than enough
+            bytesToRead = WORK_RAM_SIZE;
 
         ints_on();
         if(f_read(&gSDFile, pb, bytesToRead, &bytesWritten) == FR_OK)
@@ -960,9 +963,7 @@ void get_sd_cheat(WCHAR* sss)
 
                     while(*sp) //SKIP LN
                     {
-                        if(*sp == '\n')
-                            break;
-                        else if(*sp == '\r')
+                        if(*sp == '\r')
                         {
                             ++sp;
 
@@ -971,6 +972,12 @@ void get_sd_cheat(WCHAR* sss)
 
                             break;
                         }
+						else if (*sp == '\n')
+						{
+							++sp;
+							break;
+						}
+
                         ++sp;
                     }//!ln?
 
@@ -1003,8 +1010,9 @@ void get_sd_info(int entry)
     //cache_invalidate_pointers();
 
     if (path[wstrlen(path)-1] != (WCHAR)'/')
-        c2wstrcat(path, "/");
-    wstrcat(path, gSelections[entry].name);
+        utility_c2wstrcat(path, "/");
+
+    utility_wstrcat(path, gSelections[entry].name);
     f_close(&gSDFile);
     if (f_open(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
     {
@@ -1320,7 +1328,7 @@ void update_display(void)
                     //temp[36] = '\0';
                     shortenName(temp, (char *)buffer, 36);
                 }
-                gCursorX = 20 - strlen(temp)/2; // center the name
+                gCursorX = 20 - utility_strlen(temp)/2; // center the name
                 put_str(temp, ((gStartEntry + ix) == gCurEntry) ? 0x2000 : 0); // hilite name if currently selected entry
             }
         }
@@ -1874,7 +1882,6 @@ void importCheats(int index)
 
     ints_on();
 	setStatusMessage("Applying cheats...");
-	delay(30);
 
     //Check for types that require master code
     for(a = 0; a < registeredCheatEntries; a++)
@@ -1922,7 +1929,6 @@ void importCheats(int index)
 
 	ints_on();
 	setStatusMessage("Applying cheats...OK");
-	delay(30);
 	clearStatusMessage();
 }
 
@@ -1958,7 +1964,6 @@ void importIPS(int index)
 
 	ints_on();
     setStatusMessage("Importing patch...");
-	delay(20);
 
     f_close(&gSDFile);
     if(f_open(&gSDFile, ipsPath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
@@ -2068,7 +2073,6 @@ void importIPS(int index)
 
 	ints_on();
     setStatusMessage("Importing patch...OK");
-	delay(20);
 
 	clearStatusMessage();
 }
@@ -2121,7 +2125,6 @@ int cache_process()
 	}
 
     setStatusMessage("One-time detection in progress...");
-    delay(20);
 
     if ((rom_hdr[0xB0] == 'R') && (rom_hdr[0xB1] == 'A'))
     {
@@ -2169,7 +2172,6 @@ int cache_process()
     sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
 
     setStatusMessage("One-time detection in progress...OK");
-    delay(20);
 
     clearStatusMessage();
     return 0xFF;
@@ -2193,8 +2195,8 @@ void cache_loadPA(WCHAR* sss)
 	memset(fnbuf,0,512);
 
     ints_on();
-    c2wstrcpy(fnbuf,"/");
-    c2wstrcat(fnbuf,CACHE_DIR);
+    utility_c2wstrcpy(fnbuf,"/");
+    utility_c2wstrcat(fnbuf,CACHE_DIR);
 
     if(!createDirectory(fnbuf))
     {
@@ -2202,11 +2204,11 @@ void cache_loadPA(WCHAR* sss)
         return;
     }
 
-    c2wstrcat(fnbuf,"/");
-    wstrcat(fnbuf,sss);
+    utility_c2wstrcat(fnbuf,"/");
+    utility_wstrcat(fnbuf,sss);
 
-    *get_file_ext(fnbuf) = 0;
-    c2wstrcat(fnbuf,".dxcs");
+    *utility_getFileExtW(fnbuf) = 0;
+    utility_c2wstrcat(fnbuf,".dxcs");
 
     f_close(&gSDFile);
     if(f_open(&gSDFile,fnbuf,FA_OPEN_EXISTING | FA_READ) != FR_OK)
@@ -2273,7 +2275,7 @@ void cache_sync()
     if(gCurMode != MODE_SD)
         return;
 
-	if(*get_file_ext(gSelections[gCurEntry].name) != '.')
+	if(*utility_getFileExtW(gSelections[gCurEntry].name) != '.')
 		return;
 
 	if(gSelections[gCurEntry].run == 0x27)
@@ -2281,19 +2283,19 @@ void cache_sync()
 
     ints_on();
 	memset(fnbuf,0,512);
-    c2wstrcpy(fnbuf,"/");
-    c2wstrcat(fnbuf,CACHE_DIR);
+    utility_c2wstrcpy(fnbuf,"/");
+    utility_c2wstrcat(fnbuf,CACHE_DIR);
 
     if(!createDirectory(fnbuf))
         return;
 
     setStatusMessage("Writing cache...");
 
-    c2wstrcat(fnbuf,"/");
-    wstrcat(fnbuf,gSelections[gCurEntry].name);
+    utility_c2wstrcat(fnbuf,"/");
+    utility_wstrcat(fnbuf,gSelections[gCurEntry].name);
 
-    *get_file_ext(fnbuf) = 0;
-    c2wstrcat(fnbuf,".dxcs");
+    *utility_getFileExtW(fnbuf) = 0;
+    utility_c2wstrcat(fnbuf,".dxcs");
 
     f_close(&gSDFile);
     deleteFile(fnbuf);
@@ -2352,7 +2354,6 @@ void sram_mgr_toggleService(int index)
     ints_on();
 
     setStatusMessage("Updating configuration...");
-    delay(20);
 
     if(gManageSaves)
     {
@@ -2377,7 +2378,6 @@ void sram_mgr_toggleService(int index)
 
     ints_on();
     setStatusMessage("Updating configuration...OK");
-    delay(20);
 	clearStatusMessage();
 }
 
@@ -2433,7 +2433,6 @@ void sram_mgr_saveGamePA(WCHAR* sss)
         return;
 
     setStatusMessage("Backing up GAME sram...");
-    delay(20);
 
     if(/*gSelections[gCurEntry].type==2||*/gSRAMSize==16)//sms will not work due to romtype not being hashed
     {
@@ -2479,7 +2478,6 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     f_close(&gSDFile);
 
     setStatusMessage("Backing up GAME sram...OK!");
-    delay(30);
 	clearStatusMessage();
 }
 
@@ -2538,7 +2536,6 @@ void sram_mgr_restoreGame(int index)
     }
 
     setStatusMessage("Restoring GAME sram...");
-    delay(20);
 
     if(gSelections[gCurEntry].type==2||gSRAMSize==16)
     {
@@ -2584,7 +2581,7 @@ void sram_mgr_restoreGame(int index)
     f_close(&gSDFile);
 
     setStatusMessage("Restoring GAME sram...OK!");
-    delay(30);
+
 	clearStatusMessage();
 }
 
@@ -2595,7 +2592,6 @@ void sram_mgr_saveAll(int index)
 
     ints_on();
     setStatusMessage("Working...");
-    delay(30);
 
 	memset(fss,0,512);
 
@@ -2644,7 +2640,6 @@ void sram_mgr_restoreAll(int index)
 
     ints_on();
     setStatusMessage("Working...");
-    delay(30);
 
 	memset(fss,0,512);
     c2wstrcpy(fss,"/");
@@ -2696,7 +2691,6 @@ void sram_mgr_clearGame(int index)
 
     ints_on();
     setStatusMessage("Clearing GAME sram...");
-    delay(30);
 
     memset((char*)buffer,0x0,XFER_SIZE * 2);
 
@@ -2713,7 +2707,7 @@ void sram_mgr_clearGame(int index)
 
     ints_on();
     setStatusMessage("Clearing GAME sram...OK!");
-    delay(30);
+
 	clearStatusMessage();
 }
 
@@ -2723,7 +2717,7 @@ void sram_mgr_clearAll(int index)
 
     ints_on();
     setStatusMessage("Clearing ALL SRAM...");
-    delay(30);
+
 
     memset((char*)buffer,0x0,XFER_SIZE * 2);
 
@@ -2741,7 +2735,7 @@ void sram_mgr_clearAll(int index)
     ints_on();
     update_progress("Clearing ALL SRAM.."," ",100,100);
     setStatusMessage("Clearing ALL SRAM...OK");
-    delay(30);
+;
 	clearStatusMessage();
 }
 
@@ -2764,7 +2758,7 @@ void sram_mgr_copyGameToNextBank(int index)
 
     //copy
     setStatusMessage("Copying SRAM to next bank...");
-    delay(30);
+
 
     if(sramLength <= XFER_SIZE * 2)
     {
@@ -2827,7 +2821,7 @@ void sram_mgr_copyGameToNextBank(int index)
 
     ints_on();
     setStatusMessage("Copying SRAM to next bank...OK");
-    delay(30);
+
 	clearStatusMessage();
 }
 
@@ -3059,7 +3053,6 @@ void runSRAMMgr(int index)
 
     ints_on();
     setStatusMessage("Working...");
-    delay(30);
 	clearStatusMessage();
     cache_sync();
 	clearStatusMessage();
@@ -3087,7 +3080,7 @@ void runCheatEditor(int index)
 
     ints_on();
     printToScreen("Working...",(40 >> 1) - (strlen("Working...") >>1),12,0x2000);
-    delay(30);
+
 
     cache_sync();
 
@@ -4093,10 +4086,10 @@ void updateConfig()
         return;
     }
 
-	c2wstrcpy(fss,"/.menu"); createDirectory(fss);
-	c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
+	utility_c2wstrcpy(fss,"/.menu"); createDirectory(fss);
+	utility_c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
 
-    c2wstrcpy(fss,dxconf_cfg);
+    utility_c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
 	deleteFile(fss);
@@ -4133,9 +4126,9 @@ void loadConfig()
     BRM_SAVE_EXT = brm_save_ext_default;
 
     config_init();
-	c2wstrcpy(fss,"/.menu"); createDirectory(fss);
-	c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
-    c2wstrcpy(fss,dxconf_cfg);
+	utility_c2wstrcpy(fss,"/.menu"); createDirectory(fss);
+	utility_c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
+    utility_c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
 
@@ -4240,14 +4233,14 @@ void loadConfig()
 		config_push("brmSaveExt",brm_save_ext_default);
 	}
 
-	setStatusMessage("Finalizing...");
+	setStatusMessage("Finalizing configuration...");
 	WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE + 24];
 	memset(buf,0,256);
 
-	c2wstrcpy(buf,"/"); c2wstrcat(buf,CHEATS_DIR); createDirectory(buf);
-	c2wstrcpy(buf,"/"); c2wstrcat(buf,IPS_DIR); createDirectory(buf);
-	c2wstrcpy(buf,"/"); c2wstrcat(buf,SAVES_DIR); createDirectory(buf);
-	c2wstrcpy(buf,"/"); c2wstrcat(buf,CACHE_DIR); createDirectory(buf);
+	utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CHEATS_DIR); createDirectory(buf);
+	utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,IPS_DIR); createDirectory(buf);
+	utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,SAVES_DIR); createDirectory(buf);
+	utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CACHE_DIR); createDirectory(buf);
 
     clearStatusMessage();
     ints_on();
@@ -4664,7 +4657,6 @@ int main(void)
 
 	ints_on();
 	setStatusMessage("Loading cache & configuration...OK");
-	delay(30);
 	clear_screen();
 	clearStatusMessage();
 

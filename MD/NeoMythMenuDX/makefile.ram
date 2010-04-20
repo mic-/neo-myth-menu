@@ -5,12 +5,12 @@ OBJC = $(GENDEV)/m68k/bin/objcopy
 ASMZ80 = $(GENDEV)/bin/zasm
 BINTOC = $(GENDEV)/bin/bin2c
 
-OBJS = main_ram.o neo2.o font.o disk_io.o rom_io.o deluxe/conf.o deluxe/utility.o deluxe/cheat.o deluxe/vgmplayer.o
+OBJS = main_ram.o neo2.o font.o disk_io.o rom_io.o deluxe/conf.o deluxe/utility.o deluxe/util_68k.o deluxe/cheat.o deluxe/vgmplayer.o
 INC_OBJS = 
 
 OPTION = -DRUN_IN_PSRAM
 INCS = -I$(GENDEV)/m68k/include -I$(GENDEV)/m68k/sdk/include -I.
-FLAGS = $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer $(INCS)
+FLAGS = $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -Wno-return-type $(INCS)
 #FLAGS = $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -Wno-return-type $(INCS)
 FLAGSZ80 = -vb2
 LIBS = -L$(GENDEV)/m68k/lib -L$(GENDEV)/m68k/sdk/lib -lff -lc -lgcc
