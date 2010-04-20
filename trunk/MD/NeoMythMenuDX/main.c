@@ -24,32 +24,32 @@
 #define EEPROM_MAPPERS_COUNT (26)
 static const char* EEPROM_MAPPERS[EEPROM_MAPPERS_COUNT] =  //shared from genplus gx
 {
-	"T-8104B",//new - nba jam 32x
-	"T-120106",
-	"T-50176",
-	"T-50396",
-	"T-50446",
-	"T-50516",
-	"T-50606",
-	"T-12046",
-	"T-12053",
-	"MK-1215",
-	"MK-1228",
-	"G-5538",
-	"PR-1993",
-	"G-4060",
-	"G-4060-00",
-	"00001211-00",
-	"00004076-00",
-	"T-081326",
-	"T-81033",
-	"T-81406",
-	"T-081276",
-	"00000000-00",
-	"T-081586",
-	"T-81576",
-	"T-81476",
-	"T-120146-50"
+    "T-8104B",//new - nba jam 32x
+    "T-120106",
+    "T-50176",
+    "T-50396",
+    "T-50446",
+    "T-50516",
+    "T-50606",
+    "T-12046",
+    "T-12053",
+    "MK-1215",
+    "MK-1228",
+    "G-5538",
+    "PR-1993",
+    "G-4060",
+    "G-4060-00",
+    "00001211-00",
+    "00004076-00",
+    "T-081326",
+    "T-81033",
+    "T-81406",
+    "T-081276",
+    "00000000-00",
+    "T-081586",
+    "T-81576",
+    "T-81476",
+    "T-120146-50"
 };
 
 /* hardware definitions */
@@ -79,8 +79,8 @@ static const char* EEPROM_MAPPERS[EEPROM_MAPPERS_COUNT] =  //shared from genplus
 /*Save manager service status*/
 enum
 {
-	SMGR_STATUS_NULL = 0,
-	SMGR_STATUS_BACKUP_SRAM
+    SMGR_STATUS_NULL = 0,
+    SMGR_STATUS_BACKUP_SRAM
 };
 
 /*For the GG/Hex cheats*/
@@ -88,11 +88,11 @@ enum
 #define CHEAT_SUBPAIR_COUNT 12          //12 pairs per entry
 enum
 {
-	CT_NULL = 0xF,//null cheat entry
-	CT_MASTER = 0x1,//master code!
-	CT_REGION,//Will trigger all master codes
-	CT_SELF,//normal cheat
-	CT_CHILD = 0x7 //Will trigger all master codes
+    CT_NULL = 0xF,//null cheat entry
+    CT_MASTER = 0x1,//master code!
+    CT_REGION,//Will trigger all master codes
+    CT_SELF,//normal cheat
+    CT_CHILD = 0x7 //Will trigger all master codes
 };
 
 typedef struct CheatEntry CheatEntry;
@@ -109,16 +109,16 @@ struct CheatEntry
 typedef struct CacheBlock CacheBlock;
 struct CacheBlock
 {
-	char sig[4];/*DXCS*/
-	unsigned char version;/*what version?*/
-	unsigned char sramType;/*eeprom or sram?*/
-	unsigned char processed;/*Needs detection ? 0xff = processed*/
-	unsigned char autoManageSaves;/*manage saves automatically ? */
-	unsigned char autoManageSavesServiceStatus;/*1 = Backup SRAM using the above settings^ 0 = nothing to do*/
-	unsigned char sramBank;/*which bank affects?*/
-	short int sramSize;/*what's the sram size if type == sram?*/
-	short int YM2413; /*fm on?*/
-	short int resetMode;/*reset to menu or game?*/
+    char sig[4];/*DXCS*/
+    unsigned char version;/*what version?*/
+    unsigned char sramType;/*eeprom or sram?*/
+    unsigned char processed;/*Needs detection ? 0xff = processed*/
+    unsigned char autoManageSaves;/*manage saves automatically ? */
+    unsigned char autoManageSavesServiceStatus;/*1 = Backup SRAM using the above settings^ 0 = nothing to do*/
+    unsigned char sramBank;/*which bank affects?*/
+    short int sramSize;/*what's the sram size if type == sram?*/
+    short int YM2413; /*fm on?*/
+    short int resetMode;/*reset to menu or game?*/
 };
 
 static CacheBlock gCacheBlock;/*common cache block*/
@@ -214,6 +214,7 @@ extern unsigned char *sd_csd;           /* card specific data */
 FATFS gSDFatFs;                         /* global FatFs structure for FF */
 FIL gSDFile;                            /* global file structure for FF */
 
+short int gSdDetected = 0;                   /* 0 - not detected, 1 - detected */
 
 /* global options table entry definitions */
 
@@ -320,13 +321,13 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
 
 inline void setStatusMessage(const char* msg)
 {
-	printToScreen(gEmptyLine, 1, 23, 0x0000);
-	printToScreen(msg, (40 - utility_strlen(msg))>>1, 23, 0x0000);
+    printToScreen(gEmptyLine, 1, 23, 0x0000);
+    printToScreen(msg, (40 - utility_strlen(msg))>>1, 23, 0x0000);
 }
 
 inline void clearStatusMessage()
 {
-	printToScreen(gEmptyLine, 1, 23, 0x0000);
+    printToScreen(gEmptyLine, 1, 23, 0x0000);
 }
 
 inline int directoryExists(const XCHAR* fps)
@@ -357,7 +358,7 @@ void makeDir(const XCHAR* fps)
     WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
     int i,l,j,di;
 
-	//setStatusMessage("Creating directory tree...");
+    //setStatusMessage("Creating directory tree...");
 
     i = j = 0;
     l = wstrlen(fps);
@@ -387,7 +388,7 @@ void makeDir(const XCHAR* fps)
         ss[j++] = (WCHAR)fps[i++];
     }
 
-	//clearStatusMessage();
+    //clearStatusMessage();
 }
 
 inline int createDirectory(const XCHAR* fps)
@@ -433,7 +434,7 @@ inline UINT getFileSize(const XCHAR* fss)
 
 inline void shortenName(char *dst, char *src, int max)
 {
-    if (strlen(src) <= max)
+    if (utility_strlen(src) <= max)
     {
         // string fits, just copy it
         strcpy(dst, src);
@@ -443,7 +444,7 @@ inline void shortenName(char *dst, char *src, int max)
     // string must be shortened
     short ix, iy;
     short right = max/2;
-    short len = strlen(src);
+    short len = utility_strlen(src);
 
     // check right side of string for important name cues
     for (ix=iy=len-1; ix>(len-right); ix--)
@@ -538,16 +539,16 @@ int cheat_fillPairs(const char* code,CheatEntry* ce)
 {
     CheatPair* cp;
     int i = 0;
-	int len = strlen(code) - 1;
+    int len = utility_strlen(code) - 1;
     int ind = 0;
-	int prg = 0;
+    int prg = 0;
     char buf[16];
 
     UTIL_SetMemorySafe(buf,'0',16);
 
     while(*code)
     {
-		if((code[i] == ',') || (ind >10) || (prg > len) )
+        if((code[i] == ',') || (ind >10) || (prg > len) )
         {
             buf[ind] = '\0';
             ind = 0;
@@ -571,7 +572,7 @@ int cheat_fillPairs(const char* code,CheatEntry* ce)
         else
             buf[ind++] = *(code++);
 
-		++prg;
+        ++prg;
     }
 
     //left overs ?? => ie : the user didn't put the last delim ','...
@@ -698,7 +699,7 @@ void delay(int count)
 
     ints_on();
 
-	ticks = gTicks + count;
+    ticks = gTicks + count;
 
     while (gTicks < ticks) ;
 }
@@ -740,7 +741,7 @@ void get_menu_flash(void)
         gSelections[gMaxEntry].bsize = (p->meSRAM & 0x0F) ? 1 << ((p->meSRAM & 0x0F)-1) : 0;
         gSelections[gMaxEntry].offset = ((p->meROMHi & 0x0F)<<25)|(p->meROMLo<<17);
         gSelections[gMaxEntry].length = fsz_tbl[(p->meROMHi & 0xF0)>>4] * 131072;
-        c2wstrcpy(gSelections[gMaxEntry].name, p->meName);
+        utility_c2wstrcpy(gSelections[gMaxEntry].name, p->meName);
 
         // check for auto-boot extended menu
         if ((gSelections[gMaxEntry].run == 7) && !memcmp(p->meName, "MDEBIOS", 7))
@@ -821,7 +822,7 @@ void get_sd_ips(int entry)
 
     if(!gSDFile.fsize)
     {
-		f_close(&gSDFile);
+        f_close(&gSDFile);
         ipsPath[0] = 0; // disable
         return;
     }
@@ -832,12 +833,12 @@ void get_sd_ips(int entry)
     ints_on();
     if(f_read(&gSDFile, pa, 5, &bytesWritten) != FR_OK)
     {
-		f_close(&gSDFile);
+        f_close(&gSDFile);
         ipsPath[0] = 0; // disable
         return;
     }
 
-	f_close(&gSDFile);
+    f_close(&gSDFile);
     ints_off();
     pa[6] = 0; // make sure null terminated
     if(strncasecmp((const char *)pa, "patch", 5) == 0)
@@ -849,9 +850,9 @@ void get_sd_ips(int entry)
 void get_sd_cheat(WCHAR* sss)
 {
     char *cheatBuf = (char*)&buffer[XFER_SIZE + 2];
-	WCHAR* cheatPath = (WCHAR*)&buffer[XFER_SIZE + 18];
-	CheatEntry* e = NULL;
-	char* pb = (char*)&buffer[0];
+    WCHAR* cheatPath = (WCHAR*)&buffer[XFER_SIZE + 18];
+    CheatEntry* e = NULL;
+    char* pb = (char*)&buffer[0];
     char* head,*sp;
     UINT bytesWritten;
     UINT bytesToRead;
@@ -972,11 +973,11 @@ void get_sd_cheat(WCHAR* sss)
 
                             break;
                         }
-						else if (*sp == '\n')
-						{
-							++sp;
-							break;
-						}
+                        else if (*sp == '\n')
+                        {
+                            ++sp;
+                            break;
+                        }
 
                         ++sp;
                     }//!ln?
@@ -1141,6 +1142,8 @@ void get_sd_directory(int entry)
     FILINFO fno;
     int ix;
 
+    gSdDetected = 0;
+
     gMaxEntry = 0;
     if (entry == -1)
     {
@@ -1170,6 +1173,7 @@ void get_sd_directory(int entry)
             if (MMC_disk_initialize() == STA_NODISK)
                 return;                 /* couldn't init SD card */
         }
+        gSdDetected = 1;
     }
     else
     {
@@ -1194,23 +1198,26 @@ void get_sd_directory(int entry)
         {
             // go forward one level - add entry name to path
             if (path[wstrlen(path)-1] != (WCHAR)'/')
-                c2wstrcat(path, "/");
-            wstrcat(path, gSelections[entry].name);
+                utility_c2wstrcat(path, "/");
+            utility_wstrcat(path, gSelections[entry].name);
         }
+        gSdDetected = 1;
     }
     if (f_opendir(&dir, path))
     {
+        gSdDetected = 0;
         if (do_SDMgr())                 /* we knows there's a card, but can't read it */
             return;                     /* user opted not to try to format the SD card */
         if (f_opendir(&dir, path))
             return;                     /* failed again... give up */
+        gSdDetected = 1;
     }
 
     // add parent directory entry if not root
     if (path[1] != 0)
     {
         gSelections[gMaxEntry].type = 128; // directory entry
-        c2wstrcpy(gSelections[gMaxEntry].name, "..");
+        utility_c2wstrcpy(gSelections[gMaxEntry].name, "..");
         gMaxEntry++;
     }
 
@@ -1235,7 +1242,7 @@ void get_sd_directory(int entry)
             if (fno.lfname[0])
                 wstrcpy(gSelections[gMaxEntry].name, fno.lfname);
             else
-                c2wstrcpy(gSelections[gMaxEntry].name, fno.fname);
+                utility_c2wstrcpy(gSelections[gMaxEntry].name, fno.fname);
 
             //w2cstrcpy((char*)buffer, fno.lfname);
             //printToScreen(fno.fname, 1, gMaxEntry % 28, 0);
@@ -1252,7 +1259,7 @@ void get_sd_directory(int entry)
             if (fno.lfname[0])
                 wstrcpy(gSelections[gMaxEntry].name, fno.lfname);
             else
-                c2wstrcpy(gSelections[gMaxEntry].name, fno.fname);
+                utility_c2wstrcpy(gSelections[gMaxEntry].name, fno.fname);
 
             //w2cstrcpy((char*)buffer, fno.lfname);
             //printToScreen(fno.fname, 1, gMaxEntry % 28, 0);
@@ -1351,7 +1358,7 @@ void update_display(void)
     put_str(gFBottomLine, 0x2000);
 
 //  sprintf(temp, " %02d:%01d%01d:%01d%01d ", rtc[4]&31, rtc[3]&7, rtc[2]&15, rtc[1]&7, rtc[0]&15);
-//  gCursorX = 20 - strlen(temp)/2;     /* center time */
+//  gCursorX = 20 - utility_strlen(temp)/2;     /* center time */
 //  put_str(temp, 0);
 
     // info area
@@ -1417,7 +1424,7 @@ void update_display(void)
                 gSelections[0].length = 0x100000; // 8Mbit
                 gSelections[0].bsize = 0;
                 gSelections[0].bbank = 0;
-                c2wstrcpy(gSelections[0].name, "SMS ROM");
+                utility_c2wstrcpy(gSelections[0].name, "SMS ROM");
             }
             else
             {
@@ -1430,7 +1437,7 @@ void update_display(void)
                 {
                     // not MD or 32X binary image - assume old MD
                     gSelections[0].type = 0; // MD
-                    c2wstrcpy(gSelections[0].name, "MD ROM");
+                    utility_c2wstrcpy(gSelections[0].name, "MD ROM");
                 }
                 else
                 {
@@ -1456,7 +1463,7 @@ void update_display(void)
                     if (ix > 30)
                         ix = 30; // max string size
                     buffer[ix+1] = 0; // null terminate name
-                    c2wstrcpy(gSelections[0].name, (char*)buffer);
+                    utility_c2wstrcpy(gSelections[0].name, (char*)buffer);
                 }
             }
             ints_on(); /* enable interrupts */
@@ -1482,7 +1489,7 @@ void update_display(void)
                 gCursorY = 20;
                 put_str("Type=VGM", 0);
                 sprintf(temp, "Size=%d", gSelections[gCurEntry].length);
-                gCursorX = 39 - strlen(temp);   // right justify string
+                gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
             }
             else
@@ -1495,7 +1502,7 @@ void update_display(void)
                 sprintf(temp, "Offset=0x%08X", gSelections[gCurEntry].offset);
                 put_str(temp, 0);
                 sprintf(temp, "Size=%dMb", gSelections[gCurEntry].length/131072);
-                gCursorX = 39 - strlen(temp);   // right justify string
+                gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
 
                 gCursorX = 1;
@@ -1509,7 +1516,7 @@ void update_display(void)
                     sprintf(temp, "SRAM Bank=%d", gSelections[gCurEntry].bbank);
                 put_str(temp, 0);
                 sprintf(temp, "Size=%dKb", (gSelections[gCurEntry].run == 5) ? 1: gSelections[gCurEntry].bsize*64);
-                gCursorX = 39 - strlen(temp);   // right justify string
+                gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
             }
         }
@@ -1580,7 +1587,7 @@ void update_display(void)
                     default:
                     strcat(temp, "none");
                 }
-                gCursorX = 39 - strlen(temp);   // right justify string
+                gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
             }
             else if (!memcmp(rom_hdr, "Vgm ", 4))
@@ -1595,7 +1602,7 @@ void update_display(void)
                     ix = 37; // max string size to print
                 temp[ix+1] = 0; // null terminate name
                 gCursorY = 22;
-                gCursorX = 20 - strlen(temp)/2; // center name
+                gCursorX = 20 - utility_strlen(temp)/2; // center name
                 put_str(temp, 0);
             }
             else if (!memcmp(rom_hdr, "SEGA", 4))
@@ -1618,7 +1625,7 @@ void update_display(void)
                     ix = 37; // max string size to print
                 temp[ix+1] = 0; // null terminate name
                 gCursorY = 22;
-                gCursorX = 20 - strlen(temp)/2; // center name
+                gCursorX = 20 - utility_strlen(temp)/2; // center name
                 put_str(temp, 0);
 
                 // print rom size and sram size
@@ -1638,7 +1645,7 @@ void update_display(void)
                     start = end = 0;
                 }
                 sprintf(temp, "SRAM Size=%dKbit",(end - start + 2)/128);
-                gCursorX = 39 - strlen(temp);   // right justify string
+                gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
             }
             else
@@ -1708,9 +1715,9 @@ void update_progress(char *str1, char *str2, int curr, int total)
     gCursorY = 21;
     // erase line
     put_str(gEmptyLine, 0);
-    gCursorX = 20 - (strlen(str1) + strlen(str2)) / 2;
+    gCursorX = 20 - (utility_strlen(str1) + utility_strlen(str2)) / 2;
     put_str(str1, 0x2000);              /* print first string in green */
-    gCursorX += strlen(str1);
+    gCursorX += utility_strlen(str1);
     put_str(str2, 0);                   /* print first string in white */
 
     gCursorX = 1;
@@ -1875,13 +1882,12 @@ void importCheats(int index)
 {
     CheatEntry* e;
     CheatPair* cp;
-    short a,b;
+    short a,b,any_active;
+
+    any_active = 0;
 
     if(!registeredCheatEntries)
         return;
-
-    ints_on();
-	setStatusMessage("Applying cheats...");
 
     //Check for types that require master code
     for(a = 0; a < registeredCheatEntries; a++)
@@ -1914,6 +1920,12 @@ void importCheats(int index)
 
         if(e->active)
         {
+            if(any_active == 0)
+            {
+                ints_on();
+                setStatusMessage("Applying cheats...");
+                any_active = 1;
+            }
             for(b = 0; b < e->pairs; b++)
             {
                 cp = &e->pair[b];
@@ -1921,15 +1933,18 @@ void importCheats(int index)
                 buffer[0] =  (cp->data & 0xFF00) >> 8;
                 buffer[1] =  (cp->data & 0xFF);
 
-				ints_off();
+                ints_off();
                 neo_copyto_myth_psram(buffer,cp->addr,2);
             }
         }
     }
 
-	ints_on();
-	setStatusMessage("Applying cheats...OK");
-	clearStatusMessage();
+    ints_on();
+    if(any_active == 1)
+    {
+        setStatusMessage("Applying cheats...OK");
+        clearStatusMessage();
+    }
 }
 
 void toggleIPS(int index)
@@ -1962,20 +1977,20 @@ void importIPS(int index)
     if(ipsPath[0] == 0)
         return;
 
-	ints_on();
+    ints_on();
     setStatusMessage("Importing patch...");
 
     f_close(&gSDFile);
     if(f_open(&gSDFile, ipsPath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
-	{
-		clearStatusMessage();
+    {
+        clearStatusMessage();
         return;
-	}
+    }
 
     fsize = gSDFile.fsize;
     fsize -= 3; //adjust for eof marker
 
-	ints_on();
+    ints_on();
     //skip "PATCH"
     neo_copy_sd(in,0,5);
     fbr = 5;
@@ -2005,17 +2020,17 @@ void importIPS(int index)
                 nb++;
                 ix = 1;
 
-				ints_off();
+                ints_off();
                 neo_copyfrom_myth_psram(buffer, addr, 2);
             }
             if (nb & 1)
             {
-				ints_off();
+                ints_off();
                 neo_copyfrom_myth_psram(&buffer[nb-1], addr+nb-1, 2);
                 nb++;
             }
-			
-			ints_on();
+
+            ints_on();
             neo_copy_sd(&buffer[ix], 0, len);
             fbr += len;
         }
@@ -2032,17 +2047,17 @@ void importIPS(int index)
                 nb++;
                 ix = 1;
 
-				ints_off();
+                ints_off();
                 neo_copyfrom_myth_psram(buffer, addr, 2);
             }
             if (nb & 1)
             {
-				ints_off();
+                ints_off();
                 neo_copyfrom_myth_psram(&buffer[nb-1], addr+nb-1, 2);
                 nb++;
             }
 
-			ints_on();
+            ints_on();
             neo_copy_sd(in,0,1);
             fbr += 1;
             memset(&buffer[ix], in[0], len);
@@ -2052,7 +2067,7 @@ void importIPS(int index)
         {
             if ((addr & 0x00F00000) == ((addr+len-1) & 0x00F00000))
             {
-				ints_off();
+                ints_off();
                 // doesn't cross 1MB boundary, copy all at once
                 neo_copyto_myth_psram(buffer, addr, nb);
             }
@@ -2060,21 +2075,21 @@ void importIPS(int index)
             {
                 unsigned int len1 = ((addr & 0x00F00000) + 0x00100000) - addr;
 
-				ints_off();
+                ints_off();
                 // crosses 1MB boundary, copy up to 1MB boundary
                 neo_copyto_myth_psram(buffer, addr, len1);
 
-				ints_off();
+                ints_off();
                 // copy the rest after the boundary
                 neo_copyto_myth_psram(&buffer[len1], addr+len1, nb-len1);
             }
         }
     }
 
-	ints_on();
+    ints_on();
     setStatusMessage("Importing patch...OK");
 
-	clearStatusMessage();
+    clearStatusMessage();
 }
 
 /* CACHE */
@@ -2101,28 +2116,28 @@ int cache_process()
     unsigned int a = 0 , b = 0;
     short int i;
 
-	clearStatusMessage();
+    clearStatusMessage();
 
-	if(gSelections[gCurEntry].type == 128) //dir
-		return 0;
-	else if(gSelections[gCurEntry].type == 127) //Uknown
-		return 0;
+    if(gSelections[gCurEntry].type == 128) //dir
+        return 0;
+    else if(gSelections[gCurEntry].type == 127) //Uknown
+        return 0;
 
-	if(gSelections[gCurEntry].run == 0x27)
-		return 0;
+    if(gSelections[gCurEntry].run == 0x27)
+        return 0;
 
     if((rom_hdr[0] == 0xFF) && (rom_hdr[1] != 0x04))
-	{
-		setStatusMessage("Fetching header...");
-		get_sd_info(gCurEntry);
-		clearStatusMessage();
+    {
+        setStatusMessage("Fetching header...");
+        get_sd_info(gCurEntry);
+        clearStatusMessage();
 
-		if((rom_hdr[0] == 0xFF) && (rom_hdr[1] != 0x04)) //bad!
+        if((rom_hdr[0] == 0xFF) && (rom_hdr[1] != 0x04)) //bad!
             return 0;
 
-		if(gSelections[gCurEntry].run == 0x27)
-			return 0;
-	}
+        if(gSelections[gCurEntry].run == 0x27)
+            return 0;
+    }
 
     setStatusMessage("One-time detection in progress...");
 
@@ -2132,41 +2147,41 @@ int cache_process()
         b = rom_hdr[0xB8]<<24|rom_hdr[0xB9]<<16|rom_hdr[0xBA]<<8|rom_hdr[0xBB];
     }
 
-	gSRAMSize = 0;
+    gSRAMSize = 0;
 
-	if(b-a == 1)
-	{
-		gSRAMType = 0x0001;
-		gSRAMSize = 0;
-	}
-	else
-	{
-		if((b-a) > 2)
-		{
-			if(b-a +2 <= 8192)
-				gSRAMSize = 1;
-			else
-				gSRAMSize = (short int)(( (b-a+2) / 1024) / 8);
-		}
+    if(b-a == 1)
+    {
+        gSRAMType = 0x0001;
+        gSRAMSize = 0;
+    }
+    else
+    {
+        if((b-a) > 2)
+        {
+            if(b-a +2 <= 8192)
+                gSRAMSize = 1;
+            else
+                gSRAMSize = (short int)(( (b-a+2) / 1024) / 8);
+        }
 
-		if((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04))
-		    gSRAMSize = 16; // BRAM file
-		
-		gSRAMType = 0x0000;
+        if((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04))
+            gSRAMSize = 16; // BRAM file
 
-		if(!gSRAMSize)//check for eeprom
-		{
-		    //intense scan
-		    for(i = 0; i < EEPROM_MAPPERS_COUNT; i++)
-		    {
-		        if(!memcmp(rom_hdr + 0x83,EEPROM_MAPPERS[i],strlen(EEPROM_MAPPERS[i])))
-		        {
-		            gSRAMType = 0x0001;
-		            break;
-		        }
-		    }
-		}
-	}
+        gSRAMType = 0x0000;
+
+        if(!gSRAMSize)//check for eeprom
+        {
+            //intense scan
+            for(i = 0; i < EEPROM_MAPPERS_COUNT; i++)
+            {
+                if(!memcmp(rom_hdr + 0x83,EEPROM_MAPPERS[i],utility_strlen(EEPROM_MAPPERS[i])))
+                {
+                    gSRAMType = 0x0001;
+                    break;
+                }
+            }
+        }
+    }
 
     sprintf(gSRAMBankStr, "%d", gSRAMBank);
     sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
@@ -2180,29 +2195,23 @@ int cache_process()
 void cache_loadPA(WCHAR* sss)
 {
     UINT fbr = 0;
-	WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
 
     if(gCurMode != MODE_SD)
         return;
 
-	if(*get_file_ext(sss) != '.')
-		return;
+    if(*get_file_ext(sss) != '.')
+        return;
 
-	if(gSelections[gCurEntry].run == 0x27)
-		return;
+    if(gSelections[gCurEntry].run == 0x27)
+        return;
 
     setStatusMessage("Reading cache...");
-	memset(fnbuf,0,512);
+    memset(fnbuf,0,512);
 
     ints_on();
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,CACHE_DIR);
-
-    if(!createDirectory(fnbuf))
-    {
-        clearStatusMessage();
-        return;
-    }
 
     utility_c2wstrcat(fnbuf,"/");
     utility_wstrcat(fnbuf,sss);
@@ -2215,7 +2224,7 @@ void cache_loadPA(WCHAR* sss)
     {
         clearStatusMessage();
         cache_invalidate_pointers();
-		gCacheBlock.processed = cache_process();
+        gCacheBlock.processed = cache_process();
         cache_sync();
         return;
     }
@@ -2256,13 +2265,13 @@ void cache_loadPA(WCHAR* sss)
 
 void cache_load()
 {
-	if(gSelections[gCurEntry].type == 128) //dir
-		return;
-	else if(gSelections[gCurEntry].type == 127) //Uknown
-		return;
+    if(gSelections[gCurEntry].type == 128) //dir
+        return;
+    else if(gSelections[gCurEntry].type == 127) //Uknown
+        return;
 
-	if(gSelections[gCurEntry].run == 0x27)
-		return;
+    if(gSelections[gCurEntry].run == 0x27)
+        return;
 
     cache_loadPA(gSelections[gCurEntry].name);
 }
@@ -2270,19 +2279,19 @@ void cache_load()
 void cache_sync()
 {
     UINT fbr = 0;
-	WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
 
     if(gCurMode != MODE_SD)
         return;
 
-	if(*utility_getFileExtW(gSelections[gCurEntry].name) != '.')
-		return;
+    if(*utility_getFileExtW(gSelections[gCurEntry].name) != '.')
+        return;
 
-	if(gSelections[gCurEntry].run == 0x27)
-		return;
+    if(gSelections[gCurEntry].run == 0x27)
+        return;
 
     ints_on();
-	memset(fnbuf,0,512);
+    memset(fnbuf,0,512);
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,CACHE_DIR);
 
@@ -2378,33 +2387,33 @@ void sram_mgr_toggleService(int index)
 
     ints_on();
     setStatusMessage("Updating configuration...OK");
-	clearStatusMessage();
+    clearStatusMessage();
 }
 
 void sram_mgr_saveGamePA(WCHAR* sss)
 {
     UINT fbr = 0;
-	WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
-	int sramLength,sramBankOffs,k,i,tw;
+    WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
+    int sramLength,sramBankOffs,k,i,tw;
 
     //dont let this happen
     if(!gSRAMSize)
         return;
 
     ints_on();
-	memset(fnbuf,0,512);
+    memset(fnbuf,0,512);
 
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
     sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
 
-    c2wstrcpy(fnbuf,"/");
-    c2wstrcat(fnbuf,SAVES_DIR);
+    utility_c2wstrcpy(fnbuf,"/");
+    utility_c2wstrcat(fnbuf,SAVES_DIR);
 
     if(!createDirectory(fnbuf))
         return;
 
-    c2wstrcat(fnbuf,"/");
-    wstrcat(fnbuf,sss);
+    utility_c2wstrcat(fnbuf,"/");
+    utility_wstrcat(fnbuf,sss);
 
     *get_file_ext(fnbuf) = 0;
     if(/*gSelections[gCurEntry].type==2||*/gSRAMSize==16)//sms will not work due to romtype not being hashed
@@ -2412,16 +2421,16 @@ void sram_mgr_saveGamePA(WCHAR* sss)
         //sms or bram
         /*if(gSelections[gCurEntry].type==2)
         {
-            c2wstrcat(fnbuf,SMS_SAVE_EXT);
+            utility_c2wstrcat(fnbuf,SMS_SAVE_EXT);
         }
         else*/
         {
-            c2wstrcat(fnbuf,BRM_SAVE_EXT);//or .crm
+            utility_c2wstrcat(fnbuf,BRM_SAVE_EXT);//or .crm
         }
     }
     else
     {
-        c2wstrcat(fnbuf,MD_32X_SAVE_EXT);
+        utility_c2wstrcat(fnbuf,MD_32X_SAVE_EXT);
     }
 
     //if exists - delete
@@ -2478,7 +2487,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     f_close(&gSDFile);
 
     setStatusMessage("Backing up GAME sram...OK!");
-	clearStatusMessage();
+    clearStatusMessage();
 }
 
 void sram_mgr_saveGame(int index)
@@ -2489,19 +2498,16 @@ void sram_mgr_saveGame(int index)
 void sram_mgr_restoreGame(int index)
 {
     UINT fbr = 0;
-	WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
-	int sramLength,sramBankOffs,k,i,tr;
+    WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
+    int sramLength,sramBankOffs,k,i,tr;
 
     ints_on();
-	memset(fnbuf,0,512);
-    c2wstrcpy(fnbuf,"/");
-    c2wstrcat(fnbuf,SAVES_DIR);
+    memset(fnbuf,0,512);
+    utility_c2wstrcpy(fnbuf,"/");
+    utility_c2wstrcat(fnbuf,SAVES_DIR);
 
-    if(!createDirectory(fnbuf))
-        return;
-
-    c2wstrcat(fnbuf,"/");
-    wstrcat(fnbuf,gSelections[gCurEntry].name);
+    utility_c2wstrcat(fnbuf,"/");
+    utility_wstrcat(fnbuf,gSelections[gCurEntry].name);
 
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
     sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
@@ -2512,16 +2518,16 @@ void sram_mgr_restoreGame(int index)
         //sms or bram
         if(gSelections[gCurEntry].type==2)
         {
-            c2wstrcat(fnbuf,SMS_SAVE_EXT);
+            utility_c2wstrcat(fnbuf,SMS_SAVE_EXT);
         }
         else
         {
-            c2wstrcat(fnbuf,BRM_SAVE_EXT);//or .crm
+            utility_c2wstrcat(fnbuf,BRM_SAVE_EXT);//or .crm
         }
     }
     else
     {
-        c2wstrcat(fnbuf,MD_32X_SAVE_EXT);
+        utility_c2wstrcat(fnbuf,MD_32X_SAVE_EXT);
     }
 
     f_close(&gSDFile);
@@ -2582,30 +2588,30 @@ void sram_mgr_restoreGame(int index)
 
     setStatusMessage("Restoring GAME sram...OK!");
 
-	clearStatusMessage();
+    clearStatusMessage();
 }
 
 void sram_mgr_saveAll(int index)
 {
-	WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
     UINT fsize = 0 , i = 0 , fbr = 0;
 
     ints_on();
     setStatusMessage("Working...");
 
-	memset(fss,0,512);
+    memset(fss,0,512);
 
-    c2wstrcpy(fss,"/");
-    c2wstrcat(fss,SAVES_DIR);
+    utility_c2wstrcpy(fss,"/");
+    utility_c2wstrcat(fss,SAVES_DIR);
 
     if(!createDirectory(fss))
-	{
-		clearStatusMessage();
+    {
+        clearStatusMessage();
         return;
-	}
+    }
 
-    c2wstrcat(fss,"/SRAM");
-    c2wstrcat(fss,MD_32X_SAVE_EXT);
+    utility_c2wstrcat(fss,"/SRAM");
+    utility_c2wstrcat(fss,MD_32X_SAVE_EXT);
 
     deleteFile(fss);//delete if exists
 
@@ -2630,29 +2636,23 @@ void sram_mgr_saveAll(int index)
     ints_on();
     f_close(&gSDFile);
     update_progress("Saving ALL SRAM.."," ",100,100);
-	clearStatusMessage();
+    clearStatusMessage();
 }
 
 void sram_mgr_restoreAll(int index)
 {
-	WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
     UINT fsize = 0 , i = 0 , fbr = 0;
 
     ints_on();
     setStatusMessage("Working...");
 
-	memset(fss,0,512);
-    c2wstrcpy(fss,"/");
-    c2wstrcat(fss,SAVES_DIR);
+    memset(fss,0,512);
+    utility_c2wstrcpy(fss,"/");
+    utility_c2wstrcat(fss,SAVES_DIR);
 
-    if(!createDirectory(fss))
-	{
-		clearStatusMessage();
-        return;
-	}
-
-    c2wstrcat(fss,"/SRAM");
-    c2wstrcat(fss,MD_32X_SAVE_EXT);
+    utility_c2wstrcat(fss,"/SRAM");
+    utility_c2wstrcat(fss,MD_32X_SAVE_EXT);
 
     f_close(&gSDFile);
 
@@ -2680,7 +2680,7 @@ void sram_mgr_restoreAll(int index)
     ints_on();
     f_close(&gSDFile);
     update_progress("Restoring ALL SRAM.."," ",100,100);
-	clearStatusMessage();
+    clearStatusMessage();
 }
 
 void sram_mgr_clearGame(int index)
@@ -2708,7 +2708,7 @@ void sram_mgr_clearGame(int index)
     ints_on();
     setStatusMessage("Clearing GAME sram...OK!");
 
-	clearStatusMessage();
+    clearStatusMessage();
 }
 
 void sram_mgr_clearAll(int index)
@@ -2736,7 +2736,7 @@ void sram_mgr_clearAll(int index)
     update_progress("Clearing ALL SRAM.."," ",100,100);
     setStatusMessage("Clearing ALL SRAM...OK");
 ;
-	clearStatusMessage();
+    clearStatusMessage();
 }
 
 void sram_mgr_copyGameToNextBank(int index)
@@ -2822,7 +2822,7 @@ void sram_mgr_copyGameToNextBank(int index)
     ints_on();
     setStatusMessage("Copying SRAM to next bank...OK");
 
-	clearStatusMessage();
+    clearStatusMessage();
 }
 
 void do_sramMgr(void)
@@ -2946,10 +2946,10 @@ void do_sramMgr(void)
                 printToScreen(gFEmptyLine,1,y,0x2000);
 
                 // keep track of length
-                nameLen = strlen(gOptions[i].name);
+                nameLen = utility_strlen(gOptions[i].name);
 
                 // print centered text
-                x = (40 >> 1) - ( (nameLen + strlen(gOptions[i].value) + 2) >> 1);
+                x = (40 >> 1) - ( (nameLen + utility_strlen(gOptions[i].value) + 2) >> 1);
 
                 if(selection == i) //highlight selection
                 {
@@ -3053,19 +3053,19 @@ void runSRAMMgr(int index)
 
     ints_on();
     setStatusMessage("Working...");
-	clearStatusMessage();
+    clearStatusMessage();
     cache_sync();
-	clearStatusMessage();
+    clearStatusMessage();
     do_sramMgr();
-	clearStatusMessage();
+    clearStatusMessage();
 }
 
 void runCheatEditor(int index)
 {
     char* line = (char*)&buffer[XFER_SIZE];
-	char* buf = (char*)&buffer[XFER_SIZE + 256 ];
+    char* buf = (char*)&buffer[XFER_SIZE + 256 ];
     char* pb = (char*)&buffer[0];
-	WCHAR* cheatPath = (WCHAR*)&buffer[XFER_SIZE + 512 ];
+    WCHAR* cheatPath = (WCHAR*)&buffer[XFER_SIZE + 512 ];
     UINT fbr,read;
     int r;
     int added = 0;
@@ -3079,17 +3079,17 @@ void runCheatEditor(int index)
     clear_screen();
 
     ints_on();
-    printToScreen("Working...",(40 >> 1) - (strlen("Working...") >>1),12,0x2000);
+    printToScreen("Working...",(40 >> 1) - (utility_strlen("Working...") >>1),12,0x2000);
 
 
     cache_sync();
 
     memset(buf,'\0',32);
-	memset(line,'\0',256);
+    memset(line,'\0',256);
 
     clear_screen();
 
-    printToScreen("Prepare to enter CHEAT NAME...",(40 >> 1) - (strlen("Prepare to enter CHEAT NAME...") >>1),12,0x0000);
+    printToScreen("Prepare to enter CHEAT NAME...",(40 >> 1) - (utility_strlen("Prepare to enter CHEAT NAME...") >>1),12,0x0000);
     delay(120);
 
     memset(buf,'\0',32);
@@ -3106,7 +3106,7 @@ void runCheatEditor(int index)
     strcat(line,") , $Code(");
 
     clear_screen();
-    printToScreen("Prepare to enter CHEAT CODE...",(40 >> 1) - (strlen("Prepare to enter CHEAT CODE...") >>1),12,0x0000);
+    printToScreen("Prepare to enter CHEAT CODE...",(40 >> 1) - (utility_strlen("Prepare to enter CHEAT CODE...") >>1),12,0x0000);
     delay(120);
 
     while(running)
@@ -3122,8 +3122,8 @@ void runCheatEditor(int index)
         }
 
         clear_screen();
-        printToScreen("START = add more",((40 >> 1) - (strlen("START = add more") >> 1 ))  ,11,0x0000);
-        printToScreen("A = exit",((40 >> 1) - (strlen("A = exit") >> 1 ))  ,13,0x0000);
+        printToScreen("START = add more",((40 >> 1) - (utility_strlen("START = add more") >> 1 ))  ,11,0x0000);
+        printToScreen("A = exit",((40 >> 1) - (utility_strlen("A = exit") >> 1 ))  ,13,0x0000);
 
         while(1)
         {
@@ -3156,7 +3156,7 @@ void runCheatEditor(int index)
                     if(added >= 11)
                     {
                         clear_screen();
-                        printToScreen("Linked cheats limit reached!",(40 >> 1) - (strlen("Linked cheats limit reached!") >> 1 ),11,0x4000);
+                        printToScreen("Linked cheats limit reached!",(40 >> 1) - (utility_strlen("Linked cheats limit reached!") >> 1 ),11,0x4000);
 
                         delay(60);
 
@@ -3174,7 +3174,7 @@ void runCheatEditor(int index)
         }
     }
 
-    idx = strlen(line) - 1;
+    idx = utility_strlen(line) - 1;
 
     if(line[idx] == ',')
     {
@@ -3184,12 +3184,12 @@ void runCheatEditor(int index)
     else
         strcat(line,") )\r\n");
 
-    c2wstrcpy(cheatPath,"/");
-    c2wstrcat(cheatPath, CHEATS_DIR);
-    c2wstrcat(cheatPath, "/");
-    wstrcat(cheatPath, gSelections[gCurEntry].name);
+    utility_c2wstrcpy(cheatPath,"/");
+    utility_c2wstrcat(cheatPath, CHEATS_DIR); createDirectory(cheatPath);
+    utility_c2wstrcat(cheatPath, "/");
+    utility_wstrcat(cheatPath, gSelections[gCurEntry].name);
     *get_file_ext(cheatPath) = 0; // cut off the extension
-    c2wstrcat(cheatPath, ".cht");
+    utility_c2wstrcat(cheatPath, ".cht");
 
     f_close(&gSDFile);
 
@@ -3213,7 +3213,7 @@ void runCheatEditor(int index)
     f_close(&gSDFile);
 
     clear_screen();
-    printToScreen("Working...",(40 >> 1) - (strlen("Working...") >>1),12,0x0000);
+    printToScreen("Working...",(40 >> 1) - (utility_strlen("Working...") >>1),12,0x0000);
     delay(30);
 
     deleteFile(cheatPath);
@@ -3223,7 +3223,7 @@ void runCheatEditor(int index)
     if(f_open(&gSDFile, cheatPath, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
     {
         ints_on();
-        f_write(&gSDFile, line ,strlen(line),&fbr);
+        f_write(&gSDFile, line ,utility_strlen(line),&fbr);
 
         ints_on();
         f_write(&gSDFile, pb ,read,&fbr);
@@ -3501,12 +3501,12 @@ void do_options(void)
                     continue;   // past end, skip line
                 // put centered name
                 if(gOptions[start+ix].value != NULL)
-                    gCursorX = 20 - (strlen(gOptions[start+ix].name) + strlen(gOptions[start+ix].value) + 2)/2;
+                    gCursorX = 20 - (utility_strlen(gOptions[start+ix].name) + utility_strlen(gOptions[start+ix].value) + 2)/2;
                 else
-                    gCursorX = 20 - (strlen(gOptions[start+ix].name) /2);
+                    gCursorX = 20 - (utility_strlen(gOptions[start+ix].name) /2);
 
                 put_str(gOptions[start+ix].name, ((start+ix) == currOption) ? 0x2000 : 0);
-                gCursorX += strlen(gOptions[start+ix].name);
+                gCursorX += utility_strlen(gOptions[start+ix].name);
 
                 if(gOptions[start+ix].value != NULL)
                 {
@@ -3643,7 +3643,7 @@ void do_options(void)
                         //int ix;
                         // copy flash to myth psram
                         copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
- 
+
                         // check for raw S&K
                         if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
                             fsize = 0x300000;
@@ -3652,7 +3652,7 @@ void do_options(void)
                         for (ix=0; ix<maxOptions; ix++)
                           if (gOptions[ix].patch)
                               (gOptions[ix].patch)(ix);
- 
+
                         neo_run_myth_psram(fsize, bbank, bsize, runmode); // never returns
                     }
                 }
@@ -3670,8 +3670,8 @@ void do_options(void)
                         runmode = gSRAMType ? 5 : !bsize ? 6 : (gSelections[gCurEntry].type == 1) ? 3 : (fsize > 0x200200) ? 2 : 1;
                     // Run selected rom
                     if (path[wstrlen(path)-1] != (WCHAR)'/')
-                        c2wstrcat(path, "/");
-                    wstrcat(path, gSelections[gCurEntry].name);
+                        utility_c2wstrcat(path, "/");
+                    utility_wstrcat(path, gSelections[gCurEntry].name);
 
                     f_close(&gSDFile);
                     if (f_open(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
@@ -3816,10 +3816,10 @@ int do_SDMgr(void)
     printToScreen("=Format SD Card",24,25,0x0000);
 
     sprintf(temp, "Card has %d blocks (%d MB)", num_sectors, (num_sectors / 2048));
-    printToScreen(temp, (40 - strlen(temp))>>1, 3, 0x2000);
+    printToScreen(temp, (40 - utility_strlen(temp))>>1, 3, 0x2000);
 
 //    sprintf(temp, "CSD: %02X %02X %02X %02X %02X %02X", sd_csd[0], sd_csd[1], sd_csd[2], sd_csd[3], sd_csd[4], sd_csd[5]);
-//    printToScreen(temp, (40 - strlen(temp))>>1, 5, 0x2000);
+//    printToScreen(temp, (40 - utility_strlen(temp))>>1, 5, 0x2000);
 
     while(1)
     {
@@ -3926,10 +3926,10 @@ void run_rom(int reset_mode)
             get_sd_info(gCurEntry);
 
         if (gSelections[gCurEntry].type == 128)
-		{
+        {
             get_sd_directory(gCurEntry);
-			return;
-		}
+            return;
+        }
 
         cache_invalidate_pointers();
 
@@ -3955,8 +3955,8 @@ void run_rom(int reset_mode)
 
         // make sure file is open and ready to load
         if (path[wstrlen(path)-1] != (WCHAR)'/')
-            c2wstrcat(path, "/");
-        wstrcat(path, gSelections[gCurEntry].name);
+            utility_c2wstrcat(path, "/");
+        utility_wstrcat(path, gSelections[gCurEntry].name);
         f_close(&gSDFile);
         if (f_open(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
         {
@@ -4013,12 +4013,12 @@ void run_rom(int reset_mode)
                 ix = 37; // max string size to print
             temp2[ix+1] = 0; // null terminate name
             gCursorY = 22;
-            gCursorX = 20 - strlen(temp2)/2;    // center name
+            gCursorX = 20 - utility_strlen(temp2)/2;    // center name
             put_str(temp2, 0);
 
             strcpy(temp2, "Press C to Stop");
             gCursorY = 23;
-            gCursorX = 20 - strlen(temp2)/2;    // center name
+            gCursorX = 20 - utility_strlen(temp2)/2;    // center name
             put_str(temp2, 0);
 
             delay(60);
@@ -4061,7 +4061,7 @@ void run_rom(int reset_mode)
                 sram_mgr_restoreGame(0);
             }
 
-			clearStatusMessage();
+            clearStatusMessage();
             ints_on();
             neo2_disable_sd();
             ints_off();     /* disable interrupts */
@@ -4074,7 +4074,7 @@ void run_rom(int reset_mode)
 void updateConfig()
 {
     UINT fbr = 0;
-	WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
 
     ints_on();
 
@@ -4086,13 +4086,11 @@ void updateConfig()
         return;
     }
 
-	utility_c2wstrcpy(fss,"/.menu"); createDirectory(fss);
-	utility_c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
-
+    utility_c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
     utility_c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
-	deleteFile(fss);
+    deleteFile(fss);
 
     if(f_open(&gSDFile, fss, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
     {
@@ -4101,7 +4099,7 @@ void updateConfig()
     }
 
     ints_on();
-    f_write(&gSDFile,(char*)buffer,strlen((char*)buffer), &fbr);
+    f_write(&gSDFile,(char*)buffer,utility_strlen((char*)buffer), &fbr);
     f_close(&gSDFile);
     ints_off();
 
@@ -4112,8 +4110,11 @@ void updateConfig()
 void loadConfig()
 {
     //The above code covers all cases just to make sure that we're not going to run into issues
-    UINT fbr = 0,bytesToRead = 0;
-	WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
+    UINT fbr = 0,bytesToRead = 0,newConfig = 0;
+    WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
+
+    if(!gSdDetected)
+        return;
 
     setStatusMessage("Reading config...");
     ints_on();
@@ -4126,8 +4127,7 @@ void loadConfig()
     BRM_SAVE_EXT = brm_save_ext_default;
 
     config_init();
-	utility_c2wstrcpy(fss,"/.menu"); createDirectory(fss);
-	utility_c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
+    utility_c2wstrcpy(fss,"/.menu/md");
     utility_c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
@@ -4140,7 +4140,7 @@ void loadConfig()
             bytesToRead = XFER_SIZE;
 
         ints_on();
-		setStatusMessage("Initializing configuration...");
+        setStatusMessage("Initializing configuration...");
         if(f_read(&gSDFile,(char*)buffer,bytesToRead, &fbr) == FR_OK)
         {
             config_loadFromBuffer((char*)buffer,(int)fbr);
@@ -4164,8 +4164,9 @@ void loadConfig()
         ints_on();
     }
     else
-    {	
-		setStatusMessage("Initializing configuration...");
+    {
+        newConfig = 1;
+        setStatusMessage("Initializing configuration...");
         config_push("ipsPath",ips_dir_default);
         config_push("cheatsPath",cheats_dir_default);
         config_push("savesPath",saves_dir_default);
@@ -4175,12 +4176,15 @@ void loadConfig()
         config_push("brmSaveExt",brm_save_ext_default);
         config_push("romName","*");
 
+        utility_c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
+        utility_c2wstrcpy(fss,dxconf_cfg);
+
         if(f_open(&gSDFile, fss, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
         {
             config_saveToBuffer((char*)buffer);
             ints_on();
 
-            f_write(&gSDFile,(char*)buffer,strlen((char*)buffer), &fbr);
+            f_write(&gSDFile,(char*)buffer,utility_strlen((char*)buffer), &fbr);
 
             ints_off();
 
@@ -4189,58 +4193,58 @@ void loadConfig()
         }
     }
 
-	setStatusMessage("Validating configuration...");
-	//BAd config? - fix it
-	if(!CHEATS_DIR)
-	{
-		CHEATS_DIR = cheats_dir_default; 
-		config_push("cheatsPath",cheats_dir_default);
-	}
+    setStatusMessage("Validating configuration...");
+    //BAd config? - fix it
+    if(!CHEATS_DIR)
+    {
+        CHEATS_DIR = cheats_dir_default;
+        config_push("cheatsPath",cheats_dir_default);
+    }
 
-	if(!IPS_DIR)
-	{
-		IPS_DIR = ips_dir_default;
-		config_push("ipsPath",ips_dir_default);
-	}
+    if(!IPS_DIR)
+    {
+        IPS_DIR = ips_dir_default;
+        config_push("ipsPath",ips_dir_default);
+    }
 
-	if(!SAVES_DIR)
-	{
-		SAVES_DIR = saves_dir_default; 
- 		config_push("savesPath",saves_dir_default);
-	}
+    if(!SAVES_DIR)
+    {
+        SAVES_DIR = saves_dir_default;
+        config_push("savesPath",saves_dir_default);
+    }
 
-	if(!CACHE_DIR)
-	{
-		CACHE_DIR = cache_dir_default; 
-		config_push("cachePath",cache_dir_default);
-	}
+    if(!CACHE_DIR)
+    {
+        CACHE_DIR = cache_dir_default;
+        config_push("cachePath",cache_dir_default);
+    }
 
-	if(!MD_32X_SAVE_EXT)
-	{
-		MD_32X_SAVE_EXT = md_32x_save_ext_default;
-		config_push("md32xSaveExt",md_32x_save_ext_default);
-	}
+    if(!MD_32X_SAVE_EXT)
+    {
+        MD_32X_SAVE_EXT = md_32x_save_ext_default;
+        config_push("md32xSaveExt",md_32x_save_ext_default);
+    }
 
-	if(!SMS_SAVE_EXT)
-	{
-		SMS_SAVE_EXT = sms_save_ext_default;
-		config_push("smsSaveExt",sms_save_ext_default);
-	}
+    if(!SMS_SAVE_EXT)
+    {
+        SMS_SAVE_EXT = sms_save_ext_default;
+        config_push("smsSaveExt",sms_save_ext_default);
+    }
 
-	if(!BRM_SAVE_EXT)
-	{
-		BRM_SAVE_EXT = brm_save_ext_default;
-		config_push("brmSaveExt",brm_save_ext_default);
-	}
+    if(!BRM_SAVE_EXT)
+    {
+        BRM_SAVE_EXT = brm_save_ext_default;
+        config_push("brmSaveExt",brm_save_ext_default);
+    }
 
-	setStatusMessage("Finalizing configuration...");
-	WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE + 24];
-	memset(buf,0,256);
+    setStatusMessage("Finalizing configuration...");
+    WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE + 24];
+    memset(buf,0,256);
 
-	utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CHEATS_DIR); createDirectory(buf);
-	utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,IPS_DIR); createDirectory(buf);
-	utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,SAVES_DIR); createDirectory(buf);
-	utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CACHE_DIR); createDirectory(buf);
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CHEATS_DIR); if(newConfig)createDirectory(buf);
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,IPS_DIR); if(newConfig)createDirectory(buf);
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,SAVES_DIR); if(newConfig)createDirectory(buf);
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CACHE_DIR); if(newConfig)createDirectory(buf);
 
     clearStatusMessage();
     ints_on();
@@ -4251,12 +4255,12 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
             short int  captionColor,short int boxColor,short int textColor,short int hlTextColor,short int maxChars)
 {
     char* buf = result;
-	char* in = (char*)&buffer[(XFER_SIZE*2) - 8];/*single character replacement*/
-	static const char chars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$^&,-:\x83\0";
+    char* in = (char*)&buffer[(XFER_SIZE*2) - 8];/*single character replacement*/
+    static const char chars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$^&,-:\x83\0";
     unsigned short int buttons;
-    const short int  numChars = strlen(chars);
+    const short int  numChars = utility_strlen(chars);
     short int cursorX,cursorY,cursorZ,cursorAbsoluteOffset,lastCursorAbsoluteOffset;
-    short int len = strlen(caption),len2;
+    short int len = utility_strlen(caption),len2;
     short int x = boxX - (len >> 1),x2;
     short int y = boxY;
     short int i;
@@ -4337,7 +4341,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
     cursorAbsoluteOffset = 0;
     lastCursorAbsoluteOffset = 0;
 
-    len2 = strlen(defaultText);
+    len2 = utility_strlen(defaultText);
     if(len2 < maxChars)
         i = len2;
     else
@@ -4363,7 +4367,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
             sync = 0;
 
             printToScreen(gEmptyLine,1,y+4,0);
-            printToScreen(buf,(40 - strlen(buf)) >> 1,y + 4,textColor);
+            printToScreen(buf,(40 - utility_strlen(buf)) >> 1,y + 4,textColor);
 
             if(inputOffs < maxChars)
                 printToScreen("_",(40 + inputOffs) >> 1,y + 4,0x4000);
@@ -4575,25 +4579,26 @@ int main(void)
 
         neo2_enable_sd();
         get_sd_directory(-1);           /* get root directory of sd card */
-
-        c2wstrcpy(fss, "/.menu/md/MDEBIOS.BIN");
-        if(f_open(&gSDFile, fss, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+        if(gSdDetected)
         {
-            gCurEntry = 0;
-            c2wstrcpy(path, "/.menu/md");
-            c2wstrcpy(gSelections[gCurEntry].name, "MDEBIOS.BIN");
-            gSelections[gCurEntry].type = 0;
-            gSelections[gCurEntry].bbank = 0;
-            gSelections[gCurEntry].bsize = 0;
-            gSelections[gCurEntry].offset = 0;
-            gSelections[gCurEntry].length = gSDFile.fsize;
-            gSelections[gCurEntry].run = 0x27;
-            f_close(&gSDFile);
-            gCurMode = MODE_SD;
-            run_rom(0x0000);        /* never returns */
-		}
-
-        neo2_disable_sd();
+            utility_c2wstrcpy(fss, "/.menu/md/MDEBIOS.BIN");
+            if(f_open(&gSDFile, fss, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+            {
+                gCurEntry = 0;
+                utility_c2wstrcpy(path, "/.menu/md");
+                utility_c2wstrcpy(gSelections[gCurEntry].name, "MDEBIOS.BIN");
+                gSelections[gCurEntry].type = 0;
+                gSelections[gCurEntry].bbank = 0;
+                gSelections[gCurEntry].bsize = 0;
+                gSelections[gCurEntry].offset = 0;
+                gSelections[gCurEntry].length = gSDFile.fsize;
+                gSelections[gCurEntry].run = 0x27;
+                f_close(&gSDFile);
+                gCurMode = MODE_SD;
+                run_rom(0x0000);        /* never returns */
+            }
+        }
+        //neo2_disable_sd();
     }
 #endif
 
@@ -4601,67 +4606,68 @@ int main(void)
 //  neo_get_rtc(rtc);                   /* get current time from Neo2/3 flash cart */
 //  ints_on();                          /* enable interrupts */
 
-	ints_on();
-	clear_screen();
-	setStatusMessage("Loading cache & configuration...");
-	cache_invalidate_pointers();
-	cheat_invalidate(); 				/*Invalidate cheat list*/
-	ipsPath[0] = 0;
-	gImportIPS = 0;
-	gSelectionSize = 0;
-	gManageSaves = 0;
-	gCurMode = MODE_SD;
-	neo2_enable_sd();
-	get_sd_directory(-1);               /* get root directory of sd card */
-	loadConfig();
+    ints_on();
+    clear_screen();
+    setStatusMessage("Loading cache & configuration...");
+    cache_invalidate_pointers();
+    cheat_invalidate();                 /*Invalidate cheat list*/
+    ipsPath[0] = 0;
+    gImportIPS = 0;
+    gSelectionSize = 0;
+    gManageSaves = 0;
+    gCurMode = MODE_SD;
+#ifdef RUN_IN_PSRAM
+    neo2_enable_sd();
+    get_sd_directory(-1);               /* get root directory of sd card */
+#endif
+    if(gSdDetected)
+    {
+        loadConfig();
+        char* p = config_getS("romName");
+        if(p)
+        {
+            if(utility_strlen(p) > 2)
+            {
+                WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE - 256];//remember loadPA() uses the block after XFER_SIZE...so move 256bytes back!
 
-	{
-		char* p = config_getS("romName");
+                utility_c2wstrcpy(buf,p);
 
-		if(p)
-		{
-			if(strlen(p) > 2)
-			{
-				WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE - 256];//remember loadPA() uses the block after XFER_SIZE...so move 256bytes back!
+                cache_loadPA(buf);
 
-				c2wstrcpy(buf,p);
+                if(p[0] == '*')
+                    gSRAMgrServiceStatus = SMGR_STATUS_NULL;
 
-				cache_loadPA(buf);
+                if(gSRAMgrServiceStatus == SMGR_STATUS_BACKUP_SRAM)
+                {
+                    sram_mgr_saveGamePA(buf);
+                    setStatusMessage("Loading cache & configuration...");
 
-				if(p[0] == '*')
-					gSRAMgrServiceStatus = SMGR_STATUS_NULL;
+                    config_push("romName","*");
 
-				if(gSRAMgrServiceStatus == SMGR_STATUS_BACKUP_SRAM)
-				{
-					sram_mgr_saveGamePA(buf);
-					setStatusMessage("Loading cache & configuration...");
+                    gSRAMgrServiceStatus = SMGR_STATUS_NULL;
+                    cache_sync();
+                    updateConfig();
+                }
+            }
+        }
+    }
 
-					config_push("romName","*");
+    memcpy(gCacheBlock.sig,"DXCS",4);
+    gCacheBlock.sig[4] = '\0';
+    gCacheBlock.processed = 0;
+    gCacheBlock.version = 1;
 
-					gSRAMgrServiceStatus = SMGR_STATUS_NULL;
-					cache_sync();
-					updateConfig();
-				}
-			}
-		}
-	}
+    cache_invalidate_pointers();
 
-	memcpy(gCacheBlock.sig,"DXCS",4);
-	gCacheBlock.sig[4] = '\0';
-	gCacheBlock.processed = 0;
-	gCacheBlock.version = 1;
+    neo2_disable_sd();
 
-	cache_invalidate_pointers();
-
-	neo2_disable_sd();
-
-	ints_on();
-	setStatusMessage("Loading cache & configuration...OK");
-	clear_screen();
-	clearStatusMessage();
+    ints_on();
+    setStatusMessage("Loading cache & configuration...OK");
+    clear_screen();
+    clearStatusMessage();
 
     /* starts in flash mode, so set gSelections from menu flash */
-	gCurMode = MODE_FLASH;
+    gCurMode = MODE_FLASH;
     get_menu_flash();
 
     while(1)
@@ -4692,7 +4698,7 @@ int main(void)
 //          memcpy(rtc, now, 8);
 //          gCursorY = 19;
 //          sprintf(temp, " %02d:%01d%01d:%01d%01d ", rtc[4]&31, rtc[3]&7, rtc[2]&15, rtc[1]&7, rtc[0]&15);
-//          gCursorX = 20 - strlen(temp)/2;     /* center time */
+//          gCursorX = 20 - utility_strlen(temp)/2;     /* center time */
 //          put_str(temp, 0);
 //      }
 
@@ -4799,6 +4805,7 @@ int main(void)
                     gCursorY = 0;
                     neo2_enable_sd();
                     get_sd_directory(-1);   /* get root directory of sd card */
+                    loadConfig();
                 }
 
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
@@ -4859,6 +4866,7 @@ int main(void)
                     gCursorY = 0;
                     neo2_enable_sd();
                     get_sd_directory(-1);   /* get root directory of sd card */
+                    loadConfig();
                     gUpdate = -1;           /* clear screen for major screen update */
                     gRomDly = 60;           /* delay before loading rom header */
                     continue;
