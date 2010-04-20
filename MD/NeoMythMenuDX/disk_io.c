@@ -42,7 +42,7 @@ unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads *
 
 unsigned char sd_csd[R2_LEN];
 
-#define INIT_RETRIES (64 * 2)
+#define INIT_RETRIES (64)
 
 /*-----------------------------------------------------------------------*/
 /*                             support code                              */
