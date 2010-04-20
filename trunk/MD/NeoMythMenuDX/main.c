@@ -969,15 +969,10 @@ void get_sd_cheat(WCHAR* sss)
                             ++sp;
 
                             if(*sp == '\n')
-                                ++sp;
-
-                            break;
+                            	break;
                         }
-                        else if (*sp == '\n')
-                        {
-                            ++sp;
-                            break;
-                        }
+						else if (*sp == '\n')
+							break;
 
                         ++sp;
                     }//!ln?
