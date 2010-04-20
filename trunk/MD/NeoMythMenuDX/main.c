@@ -3032,7 +3032,7 @@ void do_sramMgr(void)
                 // C released -> do option callback
                 if (gOptions[selection].callback)
                 {
-                    clear_screen();
+                    clearStatusMessage();
                     (gOptions[selection].callback)(selection);
                     do_sramMgr();
 
