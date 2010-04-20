@@ -351,35 +351,34 @@ int wstrlen(const WCHAR *ws);
 
 void makeDir(const XCHAR* fps)
 {
-	WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
-    int i,l,j;
+    WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
+    int i,l,j,di;
     i = j = 0;
-    l=wstrlen(fps);
-	
-	if(fps[0] == (WCHAR)'/' )
-	{
-		ss[j++] = (WCHAR)'/';
-		++i;
-	}
+    l = wstrlen(fps);
+    di = 1;
+
+    if(fps[0] == (WCHAR)'/' )
+    {
+        ss[j++] = (WCHAR)'/';
+        ++i;
+    }
 
     while(i<l)
     {
         while((i<l) && (fps[i]!= (WCHAR)'/') )
-		{
-            ss[j++] = (WCHAR)fps[i];
-			++i;
-		}
-       
-		if(fps[i] == (WCHAR)'/')
-		{
-			++i;
-			ss[j++] = (WCHAR)'/';
-		}
+        {
+            ss[j++] = (WCHAR)fps[i++];
+        }
 
-		ss[j] = 0;
+        ss[j] = 0;
 
-        if(!directoryExists(ss))
+        if((di == 0)||(!directoryExists(ss)))
+        {
             f_mkdir(ss);
+            di = 0;
+        }
+
+        ss[j++] = (WCHAR)fps[i++];
     }
 }
 
@@ -4068,9 +4067,7 @@ void updateConfig()
         return;
     }
 
-	c2wstrcpy(fss,"/.menu"); createDirectory(fss);
 	c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
-
     c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
@@ -4108,7 +4105,6 @@ void loadConfig()
     BRM_SAVE_EXT = brm_save_ext_default;
 
     config_init();
-	c2wstrcpy(fss,"/.menu"); createDirectory(fss);
 	c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
     c2wstrcpy(fss,dxconf_cfg);
 
