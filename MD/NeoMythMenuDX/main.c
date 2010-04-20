@@ -1159,7 +1159,7 @@ void get_sd_directory(int entry)
                 ix = 0;                 /* for safety */
             while (ix > 0)
             {
-                if (gSelections[entry].name[ix] == (WCHAR)'/')
+                if (path[ix] == (WCHAR)'/')
                     break;
                 ix--;
             }
