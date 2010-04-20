@@ -969,10 +969,10 @@ void get_sd_cheat(WCHAR* sss)
                             ++sp;
 
                             if(*sp == '\n')
-                            	break;
+                                break;
                         }
-						else if (*sp == '\n')
-							break;
+                        else if (*sp == '\n')
+                            break;
 
                         ++sp;
                     }//!ln?
@@ -4602,8 +4602,6 @@ int main(void)
 //  ints_on();                          /* enable interrupts */
 
     ints_on();
-    clear_screen();
-    setStatusMessage("Loading cache & configuration...");
     cache_invalidate_pointers();
     cheat_invalidate();                 /*Invalidate cheat list*/
     ipsPath[0] = 0;
@@ -4617,6 +4615,8 @@ int main(void)
 #endif
     if(gSdDetected)
     {
+        clear_screen();
+        setStatusMessage("Loading cache & configuration...");
         loadConfig();
         char* p = config_getS("romName");
         if(p)
@@ -4645,6 +4645,8 @@ int main(void)
                 }
             }
         }
+        setStatusMessage("Loading cache & configuration...OK");
+        clear_screen();
     }
 
     memcpy(gCacheBlock.sig,"DXCS",4);
@@ -4657,8 +4659,6 @@ int main(void)
     neo2_disable_sd();
 
     ints_on();
-    setStatusMessage("Loading cache & configuration...OK");
-    clear_screen();
     clearStatusMessage();
 
     /* starts in flash mode, so set gSelections from menu flash */
