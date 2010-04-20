@@ -356,6 +356,12 @@ void makeDir(const XCHAR* fps)
     i = j = 0;
     l=wstrlen(fps);
 	
+	if(fps[0] == (WCHAR)'/' )
+	{
+		ss[j++] = (WCHAR)'/';
+		++i;
+	}
+
     while(i<l)
     {
         while((i<l) && (fps[i]!= (WCHAR)'/') )
@@ -364,10 +370,13 @@ void makeDir(const XCHAR* fps)
 			++i;
 		}
        
-		ss[j] = 0;
-
 		if(fps[i] == (WCHAR)'/')
+		{
 			++i;
+			ss[j++] = (WCHAR)'/';
+		}
+
+		ss[j] = 0;
 
         if(!directoryExists(ss))
             f_mkdir(ss);
