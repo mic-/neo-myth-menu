@@ -3952,6 +3952,7 @@ void run_rom(int reset_mode)
             delay(60);
 
             PlayVGM();
+            gUpdate = -1;               /* clear screen for major screen update */
             return;
         }
 
