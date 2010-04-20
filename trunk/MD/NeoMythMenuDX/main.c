@@ -123,8 +123,8 @@ static CacheBlock gCacheBlock;/*common cache block*/
 static CheatEntry cheatEntries[CHEAT_ENTRIES_COUNT];
 static short registeredCheatEntries = 0;
 
+#define dxcore_dir "/.menu"
 #define dxconf_cfg "/.menu/md/DXCONF.CFG"
-
 #define cheats_dir_default ".menu/md/cheats"
 #define ips_dir_default ".menu/md/ips"
 #define saves_dir_default ".menu/md/saves"
@@ -349,26 +349,30 @@ inline int fileExists(const XCHAR* fss)
 
 int wstrlen(const WCHAR *ws);
 
-void MakeDir(XCHAR*path)
+void makeDir(const XCHAR* fps)
 {
-    XCHAR X;
-    int i,l;
-    i=0;
-    l=wstrlen(path);
+	WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
+    int i,l,j;
+    i = 0;
+    l=wstrlen(fps);
+	
     while(i<l)
     {
-        while(i<l && path[i]!='/')
-        {
-            i++;
-        }
-        X=path[i];
-        path[i]=0;
-        if(!directoryExists(path))
-        {
-            f_mkdir(path);
-        }
-        path[i]=X;
-        i++;
+		j = 0;
+
+        while((i<l) && (fps[i]!= (WCHAR)'/') )
+		{
+            ss[j++] = (WCHAR)fps[i];
+			++i;
+		}
+       
+		ss[j] = 0;
+
+		if(fps[i] == (WCHAR)'/')
+			++i;
+
+        if(!directoryExists(ss))
+            f_mkdir(ss);
     }
 }
 
@@ -377,7 +381,7 @@ inline int createDirectory(const XCHAR* fps)
     if(directoryExists(fps))
         return 1;
 
-    MakeDir(fps);
+    makeDir(fps);
 
     return directoryExists(fps);
 }
@@ -1857,7 +1861,9 @@ void importCheats(int index)
     if(!registeredCheatEntries)
         return;
 
-    clear_screen();
+    ints_on();
+	setStatusMessage("Applying cheats...");
+	delay(30);
 
     //Check for types that require master code
     for(a = 0; a < registeredCheatEntries; a++)
@@ -1897,10 +1903,16 @@ void importCheats(int index)
                 buffer[0] =  (cp->data & 0xFF00) >> 8;
                 buffer[1] =  (cp->data & 0xFF);
 
+				ints_off();
                 neo_copyto_myth_psram(buffer,cp->addr,2);
             }
         }
     }
+
+	ints_on();
+	setStatusMessage("Applying cheats...OK");
+	delay(30);
+	clearStatusMessage();
 }
 
 void toggleIPS(int index)
@@ -1933,16 +1945,21 @@ void importIPS(int index)
     if(ipsPath[0] == 0)
         return;
 
-    clear_screen();
-    printToScreen("Importing patch...",(40 >> 1) - (UTIL_StringLengthConst("Importing patch...") >>1),12,0);
+	ints_on();
+    setStatusMessage("Importing patch...");
+	delay(20);
 
     f_close(&gSDFile);
     if(f_open(&gSDFile, ipsPath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+	{
+		clearStatusMessage();
         return;
+	}
 
     fsize = gSDFile.fsize;
     fsize -= 3; //adjust for eof marker
 
+	ints_on();
     //skip "PATCH"
     neo_copy_sd(in,0,5);
     fbr = 5;
@@ -1971,13 +1988,18 @@ void importIPS(int index)
                 addr--;
                 nb++;
                 ix = 1;
+
+				ints_off();
                 neo_copyfrom_myth_psram(buffer, addr, 2);
             }
             if (nb & 1)
             {
+				ints_off();
                 neo_copyfrom_myth_psram(&buffer[nb-1], addr+nb-1, 2);
                 nb++;
             }
+			
+			ints_on();
             neo_copy_sd(&buffer[ix], 0, len);
             fbr += len;
         }
@@ -1993,14 +2015,18 @@ void importIPS(int index)
                 addr--;
                 nb++;
                 ix = 1;
+
+				ints_off();
                 neo_copyfrom_myth_psram(buffer, addr, 2);
             }
             if (nb & 1)
             {
+				ints_off();
                 neo_copyfrom_myth_psram(&buffer[nb-1], addr+nb-1, 2);
                 nb++;
             }
 
+			ints_on();
             neo_copy_sd(in,0,1);
             fbr += 1;
             memset(&buffer[ix], in[0], len);
@@ -2010,19 +2036,30 @@ void importIPS(int index)
         {
             if ((addr & 0x00F00000) == ((addr+len-1) & 0x00F00000))
             {
+				ints_off();
                 // doesn't cross 1MB boundary, copy all at once
                 neo_copyto_myth_psram(buffer, addr, nb);
             }
             else
             {
                 unsigned int len1 = ((addr & 0x00F00000) + 0x00100000) - addr;
+
+				ints_off();
                 // crosses 1MB boundary, copy up to 1MB boundary
                 neo_copyto_myth_psram(buffer, addr, len1);
+
+				ints_off();
                 // copy the rest after the boundary
                 neo_copyto_myth_psram(&buffer[len1], addr+len1, nb-len1);
             }
         }
     }
+
+	ints_on();
+    setStatusMessage("Importing patch...OK");
+	delay(20);
+
+	clearStatusMessage();
 }
 
 /* CACHE */
@@ -2049,6 +2086,8 @@ int cache_process()
     unsigned int a = 0 , b = 0;
     short int i;
 
+	clearStatusMessage();
+
 	if(gSelections[gCurEntry].type == 128) //dir
 		return 0;
 	else if(gSelections[gCurEntry].type == 127) //Uknown
@@ -2070,9 +2109,7 @@ int cache_process()
 			return 0;
 	}
 
-    clear_screen();
-
-    printToScreen("One-time detection in progress...",(40 >> 1) - (strlen("One-time detection in progress...") >>1),12,0x4000);
+    setStatusMessage("One-time detection in progress...");
     delay(20);
 
     if ((rom_hdr[0xB0] == 'R') && (rom_hdr[0xB1] == 'A'))
@@ -2120,7 +2157,7 @@ int cache_process()
     sprintf(gSRAMBankStr, "%d", gSRAMBank);
     sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
 
-    printToScreen("One-time detection in progress...OK",(40 >> 1) - (strlen("One-time detection in progress...OK") >>1),12,0x2000);
+    setStatusMessage("One-time detection in progress...OK");
     delay(20);
 
     clearStatusMessage();
@@ -2303,7 +2340,7 @@ void sram_mgr_toggleService(int index)
 {
     ints_on();
 
-    printToScreen("Updating configuration...",(40 >> 1) - (strlen("Updating configuration...") >>1),12,0x2000);
+    setStatusMessage("Updating configuration...");
     delay(20);
 
     if(gManageSaves)
@@ -2328,9 +2365,9 @@ void sram_mgr_toggleService(int index)
     cache_sync();
 
     ints_on();
-    printToScreen("Updating configuration...OK",(40 >> 1) - (strlen("Updating configuration...OK") >>1),12,0x2000);
+    setStatusMessage("Updating configuration...OK");
     delay(20);
-
+	clearStatusMessage();
 }
 
 void sram_mgr_saveGamePA(WCHAR* sss)
@@ -2384,7 +2421,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     if(f_open(&gSDFile,fnbuf,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
         return;
 
-    printToScreen("Backing up GAME sram...",(40 >> 1) - (strlen("Backing up GAME sram...") >>1),12,0x2000);
+    setStatusMessage("Backing up GAME sram...");
     delay(20);
 
     if(/*gSelections[gCurEntry].type==2||*/gSRAMSize==16)//sms will not work due to romtype not being hashed
@@ -2430,8 +2467,9 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     ints_on();
     f_close(&gSDFile);
 
-    printToScreen("Backing up GAME sram...OK!",(40 >> 1) - (strlen("Backing up GAME sram...OK!") >>1),12,0x2000);
+    setStatusMessage("Backing up GAME sram...OK!");
     delay(30);
+	clearStatusMessage();
 }
 
 void sram_mgr_saveGame(int index)
@@ -2488,7 +2526,7 @@ void sram_mgr_restoreGame(int index)
         return;
     }
 
-    printToScreen("Restoring GAME sram...",(40 >> 1) - (strlen("Restoring GAME sram...") >>1),12,0x2000);
+    setStatusMessage("Restoring GAME sram...");
     delay(20);
 
     if(gSelections[gCurEntry].type==2||gSRAMSize==16)
@@ -2534,8 +2572,9 @@ void sram_mgr_restoreGame(int index)
     ints_on();
     f_close(&gSDFile);
 
-    printToScreen("Restoring GAME sram...OK!",(40 >> 1) - (strlen("Restoring GAME sram...OK!") >>1),12,0x2000);
+    setStatusMessage("Restoring GAME sram...OK!");
     delay(30);
+	clearStatusMessage();
 }
 
 void sram_mgr_saveAll(int index)
@@ -2544,7 +2583,7 @@ void sram_mgr_saveAll(int index)
     UINT fsize = 0 , i = 0 , fbr = 0;
 
     ints_on();
-    printToScreen("Working...",(40 >> 1) - (strlen("Working...") >>1),12,0x0000);
+    setStatusMessage("Working...");
     delay(30);
 
 	memset(fss,0,512);
@@ -2553,7 +2592,10 @@ void sram_mgr_saveAll(int index)
     c2wstrcat(fss,SAVES_DIR);
 
     if(!createDirectory(fss))
+	{
+		clearStatusMessage();
         return;
+	}
 
     c2wstrcat(fss,"/SRAM");
     c2wstrcat(fss,MD_32X_SAVE_EXT);
@@ -2581,7 +2623,7 @@ void sram_mgr_saveAll(int index)
     ints_on();
     f_close(&gSDFile);
     update_progress("Saving ALL SRAM.."," ",100,100);
-
+	clearStatusMessage();
 }
 
 void sram_mgr_restoreAll(int index)
@@ -2590,7 +2632,7 @@ void sram_mgr_restoreAll(int index)
     UINT fsize = 0 , i = 0 , fbr = 0;
 
     ints_on();
-    printToScreen("Working...",(40 >> 1) - (strlen("Working...") >>1),12,0x0000);
+    setStatusMessage("Working...");
     delay(30);
 
 	memset(fss,0,512);
@@ -2598,7 +2640,10 @@ void sram_mgr_restoreAll(int index)
     c2wstrcat(fss,SAVES_DIR);
 
     if(!createDirectory(fss))
+	{
+		clearStatusMessage();
         return;
+	}
 
     c2wstrcat(fss,"/SRAM");
     c2wstrcat(fss,MD_32X_SAVE_EXT);
@@ -2629,6 +2674,7 @@ void sram_mgr_restoreAll(int index)
     ints_on();
     f_close(&gSDFile);
     update_progress("Restoring ALL SRAM.."," ",100,100);
+	clearStatusMessage();
 }
 
 void sram_mgr_clearGame(int index)
@@ -2638,7 +2684,7 @@ void sram_mgr_clearGame(int index)
     const int sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
 
     ints_on();
-    printToScreen("Clearing GAME sram...",(40 >> 1) - (strlen("Clearing GAME sram...") >>1),12,0x2000);
+    setStatusMessage("Clearing GAME sram...");
     delay(30);
 
     memset((char*)buffer,0x0,XFER_SIZE * 2);
@@ -2655,8 +2701,9 @@ void sram_mgr_clearGame(int index)
     }
 
     ints_on();
-    printToScreen("Clearing GAME sram...OK!",(40 >> 1) - (strlen("Clearing GAME sram...OK!") >>1),12,0x2000);
+    setStatusMessage("Clearing GAME sram...OK!");
     delay(30);
+	clearStatusMessage();
 }
 
 void sram_mgr_clearAll(int index)
@@ -2664,7 +2711,7 @@ void sram_mgr_clearAll(int index)
     int i = 0;
 
     ints_on();
-    printToScreen("Clearing ALL SRAM...",(40 >> 1) - (strlen("Clearing ALL SRAM...") >>1),12,0x2000);
+    setStatusMessage("Clearing ALL SRAM...");
     delay(30);
 
     memset((char*)buffer,0x0,XFER_SIZE * 2);
@@ -2682,8 +2729,9 @@ void sram_mgr_clearAll(int index)
 
     ints_on();
     update_progress("Clearing ALL SRAM.."," ",100,100);
-    printToScreen("Clearing ALL SRAM...OK",(40 >> 1) - (strlen("Clearing ALL SRAM...OK") >>1),12,0x2000);
+    setStatusMessage("Clearing ALL SRAM...OK");
     delay(30);
+	clearStatusMessage();
 }
 
 void sram_mgr_copyGameToNextBank(int index)
@@ -2704,7 +2752,7 @@ void sram_mgr_copyGameToNextBank(int index)
     oldBankOffs = gSRAMBank * max(sramLength,8192);
 
     //copy
-    printToScreen("Copying SRAM to next bank...",(40 >> 1) - (strlen("Copying SRAM to next bank...") >>1),12,0x2000);
+    setStatusMessage("Copying SRAM to next bank...");
     delay(30);
 
     if(sramLength <= XFER_SIZE * 2)
@@ -2767,8 +2815,9 @@ void sram_mgr_copyGameToNextBank(int index)
     }
 
     ints_on();
-    printToScreen("Copying SRAM to next bank...OK",(40 >> 1) - (strlen("Copying SRAM to next bank...OK") >>1),12,0x2000);
+    setStatusMessage("Copying SRAM to next bank...OK");
     delay(30);
+	clearStatusMessage();
 }
 
 void do_sramMgr(void)
@@ -2997,16 +3046,14 @@ void runSRAMMgr(int index)
 //    if(gCurMode != MODE_SD)
 //        return;
 
-    clear_screen();
-
     ints_on();
-    printToScreen("Working...",(40 >> 1) - (strlen("Working...") >>1),12,0x2000);
+    setStatusMessage("Working...");
     delay(30);
-
+	clearStatusMessage();
     cache_sync();
-    clear_screen();
-
+	clearStatusMessage();
     do_sramMgr();
+	clearStatusMessage();
 }
 
 void runCheatEditor(int index)
@@ -3978,8 +4025,6 @@ void run_rom(int reset_mode)
 
             if(gManageSaves)
             {
-                clear_screen();
-
                 gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
                 cache_sync();
 
@@ -3991,6 +4036,7 @@ void run_rom(int reset_mode)
                 sram_mgr_restoreGame(0);
             }
 
+			clearStatusMessage();
             ints_on();
             neo2_disable_sd();
             ints_off();     /* disable interrupts */
@@ -4014,6 +4060,9 @@ void updateConfig()
         clearStatusMessage();
         return;
     }
+
+	c2wstrcpy(fss,"/.menu"); createDirectory(fss);
+	c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
 
     c2wstrcpy(fss,dxconf_cfg);
 
@@ -4052,6 +4101,7 @@ void loadConfig()
     BRM_SAVE_EXT = brm_save_ext_default;
 
     config_init();
+	c2wstrcpy(fss,"/.menu"); createDirectory(fss);
 	c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
     c2wstrcpy(fss,dxconf_cfg);
 
@@ -4524,7 +4574,7 @@ int main(void)
 
 	ints_on();
 	clear_screen();
-	printToScreen("Loading cache & configuration...",(40 >> 1) - (strlen("Loading cache & configuration...") >>1),12,0x0000);
+	setStatusMessage("Loading cache & configuration...");
 	cache_invalidate_pointers();
 	cheat_invalidate(); 				/*Invalidate cheat list*/
 	ipsPath[0] = 0;
@@ -4554,10 +4604,8 @@ int main(void)
 
 				if(gSRAMgrServiceStatus == SMGR_STATUS_BACKUP_SRAM)
 				{
-					clear_screen();
 					sram_mgr_saveGamePA(buf);
-					clear_screen();
-					printToScreen("Loading cache & configuration...",(40 >> 1) - (strlen("Loading cache & configuration...") >>1),12,0x0000);
+					setStatusMessage("Loading cache & configuration...");
 
 					config_push("romName","*");
 
@@ -4579,8 +4627,10 @@ int main(void)
 	neo2_disable_sd();
 
 	ints_on();
-	printToScreen("Loading cache & configuration...OK",(40 >> 1) - (strlen("Loading cache & configuration...OK") >>1),12,0x2000);
+	setStatusMessage("Loading cache & configuration...OK");
 	delay(30);
+	clear_screen();
+	clearStatusMessage();
 
     /* starts in flash mode, so set gSelections from menu flash */
 	gCurMode = MODE_FLASH;
