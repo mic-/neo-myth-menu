@@ -3563,7 +3563,21 @@ void do_options(void)
 
             if ((changed & SEGA_CTRL_LEFT) && (buttons & SEGA_CTRL_LEFT))
             {
-
+                // LEFT pressed, go one page back
+                currOption -= PAGE_ENTRIES;
+                if (currOption < 0)
+                {
+                    currOption = maxOptions - 1;
+                    start = maxOptions - (maxOptions % PAGE_ENTRIES);
+                }
+                if (currOption < start)
+                {
+                    start -= PAGE_ENTRIES; // previous "page" of entries
+                    if (start < 0)
+                        start = 0;
+                }
+                update = 1;
+                continue;
             }
 
             if ((changed & SEGA_CTRL_DOWN) && (buttons & SEGA_CTRL_DOWN))
@@ -3580,7 +3594,14 @@ void do_options(void)
 
             if ((changed & SEGA_CTRL_RIGHT) && (buttons & SEGA_CTRL_RIGHT))
             {
-
+                // RIGHT pressed, go one page forward
+                currOption += PAGE_ENTRIES;
+                if (currOption >= maxOptions)
+                    currOption = start = 0;    // wrap around to top
+                if ((currOption - start) >= PAGE_ENTRIES)
+                    start += PAGE_ENTRIES; // next "page" of entries
+                update = 1;
+                continue;
             }
 
             if ((changed & SEGA_CTRL_A) && !(buttons & SEGA_CTRL_A))
