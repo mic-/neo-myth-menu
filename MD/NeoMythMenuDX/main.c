@@ -353,13 +353,11 @@ void makeDir(const XCHAR* fps)
 {
 	WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
     int i,l,j;
-    i = 0;
+    i = j = 0;
     l=wstrlen(fps);
 	
     while(i<l)
     {
-		j = 0;
-
         while((i<l) && (fps[i]!= (WCHAR)'/') )
 		{
             ss[j++] = (WCHAR)fps[i];
