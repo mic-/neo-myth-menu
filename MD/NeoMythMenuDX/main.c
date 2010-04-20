@@ -353,6 +353,9 @@ void makeDir(const XCHAR* fps)
 {
     WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
     int i,l,j,di;
+
+	setStatusMessage("Creating directory tree...");
+
     i = j = 0;
     l = wstrlen(fps);
     di = 1;
@@ -380,6 +383,8 @@ void makeDir(const XCHAR* fps)
 
         ss[j++] = (WCHAR)fps[i++];
     }
+
+	clearStatusMessage();
 }
 
 inline int createDirectory(const XCHAR* fps)
@@ -4067,7 +4072,9 @@ void updateConfig()
         return;
     }
 
+	c2wstrcpy(fss,"/.menu"); createDirectory(fss);
 	c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
+
     c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
@@ -4105,6 +4112,7 @@ void loadConfig()
     BRM_SAVE_EXT = brm_save_ext_default;
 
     config_init();
+	c2wstrcpy(fss,"/.menu"); createDirectory(fss);
 	c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
     c2wstrcpy(fss,dxconf_cfg);
 
@@ -4118,6 +4126,7 @@ void loadConfig()
             bytesToRead = XFER_SIZE;
 
         ints_on();
+		setStatusMessage("Initializing configuration...");
         if(f_read(&gSDFile,(char*)buffer,bytesToRead, &fbr) == FR_OK)
         {
             config_loadFromBuffer((char*)buffer,(int)fbr);
@@ -4141,7 +4150,8 @@ void loadConfig()
         ints_on();
     }
     else
-    {
+    {	
+		setStatusMessage("Initializing configuration...");
         config_push("ipsPath",ips_dir_default);
         config_push("cheatsPath",cheats_dir_default);
         config_push("savesPath",saves_dir_default);
@@ -4165,6 +4175,7 @@ void loadConfig()
         }
     }
 
+	setStatusMessage("Validating configuration...");
 	//BAd config? - fix it
 	if(!CHEATS_DIR)
 	{
@@ -4208,6 +4219,7 @@ void loadConfig()
 		config_push("brmSaveExt",brm_save_ext_default);
 	}
 
+	setStatusMessage("Finalizing...");
 	WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE + 24];
 	memset(buf,0,256);
 
