@@ -1004,8 +1004,8 @@ void get_sd_info(int entry)
     gFileType = 0;
     gMythHdr = 0;
 
-    get_sd_cheat(gSelections[entry].name);
-    get_sd_ips(entry);
+    //get_sd_cheat(gSelections[entry].name);
+    //get_sd_ips(entry);
 
     //cache_invalidate_pointers();
 
@@ -3234,7 +3234,8 @@ void runCheatEditor(int index)
 
     ints_on();
     get_sd_cheat(gSelections[gCurEntry].name);//cheatPath);
-    //delay(10);
+	gButtons = SEGA_CTRL_NONE;
+	delay(10);
     clear_screen();
 }
 
@@ -3248,6 +3249,13 @@ void do_options(void)
     char ipsFPath[40];
 
     __options_EntryPoint:
+
+    clearStatusMessage();
+	setStatusMessage("Checking for cheats...");
+    get_sd_cheat(gSelections[gCurEntry].name);
+    clearStatusMessage();
+	setStatusMessage("Checking for ips...");
+    get_sd_ips(gCurEntry);
     clearStatusMessage();
 
     maxOptions = currOption = 0;
@@ -3704,6 +3712,8 @@ void do_options(void)
 
                             sram_mgr_restoreGame(0);
                         }
+						else
+							cache_sync();
 
                         neo2_disable_sd();
                         ints_off();     /* disable interrupts */
@@ -4061,6 +4071,8 @@ void run_rom(int reset_mode)
 
                 sram_mgr_restoreGame(0);
             }
+			else
+				cache_sync();
 
             clearStatusMessage();
             ints_on();

@@ -1,9 +1,10 @@
 CC = $(GENDEV)/m68k/bin/gcc
 AR = $(GENDEV)/m68k/bin/ar
+AS = $(GENDEV)/m68k/bin/as
 RANLIB = $(GENDEV)/m68k/bin/ranlib
 RM = rm -rf
 
-libff.a_OBJS = ff.o diskio.o option/ccsbcs.o
+libff.a_OBJS = ff.o diskio.o option/ccsbcs.o optimize/genesis/memory.o
 
 INCS = -I. -I$(GENDEV)/m68k/include -I$(GENDEV)/m68k/sdk/include
 FLAGS = -m68000 -Wall -O2 -fomit-frame-pointer -D_GCC_LIMITS_H_ $(INCS)
@@ -15,11 +16,14 @@ all: $(libff.a_OBJS) libff.a
 	$(AR) cru $@ $($@_OBJS)
 	$(RANLIB) $@
 
+%.o: %.s
+	$(AS) -m68000 --register-prefix-optional $< -o $@
+
 %.o: %.c
 	$(CC) $(FLAGS) -c $< -o $@
 
 clean:
-	$(RM) *.o *.a option/*.o
+	$(RM) *.o *.a option/*.o optimize/genesis/*.o
 
 install: all
 	mkdir -p $(GENDEV)/m68k/sdk
