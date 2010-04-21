@@ -216,6 +216,9 @@ FIL gSDFile;                            /* global file structure for FF */
 
 short int gSdDetected = 0;                   /* 0 - not detected, 1 - detected */
 
+#define gRomDly_default_flash 0
+#define gRomDly_default_sd 27
+
 /* global options table entry definitions */
 
 typedef struct {
@@ -358,7 +361,9 @@ void makeDir(const XCHAR* fps)
     WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
     int i,l,j,di;
 
-    //setStatusMessage("Creating directory tree...");
+    strcpy((char*)ss,"Creating directory: ");
+    utility_w2cstrcpy((char*)(ss+10),fps);
+    setStatusMessage((char*)ss);
 
     i = j = 0;
     l = wstrlen(fps);
@@ -388,7 +393,7 @@ void makeDir(const XCHAR* fps)
         ss[j++] = (WCHAR)fps[i++];
     }
 
-    //clearStatusMessage();
+    clearStatusMessage();
 }
 
 inline int createDirectory(const XCHAR* fps)
@@ -988,8 +993,6 @@ void get_sd_cheat(WCHAR* sss)
         }//f_read -> ok?
 
     }//open handle?
-    ints_off();
-    ints_on();
 }
 
 void get_sd_info(int entry)
@@ -1143,6 +1146,8 @@ void get_sd_directory(int entry)
     gMaxEntry = 0;
     if (entry == -1)
     {
+        rom_hdr[0] = rom_hdr[1] = 0xFF;
+
         // get root
         path[0] = (WCHAR)'/';
         path[1] = 0;
@@ -3085,8 +3090,8 @@ void runCheatEditor(int index)
 
     clear_screen();
 
-    printToScreen("Prepare to enter CHEAT NAME...",(40 >> 1) - (utility_strlen("Prepare to enter CHEAT NAME...") >>1),12,0x0000);
-    delay(120);
+    //printToScreen("Prepare to enter CHEAT NAME...",(40 >> 1) - (utility_strlen("Prepare to enter CHEAT NAME...") >>1),12,0x0000);
+    //delay(120);
 
     memset(buf,'\0',32);
     r = inputBox(buf,"Enter cheat NAME","Some name",40 >> 1,5,0x4000,0x2000,0x0000,0x2000,32);
@@ -3102,8 +3107,8 @@ void runCheatEditor(int index)
     strcat(line,") , $Code(");
 
     clear_screen();
-    printToScreen("Prepare to enter CHEAT CODE...",(40 >> 1) - (utility_strlen("Prepare to enter CHEAT CODE...") >>1),12,0x0000);
-    delay(120);
+    //printToScreen("Prepare to enter CHEAT CODE...",(40 >> 1) - (utility_strlen("Prepare to enter CHEAT CODE...") >>1),12,0x0000);
+    //delay(120);
 
     while(running)
     {
@@ -3210,11 +3215,11 @@ void runCheatEditor(int index)
 
     clear_screen();
     printToScreen("Working...",(40 >> 1) - (utility_strlen("Working...") >>1),12,0x0000);
-    delay(30);
+    //delay(30);
 
     deleteFile(cheatPath);
 
-    delay(30);
+    //delay(30);
 
     if(f_open(&gSDFile, cheatPath, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
     {
@@ -3229,7 +3234,7 @@ void runCheatEditor(int index)
 
     ints_on();
     get_sd_cheat(gSelections[gCurEntry].name);//cheatPath);
-    delay(10);
+    //delay(10);
     clear_screen();
 }
 
@@ -4161,7 +4166,7 @@ void loadConfig()
     }
     else
     {
-        //newConfig = 1;
+        newConfig = 1;
         setStatusMessage("Initializing configuration...");
         config_push("ipsPath",ips_dir_default);
         config_push("cheatsPath",cheats_dir_default);
@@ -4573,6 +4578,10 @@ int main(void)
     {
         WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE];
 
+        gCurEntry = 0;
+        gStartEntry = 0;
+        gMaxEntry = 0;
+
         neo2_enable_sd();
         get_sd_directory(-1);           /* get root directory of sd card */
         if(gSdDetected)
@@ -4611,6 +4620,9 @@ int main(void)
     gManageSaves = 0;
     gCurMode = MODE_SD;
 #ifdef RUN_IN_PSRAM
+    gCurEntry = 0;
+    gStartEntry = 0;
+    gMaxEntry = 0;
     neo2_enable_sd();
     get_sd_directory(-1);               /* get root directory of sd card */
 #endif
@@ -4657,14 +4669,25 @@ int main(void)
 
     cache_invalidate_pointers();
 
-    neo2_disable_sd();
+    if(gSdDetected&&(gMaxEntry>0))
+    {
+        ints_on();
+        clearStatusMessage();
+    }
+    else
+    {
+        neo2_disable_sd();
 
-    ints_on();
-    clearStatusMessage();
+        ints_on();
+        clearStatusMessage();
 
-    /* starts in flash mode, so set gSelections from menu flash */
-    gCurMode = MODE_FLASH;
-    get_menu_flash();
+        /* starts in flash mode, so set gSelections from menu flash */
+        gCurEntry = 0;
+        gStartEntry = 0;
+        gMaxEntry = 0;
+        gCurMode = MODE_FLASH;
+        get_menu_flash();
+    }
 
     while(1)
     {
@@ -4732,7 +4755,7 @@ int main(void)
                 }
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 gUpdate = 1;            /* minor screen update */
-                gRomDly = 60;           /* delay before loading rom header */
+                gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
                 continue;
             }
             if ((changed & SEGA_CTRL_LEFT) && (buttons & SEGA_CTRL_LEFT))
@@ -4752,7 +4775,7 @@ int main(void)
                 }
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 gUpdate = 1;            /* minor screen update */
-                gRomDly = 60;           /* delay before loading rom header */
+                gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
                 continue;
             }
             if ((changed & SEGA_CTRL_DOWN) && (buttons & SEGA_CTRL_DOWN))
@@ -4765,7 +4788,7 @@ int main(void)
                     gStartEntry += PAGE_ENTRIES; // next "page" of entries
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 gUpdate = 1;            /* minor screen update */
-                gRomDly = 60;           /* delay before loading rom header */
+                gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
                 continue;
             }
             if ((changed & SEGA_CTRL_RIGHT) && (buttons & SEGA_CTRL_RIGHT))
@@ -4778,7 +4801,7 @@ int main(void)
                     gStartEntry += PAGE_ENTRIES; // next "page" of entries
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 gUpdate = 1;            /* minor screen update */
-                gRomDly = 60;           /* delay before loading rom header */
+                gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
                 continue;
             }
 
@@ -4806,7 +4829,7 @@ int main(void)
 
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 gUpdate = -1;           /* clear screen for major screen update */
-                gRomDly = 60;           /* delay before loading rom header */
+                gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
                 continue;
             }
 
@@ -4832,7 +4855,7 @@ int main(void)
                     set_usb();
                     ints_on();     /* enable interrupts */
                     gUpdate = 1;        /* minor screen update */
-                    gRomDly = 60;       /* delay before loading rom header */
+                    gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
                     continue;
                 }
                 else if (gCurMode == MODE_SD)
@@ -4852,7 +4875,7 @@ int main(void)
                     gCurEntry = 0;
                     gStartEntry = 0;
                     gUpdate = 1;        /* minor screen update */
-                    gRomDly = 60;       /* delay before loading rom header */
+                    gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
                     continue;
                 }
 
@@ -4864,7 +4887,7 @@ int main(void)
                     get_sd_directory(-1);   /* get root directory of sd card */
                     loadConfig();
                     gUpdate = -1;           /* clear screen for major screen update */
-                    gRomDly = 60;           /* delay before loading rom header */
+                    gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
                     continue;
                 }
 
