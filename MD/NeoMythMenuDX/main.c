@@ -730,6 +730,7 @@ void get_menu_flash(void)
     menuEntry_t *p = NULL;
 
     gMaxEntry = 0;
+    rom_hdr[0] = rom_hdr[1] = 0xFF;
     // count the number of entries present in menu flash
     p = (menuEntry_t *)0x00B000;            /* menu entries in menu flash */
     while (p->meValid != 0xFF)
@@ -4160,7 +4161,7 @@ void loadConfig()
     }
     else
     {
-        newConfig = 1;
+        //newConfig = 1;
         setStatusMessage("Initializing configuration...");
         config_push("ipsPath",ips_dir_default);
         config_push("cheatsPath",cheats_dir_default);
