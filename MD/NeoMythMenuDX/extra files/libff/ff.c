@@ -1,3 +1,4 @@
+
 /*----------------------------------------------------------------------------/
 /  FatFs - FAT file system module  R0.07e                    (C)ChaN, 2009
 /-----------------------------------------------------------------------------/
@@ -171,7 +172,13 @@ WCHAR LfnBuf[_MAX_LFN + 1];
 /* String functions                                                      */
 /*-----------------------------------------------------------------------*/
 
-/* Copy memory to memory */
+/*Genesis optimized code*/
+extern void mem_cpy (void* dst, const void* src, int cnt);
+extern void mem_set (void* dst, int val, int cnt);
+extern int chk_chr (const char* str, int chr);
+extern int mem_cmp (const void* dst, const void* src, int cnt);
+
+/*
 static
 void mem_cpy (void* dst, const void* src, int cnt) {
 	char *d = (char*)dst;
@@ -179,23 +186,12 @@ void mem_cpy (void* dst, const void* src, int cnt) {
 	while (cnt--) *d++ = *s++;
 }
 
-/* Fill memory */
 static
 void mem_set (void* dst, int val, int cnt) {
 	char *d = (char*)dst;
 	while (cnt--) *d++ = (char)val;
 }
 
-/* Compare memory to memory */
-static
-int mem_cmp (const void* dst, const void* src, int cnt) {
-	const char *d = (const char *)dst, *s = (const char *)src;
-	int r = 0;
-	while (cnt-- && (r = *d++ - *s++) == 0) ;
-	return r;
-}
-
-/* Check if chr is contained in the string */
 static
 int chk_chr (const char* str, int chr) {
 	while (*str && *str != chr) str++;
@@ -203,6 +199,14 @@ int chk_chr (const char* str, int chr) {
 }
 
 
+static
+int mem_cmp (const void* dst, const void* src, int cnt) {
+	const char *d = (const char *)dst, *s = (const char *)src;
+	int r = 0;
+	while (cnt-- && (r = *d++ - *s++) == 0) ;
+	return r;
+}
+*/
 
 /*-----------------------------------------------------------------------*/
 /* Request/Release grant to access the volume                            */
