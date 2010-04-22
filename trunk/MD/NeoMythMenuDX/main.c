@@ -88,11 +88,11 @@ enum
 #define CHEAT_SUBPAIR_COUNT 12          //12 pairs per entry
 enum
 {
-    CT_NULL = 0xF,//null cheat entry
-    CT_MASTER = 0x1,//master code!
-    CT_REGION,//Will trigger all master codes
-    CT_SELF,//normal cheat
-    CT_CHILD = 0x7 //Will trigger all master codes
+    CT_NULL   = 0x0, //null cheat entry
+    CT_CHILD  = 0x1, //not used now
+    CT_SELF   = 0x2, //normal cheat, not used now
+    CT_MASTER = 0x4, //master code!
+    CT_REGION = 0x8  //region code
 };
 
 typedef struct CheatEntry CheatEntry;
@@ -329,6 +329,12 @@ inline int getClockType()
   return (*(char *)0xA10001 >> 6) & 1;
 }
 
+inline char systemRegion()
+{
+    char _od=(*(char *)0xA10001 >> 7) & 1;
+    char _pn=(*(char *)0xA10001 >> 6) & 1;
+    return _od ? (_pn ? 'E' : 'U') : 'J';
+}
 
 inline void setStatusMessage(const char* msg)
 {
@@ -425,6 +431,7 @@ inline int createDirectoryFast(const XCHAR* fps)
 
     f_mkdir(fps);
 
+    clearStatusMessage();
     return 1;
 }
 
@@ -886,6 +893,7 @@ void get_sd_cheat(WCHAR* sss)
     UINT bytesWritten;
     UINT bytesToRead;
     short lk,ll;
+    char region = systemRegion();
 
     ints_on();
     cheat_invalidate();
@@ -967,22 +975,29 @@ void get_sd_cheat(WCHAR* sss)
 
                                 if(UTIL_StringFind(sp,"CT_MASTER"))
                                 {
-                                    e->type = CT_MASTER;
-                                    e->active = 1;
-                                }
-                                else if(UTIL_StringFind(sp,"CT_REGION"))
-                                {
-                                    e->type = CT_REGION;
-                                    e->active = 1;
-                                }
-                                else if(UTIL_StringFind(sp,"CT_CHILD"))
-                                {
-                                    e->type = CT_CHILD;
+                                    e->type = e->type | CT_MASTER;
                                     e->active = 0;
                                 }
-                                else if(UTIL_StringFind(sp,"CT_SELF"))
+                                /*else*/ if(UTIL_StringFind(sp,"CT_REGION"))
                                 {
-                                    e->type = CT_SELF;
+                                    e->type = e->type | CT_REGION;
+                                    if((region==rom_hdr[0xf0])||(region==rom_hdr[0xf1])||(region==rom_hdr[0xf2]))
+                                    {
+                                        e->active = 0;
+                                    }
+                                    else
+                                    {
+                                        e->active = 1;
+                                    }
+                                }
+                                /*else*/ if(UTIL_StringFind(sp,"CT_CHILD"))
+                                {
+                                    e->type = e->type | CT_CHILD;
+                                    e->active = 0;
+                                }
+                                /*else*/ if(UTIL_StringFind(sp,"CT_SELF"))
+                                {
+                                    e->type = e->type | CT_SELF;
                                     e->active = 0;
                                 }
                             }
@@ -1014,7 +1029,7 @@ void get_sd_cheat(WCHAR* sss)
             }//*head?
 
         }//f_read -> ok?
-
+        //f_close(&gSDFile);
     }//open handle?
 }
 
@@ -1028,10 +1043,10 @@ void get_sd_info(int entry)
     gFileType = 0;
     gMythHdr = 0;
 
-	if(getClockType())
-    	gRomDly_default_sd = 20;
-	else
-		gRomDly_default_sd = 28;
+    if(getClockType())
+        gRomDly_default_sd = 20;
+    else
+        gRomDly_default_sd = 28;
 
     //get_sd_cheat(gSelections[entry].name);
     //get_sd_ips(entry);
@@ -1182,26 +1197,26 @@ void get_sd_info(int entry)
 
     gRomDly_default_sd = (int)( ((gTime2-gTime1) * gSelections[entry].length) / 0x20000);
 
-	if(getClockType())
-	{
-		if(gRomDly_default_sd >= 28)
-		    gRomDly_default_sd >>= 1;
+    if(getClockType())
+    {
+        if(gRomDly_default_sd >= 28)
+            gRomDly_default_sd >>= 1;
 
-		if(gRomDly_default_sd > 20)
-		    gRomDly_default_sd = 20;
-		else if(gRomDly_default_sd < 8)
-		    gRomDly_default_sd = 8;
-	}
-	else
-	{
-		if(gRomDly_default_sd >= 38)
-		    gRomDly_default_sd >>= 1;
+        if(gRomDly_default_sd > 20)
+            gRomDly_default_sd = 20;
+        else if(gRomDly_default_sd < 8)
+            gRomDly_default_sd = 8;
+    }
+    else
+    {
+        if(gRomDly_default_sd >= 38)
+            gRomDly_default_sd >>= 1;
 
-		if(gRomDly_default_sd > 28)
-		    gRomDly_default_sd = 28;
-		else if(gRomDly_default_sd < 20)
-		    gRomDly_default_sd = 20;
-	}
+        if(gRomDly_default_sd > 28)
+            gRomDly_default_sd = 28;
+        else if(gRomDly_default_sd < 20)
+            gRomDly_default_sd = 20;
+    }
 }
 
 void get_sd_directory(int entry)
@@ -1968,20 +1983,17 @@ void importCheats(int index)
 
         if(e->active)
         {
-            if((e->type == CT_REGION) || (e->type == CT_CHILD))
+            //apply all master codes if exist
+            for(b = 0; b < registeredCheatEntries; b++)
             {
-                //apply all master codes if exist
-                for(b = 0; b < registeredCheatEntries; b++)
-                {
-                    e = &cheatEntries[b];
+                e = &cheatEntries[b];
 
-                    if(e->type == CT_MASTER)
-                        e->active = 1;
-                }
-
-                //one time is enough to enable all master codes -- exit
-                break;
+                if(e->type & CT_MASTER)
+                    e->active = 1;
             }
+
+            //one time is enough to enable all master codes -- exit
+            break;
         }
     }
 
@@ -3317,6 +3329,7 @@ void do_options(void)
     int currOption = 0;
     int update = 1;
     char ipsFPath[40];
+    char optCheatFirst = 1;
 
     __options_EntryPoint:
 
@@ -3529,7 +3542,8 @@ void do_options(void)
                 gOptions[maxOptions].value = "On";
 
             gOptions[maxOptions].callback = &toggleCheat;
-            gOptions[maxOptions].patch = &importCheats;
+            gOptions[maxOptions].patch = optCheatFirst?&importCheats:0;
+            optCheatFirst = 0; // we need only one call of importCheats
             gOptions[maxOptions].userData = (void*)(&cheatEntries[i]);
 
             maxOptions++;
