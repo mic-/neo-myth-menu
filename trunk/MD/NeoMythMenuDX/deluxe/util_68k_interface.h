@@ -25,17 +25,18 @@ extern unsigned short* utility_getFileExtW(unsigned short* src);
 //CHAR
 extern int utility_strlen(const char* s);
 extern int utility_strlen2(const char* s);
-extern int utility_isMultipleOf(int base,int n);
 extern char* utility_getFileExt(char* src);
+extern char* utility_strcpy(char* ws1,const char* ws2);
+extern char* utility_strcat(char* s1,const char* s2);
 
 //MEM - CHAR
-extern void utility_bmemcpy(const unsigned char* src,unsigned char* dst,int len);
-extern void utility_wmemcpy(const unsigned char* src,unsigned char* dst,int len);
-extern void utility_lmemcpy(const unsigned char* src,unsigned char* dst,int len);
-extern void utility_bmemset(unsigned char* data,unsigned char c,int len);
-extern void utility_wmemset(unsigned char* data,short int c,int len);
-extern void utility_lmemset(unsigned char* data,int c,int len);
+extern void utility_memcpy(void* dst,const void* src,int len);
+extern void utility_memset(void* dst,int c,int len);
 
+//MISC
+extern int utility_isMultipleOf(int base,int n);
+extern int utility_memcmp(const void* dst, const void* src, int cnt);
+extern int utility_logtwo(int x);
 #endif
 
 
