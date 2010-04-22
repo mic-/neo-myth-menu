@@ -126,7 +126,7 @@ static CacheBlock gCacheBlock;/*common cache block*/
 static CheatEntry cheatEntries[CHEAT_ENTRIES_COUNT];
 static short registeredCheatEntries = 0;
 
-#define dxcore_dir "/.menu"
+#define dxcore_dir_default ".menu/md"
 #define dxconf_cfg "/.menu/md/DXCONF.CFG"
 #define cheats_dir_default ".menu/md/cheats"
 #define ips_dir_default ".menu/md/ips"
@@ -136,6 +136,7 @@ static short registeredCheatEntries = 0;
 #define sms_save_ext_default ".ssm"
 #define brm_save_ext_default ".brm"
 
+static char* DXCORE_DIR = dxcore_dir_default;
 static char* CHEATS_DIR = cheats_dir_default;
 static char* IPS_DIR = ips_dir_default;
 static char* SAVES_DIR = saves_dir_default;
@@ -216,8 +217,10 @@ FIL gSDFile;                            /* global file structure for FF */
 
 short int gSdDetected = 0;                   /* 0 - not detected, 1 - detected */
 
-#define gRomDly_default_flash 0
-#define gRomDly_default_sd 27
+#define gRomDly_default_flash (0)
+
+short int gRomDly_default_sd = 20;
+static int gTime1,gTime2;
 
 /* global options table entry definitions */
 
@@ -354,19 +357,13 @@ inline int fileExists(const XCHAR* fss)
     return 1;
 }
 
-int wstrlen(const WCHAR *ws);
-
-void makeDir(const XCHAR* fps)
+inline void makeDirTree(const XCHAR* fps)
 {
     WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
     int i,l,j,di;
 
-    strcpy((char*)ss,"Creating directory: ");
-    utility_w2cstrcpy((char*)(ss+10),fps);
-    setStatusMessage((char*)ss);
-
     i = j = 0;
-    l = wstrlen(fps);
+    l = utility_wstrlen(fps);
     di = 1;
 
     if(fps[0] == (WCHAR)'/' )
@@ -392,8 +389,11 @@ void makeDir(const XCHAR* fps)
 
         ss[j++] = (WCHAR)fps[i++];
     }
+}
 
-    clearStatusMessage();
+inline void createDirectoryFast(const XCHAR* fps)
+{
+	f_mkdir(fps);
 }
 
 inline int createDirectory(const XCHAR* fps)
@@ -401,7 +401,7 @@ inline int createDirectory(const XCHAR* fps)
     if(directoryExists(fps))
         return 1;
 
-    makeDir(fps);
+    createDirectoryFast(fps);
 
     return directoryExists(fps);
 }
@@ -442,7 +442,7 @@ inline void shortenName(char *dst, char *src, int max)
     if (utility_strlen(src) <= max)
     {
         // string fits, just copy it
-        strcpy(dst, src);
+        utility_strcpy(dst, src);
         return;
     }
 
@@ -458,9 +458,9 @@ inline void shortenName(char *dst, char *src, int max)
     if (right > (len - iy))
         right = len - iy; // split at last cue
 
-    memcpy(dst, src, max);
+    utility_memcpy(dst, src, max);
     dst[max - right - 1] = '~';
-    memcpy(&dst[max - right], &src[iy], right);
+    utility_memcpy(&dst[max - right], &src[iy], right);
     dst[max] = '\0';
 }
 
@@ -607,6 +607,7 @@ int cheat_fillPairs(const char* code,CheatEntry* ce)
 }
 
 /* wide string functions */
+/*
 int wstrcmp(WCHAR *ws1, WCHAR *ws2)
 {
     int ix = 0;
@@ -688,7 +689,7 @@ WCHAR *c2wstrcat(WCHAR *ws1, char *s2)
     ws1[ix] = 0;
     return ws1;
 }
-
+*/
 /* support functions */
 inline void neo_copy_sd(unsigned char *dest, int fstart, int len)
 {
@@ -719,12 +720,12 @@ void sort_entries()
         selEntry_t temp;
 
         if (((gSelections[ix].type != 128) && (gSelections[ix+1].type == 128)) || // directories first
-            ((gSelections[ix].type == 128) && (gSelections[ix+1].type == 128) && wstrcmp(gSelections[ix].name, gSelections[ix+1].name) > 0) ||
-            ((gSelections[ix].type != 128) && (gSelections[ix+1].type != 128) && wstrcmp(gSelections[ix].name, gSelections[ix+1].name) > 0))
+            ((gSelections[ix].type == 128) && (gSelections[ix+1].type == 128) &&  utility_wstrcmp(gSelections[ix].name, gSelections[ix+1].name) > 0) ||
+            ((gSelections[ix].type != 128) && (gSelections[ix+1].type != 128) &&  utility_wstrcmp(gSelections[ix].name, gSelections[ix+1].name) > 0))
         {
-            memcpy((void*)&temp, (void*)&gSelections[ix], sizeof(selEntry_t));
-            memcpy((void*)&gSelections[ix], (void*)&gSelections[ix+1], sizeof(selEntry_t));
-            memcpy((void*)&gSelections[ix+1], (void*)&temp, sizeof(selEntry_t));
+            utility_memcpy((void*)&temp, (void*)&gSelections[ix], sizeof(selEntry_t));
+            utility_memcpy((void*)&gSelections[ix], (void*)&gSelections[ix+1], sizeof(selEntry_t));
+            utility_memcpy((void*)&gSelections[ix+1], (void*)&temp, sizeof(selEntry_t));
             ix = !ix ? -1 : ix-2;
         }
     }
@@ -750,7 +751,7 @@ void get_menu_flash(void)
         utility_c2wstrcpy(gSelections[gMaxEntry].name, p->meName);
 
         // check for auto-boot extended menu
-        if ((gSelections[gMaxEntry].run == 7) && !memcmp(p->meName, "MDEBIOS", 7))
+        if ((gSelections[gMaxEntry].run == 7) && !utility_memcmp(p->meName, "MDEBIOS", 7))
         {
             gCurEntry = gMaxEntry;
             run_rom(0x0000); // never returns
@@ -774,7 +775,7 @@ void get_smd_hdr(unsigned char *jump)
         rom_hdr[ix*2 + 1] = buffer[ix + 0x0280];
         rom_hdr[ix*2 + 0] = buffer[ix + 0x2280];
     }
-    if (!memcmp(rom_hdr, "SEGA", 4))
+    if (!utility_memcmp(rom_hdr, "SEGA", 4))
     {
         gFileType = 1; // SMD LSB 1ST
         jump[0] = buffer[0x2300];
@@ -787,7 +788,7 @@ void get_smd_hdr(unsigned char *jump)
             rom_hdr[ix*2 + 0] = buffer[ix + 0x0280];
             rom_hdr[ix*2 + 1] = buffer[ix + 0x2280];
         }
-        if (!memcmp(rom_hdr, "SEGA", 4))
+        if (!utility_memcmp(rom_hdr, "SEGA", 4))
         {
             gFileType = 2; // SMD MSB 1ST
             jump[0] = buffer[0x0300];
@@ -795,7 +796,7 @@ void get_smd_hdr(unsigned char *jump)
         }
     }
 }
-
+/*
 WCHAR *get_file_ext(WCHAR *src)
 {
     int ix = wstrlen(src) - 1;
@@ -803,7 +804,7 @@ WCHAR *get_file_ext(WCHAR *src)
     if (!ix)
         ix = wstrlen(src); // no extension, use whole string
     return &src[ix];
-}
+}*/
 
 void get_sd_ips(int entry)
 {
@@ -912,19 +913,19 @@ void get_sd_cheat(WCHAR* sss)
                     if(!e)//all cheat slots used
                         return;
 
-                    UTIL_SetMemorySafe(e->name,'\0',32);//remove possible garbage
+                    utility_memset(e->name,'\0',32);//UTIL_SetMemorySafe(e->name,'\0',32);//remove possible garbage
                     UTIL_SubString(e->name,sp,"$Name(",")"); e->name[31] = '\0';
 
-                    lk = UTIL_StringLengthConst(e->name);
+                    lk = utility_strlen(e->name);//UTIL_StringLengthConst(e->name);
                     sp += 7;//speedup string parsing
                     sp += lk;//speedup string parsing
 
-                    UTIL_SetMemorySafe(cheatBuf,'\0',256);//remove possible garbage
+                    utility_memset(cheatBuf,'\0',256);//UTIL_SetMemorySafe(cheatBuf,'\0',256);//remove possible garbage
                     UTIL_SubString(cheatBuf,sp,"$Code(",")");cheatBuf[255] = '\0';
 
                     //debugText(cheatBuf,2,y,0); y += 3;
 
-                    ll = UTIL_StringLengthConst(cheatBuf);
+                    ll = utility_strlen(cheatBuf);//UTIL_StringLengthConst(cheatBuf);
 
                     sp += 7;//speedup string parsing
                     sp += ll;//speedup string parsing
@@ -998,17 +999,20 @@ void get_sd_cheat(WCHAR* sss)
 void get_sd_info(int entry)
 {
     unsigned char jump[4];
-    int eos = wstrlen(path);
+    int eos = utility_wstrlen(path);
     UINT ts;
 
+	gTime1 = gTime2 = 0;
     gFileType = 0;
     gMythHdr = 0;
+	gRomDly_default_sd = 20;
 
     //get_sd_cheat(gSelections[entry].name);
     //get_sd_ips(entry);
 
     //cache_invalidate_pointers();
 
+	gTime1 = gTicks;
     if (path[eos-1] != (WCHAR)'/')
         utility_c2wstrcat(path, "/");
 
@@ -1019,22 +1023,24 @@ void get_sd_info(int entry)
         // couldn't open file
         char *temp = (char *)buffer;
         char *temp2 = (char *)&buffer[1024];
-        w2cstrcpy(temp2, path);
+        utility_w2cstrcpy(temp2, path);
         temp2[32] = '\0';
         sprintf(temp, "!open %s",temp2);
         setStatusMessage(temp);
         path[eos] = 0;
+		gRomDly_default_sd = 1;
         return;
     }
     path[eos] = 0;
 
     f_lseek(&gSDFile, 0x7FF0);
     f_read(&gSDFile, rom_hdr, 16, &ts);
-    if (!memcmp(rom_hdr, "TMR SEGA", 8))
+    if (!utility_memcmp(rom_hdr, "TMR SEGA", 8))
     {
         // SMS ROM header
         gSelections[entry].type = 2; // SMS
         gSelections[entry].run = 0x13; // run mode = SMS + FM
+		gRomDly_default_sd = 1;
         return;
     }
 
@@ -1047,7 +1053,7 @@ void get_sd_info(int entry)
 
     f_lseek(&gSDFile, 0);
     f_read(&gSDFile, buffer, 0x2400, &ts);
-    if (!memcmp(buffer, "Vgm ", 4))
+    if (!utility_memcmp(buffer, "Vgm ", 4))
     {
         int gd3;
 
@@ -1055,8 +1061,8 @@ void get_sd_info(int entry)
         gSelections[entry].type = 4; // VGM song file
         gSelections[entry].run = 7; // extended mode
 
-        memcpy(rom_hdr, buffer, 4);
-        memset(&rom_hdr[0x20], 0x20, 0x30); // fill name with spaces
+        utility_memcpy(rom_hdr, buffer, 4);
+        utility_memset(&rom_hdr[0x20], 0x20, 0x30); // fill name with spaces
 
         gd3 = buffer[20] | (buffer[21]<<8) | (buffer[22]<<16) | (buffer[23]<<24);
         if (gd3)
@@ -1073,8 +1079,9 @@ void get_sd_info(int entry)
             }
         }
         else
-            memcpy((char *)&rom_hdr[0x20], "No GD3 Tag", 10);
+            utility_memcpy((char *)&rom_hdr[0x20], "No GD3 Tag", 10);
 
+		gRomDly_default_sd = 5;
         return;
     }
     else if ((buffer[8] == 0xAA) & (buffer[9] == 0xBB))
@@ -1086,11 +1093,11 @@ void get_sd_info(int entry)
     else
     {
         // assume binary
-        memcpy(rom_hdr, &buffer[0x100], 0x100);
-        memcpy(jump, &buffer[0x200], 4);
+        utility_memcpy(rom_hdr, &buffer[0x100], 0x100);
+        utility_memcpy(jump, &buffer[0x200], 4);
     }
 
-    if (!memcmp(&rom_hdr[0xC8], "MYTH", 4))
+    if (!utility_memcmp(&rom_hdr[0xC8], "MYTH", 4))
     {
         gSelections[entry].run = (rom_hdr[0xCC]-'0')*10 + (rom_hdr[0xCD]-'0');
         gSelections[entry].bbank = 0;
@@ -1098,7 +1105,7 @@ void get_sd_info(int entry)
         gSelections[entry].type = (jump[0]!=0)&&((jump[3]==0x88)||(jump[3]==0x90)||(jump[3]==0x91)||(memcmp(rom_hdr+0x20,"MARS",4)==0)) ? 1 : 0;
         gMythHdr = 1;
     }
-    else if (memcmp(rom_hdr, "SEGA", 4))
+    else if (utility_memcmp(rom_hdr, "SEGA", 4))
     {
         // not MD or 32X binary image
         gSelections[entry].type = 0; // MD
@@ -1112,7 +1119,7 @@ void get_sd_info(int entry)
     }
     else
     {
-        if((jump[0]!=0)&&((jump[3]==0x88)||(jump[3]==0x90)||(jump[3]==0x91)||(memcmp(rom_hdr+0x20,"MARS",4)==0)))
+        if((jump[0]!=0)&&((jump[3]==0x88)||(jump[3]==0x90)||(jump[3]==0x91)||(utility_memcmp(rom_hdr+0x20,"MARS",4)==0)))
         {
             gSelections[entry].type = 1; // 32X
             gSelections[entry].run = 3;
@@ -1139,6 +1146,21 @@ void get_sd_info(int entry)
         }
     }
 
+	gTime2 = gTicks;
+	
+	if( !(gTime2-gTime1) )
+	{
+		gRomDly_default_sd = 1;
+		return;
+	}
+
+	gRomDly_default_sd = (short int)( ((gTime2-gTime1) * gSelections[entry].length) / 0x20000);
+
+	if(gRomDly_default_sd >= 28)
+		gRomDly_default_sd >>= 1;
+
+	if(gRomDly_default_sd > 20)
+		gRomDly_default_sd = 20;
 }
 
 void get_sd_directory(int entry)
@@ -1148,6 +1170,7 @@ void get_sd_directory(int entry)
     int ix;
 
     gSdDetected = 0;
+	gRomDly_default_sd = 0;
 
     gMaxEntry = 0;
     if (entry == -1)
@@ -1188,7 +1211,7 @@ void get_sd_directory(int entry)
         if (gSelections[entry].name[0] == (WCHAR)'.')
         {
             // go back one level
-            ix = wstrlen(path) - 1;
+            ix = utility_wstrlen(path) - 1;
             if (ix < 0)
                 ix = 0;                 /* for safety */
             while (ix > 0)
@@ -1204,8 +1227,9 @@ void get_sd_directory(int entry)
         else
         {
             // go forward one level - add entry name to path
-            if (path[wstrlen(path)-1] != (WCHAR)'/')
+            if (path[utility_wstrlen(path)-1] != (WCHAR)'/')
                 utility_c2wstrcat(path, "/");
+
             utility_wstrcat(path, gSelections[entry].name);
         }
         gSdDetected = 1;
@@ -1247,7 +1271,7 @@ void get_sd_directory(int entry)
         {
             gSelections[gMaxEntry].type = 128; // directory entry
             if (fno.lfname[0])
-                wstrcpy(gSelections[gMaxEntry].name, fno.lfname);
+                utility_wstrcpy(gSelections[gMaxEntry].name, fno.lfname);
             else
                 utility_c2wstrcpy(gSelections[gMaxEntry].name, fno.fname);
 
@@ -1264,7 +1288,7 @@ void get_sd_directory(int entry)
             gSelections[gMaxEntry].offset = 0; // maybe later use this to skip a header
             gSelections[gMaxEntry].length = fno.fsize;
             if (fno.lfname[0])
-                wstrcpy(gSelections[gMaxEntry].name, fno.lfname);
+                utility_wstrcpy(gSelections[gMaxEntry].name, fno.lfname);
             else
                 utility_c2wstrcpy(gSelections[gMaxEntry].name, fno.fname);
 
@@ -1322,7 +1346,7 @@ void update_display(void)
         {
             for (ix=0; ix<PAGE_ENTRIES; ix++, gCursorY++)
             {
-                w2cstrcpy((char*)buffer, gSelections[gStartEntry + ix].name);
+                utility_w2cstrcpy((char*)buffer, gSelections[gStartEntry + ix].name);
                 // erase line
                 gCursorX = 1;
                 put_str(gFEmptyLine, 0x2000);
@@ -1331,10 +1355,10 @@ void update_display(void)
                 // put centered name
                 if (gSelections[gStartEntry + ix].type == 128)
                 {
-                    strcpy(temp, "[");
+                    utility_strcpy(temp, "[");
                     strncat(temp, (const char *)buffer, 34);
                     temp[35] = '\0';
-                    strcat(temp, "]"); // show directories in brackets
+                    utility_strcat(temp, "]"); // show directories in brackets
                 }
                 else
                 {
@@ -1423,7 +1447,7 @@ void update_display(void)
             gFileType = 0;
             ints_off(); /* disable interrupts */
             neo_copy_game(rom_hdr, 0x7FF0, 16);
-            if (!memcmp(rom_hdr, "TMR SEGA", 8))
+            if (!utility_memcmp(rom_hdr, "TMR SEGA", 8))
             {
                 // SMS ROM header
                 gSelections[0].type = 2; // SMS
@@ -1440,7 +1464,7 @@ void update_display(void)
                 gSelections[0].bsize = 0;
                 gSelections[0].bbank = 0;
                 neo_copy_game(rom_hdr, 0x100, 256);
-                if (memcmp(rom_hdr, "SEGA", 4))
+                if (utility_memcmp(rom_hdr, "SEGA", 4))
                 {
                     // not MD or 32X binary image - assume old MD
                     gSelections[0].type = 0; // MD
@@ -1450,19 +1474,19 @@ void update_display(void)
                 {
                     unsigned char jump[4];
                     neo_copy_game(jump, 0x200, 4);
-                    if ((jump[0]!=0)&&((jump[3]==0x88)||(jump[3]==0x90)||(jump[3]==0x91)||(memcmp(rom_hdr+0x20,"MARS",4)==0)))
+                    if ((jump[0]!=0)&&((jump[3]==0x88)||(jump[3]==0x90)||(jump[3]==0x91)||(utility_memcmp(rom_hdr+0x20,"MARS",4)==0)))
                         gSelections[0].type = 1; // 32X
                     else
                         gSelections[0].type = 0; // MD
                     // get name from rom header
-                    memcpy(buffer, &rom_hdr[0x20], 0x30);
+                    utility_memcpy(buffer, &rom_hdr[0x20], 0x30);
                     for (ix=47; ix>0; ix--)
                         if (buffer[ix] != 0x20)
                             break;
                     if (ix == 0)
                     {
                         // no domestic name, use export name
-                        memcpy(buffer, &rom_hdr[0x50], 0x30);
+                        utility_memcpy(buffer, &rom_hdr[0x50], 0x30);
                         for (ix=47; ix>0; ix--)
                             if (buffer[ix] != 0x20)
                                 break;
@@ -1518,7 +1542,7 @@ void update_display(void)
                 put_str(temp, 0);
                 gCursorX = 12;
                 if (gSelections[gCurEntry].run == 5)
-                    strcpy(temp, "SRAM=EEPROM");
+                    utility_strcpy(temp, "SRAM=EEPROM");
                 else
                     sprintf(temp, "SRAM Bank=%d", gSelections[gCurEntry].bbank);
                 put_str(temp, 0);
@@ -1533,75 +1557,75 @@ void update_display(void)
         {
             int start, end;
 
-            if (!memcmp(rom_hdr, "TMR SEGA", 8))
+            if (!utility_memcmp(rom_hdr, "TMR SEGA", 8))
             {
                 // SMS ROM header
-                strcpy(temp, "Region=");
+                utility_strcpy(temp, "Region=");
                 switch ((rom_hdr[15] & 0xF0) >> 4)
                 {
                     case 3:
-                    strcat(temp, "SMS Japan");
+                    utility_strcat(temp, "SMS Japan");
                     break;
                     case 4:
-                    strcat(temp, "SMS Export");
+                    utility_strcat(temp, "SMS Export");
                     break;
                     case 5:
-                    strcat(temp, "GG Japan");
+                    utility_strcat(temp, "GG Japan");
                     break;
                     case 6:
-                    strcat(temp, "GG Export");
+                    utility_strcat(temp, "GG Export");
                     break;
                     case 7:
-                    strcat(temp, "GG Intl");
+                    utility_strcat(temp, "GG Intl");
                     break;
                     default:
-                    strcat(temp, "unknown");
+                    utility_strcat(temp, "unknown");
                 }
                 gCursorX = 1;   // left justified
                 gCursorY = 22;
                 put_str(temp, 0);
 
-                strcpy(temp,"Reported Size=");
+                utility_strcpy(temp,"Reported Size=");
                 switch (rom_hdr[15] & 0x0F)
                 {
                     case 0:
-                    strcat(temp, "256KB");
+                    utility_strcat(temp, "256KB");
                     break;
                     case 1:
-                    strcat(temp, "512KB");
+                    utility_strcat(temp, "512KB");
                     break;
                     case 2:
-                    strcat(temp, "1MB");
+                    utility_strcat(temp, "1MB");
                     break;
                     case 10:
-                    strcat(temp, "8KB");
+                    utility_strcat(temp, "8KB");
                     break;
                     case 11:
-                    strcat(temp, "16KB");
+                    utility_strcat(temp, "16KB");
                     break;
                     case 12:
-                    strcat(temp, "32KB");
+                    utility_strcat(temp, "32KB");
                     break;
                     case 13:
-                    strcat(temp, "48KB");
+                    utility_strcat(temp, "48KB");
                     break;
                     case 14:
-                    strcat(temp, "64KB");
+                    utility_strcat(temp, "64KB");
                     break;
                     case 15:
-                    strcat(temp, "128KB");
+                    utility_strcat(temp, "128KB");
                     break;
                     default:
-                    strcat(temp, "none");
+                    utility_strcat(temp, "none");
                 }
                 gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
             }
-            else if (!memcmp(rom_hdr, "Vgm ", 4))
+            else if (!utility_memcmp(rom_hdr, "Vgm ", 4))
             {
                 // VGM song file
                 // print track name from header
-                memcpy(temp, &rom_hdr[0x20], 0x30);
+                utility_memcpy(temp, &rom_hdr[0x20], 0x30);
                 for (ix=47; ix>0; ix--)
                     if (temp[ix] != 0x20)
                         break;
@@ -1612,18 +1636,18 @@ void update_display(void)
                 gCursorX = 20 - utility_strlen(temp)/2; // center name
                 put_str(temp, 0);
             }
-            else if (!memcmp(rom_hdr, "SEGA", 4))
+            else if (!utility_memcmp(rom_hdr, "SEGA", 4))
             {
                 // MD/32X ROM header
                 // print game name from header
-                memcpy(temp, &rom_hdr[0x20], 0x30);
+                utility_memcpy(temp, &rom_hdr[0x20], 0x30);
                 for (ix=47; ix>0; ix--)
                     if (temp[ix] != 0x20)
                         break;
                 if (ix == 0)
                 {
                     // no domestic name, use export name
-                    memcpy(temp, &rom_hdr[0x50], 0x30);
+                    utility_memcpy(temp, &rom_hdr[0x50], 0x30);
                     for (ix=47; ix>0; ix--)
                         if (temp[ix] != 0x20)
                             break;
@@ -1778,7 +1802,7 @@ void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(u
         (dst)(&buffer[gFileType ? XFER_SIZE : 0], doffset + iy, XFER_SIZE);
         update_progress(str1, str2, iy, length);
     }
-    memset(buffer, 0x00, XFER_SIZE);
+    utility_memset(buffer, 0x00, XFER_SIZE);
     for (iy=length; iy<(length + 0x020000); iy+=XFER_SIZE)
         (dst)(buffer, doffset + iy, XFER_SIZE);
 }
@@ -1812,7 +1836,7 @@ void toggleSRAMType(int index)
         gOptions[index].value = "EEPROM";
     }
 }
-
+/*
 int logtwo(int x)
 {
     int result = -1;
@@ -1822,7 +1846,7 @@ int logtwo(int x)
         x >>= 1;
     }
     return result;
-}
+}*/
 
 void incSaveRAMSize(int index)
 {
@@ -1833,7 +1857,7 @@ void incSaveRAMSize(int index)
 
     sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
     // remask bank setting
-    gSRAMBank = gSRAMBank & (63 >> logtwo(gSRAMSize));
+    gSRAMBank = gSRAMBank & (63 >> utility_logtwo(gSRAMSize));
 
     if (gSRAMBank > 31)
         gSRAMBank = 0; // max of 32 banks since minimum bank size is 8KB sram
@@ -1843,7 +1867,7 @@ void incSaveRAMSize(int index)
 
 void incSaveRAMBank(int index)
 {
-    gSRAMBank = (gSRAMBank + 1) & (63 >> logtwo(gSRAMSize));
+    gSRAMBank = (gSRAMBank + 1) & (63 >> utility_logtwo(gSRAMSize));
 
     if (gSRAMBank > 31)
         gSRAMBank = 0; // max of 32 banks since minimum bank size is 8KB sram
@@ -2067,7 +2091,7 @@ void importIPS(int index)
             ints_on();
             neo_copy_sd(in,0,1);
             fbr += 1;
-            memset(&buffer[ix], in[0], len);
+            utility_memset(&buffer[ix], in[0], len);
         }
 
         if((addr+len-1) < gSelectionSize)
@@ -2181,7 +2205,7 @@ int cache_process()
             //intense scan
             for(i = 0; i < EEPROM_MAPPERS_COUNT; i++)
             {
-                if(!memcmp(rom_hdr + 0x83,EEPROM_MAPPERS[i],utility_strlen(EEPROM_MAPPERS[i])))
+                if(!utility_memcmp(rom_hdr + 0x83,EEPROM_MAPPERS[i],utility_strlen(EEPROM_MAPPERS[i])))
                 {
                     gSRAMType = 0x0001;
                     break;
@@ -2207,14 +2231,14 @@ void cache_loadPA(WCHAR* sss)
     if(gCurMode != MODE_SD)
         return;
 
-    if(*get_file_ext(sss) != '.')
+    if(*utility_getFileExtW(sss) != '.')
         return;
 
     if(gSelections[gCurEntry].run == 0x27)
         return;
 
     setStatusMessage("Reading cache...");
-    memset(fnbuf,0,512);
+    utility_memset(fnbuf,0,512);
 
     ints_on();
     utility_c2wstrcpy(fnbuf,"/");
@@ -2298,7 +2322,7 @@ void cache_sync()
         return;
 
     ints_on();
-    memset(fnbuf,0,512);
+    utility_memset(fnbuf,0,512);
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,CACHE_DIR);
 
@@ -2408,7 +2432,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
         return;
 
     ints_on();
-    memset(fnbuf,0,512);
+    utility_memset(fnbuf,0,512);
 
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
     sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
@@ -2422,7 +2446,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     utility_c2wstrcat(fnbuf,"/");
     utility_wstrcat(fnbuf,sss);
 
-    *get_file_ext(fnbuf) = 0;
+    *utility_getFileExtW(fnbuf) = 0;
     if(/*gSelections[gCurEntry].type==2||*/gSRAMSize==16)//sms will not work due to romtype not being hashed
     {
         //sms or bram
@@ -2509,7 +2533,7 @@ void sram_mgr_restoreGame(int index)
     int sramLength,sramBankOffs,k,i,tr;
 
     ints_on();
-    memset(fnbuf,0,512);
+    utility_memset(fnbuf,0,512);
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,SAVES_DIR);
 
@@ -2519,7 +2543,7 @@ void sram_mgr_restoreGame(int index)
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
     sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
 
-    *get_file_ext(fnbuf) = 0;
+    *utility_getFileExtW(fnbuf) = 0;
     if(gSelections[gCurEntry].type==2||gSRAMSize==16)
     {
         //sms or bram
@@ -2606,7 +2630,7 @@ void sram_mgr_saveAll(int index)
     ints_on();
     setStatusMessage("Working...");
 
-    memset(fss,0,512);
+    utility_memset(fss,0,512);
 
     utility_c2wstrcpy(fss,"/");
     utility_c2wstrcat(fss,SAVES_DIR);
@@ -2654,7 +2678,7 @@ void sram_mgr_restoreAll(int index)
     ints_on();
     setStatusMessage("Working...");
 
-    memset(fss,0,512);
+    utility_memset(fss,0,512);
     utility_c2wstrcpy(fss,"/");
     utility_c2wstrcat(fss,SAVES_DIR);
 
@@ -2699,7 +2723,7 @@ void sram_mgr_clearGame(int index)
     ints_on();
     setStatusMessage("Clearing GAME sram...");
 
-    memset((char*)buffer,0x0,XFER_SIZE * 2);
+    utility_memset((char*)buffer,0x0,XFER_SIZE * 2);
 
     while(sramLength)//write  32KB blocks
     {
@@ -2725,8 +2749,7 @@ void sram_mgr_clearAll(int index)
     ints_on();
     setStatusMessage("Clearing ALL SRAM...");
 
-
-    memset((char*)buffer,0x0,XFER_SIZE * 2);
+    utility_memset((char*)buffer,0x0,XFER_SIZE * 2);
 
     while( i < ((XFER_SIZE * 2) * 4) * 2)//write  32KB blocks
     {
@@ -2755,7 +2778,7 @@ void sram_mgr_copyGameToNextBank(int index)
 
     targetBank = gSRAMBank + 1;
     // check for wrap-around
-    targetBank = targetBank & (63 >> logtwo(gSRAMSize));
+    targetBank = targetBank & (63 >> utility_logtwo(gSRAMSize));
     if (targetBank > 31)
         targetBank = 0; // max of 32 banks since minimum bank size is 8KB sram
 
@@ -3091,15 +3114,15 @@ void runCheatEditor(int index)
 
     cache_sync();
 
-    memset(buf,'\0',32);
-    memset(line,'\0',256);
+    utility_memset(buf,'\0',32);
+    utility_memset(line,'\0',256);
 
     clear_screen();
 
     //printToScreen("Prepare to enter CHEAT NAME...",(40 >> 1) - (utility_strlen("Prepare to enter CHEAT NAME...") >>1),12,0x0000);
     //delay(120);
 
-    memset(buf,'\0',32);
+    utility_memset(buf,'\0',32);
     r = inputBox(buf,"Enter cheat NAME","Some name",40 >> 1,5,0x4000,0x2000,0x0000,0x2000,32);
 
     if(!r)
@@ -3108,9 +3131,9 @@ void runCheatEditor(int index)
         return;
     }
 
-    strcpy(line,"AddCheat( $Name(");
-    strcat(line,buf);
-    strcat(line,") , $Code(");
+    utility_strcpy(line,"AddCheat( $Name(");
+    utility_strcat(line,buf);
+    utility_strcat(line,") , $Code(");
 
     clear_screen();
     //printToScreen("Prepare to enter CHEAT CODE...",(40 >> 1) - (utility_strlen("Prepare to enter CHEAT CODE...") >>1),12,0x0000);
@@ -3124,8 +3147,8 @@ void runCheatEditor(int index)
             break;
 
         {
-            strcat(line,buf);
-            strcat(line,",");
+            utility_strcat(line,buf);
+            utility_strcat(line,",");
         }
 
         clear_screen();
@@ -3185,17 +3208,17 @@ void runCheatEditor(int index)
 
     if(line[idx] == ',')
     {
-        memcpy(line + idx,"))\r\n",4);
+        utility_memcpy(line + idx,"))\r\n",4);
         line[idx + 4] = '\0';
     }
     else
-        strcat(line,") )\r\n");
+        utility_strcat(line,") )\r\n");
 
     utility_c2wstrcpy(cheatPath,"/");
     utility_c2wstrcat(cheatPath, CHEATS_DIR); createDirectory(cheatPath);
     utility_c2wstrcat(cheatPath, "/");
     utility_wstrcat(cheatPath, gSelections[gCurEntry].name);
-    *get_file_ext(cheatPath) = 0; // cut off the extension
+    *utility_getFileExtW(cheatPath) = 0; // cut off the extension
     utility_c2wstrcat(cheatPath, ".cht");
 
     f_close(&gSDFile);
@@ -3239,7 +3262,7 @@ void runCheatEditor(int index)
     f_close(&gSDFile);
 
     ints_on();
-    get_sd_cheat(gSelections[gCurEntry].name);//cheatPath);
+    // - not needed anymore - get_sd_cheat(gSelections[gCurEntry].name);//cheatPath);
 	gButtons = SEGA_CTRL_NONE;
 	delay(10);
     clear_screen();
@@ -3474,7 +3497,7 @@ void do_options(void)
 
     if(ipsPath[0] != 0)
     {
-        w2cstrcpy((char*)buffer, ipsPath);
+        utility_w2cstrcpy((char*)buffer, ipsPath);
         strncpy(ipsFPath, (const char *)buffer, 36);
         ipsFPath[36] = '\0';
         gOptions[maxOptions].name = ipsFPath;
@@ -3631,7 +3654,7 @@ void do_options(void)
                 // B released
                 char temp[32];
 
-                w2cstrcpy((char*)buffer, gSelections[gCurEntry].name);
+                utility_w2cstrcpy((char*)buffer, gSelections[gCurEntry].name);
                 //strncpy(temp, (const char *)buffer, 30);
                 //temp[30] = '\0';
                 shortenName(temp, (char *)buffer, 30);
@@ -3660,7 +3683,7 @@ void do_options(void)
                         copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
 
                         // check for raw S&K
-                        if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
+                        if (!utility_memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
                             fsize = 0x300000;
 
                         // do patch callbacks
@@ -3673,7 +3696,7 @@ void do_options(void)
                 }
                 else if (gCurMode == MODE_SD)
                 {
-                    int eos = wstrlen(path);
+                    int eos = utility_wstrlen(path);
                     int fsize, bbank, bsize, runmode;
                     UINT ts;
 
@@ -3684,7 +3707,7 @@ void do_options(void)
                     if ((runmode & 0x1F) < 7)
                         runmode = gSRAMType ? 5 : !bsize ? 6 : (gSelections[gCurEntry].type == 1) ? 3 : (fsize > 0x200200) ? 2 : 1;
                     // Run selected rom
-                    if (path[wstrlen(path)-1] != (WCHAR)'/')
+                    if (path[utility_wstrlen(path)-1] != (WCHAR)'/')
                         utility_c2wstrcat(path, "/");
                     utility_wstrcat(path, gSelections[gCurEntry].name);
 
@@ -3712,7 +3735,7 @@ void do_options(void)
                             cache_sync();
 
                             char* p = (char*)buffer;
-                            w2cstrcpy(p,gSelections[gCurEntry].name);
+                            utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                             config_push("romName",p);
                             updateConfig();
 
@@ -3733,7 +3756,7 @@ void do_options(void)
                         copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
 
                         // check for raw S&K
-                        if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
+                        if (!utility_memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
                             fsize = 0x300000;
 
                         gSelectionSize = fsize;
@@ -3752,7 +3775,7 @@ void do_options(void)
                             cache_sync();
 
                             char* p = (char*)buffer;
-                            w2cstrcpy(p,gSelections[gCurEntry].name);
+                            utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                             config_push("romName",p);
                             updateConfig();
 
@@ -3883,7 +3906,7 @@ void run_rom(int reset_mode)
 {
     char temp[32];
 
-    w2cstrcpy((char*)buffer, gSelections[gCurEntry].name);
+    utility_w2cstrcpy((char*)buffer, gSelections[gCurEntry].name);
     //strncpy(temp, (const char *)buffer, 30);
     //temp[30] = '\0';
     shortenName(temp, (char *)buffer, 30);
@@ -3911,7 +3934,7 @@ void run_rom(int reset_mode)
             copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
 
             // check for raw S&K
-            if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
+            if (!utility_memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
                 fsize = 0x300000;
 
             neo_run_myth_psram(fsize, bbank, bsize, gSelections[gCurEntry].run); // never returns
@@ -3934,7 +3957,7 @@ void run_rom(int reset_mode)
     }
     else if (gCurMode == MODE_SD)
     {
-        int eos = wstrlen(path);
+        int eos = utility_wstrlen(path);
         int fsize, bbank, bsize, runmode;
         UINT ts;
 
@@ -3971,7 +3994,7 @@ void run_rom(int reset_mode)
             runmode = 6;
 
         // make sure file is open and ready to load
-        if (path[wstrlen(path)-1] != (WCHAR)'/')
+        if (path[utility_wstrlen(path)-1] != (WCHAR)'/')
             utility_c2wstrcat(path, "/");
         utility_wstrcat(path, gSelections[gCurEntry].name);
         f_close(&gSDFile);
@@ -4022,7 +4045,7 @@ void run_rom(int reset_mode)
             put_str(gEmptyLine, 0);
 
             // print track name from header
-            memcpy(temp2, &rom_hdr[0x20], 0x30);
+            utility_memcpy(temp2, &rom_hdr[0x20], 0x30);
             for (ix=47; ix>0; ix--)
                 if (temp2[ix] != 0x20)
                     break;
@@ -4033,7 +4056,7 @@ void run_rom(int reset_mode)
             gCursorX = 20 - utility_strlen(temp2)/2;    // center name
             put_str(temp2, 0);
 
-            strcpy(temp2, "Press C to Stop");
+            utility_strcpy(temp2, "Press C to Stop");
             gCursorY = 23;
             gCursorX = 20 - utility_strlen(temp2)/2;    // center name
             put_str(temp2, 0);
@@ -4062,7 +4085,7 @@ void run_rom(int reset_mode)
             copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
 
             // check for raw S&K
-            if (!memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
+            if (!utility_memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
                 fsize = 0x300000;
 
             if(gManageSaves)
@@ -4071,7 +4094,7 @@ void run_rom(int reset_mode)
                 cache_sync();
 
                 char* p = (char*)buffer;
-                w2cstrcpy(p,gSelections[gCurEntry].name);
+                utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                 config_push("romName",p);
                 updateConfig();
 
@@ -4105,7 +4128,7 @@ void updateConfig()
         return;
     }
 
-    utility_c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
+    //utility_c2wstrcpy(fss,DXCORE_DIR); createDirectory(fss);
     utility_c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
@@ -4129,24 +4152,45 @@ void updateConfig()
 void loadConfig()
 {
     //The above code covers all cases just to make sure that we're not going to run into issues
-    UINT fbr = 0,bytesToRead = 0,newConfig = 0;
+    UINT fbr = 0,bytesToRead = 0,coreExists = 1;
     WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* buf = (WCHAR*)&buffer[WORK_RAM_SIZE - 1024];
+	char* ps = (char*)&buffer[WORK_RAM_SIZE - 256];
+    char* ps2 = NULL;
 
     if(!gSdDetected)
         return;
 
     setStatusMessage("Reading config...");
-    ints_on();
-    CHEATS_DIR = cheats_dir_default;
-    IPS_DIR = ips_dir_default;
-    SAVES_DIR = saves_dir_default;
-    CACHE_DIR = cache_dir_default;
-    MD_32X_SAVE_EXT = md_32x_save_ext_default;
-    SMS_SAVE_EXT = sms_save_ext_default;
-    BRM_SAVE_EXT = brm_save_ext_default;
+	utility_memset(buf,0,256);
+    
+	ints_on();
+
+	if((!DXCORE_DIR) || (!CHEATS_DIR) || (!IPS_DIR) || (!SAVES_DIR) || (!CACHE_DIR) || (!MD_32X_SAVE_EXT) || (!SMS_SAVE_EXT) || (!BRM_SAVE_EXT) )
+	{
+		DXCORE_DIR = dxcore_dir_default;
+		CHEATS_DIR = cheats_dir_default;
+		IPS_DIR = ips_dir_default;
+		SAVES_DIR = saves_dir_default;
+		CACHE_DIR = cache_dir_default;
+		MD_32X_SAVE_EXT = md_32x_save_ext_default;
+		SMS_SAVE_EXT = sms_save_ext_default;
+		BRM_SAVE_EXT = brm_save_ext_default;
+	}
 
     config_init();
-    utility_c2wstrcpy(fss,"/.menu/md");
+
+	utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,DXCORE_DIR);
+
+	if(!directoryExists(buf))
+	{
+		ps2 = utility_strcpy(ps,"Creating dir tree :");
+		utility_strcat(ps2,DXCORE_DIR);
+		setStatusMessage(ps);
+		coreExists = 0;
+		makeDirTree(buf);
+	}
+
     utility_c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
@@ -4171,11 +4215,13 @@ void loadConfig()
             MD_32X_SAVE_EXT = config_getS("md32xSaveExt");
             SMS_SAVE_EXT = config_getS("smsSaveExt");
             BRM_SAVE_EXT = config_getS("brmSaveExt");
+			DXCORE_DIR = config_getS("dxcoreDir");
 
             if(CHEATS_DIR[0]=='/')CHEATS_DIR++;
             if(IPS_DIR[0]=='/')IPS_DIR++;
             if(SAVES_DIR[0]=='/')SAVES_DIR++;
             if(CACHE_DIR[0]=='/')CACHE_DIR++;
+			if(DXCORE_DIR[0]=='/')DXCORE_DIR++;
         }
 
         f_close(&gSDFile);
@@ -4184,7 +4230,6 @@ void loadConfig()
     }
     else
     {
-        newConfig = 1;
         setStatusMessage("Initializing configuration...");
         config_push("ipsPath",ips_dir_default);
         config_push("cheatsPath",cheats_dir_default);
@@ -4193,9 +4238,10 @@ void loadConfig()
         config_push("md32xSaveExt",md_32x_save_ext_default);
         config_push("smsSaveExt",sms_save_ext_default);
         config_push("brmSaveExt",brm_save_ext_default);
+		config_push("dxcoreDir",dxcore_dir_default);
         config_push("romName","*");
 
-        utility_c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
+        utility_c2wstrcpy(fss,DXCORE_DIR); createDirectory(fss);
         utility_c2wstrcpy(fss,dxconf_cfg);
 
         if(f_open(&gSDFile, fss, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
@@ -4256,14 +4302,21 @@ void loadConfig()
         config_push("brmSaveExt",brm_save_ext_default);
     }
 
-    setStatusMessage("Finalizing configuration...");
-    WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE + 24];
-    memset(buf,0,256);
+    if(!DXCORE_DIR)
+    {
+        DXCORE_DIR = dxcore_dir_default;
+        config_push("dxcoreDir",dxcore_dir_default);
+    }
 
-    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CHEATS_DIR); if(newConfig)createDirectory(buf);
-    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,IPS_DIR); if(newConfig)createDirectory(buf);
-    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,SAVES_DIR); if(newConfig)createDirectory(buf);
-    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CACHE_DIR); if(newConfig)createDirectory(buf);
+	setStatusMessage("Finalizing configuration...");
+
+	if(!coreExists)
+	{
+		utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CHEATS_DIR); /*if(!directoryExists(buf))*/createDirectoryFast(buf);
+		utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,IPS_DIR); /*if(!directoryExists(buf))*/createDirectoryFast(buf);
+		utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,SAVES_DIR); /*if(!directoryExists(buf))*/createDirectoryFast(buf);
+		utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CACHE_DIR); /*if(!directoryExists(buf))*/createDirectoryFast(buf);
+	}
 
     clearStatusMessage();
     ints_on();
@@ -4368,8 +4421,8 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
     x2 = (40 - i) >> 1;
 
     inputOffs = i;
-    memset(buf,'\0',maxChars);
-    memcpy(buf,defaultText,i);
+    utility_memset(buf,'\0',maxChars);
+    utility_memcpy(buf,defaultText,i);
     buf[i] = '\0';
 
     printToScreen("A",2 + 5,y + 17,0);  printToScreen("=Delete",3 + 5,y + 17,0x4000);
@@ -4625,6 +4678,7 @@ int main(void)
     }
 #endif
 
+	 
 //  ints_off();                         /* disable interrupts */
 //  neo_get_rtc(rtc);                   /* get current time from Neo2/3 flash cart */
 //  ints_on();                          /* enable interrupts */
@@ -4680,7 +4734,7 @@ int main(void)
         clear_screen();
     }
 
-    memcpy(gCacheBlock.sig,"DXCS",4);
+    utility_memcpy(gCacheBlock.sig,"DXCS",4);
     gCacheBlock.sig[4] = '\0';
     gCacheBlock.processed = 0;
     gCacheBlock.version = 1;
@@ -4914,6 +4968,29 @@ int main(void)
             if ((changed & SEGA_CTRL_C) && !(buttons & SEGA_CTRL_C))
             {
                 // C released
+                if ((gCurMode == MODE_SD) && (gSelections[gCurEntry].type == 128))
+                {
+                    // get selected subdirectory
+                    get_sd_directory(gCurEntry);
+                    gCurEntry = 0;
+                    gStartEntry = 0;
+                    gUpdate = 1;        /* minor screen update */
+                    gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
+                    continue;
+                }
+
+                if ((gCurMode == MODE_SD) && (gMaxEntry == 0))
+                {
+                    // no entries last time SD card checked... check again
+                    gCursorY = 0;
+                    neo2_enable_sd();
+                    get_sd_directory(-1);   /* get root directory of sd card */
+                    loadConfig();
+                    gUpdate = -1;           /* clear screen for major screen update */
+                    gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
+                    continue;
+                }
+
                 run_rom(0x00FF);
             }
         }

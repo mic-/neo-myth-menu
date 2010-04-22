@@ -9,6 +9,41 @@
         .text
         .align 2
 
+|int utility_logtwo(int x)
+        .global utility_logtwo
+utility_logtwo:
+		move.l 4(sp),d1
+		moveq.l #-1,d0
+
+0:
+		tst.l d1
+		ble.b 1f
+		addq.l #1,d0
+		lsr.l #1,d1
+		bra 0b
+1:
+		rts
+
+|int utility_memcmp (const void* dst, const void* src, int cnt)
+        .global utility_memcmp
+utility_memcmp:
+		movea.l 4(sp),a0
+		movea.l 8(sp),a1
+		move.l  12(sp),d1
+		moveq   #0,d0
+0:
+		tst.l   d1
+        ble.b   1f
+
+		subq.l  #1,d1
+		move.b  (a0)+,d0
+		sub.b   (a1)+,d0
+        beq.b   0b
+1:
+        ext.w   d0
+        ext.l   d0
+		rts
+
 | unsigned short* utility_getFileExtW(unsigned short* src)
     .global utility_getFileExtW
 
@@ -20,7 +55,7 @@ utility_getFileExtW:
         bne.b   1b
 
         subq.l  #2,a0
-        move.l  a0,d0 /*save addr - use this if not found*/
+        move.l  a0,d0
 2:
         cmpi.w  #46,-(a0)
         beq.b   3f
@@ -28,7 +63,7 @@ utility_getFileExtW:
         bne.b   2b
         rts
 3:
-        move.l  a0,d0 /*found*/
+        move.l  a0,d0
         rts
 
 | char* utility_getFileExt(char* src)
@@ -42,7 +77,7 @@ utility_getFileExt:
         bne.b   1b
 
         subq.l  #1,a0
-        move.l  a0,d0 /*save addr - use this if not found*/
+        move.l  a0,d0
 2:
         cmpi.b  #46,-(a0)
         beq.b   3f
@@ -50,7 +85,7 @@ utility_getFileExt:
         bne.b   2b
         rts
 3:
-        move.l  a0,d0 /*found*/
+        move.l  a0,d0
         rts
 
 
@@ -76,51 +111,49 @@ utility_w2cstrcpy:
     .global utility_wstrcmp
 
 utility_wstrcmp:
-        movea.l 4(sp),a0        /*ws1*/
-        movea.l 8(sp),a1        /*ws2*/
+		movea.l 4(sp),a0
+		movea.l 8(sp),a1
+		moveq   #0,d0
+0:
+		tst.w   (a0)
+        ble.b   1f
+
+		tst.w   (a1)
+        ble.b   1f
+
+		move.w  (a0)+,d0
+		sub.w   (a1)+,d0
+        beq.b   0b
 1:
-        cmpi.w  #0,(a0)         /**ws1 == 0 ?*/
-        beq.b   2f              /*break*/
-
-        cmpi.w  #0,(a1)         /**ws2 == 0 ?*/
-        beq.b   2f              /*break*/
-
-        cmp.w   (a0)+,(a1)+     /* *ws1 == *ws2*/
-        beq.b   1b              /* loop! */
-2:
-        cmpi.w  #0,(a0)         /*!*ws1*/
-        beq.b   3f
-
-        bra.b   4f              /* *ws1 */
-3: /*ws1 < ws2*/
-        cmpi.w  #0,(a1)
-        bne.b   5f
-
-        move.w  #0,d0
-        bra.b   6f
-4: /*ws1 > ws2*/
-        cmpi.w  #0,(a1)
-        bne.b   5f
-
-        move.w  #1,d0
-        bra.b   6f
-5: /* ws1 - ws2*/
-        move.w  (a0),d0
-        sub.w   (a1),d0
-6:
-        rts
+        ext.w   d0
+        ext.l   d0
+		rts
 
 | unsigned short* utility_wstrcpy(unsigned short* ws1,const unsigned short* ws2)
     .global utility_wstrcpy
 
 utility_wstrcpy:
-        movea.l 4(sp),a0 /* dst */
-        movea.l 8(sp),a1 /* src */
+        movea.l 4(sp),a0
+        movea.l 8(sp),a1
 1:
-        move.w  (a1)+,(a0)+ /* *ws1++ = *ws2++ */
-        bne.b   1b          /* loop */
+        move.w  (a1)+,(a0)+ 
+        bne.b   1b         
 2:
-        subq.l  #2,a0       /* *ws1 = 0 */
+        subq.l  #2,a0      
+        move.l  a0,d0
+        rts
+
+| char* utility_strcpy(char* ws1,const char* ws2)
+    .global utility_strcpy
+
+utility_strcpy:
+        movea.l 4(sp),a0
+        movea.l 8(sp),a1
+1:
+        move.b  (a1)+,(a0)+ 
+        bne.b   1b        
+2:
+        subq.l  #1,a0      
         move.l  a0,d0
         rts
 
@@ -128,8 +161,8 @@ utility_wstrcpy:
     .global utility_c2wstrcat
 
 utility_c2wstrcat:
-        movea.l 4(sp),a0 /* dst */
-        movea.l 8(sp),a1 /* src */
+        movea.l 4(sp),a0
+        movea.l 8(sp),a1 
 1:
         tst.w   (a0)+
         bne.b   1b
@@ -150,8 +183,8 @@ utility_c2wstrcat:
     .global utility_wstrcat
 
 utility_wstrcat:
-        movea.l 4(sp),a0 /* dst */
-        movea.l 8(sp),a1 /* src */
+        movea.l 4(sp),a0 
+        movea.l 8(sp),a1 
 
 1:
         tst.w   (a0)+
@@ -163,6 +196,26 @@ utility_wstrcat:
         bne.b   2b
 
         subq.l  #2,a0
+        move.l  a0,d0
+        rts
+
+| char* utility_strcat(char* s1,const char* s2)
+    .global utility_strcat
+
+utility_strcat:
+        movea.l 4(sp),a0 
+        movea.l 8(sp),a1 
+
+1:
+        tst.b   (a0)+
+        bne.b   1b
+
+        subq.l  #1,a0
+2:
+        move.b  (a1)+,(a0)+
+        bne.b   2b
+
+        subq.l  #1,a0
         move.l  a0,d0
         rts
 
@@ -188,15 +241,15 @@ otherwise prefer the strlen */
     .global utility_strlen2
 
 utility_strlen2:
-        movea.l 4(sp),a0 /* s */
-        movea.l a0,a1  /* s1 <- s : copy base address to avoid increasing result */
+        movea.l 4(sp),a0
+        movea.l a0,a1
 1:
-        tst.b   (a0)+ /* *(s++) == '\0' ?*/
+        tst.b   (a0)+
         bne.b   1b
 2:
-        move.l  a0,d0 /*end addr of string*/
-        sub.l   a1,d0 /* len <- (end - start) */
-        subq.l  #1,d0 /*normalize result because a0 gets increased before the jump*/
+        move.l  a0,d0
+        sub.l   a1,d0
+        subq.l  #1,d0
 
         rts
 
@@ -204,16 +257,16 @@ utility_strlen2:
     .global utility_wstrlen2
 
 utility_wstrlen2:
-        movea.l 4(sp),a0 /* s */
-        movea.l a0,a1  /* s1 <- s : copy base address to avoid increasing result */
+        movea.l 4(sp),a0
+        movea.l a0,a1
 1:
-        tst.w   (a0)+ /* *(s++) == 0 ?*/
+        tst.w   (a0)
         bne.b   1b
 2:
-        move.l  a0,d0 /*end addr of string*/
-        sub.l   a1,d0 /* len <- (end - start) */
-        lsr.l   #1,d0 /* >>= 1*/
-        subq.l  #1,d0 /*normalize result because a0 gets increased before the jump*/
+        move.l  a0,d0
+        sub.l   a1,d0 
+        lsr.l   #1,d0 
+        subq.l  #1,d0
 
         rts
 
@@ -222,14 +275,14 @@ utility_wstrlen2:
     .global utility_strlen
 
 utility_strlen:
-        movea.l 4(sp),a0 /* s */
-        moveq.l #0,d0 /* init result */
+        movea.l 4(sp),a0
+        moveq.l #0,d0
 1:
-        tst.b   (a0)+ /* *(s++) == '\0' ?*/
-        beq.b   2f          /* exit ! */
+        tst.b   (a0)+ 
+        beq.b   2f         
 
-        addq.l  #1,d0 /*r <- r + 1*/
-        bra.b   1b          /* loop */
+        addq.l  #1,d0 
+        bra.b   1b         
 2:
         rts
 
@@ -237,14 +290,14 @@ utility_strlen:
     .global utility_wstrlen
 
 utility_wstrlen:
-        movea.l 4(sp),a0 /* s */
-        moveq.l #0,d0 /* init result */
+        movea.l 4(sp),a0
+        moveq.l #0,d0
 1:
-        tst.w   (a0)+ /* *(s++) == 0 ?*/
-        beq.b   2f          /* exit ! */
+        tst.w   (a0)+
+        beq.b   2f
 
-        addq.l  #1,d0 /*r <- r + 1*/
-        bra.b   1b          /* loop */
+        addq.l  #1,d0
+        bra.b   1b
 2:
         rts
 
@@ -253,126 +306,47 @@ utility_wstrlen:
 
 utility_isMultipleOf:
         /*!(base & (n - 1))*/
-        move.l  8(sp),d1 /* n */
+        move.l  8(sp),d1
 
         cmpi.w  #1,d1
         blt.b   1f
 
-        move.l  4(sp),d0 /* base */
-        subq    #1,d1 /* n <- n - 1*/
+        move.l  4(sp),d0
+        subq    #1,d1
 
-        and     d1,d0 /* base & n*/
+        and     d1,d0
         not     d0
 1:
         rts
 
-/* ###### B/W/L MEMCPY 68K CPU IMPLEMENTATION ###### */
-| void utility_bmemcpy(const unsigned char* src,unsigned char* dst,int len)
-        .global utility_bmemcpy
-utility_bmemcpy:
-        /*0 ~ 4(sp) <- RA*/
-
-        movea.l 4(sp),a0 /* src */
-        movea.l 8(sp),a1 /* dst */
-        move.l  12(sp),d0 /* length */
+| void utility_memcpy(void* dst,const void* src,int len)
+        .global utility_memcpy
+utility_memcpy:
+        movea.l 4(sp),a0 
+        movea.l 8(sp),a1
+        move.l  12(sp),d0 
 
         bra.b   2f
 1:
-        move.b  (a1)+,(a0)+ /* *dst <- *src */
+        move.b  (a1)+,(a0)+
 2:
-        dbra    d0,1b /* !0 ? loop */
+        dbra    d0,1b 
 
         rts
 
-| void utility_wmemcpy(const unsigned char* src,unsigned char* dst,int len)
-        .global utility_wmemcpy
-utility_wmemcpy:
-        /*0 ~ 4(sp) <- RA*/
+| void utility_memset(void* dst,int c,int len)
+        .global utility_memset
+utility_memset:
 
-        movea.l 4(sp),a0 /* src */
-        movea.l 8(sp),a1 /* dst */
-        move.l  12(sp),d0 /* length */
-
-        lsr.w   #1,d0 /* >>= 1*/
+        movea.l 4(sp),a0
+        move.l  8(sp),d0
+        move.l  12(sp),d1
 
         bra.b   2f
 1:
-        move.w  (a1)+,(a0)+ /* *dst <- *src */
+        move.b  d0,(a0)+
 2:
-        dbra    d0,1b /* !0 ? loop */
+        dbra    d1,1b
 
         rts
 
-| void utility_lmemcpy(const unsigned char* src,unsigned char* dst,int len)
-        .global utility_lmemcpy
-utility_lmemcpy:
-        /*0 ~ 4(sp) <- RA*/
-
-        movea.l 4(sp),a0 /* src */
-        movea.l 8(sp),a1 /* dst */
-        move.l  12(sp),d0 /* length */
-
-        lsr.w   #2,d0 /* >>= 2*/
-
-        bra.b   2f
-1:
-        move.l  (a1)+,(a0)+ /* *dst <- *src */
-2:
-        dbra    d0,1b /* !0 ? loop */
-
-        rts
-
-
-/* ###### B/W/L MEMSET 68K CPU IMPLEMENTATION ###### */
-| void utility_bmemset(unsigned char* data,unsigned char c,int len)
-        .global utility_bmemset
-utility_bmemset:
-        /*0 ~ 4(sp) <- RA*/
-
-        movea.l 4(sp),a0 /* src */
-        move.b  8(sp),d0 /* replace with this */
-        move.l  9(sp),d1 /* length */
-
-        bra.b   2f
-1:
-        move.b  d0,(a0)+ /* *dst <- *src */
-2:
-        dbra    d1,1b /* !0 ? loop */
-
-        rts
-
-| void utility_wmemset(unsigned char* data,short int c,int len)
-        .global utility_wmemset
-utility_wmemset:
-        /*0 ~ 4(sp) <- RA*/
-        movea.l 4(sp),a0 /* src */
-        move.w  8(sp),d0 /* replace with this */
-        move.l  10(sp),d1 /* length */
-
-        lsr.w   #1,d1 /* >>= 1*/
-
-        bra.b   2f
-1:
-        move.w  d0,(a0)+ /* *dst <- *src */
-2:
-        dbra    d1,1b /* !0 ? loop */
-
-        rts
-
-| void utility_lmemset(unsigned char* data,int c,int len)
-        .global utility_lmemset
-utility_lmemset:
-        /*0 ~ 4(sp) <- RA*/
-        movea.l 4(sp),a0 /* src */
-        move.l  8(sp),d0 /* replace with this */
-        move.l  12(sp),d1 /* length */
-
-        lsr.w   #2,d1 /* >>= 2*/
-
-        bra.b   2f
-1:
-        move.l  d0,(a0)+ /* *dst <- *src */
-2:
-        dbra    d1,1b /* !0 ? loop */
-
-        rts
