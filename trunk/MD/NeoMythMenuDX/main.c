@@ -323,6 +323,12 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
 #define INPUTBOX_DELAY 6
 
 //macros
+//0 = 7.67 MHz, and 1 = 7.60 MHz
+inline int getClockType()
+{
+  return (*(char *)0xA10001 >> 6) & 1;
+}
+
 
 inline void setStatusMessage(const char* msg)
 {
@@ -1021,7 +1027,11 @@ void get_sd_info(int entry)
     gTime1 = gTime2 = 0;
     gFileType = 0;
     gMythHdr = 0;
-    gRomDly_default_sd = 20;
+
+	if(getClockType())
+    	gRomDly_default_sd = 20;
+	else
+		gRomDly_default_sd = 28;
 
     //get_sd_cheat(gSelections[entry].name);
     //get_sd_ips(entry);
@@ -1172,11 +1182,26 @@ void get_sd_info(int entry)
 
     gRomDly_default_sd = (int)( ((gTime2-gTime1) * gSelections[entry].length) / 0x20000);
 
-    if(gRomDly_default_sd >= 28)
-        gRomDly_default_sd >>= 1;
+	if(getClockType())
+	{
+		if(gRomDly_default_sd >= 28)
+		    gRomDly_default_sd >>= 1;
 
-    if(gRomDly_default_sd > 20)
-        gRomDly_default_sd = 20;
+		if(gRomDly_default_sd > 20)
+		    gRomDly_default_sd = 20;
+		else if(gRomDly_default_sd < 8)
+		    gRomDly_default_sd = 8;
+	}
+	else
+	{
+		if(gRomDly_default_sd >= 38)
+		    gRomDly_default_sd >>= 1;
+
+		if(gRomDly_default_sd > 28)
+		    gRomDly_default_sd = 28;
+		else if(gRomDly_default_sd < 20)
+		    gRomDly_default_sd = 20;
+	}
 }
 
 void get_sd_directory(int entry)
