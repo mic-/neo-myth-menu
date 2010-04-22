@@ -126,7 +126,7 @@ static CacheBlock gCacheBlock;/*common cache block*/
 static CheatEntry cheatEntries[CHEAT_ENTRIES_COUNT];
 static short registeredCheatEntries = 0;
 
-
+#define dxcore_dir "/.menu/md"
 #define dxconf_cfg "/.menu/md/DXCONF.CFG"
 #define cheats_dir_default ".menu/md/cheats"
 #define ips_dir_default ".menu/md/ips"
@@ -406,6 +406,15 @@ inline int createDirectory(const XCHAR* fps)
     return directoryExists(fps);
 }
 
+inline int createDirectoryFast(const XCHAR* fps)
+{
+    if(directoryExists(fps))
+        return 1;
+
+    f_mkdir(fps);
+
+    return 1;
+}
 
 inline int deleteFile(const XCHAR* fss)
 {
@@ -1003,17 +1012,17 @@ void get_sd_info(int entry)
     int eos = utility_wstrlen(path);
     UINT ts;
 
-	gTime1 = gTime2 = 0;
+    gTime1 = gTime2 = 0;
     gFileType = 0;
     gMythHdr = 0;
-	gRomDly_default_sd = 20;
+    gRomDly_default_sd = 20;
 
     //get_sd_cheat(gSelections[entry].name);
     //get_sd_ips(entry);
 
     //cache_invalidate_pointers();
 
-	gTime1 = gTicks;
+    gTime1 = gTicks;
     if (path[eos-1] != (WCHAR)'/')
         utility_c2wstrcat(path, "/");
 
@@ -1029,7 +1038,7 @@ void get_sd_info(int entry)
         sprintf(temp, "!open %s",temp2);
         setStatusMessage(temp);
         path[eos] = 0;
-		gRomDly_default_sd = 1;
+        gRomDly_default_sd = 1;
         return;
     }
     path[eos] = 0;
@@ -1041,7 +1050,7 @@ void get_sd_info(int entry)
         // SMS ROM header
         gSelections[entry].type = 2; // SMS
         gSelections[entry].run = 0x13; // run mode = SMS + FM
-		gRomDly_default_sd = 1;
+        gRomDly_default_sd = 1;
         return;
     }
 
@@ -1082,7 +1091,7 @@ void get_sd_info(int entry)
         else
             utility_memcpy((char *)&rom_hdr[0x20], "No GD3 Tag", 10);
 
-		gRomDly_default_sd = 5;
+        gRomDly_default_sd = 5;
         return;
     }
     else if ((buffer[8] == 0xAA) & (buffer[9] == 0xBB))
@@ -1147,21 +1156,21 @@ void get_sd_info(int entry)
         }
     }
 
-	gTime2 = gTicks;
-	
-	if( !(gTime2-gTime1) )
-	{
-		gRomDly_default_sd = 1;
-		return;
-	}
+    gTime2 = gTicks;
 
-	gRomDly_default_sd = (int)( ((gTime2-gTime1) * gSelections[entry].length) / 0x20000);
+    if( !(gTime2-gTime1) )
+    {
+        gRomDly_default_sd = 1;
+        return;
+    }
 
-	if(gRomDly_default_sd >= 28)
-		gRomDly_default_sd >>= 1;
+    gRomDly_default_sd = (int)( ((gTime2-gTime1) * gSelections[entry].length) / 0x20000);
 
-	if(gRomDly_default_sd > 20)
-		gRomDly_default_sd = 20;
+    if(gRomDly_default_sd >= 28)
+        gRomDly_default_sd >>= 1;
+
+    if(gRomDly_default_sd > 20)
+        gRomDly_default_sd = 20;
 }
 
 void get_sd_directory(int entry)
@@ -1171,7 +1180,7 @@ void get_sd_directory(int entry)
     int ix;
 
     gSdDetected = 0;
-	gRomDly_default_sd = 0;
+    gRomDly_default_sd = 0;
 
     gMaxEntry = 0;
     if (entry == -1)
@@ -3264,8 +3273,8 @@ void runCheatEditor(int index)
 
     ints_on();
     // - not needed anymore - get_sd_cheat(gSelections[gCurEntry].name);//cheatPath);
-	gButtons = SEGA_CTRL_NONE;
-	delay(10);
+    gButtons = SEGA_CTRL_NONE;
+    delay(10);
     clear_screen();
 }
 
@@ -3281,10 +3290,10 @@ void do_options(void)
     __options_EntryPoint:
 
     clearStatusMessage();
-	setStatusMessage("Checking for cheats...");
+    setStatusMessage("Checking for cheats...");
     get_sd_cheat(gSelections[gCurEntry].name);
     clearStatusMessage();
-	setStatusMessage("Checking for ips...");
+    setStatusMessage("Checking for ips...");
     get_sd_ips(gCurEntry);
     clearStatusMessage();
 
@@ -3742,8 +3751,8 @@ void do_options(void)
 
                             sram_mgr_restoreGame(0);
                         }
-						else
-							cache_sync();
+                        else
+                            cache_sync();
 
                         neo2_disable_sd();
                         ints_off();     /* disable interrupts */
@@ -4101,8 +4110,8 @@ void run_rom(int reset_mode)
 
                 sram_mgr_restoreGame(0);
             }
-			else
-				cache_sync();
+            else
+                cache_sync();
 
             clearStatusMessage();
             ints_on();
@@ -4129,7 +4138,7 @@ void updateConfig()
         return;
     }
 
-    utility_c2wstrcpy(fss,"/.menu/md");createDirectory(fss);
+    utility_c2wstrcpy(fss,dxcore_dir); createDirectory(fss);
     utility_c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
@@ -4160,17 +4169,11 @@ void loadConfig()
         return;
 
     setStatusMessage("Reading config...");
+
     ints_on();
-    CHEATS_DIR = cheats_dir_default;
-    IPS_DIR = ips_dir_default;
-    SAVES_DIR = saves_dir_default;
-    CACHE_DIR = cache_dir_default;
-    MD_32X_SAVE_EXT = md_32x_save_ext_default;
-    SMS_SAVE_EXT = sms_save_ext_default;
-    BRM_SAVE_EXT = brm_save_ext_default;
 
     config_init();
-    utility_c2wstrcpy(fss,"/.menu/md");createDirectory(fss);
+
     utility_c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
@@ -4203,12 +4206,12 @@ void loadConfig()
         }
 
         f_close(&gSDFile);
-        ints_off();
         ints_on();
     }
     else
     {
         newConfig = 1;
+
         setStatusMessage("Initializing configuration...");
         config_push("ipsPath",ips_dir_default);
         config_push("cheatsPath",cheats_dir_default);
@@ -4219,7 +4222,7 @@ void loadConfig()
         config_push("brmSaveExt",brm_save_ext_default);
         config_push("romName","*");
 
-        utility_c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
+        utility_c2wstrcpy(fss,dxcore_dir); createDirectory(fss);
         utility_c2wstrcpy(fss,dxconf_cfg);
 
         if(f_open(&gSDFile, fss, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
@@ -4284,10 +4287,13 @@ void loadConfig()
     WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE + 24];
     memset(buf,0,256);
 
-    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CHEATS_DIR); if(newConfig)createDirectory(buf);
-    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,IPS_DIR); if(newConfig)createDirectory(buf);
-    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,SAVES_DIR); if(newConfig)createDirectory(buf);
-    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CACHE_DIR); if(newConfig)createDirectory(buf);
+    //if config existed before, it's the responsibility of user to create directories
+    //if it's new default config, we create directories here
+    //if directories do not exist, they will be created by the code that saves to those directories
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CHEATS_DIR); if(newConfig)createDirectoryFast(buf);
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,IPS_DIR); if(newConfig)createDirectoryFast(buf);
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,SAVES_DIR); if(newConfig)createDirectoryFast(buf);
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CACHE_DIR); if(newConfig)createDirectoryFast(buf);
 
     clearStatusMessage();
     ints_on();
@@ -4649,7 +4655,7 @@ int main(void)
     }
 #endif
 
-	 
+
 //  ints_off();                         /* disable interrupts */
 //  neo_get_rtc(rtc);                   /* get current time from Neo2/3 flash cart */
 //  ints_on();                          /* enable interrupts */
