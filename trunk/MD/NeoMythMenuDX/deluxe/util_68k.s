@@ -293,7 +293,7 @@ utility_wmemcpy:
         movea.l 8(sp),a1 /* dst */
         move.l  12(sp),d0 /* length */
 
-        lsl.w   #1,d0 /* >>= 1*/
+        lsr.w   #1,d0 /* >>= 1*/
 
         bra.b   2f
 1:
@@ -312,7 +312,7 @@ utility_lmemcpy:
         movea.l 8(sp),a1 /* dst */
         move.l  12(sp),d0 /* length */
 
-        lsl.w   #2,d0 /* >>= 2*/
+        lsr.w   #2,d0 /* >>= 2*/
 
         bra.b   2f
 1:
@@ -349,7 +349,7 @@ utility_wmemset:
         move.w  8(sp),d0 /* replace with this */
         move.l  10(sp),d1 /* length */
 
-        lsl.w   #1,d1 /* >>= 1*/
+        lsr.w   #1,d1 /* >>= 1*/
 
         bra.b   2f
 1:
@@ -367,7 +367,7 @@ utility_lmemset:
         move.l  8(sp),d0 /* replace with this */
         move.l  12(sp),d1 /* length */
 
-        lsl.w   #2,d1 /* >>= 2*/
+        lsr.w   #2,d1 /* >>= 2*/
 
         bra.b   2f
 1:
