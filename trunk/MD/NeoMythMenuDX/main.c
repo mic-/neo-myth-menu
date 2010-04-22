@@ -1009,7 +1009,7 @@ void get_sd_info(int entry)
 
     //cache_invalidate_pointers();
 
-    if (path[wstrlen(path)-1] != (WCHAR)'/')
+    if (path[eos-1] != (WCHAR)'/')
         utility_c2wstrcat(path, "/");
 
     utility_wstrcat(path, gSelections[entry].name);
@@ -1017,6 +1017,12 @@ void get_sd_info(int entry)
     if (f_open(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
     {
         // couldn't open file
+        char *temp = (char *)buffer;
+        char *temp2 = (char *)&buffer[1024];
+        w2cstrcpy(temp2, path);
+        temp2[32] = '\0';
+        sprintf(temp, "!open %s",temp2);
+        setStatusMessage(temp);
         path[eos] = 0;
         return;
     }
