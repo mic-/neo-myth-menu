@@ -219,7 +219,7 @@ short int gSdDetected = 0;                   /* 0 - not detected, 1 - detected *
 
 #define gRomDly_default_flash (0)
 
-short int gRomDly_default_sd = 20;
+int gRomDly_default_sd = 20;
 static int gTime1,gTime2;
 
 /* global options table entry definitions */
