@@ -408,8 +408,14 @@ inline int createDirectory(const XCHAR* fps)
 
 inline int createDirectoryFast(const XCHAR* fps)
 {
+    WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
+
     if(directoryExists(fps))
         return 1;
+
+    utility_strcpy((char*)ss,"Creating directory: ");
+    utility_w2cstrcpy((char*)(ss+10),fps);
+    setStatusMessage((char*)ss);
 
     f_mkdir(fps);
 
