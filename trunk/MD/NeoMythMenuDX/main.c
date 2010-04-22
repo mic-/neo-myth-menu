@@ -126,7 +126,7 @@ static CacheBlock gCacheBlock;/*common cache block*/
 static CheatEntry cheatEntries[CHEAT_ENTRIES_COUNT];
 static short registeredCheatEntries = 0;
 
-#define dxcore_dir_default ".menu/md"
+
 #define dxconf_cfg "/.menu/md/DXCONF.CFG"
 #define cheats_dir_default ".menu/md/cheats"
 #define ips_dir_default ".menu/md/ips"
@@ -136,7 +136,6 @@ static short registeredCheatEntries = 0;
 #define sms_save_ext_default ".ssm"
 #define brm_save_ext_default ".brm"
 
-static char* DXCORE_DIR = dxcore_dir_default;
 static char* CHEATS_DIR = cheats_dir_default;
 static char* IPS_DIR = ips_dir_default;
 static char* SAVES_DIR = saves_dir_default;
@@ -357,10 +356,14 @@ inline int fileExists(const XCHAR* fss)
     return 1;
 }
 
-inline void makeDirTree(const XCHAR* fps)
+void makeDir(const XCHAR* fps)
 {
     WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
     int i,l,j,di;
+
+    utility_strcpy((char*)ss,"Creating directory: ");
+    utility_w2cstrcpy((char*)(ss+10),fps);
+    setStatusMessage((char*)ss);
 
     i = j = 0;
     l = utility_wstrlen(fps);
@@ -389,11 +392,8 @@ inline void makeDirTree(const XCHAR* fps)
 
         ss[j++] = (WCHAR)fps[i++];
     }
-}
 
-inline void createDirectoryFast(const XCHAR* fps)
-{
-	f_mkdir(fps);
+    clearStatusMessage();
 }
 
 inline int createDirectory(const XCHAR* fps)
@@ -401,10 +401,11 @@ inline int createDirectory(const XCHAR* fps)
     if(directoryExists(fps))
         return 1;
 
-    createDirectoryFast(fps);
+    makeDir(fps);
 
     return directoryExists(fps);
 }
+
 
 inline int deleteFile(const XCHAR* fss)
 {
@@ -1154,7 +1155,7 @@ void get_sd_info(int entry)
 		return;
 	}
 
-	gRomDly_default_sd = (short int)( ((gTime2-gTime1) * gSelections[entry].length) / 0x20000);
+	gRomDly_default_sd = (int)( ((gTime2-gTime1) * gSelections[entry].length) / 0x20000);
 
 	if(gRomDly_default_sd >= 28)
 		gRomDly_default_sd >>= 1;
@@ -4128,7 +4129,7 @@ void updateConfig()
         return;
     }
 
-    //utility_c2wstrcpy(fss,DXCORE_DIR); createDirectory(fss);
+    utility_c2wstrcpy(fss,"/.menu/md");createDirectory(fss);
     utility_c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
@@ -4152,45 +4153,24 @@ void updateConfig()
 void loadConfig()
 {
     //The above code covers all cases just to make sure that we're not going to run into issues
-    UINT fbr = 0,bytesToRead = 0,coreExists = 1;
+    UINT fbr = 0,bytesToRead = 0,newConfig = 0;
     WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
-    WCHAR* buf = (WCHAR*)&buffer[WORK_RAM_SIZE - 1024];
-	char* ps = (char*)&buffer[WORK_RAM_SIZE - 256];
-    char* ps2 = NULL;
 
     if(!gSdDetected)
         return;
 
     setStatusMessage("Reading config...");
-	utility_memset(buf,0,256);
-    
-	ints_on();
-
-	if((!DXCORE_DIR) || (!CHEATS_DIR) || (!IPS_DIR) || (!SAVES_DIR) || (!CACHE_DIR) || (!MD_32X_SAVE_EXT) || (!SMS_SAVE_EXT) || (!BRM_SAVE_EXT) )
-	{
-		DXCORE_DIR = dxcore_dir_default;
-		CHEATS_DIR = cheats_dir_default;
-		IPS_DIR = ips_dir_default;
-		SAVES_DIR = saves_dir_default;
-		CACHE_DIR = cache_dir_default;
-		MD_32X_SAVE_EXT = md_32x_save_ext_default;
-		SMS_SAVE_EXT = sms_save_ext_default;
-		BRM_SAVE_EXT = brm_save_ext_default;
-	}
+    ints_on();
+    CHEATS_DIR = cheats_dir_default;
+    IPS_DIR = ips_dir_default;
+    SAVES_DIR = saves_dir_default;
+    CACHE_DIR = cache_dir_default;
+    MD_32X_SAVE_EXT = md_32x_save_ext_default;
+    SMS_SAVE_EXT = sms_save_ext_default;
+    BRM_SAVE_EXT = brm_save_ext_default;
 
     config_init();
-
-	utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,DXCORE_DIR);
-
-	if(!directoryExists(buf))
-	{
-		ps2 = utility_strcpy(ps,"Creating dir tree :");
-		utility_strcat(ps2,DXCORE_DIR);
-		setStatusMessage(ps);
-		coreExists = 0;
-		makeDirTree(buf);
-	}
-
+    utility_c2wstrcpy(fss,"/.menu/md");createDirectory(fss);
     utility_c2wstrcpy(fss,dxconf_cfg);
 
     f_close(&gSDFile);
@@ -4215,13 +4195,11 @@ void loadConfig()
             MD_32X_SAVE_EXT = config_getS("md32xSaveExt");
             SMS_SAVE_EXT = config_getS("smsSaveExt");
             BRM_SAVE_EXT = config_getS("brmSaveExt");
-			DXCORE_DIR = config_getS("dxcoreDir");
 
             if(CHEATS_DIR[0]=='/')CHEATS_DIR++;
             if(IPS_DIR[0]=='/')IPS_DIR++;
             if(SAVES_DIR[0]=='/')SAVES_DIR++;
             if(CACHE_DIR[0]=='/')CACHE_DIR++;
-			if(DXCORE_DIR[0]=='/')DXCORE_DIR++;
         }
 
         f_close(&gSDFile);
@@ -4230,6 +4208,7 @@ void loadConfig()
     }
     else
     {
+        newConfig = 1;
         setStatusMessage("Initializing configuration...");
         config_push("ipsPath",ips_dir_default);
         config_push("cheatsPath",cheats_dir_default);
@@ -4238,10 +4217,9 @@ void loadConfig()
         config_push("md32xSaveExt",md_32x_save_ext_default);
         config_push("smsSaveExt",sms_save_ext_default);
         config_push("brmSaveExt",brm_save_ext_default);
-		config_push("dxcoreDir",dxcore_dir_default);
         config_push("romName","*");
 
-        utility_c2wstrcpy(fss,DXCORE_DIR); createDirectory(fss);
+        utility_c2wstrcpy(fss,"/.menu/md"); createDirectory(fss);
         utility_c2wstrcpy(fss,dxconf_cfg);
 
         if(f_open(&gSDFile, fss, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
@@ -4302,21 +4280,14 @@ void loadConfig()
         config_push("brmSaveExt",brm_save_ext_default);
     }
 
-    if(!DXCORE_DIR)
-    {
-        DXCORE_DIR = dxcore_dir_default;
-        config_push("dxcoreDir",dxcore_dir_default);
-    }
+    setStatusMessage("Finalizing configuration...");
+    WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE + 24];
+    memset(buf,0,256);
 
-	setStatusMessage("Finalizing configuration...");
-
-	if(!coreExists)
-	{
-		utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CHEATS_DIR); /*if(!directoryExists(buf))*/createDirectoryFast(buf);
-		utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,IPS_DIR); /*if(!directoryExists(buf))*/createDirectoryFast(buf);
-		utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,SAVES_DIR); /*if(!directoryExists(buf))*/createDirectoryFast(buf);
-		utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CACHE_DIR); /*if(!directoryExists(buf))*/createDirectoryFast(buf);
-	}
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CHEATS_DIR); if(newConfig)createDirectory(buf);
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,IPS_DIR); if(newConfig)createDirectory(buf);
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,SAVES_DIR); if(newConfig)createDirectory(buf);
+    utility_c2wstrcpy(buf,"/"); utility_c2wstrcat(buf,CACHE_DIR); if(newConfig)createDirectory(buf);
 
     clearStatusMessage();
     ints_on();
