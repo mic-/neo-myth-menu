@@ -18,6 +18,8 @@ REM ASM -> OBJ
 ..\bin\wla-65816.exe -io hw_math.asm hw_math.obj
 ..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
 ..\bin\wla-65816.exe -io neo2.asm neo2.obj
+..\bin\wla-65816.exe -io neo2_spc.asm neo2_spc.obj
+..\bin\wla-65816.exe -io ppu.asm ppu.obj
 ..\bin\wla-65816.exe -io dummy_games_list.asm dummy_games_list.obj
 
 ..\bin\wla-65816.exe -io mainopt.s main.obj
@@ -25,7 +27,7 @@ REM ASM -> OBJ
 ..\bin\wla-65816.exe -io font.s font.obj
 
 REM OBJ -> SMC
-..\bin\wlalink.exe -dvso main.obj navigation.obj data.obj dma.obj font.obj hw_math.obj lzss_decode.obj neo2.obj dummy_games_list.obj NEOSNES.BIN
+..\bin\wlalink.exe -dvso main.obj navigation.obj data.obj dma.obj font.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj dummy_games_list.obj NEOSNES.BIN
 
 REM Delete files
 del *.ps

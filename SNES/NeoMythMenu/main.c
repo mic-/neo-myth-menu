@@ -168,7 +168,11 @@ char *metaStrings[] =
     "\xff\x12\x01\x02 S-PPU2 V0",
     "\xff\x12\x01\x02 S-PPU2 V1",
     "\xff\x12\x01\x02 S-PPU2 V2",
-    "\xff\x12\x01\x02 S-PPU2 V3"
+    "\xff\x12\x01\x02 S-PPU2 V3",
+    // 73
+	"\xff\x03\x01\x00 MENU V 0.21\xff\x06\x02\x00GAMES\xff\x17\x03\x03\x42 \
+     \xff\x17\x04\x00: GO BACK\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     \
+     \xff\x09\x01\x00 SPC LOAD TEST",
 };
 
 const u8 ppuRegData1[12] =
@@ -490,6 +494,27 @@ void print_meta_string(u16 msNum)
 }
 
 
+void printxy(char *pStr, u16 x, u16 y, u16 attribs)
+{
+	int i;
+
+	u16 vramOffs = (y << 5) | x;
+
+	for (;;)
+	{
+		if (*pStr == 0)
+		{
+			// We've reached the null-terminator
+			break;
+		}
+		bg0Buffer[vramOffs++] = *pStr;
+		bg0Buffer[vramOffs++] = attribs;
+		pStr++;
+	}
+	bg0BufferDirty = 1;
+}
+
+
 void puts_game_title(u16 gameNum, u16 vramOffs, u8 attributes)
 {
 	u8 *pGame;
@@ -660,6 +685,17 @@ void run_secondary_cart_c()
 }
 
 
+void play_spc_from_gba_card_c()
+{
+	void (*play_spc)(void) = play_spc_from_gba_card & 0x7fff;
+
+	// The AND-operation above will not mask out bits 16-23, so we only add 0x7d to the bank here
+	// to get the result we want (0x7e).
+	add_full_pointer((void**)&play_spc, 0x7d, 0x8000);
+
+	play_spc();
+}
+
 
 int main()
 {
@@ -753,6 +789,11 @@ int main()
 		{
 			// Y
 			run_secondary_cart_c();
+		}
+		if (keys & 0x0040)
+		{
+			// X
+			play_spc_from_gba_card_c();
 		}
 		else if (keys & 0x2000)
 		{
