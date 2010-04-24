@@ -14,10 +14,12 @@ copy_ram_code:
 	php
 	rep	#$10
 	sep	#$20
-	ldy	#(ram_code_end - ram_code_begin)
+	; Note: it's very important that the correct labels are used here. Look in NEOSNES.SYM if you suspect that
+	; the order of the sections involved has been changed by the linker.
+	ldy	#(neo2_spc_ram_code_end - ppu_ram_code_begin)
 	ldx	#0
 -:	
-	lda.l	ram_code_begin,x
+	lda.l	ppu_ram_code_begin,x
 	sta.l	$7e8000,x
 	inx
 	dey
@@ -31,7 +33,7 @@ copy_ram_code:
 
 .bank 3 slot 0
 .org 0
-.section "text_neo2_2"
+.section "text_neo2_two"
 
 ram_code_begin:
 
@@ -183,63 +185,6 @@ CHEAT:
         RTL
         
 
-; Enable the mosaic effect for BG0 (the text layer), and slide the mosaic size up from 0 to
-; the maximum in 16 frames.
-mosaic_up:
-	php
-	rep	#$10
-	sep	#$20
-	ldx	#0
--:
-	jsr.w	_wait_nmi
-	txa
-	asl	a
-	asl	a
-	asl	a
-	asl	a		; Mosaic size in d4-d7
-	ora	#1		; Enable effect for BG0
-	sta.l	REG_MOSAIC
-	inx
-	cpx	#$10
-	bne	-
-	plp
-	rtl
-
-
-; Enable the mosaic effect for BG0 (the text layer), and slide the mosaic size down from the maximum
-; to 0 in 16 frames.
-mosaic_down:
-	php
-	rep	#$10
-	sep	#$20
-	ldx	#14
--:
-	jsr.w	_wait_nmi
-	txa
-	asl	a
-	asl	a
-	asl	a
-	asl	a		; Mosaic size in d4-d7
-	ora	#1		; Enable effect for BG0
-	sta.l	REG_MOSAIC
-	dex
-	bpl	-
-	plp
-	rtl
-	
-	
-_wait_nmi:
-	php
-	sep	#$20
--:
-	lda.l	REG_RDNMI
-	bmi	-
--:
-	lda.l	REG_RDNMI
-	bpl	-
-	plp
-	rts
-	
 	
 run_secondary_cart:
 	rep	#$30
