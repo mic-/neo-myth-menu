@@ -3,6 +3,7 @@
 
 #include "snes.h"
 #include "neo2.h"
+#include "hw_math.h"
 #include "navigation.h"
 
 extern gamesList_t gamesList;
