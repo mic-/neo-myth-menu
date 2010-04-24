@@ -33,7 +33,7 @@ font.s: assets/font.c
 	$(OPTIMIZE) $< >$@
 
 %.a2: %.a1
-	$(OPTIMORE) $< >$@
+	$(OPTIMORE) $< $@
 
 %.obj: %.asm
 	$(AS) -io $< $@
@@ -41,8 +41,7 @@ font.s: assets/font.c
 %.obj: %.s
 	$(AS) -io $< $@
 
-#%.obj: %.a2
-%.obj: %.a1
+%.obj: %.a2
 	$(AS) -io $< $@
 
 clean:
