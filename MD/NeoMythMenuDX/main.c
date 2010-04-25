@@ -1491,6 +1491,31 @@ void update_display(void)
                 ints_off(); /* disable interrupts */
                 if (gSelections[gCurEntry].type == 2)
                     neo_copy_game(rom_hdr, fstart+0x7FF0, 16);
+				else if (gSelections[gCurEntry].type == 4)
+				{
+					int gd3;
+
+					neo_copy_game(buffer, fstart, 0x2400);
+
+					utility_memcpy(rom_hdr, buffer, 4);
+					utility_memset(&rom_hdr[0x20], 0x20, 0x30); // fill name with spaces
+
+					gd3 = buffer[20] | (buffer[21]<<8) | (buffer[22]<<16) | (buffer[23]<<24);
+					if (gd3)
+					{
+						int i;
+						neo_copy_game(buffer, fstart + gd3 + 20, gSelections[gCurEntry].length - (gd3 + 20));
+						for (i=0; i<0x30; i++)
+						{
+							// copy track name
+							if (!buffer[12 + i*2])
+								break;
+							rom_hdr[0x20 + i] = buffer[12 + i*2];
+						}
+					}
+					else
+						utility_memcpy((char *)&rom_hdr[0x20], "No GD3 Tag", 10);
+				}
                 else
                     neo_copy_game(rom_hdr, fstart+0x100, 256);
                 ints_on(); /* enable interrupts */
@@ -3975,6 +4000,65 @@ void run_rom(int reset_mode)
         fsize = gSelections[gCurEntry].length;
         bbank = gSelections[gCurEntry].bbank;
         bsize = gSelections[gCurEntry].bsize * 8192;
+
+        if (gSelections[gCurEntry].type == 4)
+        {
+            int ix;
+            char temp2[48];
+
+            // Play VGM song
+#ifndef RUN_IN_PSRAM
+            if (fsize > 0x1C0000)
+                return; // too big for current method of playing
+#else
+            if (fsize > 0x100000)
+                return; // too big for current method of playing
+#endif
+            // copy file to myth psram
+            ints_off();
+            copyGame(&neo_copyto_myth_psram, &neo_copy_game, 0x600000, fstart, fsize, "Loading ", temp);
+            ints_on();     /* enable interrupts */
+
+            gCursorX = 1;
+            gCursorY = 20;
+            // erase line
+            put_str(gEmptyLine, 0);
+            gCursorX = 1;
+            gCursorY = 21;
+            // erase line
+            put_str(gEmptyLine, 0);
+            gCursorX = 1;
+            gCursorY = 22;
+            // erase line
+            put_str(gEmptyLine, 0);
+            gCursorX = 1;
+            gCursorY = 23;
+            // erase line
+            put_str(gEmptyLine, 0);
+
+            // print track name from header
+            utility_memcpy(temp2, &rom_hdr[0x20], 0x30);
+            for (ix=47; ix>0; ix--)
+                if (temp2[ix] != 0x20)
+                    break;
+            if (ix > 37)
+                ix = 37; // max string size to print
+            temp2[ix+1] = 0; // null terminate name
+            gCursorY = 22;
+            gCursorX = 20 - utility_strlen(temp2)/2;    // center name
+            put_str(temp2, 0);
+
+            utility_strcpy(temp2, "Press C to Stop");
+            gCursorY = 23;
+            gCursorX = 20 - utility_strlen(temp2)/2;    // center name
+            put_str(temp2, 0);
+
+            delay(60);
+
+            PlayVGM();
+            gUpdate = -1;               /* clear screen for major screen update */
+            return;
+        }
 
         // Run selected rom
         ints_off();     /* disable interrupts */
