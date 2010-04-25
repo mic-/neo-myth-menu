@@ -1,37 +1,69 @@
-CC = $(GENDEV)/m68k/bin/gcc
-AS = $(GENDEV)/m68k/bin/as
-RM = rm -f
-OBJC = $(GENDEV)/m68k/bin/objcopy
-ASMZ80 = $(GENDEV)/bin/zasm
-BINTOC = $(GENDEV)/bin/bin2c
+CC := $(GENDEV)/m68k/bin/gcc
+AS := $(GENDEV)/m68k/bin/as
+RM := rm -f
+OBJC := $(GENDEV)/m68k/bin/objcopy
+ASMZ80 := $(GENDEV)/bin/zasm
+BINTOC := $(GENDEV)/bin/bin2c
 
-OBJS = main.o neo2.o font.o pff.o diskio.o
-INC_OBJS = 
+OBJS := crt0.o main.o neo2.o font.o pff.o diskio.o
 
-INCS = -I$(GENDEV)/m68k/include -I$(GENDEV)/m68k/sdk/include -I.
-FLAGS = $(OPTION) -m68000 -Wall -Os -c -fomit-frame-pointer $(INCS)
-FLAGSZ80 = -vb2
-LIBS = -L$(GENDEV)/m68k/lib -L$(GENDEV)/m68k/sdk/lib -lc -lgcc
+OPTION := 
+INCS := -I$(GENDEV)/m68k/include -I$(GENDEV)/m68k/sdk/include -I.
+CCFLAGS := $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer $(INCS)
+Z80FLAGS := -vb2
+ASFLAGS := -m68000 --register-prefix-optional
+LIBS := -L$(GENDEV)/m68k/lib -L$(GENDEV)/m68k/sdk/lib -lc -lgcc
+LINKFLAGS := -T $(GENDEV)/m68k/lib/md-neo.ld
+BUILD := build
+TARGET := MDBIOS.BIN
 
-all: crt0.o MDBIOS.BIN
+ifneq ($(BUILD),$(notdir $(CURDIR)))
 
-MDBIOS.BIN: rom.out
-	$(OBJC) --pad-to 65536 -O binary rom.out MDBIOS.BIN
+export OUTPUT  := $(CURDIR)/$(TARGET)
+export VPATH   := $(CURDIR) $(CURDIR)/deluxe
+export DEPENDS := $(OBJS:.o=.d)
 
-rom.out: $(OBJS) $(INC_OBJS)
-	$(CC) -T $(GENDEV)/m68k/lib/md.ld -nostdlib crt0.o $(OBJS) $(LIBS) $(INC_OBJS) -o rom.out
+.PHONY: $(BUILD) clean install
 
-%.o80: %.s80
-	$(ASMZ80) $(FLAGSZ80) -o $@ $<
-
-%.c: %.o80
-	$(BINTOC) $<
-
-%.o: %.c
-	$(CC) $(FLAGS) -c $< -o $@
-
-%.o: %.s
-	$(AS) -m68000 --register-prefix-optional $< -o $@
+$(BUILD):
+	@[ -d $@ ] || mkdir -p $@
+	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/makefile
 
 clean:
-	$(RM) -rf *.o *.a *.o80 *.out *.bin *.log *.BIN
+	@echo cleaning ...
+	@rm -fr $(BUILD) $(OUTPUT)
+
+install: $(BUILD)
+	neocmd --menu $(OUTPUT)
+
+all: $(BUILD)
+
+else
+
+ELF := $(notdir $(OUTPUT)).elf
+
+$(OUTPUT): $(ELF)
+	@$(OBJC) --pad-to 65536 -O binary $(ELF) $@
+
+$(ELF): $(OBJS)
+	@echo Linking $(TARGET)...
+	@$(CC) $(LINKFLAGS) -nostdlib $(OBJS) $(LIBS) -o $(ELF)
+
+%.o80: %.s80
+	@echo Compiling $(notdir $<)...
+	@$(ASMZ80) $(Z80FLAGS) -o $@ $<
+
+%.c: %.o80
+	@$(BINTOC) $<
+
+%.o: %.c
+	@echo Compiling $(notdir $<)...
+	@$(CC) -MMD $(CCFLAGS) -c $< -o $@
+
+%.o: %.s
+	@echo Compiling $(notdir $<)...
+	@$(AS) --MD $(@:.o=.d) $(ASFLAGS) $< -o $@
+
+-include $(DEPENDS)
+
+endif
