@@ -1,9 +1,11 @@
 /* Neo Super 32X/MD/SMS Flash Cart Menu by Chilly Willy, based on Dr. Neo's Menu code */
 /* The license on this code is the same as the original menu code - MIT/X11 */
 
+/*std*/
 #include <string.h>
 #include <stdio.h>
 
+/*io*/
 #include <diskio.h>
 #include <ff.h>
 
@@ -16,6 +18,9 @@
 /*For the GG/Hex cheats*/
 #include "deluxe/cheat.h"
 #include "deluxe/utility.h"
+
+/*profiling ??*/
+#include "deluxe/profiling.h"
 
 #define min(x,y) (((x)<(y))?(x):(y))
 #define max(x,y) (((x)>(y))?(x):(y))
@@ -320,7 +325,7 @@ void run_rom(int reset_mode);
 int inputBox(char* result,const char* caption,const char* defaultText,short int  boxX,short int  boxY,
             short int  captionColor,short int boxColor,short int textColor,short int hlTextColor,short int maxChars);
 
-#define INPUTBOX_DELAY 6
+static int inputboxDelay = 5;
 
 //macros
 //0 = 7.67 MHz, and 1 = 7.60 MHz
@@ -4453,6 +4458,12 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
 
     ints_on();
     clear_screen();
+
+	if(getClockType())
+		inputboxDelay = 3;
+	else
+		inputboxDelay = 5;
+
     for(i = x - 10; i < x + 10; i++)
         printToScreen("\x82",i,y,boxColor);
 
@@ -4538,7 +4549,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
 
     while(1)
     {
-        delay(INPUTBOX_DELAY);
+        delay(inputboxDelay);
 
         if(sync)
         {
@@ -4783,6 +4794,35 @@ int main(void)
         //neo2_disable_sd();
     }
 #endif
+
+	#ifdef  __DO_PROFILING__
+    unsigned int i;
+
+    Z80_requestBus(1);
+
+    for (i=0; i<0x2000; i++)
+        *(unsigned char  *)(Z80_RAM + i) = 0;
+
+    Z80_setBank(0);
+
+    // upload Z80 driver
+    for (i=0; i<sizeof(z80_thread); i++)
+        *(unsigned char *)(Z80_RAM + i) = *(unsigned char*)(z80_thread + i);
+
+    // reset Z80
+    Z80_startReset();
+    Z80_releaseBus();
+    Z80_endReset();
+
+	Z80_THREAD_IDLE();//idle state
+	
+	/*do_profilingPrint(
+			"utility_memset",
+			utility_memset((char*)&buffer[0],'\0',WORK_RAM_SIZE),
+			1,
+			1);
+	delay(100);*/
+	#endif
 
 
 //  ints_off();                         /* disable interrupts */
