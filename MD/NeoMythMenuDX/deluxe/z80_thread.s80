@@ -1,0 +1,45 @@
+;by conleon1988@gmail.com based on ChillyWilly's Z80 music demo code
+
+#target bin
+#code $0000, $2000
+
+threadResultAddr    EQU    $0040    ;16bit result (LE)
+cmdMasterAddr    EQU    $0042        ;8bit command - 1 = do timing , 0 = idle
+
+z80_init_proc
+
+   DI                      ; Disable ints
+   LD  SP, $2000           ; Setup stack
+   IM  $01                 ; Set int mode 1
+   JP  start               ; Jump to start
+
+; interrupt handler
+;   ORG  $0038
+   defs $0038 - $
+
+interrupt
+    RETI
+
+;main entry point
+
+;   ORG  $0080
+   defs $0080 - $
+
+start
+    LD  HL,0
+    LD  (threadResultAddr),HL
+
+mainloop
+    ;check command
+    LD A,(cmdMasterAddr)
+    OR A
+    JR Z,start
+   
+timing_thread
+    INC HL
+    LD  (threadResultAddr),HL
+   
+    ;loop
+    JP  mainloop
+
+#end
