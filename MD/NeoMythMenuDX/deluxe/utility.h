@@ -57,11 +57,11 @@ void UTIL_SetMemorySafe(char* dst,const char c,int len);
 void UTIL_SetMemoryUnSafe(char* dst,const char c);
 
 //String length using block jumps
-const int UTIL_StringLengthMemBlockConst(const char* str,const int blockLen);
+int UTIL_StringLengthMemBlockConst(const char* str,const int blockLen);
 int UTIL_StringLengthMemBlock(char* str,const int blockLen);
 
 //String length
-const int UTIL_StringLengthConst(const char* str);
+int UTIL_StringLengthConst(const char* str);
 int UTIL_StringLength(char* str);
 
 //find string
@@ -81,8 +81,8 @@ const char* UTIL_StringFindLastConst(const char* base,const char* sub);
 char* UTIL_StringFindLast(char* base,char* sub);
 const char* UTIL_StringFindLastAnyCaseConst(const char* base,const char* sub);
 char* UTIL_StringFindLastAnyCase(char* base,char* sub);
-const int UTIL_StringLengthFastLE32(const char* src);
-const int UTIL_StringLengthFastBE32(const char* src);
+int UTIL_StringLengthFastLE32(const char* src);
+int UTIL_StringLengthFastBE32(const char* src);
 char* UTIL_StringAppend(char* dst,const char* src);
 
 const char* UTIL_StringFindReverseConst(const char* base,const char* sub);

@@ -57,7 +57,7 @@ void UTIL_SetMemoryUnSafe(char* dst,const char c)
 }
 
 //String length using block jumps
-const int UTIL_StringLengthMemBlockConst(const char* str,const int blockLen)
+int UTIL_StringLengthMemBlockConst(const char* str,const int blockLen)
 {
     const char* base = str;
 
@@ -78,7 +78,7 @@ int UTIL_StringLengthMemBlock(char* str,const int blockLen)
 }
 
 //String length
-const int UTIL_StringLengthConst(const char* str)
+int UTIL_StringLengthConst(const char* str)
 {
     const char* base = str;
 
@@ -877,7 +877,7 @@ int UTIL_StringToInteger(const char* str)
 	return result;
 }
 
-const int UTIL_StringLengthFastLE32(const char* src)
+int UTIL_StringLengthFastLE32(const char* src)
 {
     int result = 0;
     unsigned int* dword = (unsigned int*)src;
@@ -903,7 +903,7 @@ const int UTIL_StringLengthFastLE32(const char* src)
     return result;
 }
 
-const int UTIL_StringLengthFastBE32(const char* src)
+int UTIL_StringLengthFastBE32(const char* src)
 {
     int result = 0;
     unsigned int* dword = (unsigned int*)src;
