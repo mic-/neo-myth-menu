@@ -216,6 +216,9 @@ run_secondary_cart:
 	pea	3
 	jsl	print_meta_string			; Print cart name
 	pla
+	pea	0
+	jsl	print_meta_string			; Print instructions
+	pla
 	pea	58
 	jsl	print_meta_string			; Print instructions
 	pla
@@ -267,9 +270,9 @@ run_secondary_cart:
 	beq	-
 	
 	lda.b	tcc__r0
-	and	#$8000
+	and	#$4000
 	beq	+
-	; B was pressed
+	; Y was pressed
 	lda	#0
 	sep	#$20
 	sta.l	$00c017
@@ -277,6 +280,9 @@ run_secondary_cart:
 	rep	#$20
 	jsl	clear_screen
 	pea	0
+	jsl	print_meta_string
+	pla
+	pea	75
 	jsl	print_meta_string
 	pla
 	pea	4
@@ -291,9 +297,9 @@ run_secondary_cart:
 	
 +:
 	lda.b	tcc__r0
-	and	#$4000
+	and	#$8000
 	beq	+
-	; Y was pressed
+	; B was pressed
 	sep	#$20
 	lda	#$05
 	sta.l	MYTH_OPTION_IO
@@ -310,7 +316,11 @@ run_secondary_cart:
 	rtl
 	
 
+; Apply Game Genie codes to game ROM data that has been copied to PSRAM
+apply_gg_codes:
+	rts
 	
+
 
 ; Updates and displays the "LOADING......(nn)" string 
 show_loading_progress:
@@ -618,6 +628,8 @@ MOV_PSRAM_LOOP:
          
          jsr	copy_1mbit_from_gbac_to_psram
 
+	 ;jsr	apply_gg_codes
+	
          DEC    tcc__r0h+1
          BNE    -
          
