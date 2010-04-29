@@ -10,32 +10,7 @@
 #include "myth.h"
 #include "neo2.h"
 #include "navigation.h"
-#include "string.h"
-
-
-// The default header that comes with SNESC specifies a LOROM configuration. Remove this define if HIROM is used.
-//#define LOROM
-
-#ifdef LOROM
-#define GAME_LIST_BANK 1
-#else
-#define GAME_LIST_BANK 0
-#endif
-
-
-// For use with can_games_list_scroll
-typedef enum
-{
-	DIRECTION_UP,
-	DIRECTION_DOWN
-} scrollDirection_t;
-
-typedef enum
-{
-	SORT_LOGICALLY,
-	SORT_ALPHABETICALLY
-} sortOrder_t;
-
+#include "common.h"
 
 
 // Some resources defined in separate source files
@@ -53,15 +28,10 @@ u8 gameMode;
 u8 romSize, romRunMode, sramSize, sramBank, sramMode;
 u8 extDsp, extSram;
 
-
 sortOrder_t sortOrder = SORT_LOGICALLY;
 char sortLetter = 'A';
 
-struct
-{
-	u16 firstLetterIdx[27];
-	u16 alphaToLogical[500];
-} gbaCardAlphabeticalIdx;
+u16 gbaCardAlphabeticalIdx[500];
 
 gamesList_t gamesList;
 
@@ -75,17 +45,15 @@ u8 bg0BufferDirty;
 // the .data section rather than .rodata.
 //
 char MS2[] = "\xff\x15\x02\x02 LOADING......(  )";
-char MS3[] = "\xff\x0b\x02\x02                        \xff\x09\x02\x00SECONDARY CART:";
+char MS3[] = "\xff\x0b\x02\x02                        \xff\x09\x02\x07SECONDARY CART:";
 char MS4[] = "\xff\x15\x02\x02 GAME (001)";
-
 
 // Each of these metastrings are onm the format 0xff,row,column,palette,"actual text". A single metastring can go on
 // indefinitely until a null-terminator is reached.
 //
 char *metaStrings[] =
 {
-	"\xff\x03\x01\x00 MENU V 0.21\xff\x06\x02\x00GAMES\xff\x17\x03\x03\x42\xff\x17\x04\x00: RUN, \xff\x17\x0c\x03Y \
-     \xff\x17\x0d\x00: RUN 2ND CART\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
+    "\xff\x03\x01\x07 MENU V 0.21\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
 	"\xff\x01\xfe\x0f\x0a\x68\x69\x6A\x20\x71\x72\x73\x20\x7a\x7b\x7c\x83\x84\x85\xfe\x10\x0a\x6b\x6c\x6d\x20\x74\x75 \
 	 \x76\x20\x7d\x7e\x7f\x86\x87\x88xfe\x11\x0a\x6e\x6f\x70\x20\x77\x78\x79\x20\x80\x81\x82\x89\x8a\x8b\xfe\x17\x06 \
 	 \x06\xff\x04                             ",
@@ -94,9 +62,9 @@ char *metaStrings[] =
 	MS4,
 	"\xff\x02\x1b\x03(B)",
 	"\xff\x02\x1b\x03(C)",
-	"\xff\x03\x14\x00(HARD 0.1)",
-	"\xff\x03\x14\x00(HARD 0.1)",
-	"\xff\x03\x14\x00(HARD 0.1)",
+	"\xff\x03\x14\x07(HARD 0.1)",
+	"\xff\x03\x14\x07(HARD 0.1)",
+	"\xff\x03\x14\x07(HARD 0.1)",
     "\xff\x16\x03\x02          ",
     "\xff\x16\x03\x02SAVE 2KB  ",
     "\xff\x16\x03\x02SAVE 8KB  ",
@@ -120,10 +88,10 @@ char *metaStrings[] =
 	"\xff\x09\x01\x02 TESTING PSRAM... ",
 	"\xff\x0b\x01\x03 PSRAM TEST OK    ",
 	"\xff\x0b\x01\x01 PSRAM TEST ERROR!",
-	"\xff\x08\x10\x00\x66",		// Up arrow
-	"\xff\x12\x10\x00\x67",		// Down arrow
-	"\xff\x08\x10\x00 ",		// Up arrow clear
-	"\xff\x12\x10\x00 ",		// Down arrow clear
+	"\xff\x08\x10\x07\x66",		// Up arrow
+	"\xff\x12\x10\x07\x67",		// Down arrow
+	"\xff\x08\x10\x07 ",		// Up arrow clear
+	"\xff\x12\x10\x07 ",		// Down arrow clear
 	// Game sizes (strings nbr 37-47)
 	"\xff\x15\x0f\x02\x34M ",
 	"\xff\x15\x0f\x02?M ",
@@ -139,7 +107,7 @@ char *metaStrings[] =
 	// ROM types
 	"\xff\x15\x13\x02HIROM",
 	"\xff\x15\x13\x02LOROM",
-	// DSP types
+	// DSP types (50-57)
 	"\xff\x15\x19\x02    ",
 	"\xff\x15\x19\x02\x44SP1",
 	"\xff\x15\x19\x02\x44SP2",
@@ -148,9 +116,7 @@ char *metaStrings[] =
 	"\xff\x15\x19\x02\x44SP5",
 	"\xff\x15\x19\x02\x44SP6",
 	"\xff\x15\x19\x02SFX ",
-	"\xff\x03\x01\x00 MENU V 0.21\xff\x06\x02\x00GAMES\xff\x17\x03\x03Y\xff\x17\x04\x00: RUN, \xff\x17\x0c\x03\x42 \
-     \xff\x17\x0d\x00: GO BACK\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     \
-     \xff\x0d\x01\x00 SYSTEM INFO:",
+	"\xff\x06\x02\x07GAME  \xff\x17\x03\x03\x42\xff\x17\x04\x07: RUN, \xff\x17\x0c\x03Y\xff\x17\x0d\x07: GO BACK\xff\x0d\x01\x07 SYSTEM INFO:",
 	// Regions (59-60)
     "\xff\x0f\x01\x02 NTSC (60HZ)",
     "\xff\x0f\x01\x02 PAL  (50HZ)",
@@ -170,10 +136,19 @@ char *metaStrings[] =
     "\xff\x12\x01\x02 S-PPU2 V2",
     "\xff\x12\x01\x02 S-PPU2 V3",
     // 73
-	"\xff\x03\x01\x00 MENU V 0.21\xff\x06\x02\x00GAMES\xff\x17\x03\x03\x42 \
-     \xff\x17\x04\x00: GO BACK\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     \
-     \xff\x09\x01\x00 SPC LOAD TEST",
+	"\xff\x06\x02\x07GAMES\xff\x17\x03\x03Y\xff\x17\x04\x07: GO BACK\xff\x09\x01\x07 SPC LOAD TEST",
+	"\xff\x06\x02\x07OPTION\xff\x17\x03\x03Y\xff\x17\x04\x07: GO BACK",
+    "\xff\x06\x02\x07GAMES\xff\x17\x03\x03\x42\xff\x17\x04\x07: RUN, \xff\x17\x0c\x03Y\xff\x17\x0d\x07: RUN 2ND CART",
+    "\xff\x06\x02\x07\x43ODES\xff\x17\x03\x03\x42\xff\x17\x04\x07: RUN, \xff\x17\x0f\x03Y\xff\x17\x10\x07: GO BACK\xff\x16\x03\x03\x44PAD\xff\x16\x07\x07: PICK, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: EDIT",
 };
+
+
+ggCode_t ggCodes[MAX_GG_CODES];
+
+////// DEBUG
+u8 ggTestCode[] = {0x2,0x2,0xB,0xB,0xA,0xD,0x0,0x1};  // Infinite lives in Contra 3
+////////////
+
 
 const u8 ppuRegData1[12] =
 {
@@ -207,7 +182,7 @@ const u8 ppuRegData2[9] =
 const u16 fontColors[] =
 {
 	0x7fff, 0x3c7f, 0x7fff, 0x47f1,
-	0x1fc6, 0x7f18, 0x31ed, 0x718f
+	0x1fc6, 0x7f18, 0x31ed, 0x4292 //0x718f
 };
 
 
@@ -316,110 +291,6 @@ void load_font_colors()
 }
 
 
-// Return the number of games stored on the GBA card
-//
-u16 count_games_on_gba_card()
-{
-	u16 cnt;
-	u8 *pGames;
-
-	set_full_pointer((void**)&pGames, GAME_LIST_BANK, 0xc800);
-
-	// Loop until a chunk is found that doesn't begin with the value 0xff
-	for (cnt = 0; *pGames == 0xff; pGames += 0x40)
-	{
-		if (++cnt == 500)
-		{
-			break;
-		}
-	}
-
-	return cnt;
-}
-
-
-
-void swap(u16 *a, u16 *b)
-{
-  	int t=*a; *a=*b; *b=t;
-}
-
-// Quicksort implementation taken from Wikipedia, with some modifications
-//
-void quick_sort(u16 *arr, int beg, int end, int (*cmp)(u16,u16))
-{
-	int piv, l, r;
-
-	if (end > beg + 1)
-  	{
-    	piv = arr[beg], l = beg + 1, r = end;
-    	while (l < r)
-    	{
-			if (cmp(arr[l], piv) <= 0)
-			{
-				l++;
-			}
-			else
-			{
-				swap(&arr[l], &arr[--r]);
-			}
-		}
-    	swap(&arr[--l], &arr[beg]);
-    	quick_sort(arr, beg, l, cmp);
-    	quick_sort(arr, r, end, cmp);
-  	}
-}
-
-// Game title string comparator used when sorting
-//
-int cmp_game_titles(u16 a, u16 b)
-{
-	u8 *pGameA, *pGameB;
-
-	set_full_pointer((void**)&pGameA, GAME_LIST_BANK, 0xc800 + (a << 6));
-	set_full_pointer((void**)&pGameB, GAME_LIST_BANK, 0xc800 + (b << 6));
-
-	return strcmp(&pGameA[0xc], &pGameB[0xc]);
-}
-
-
-void create_alphabetical_index()
-{
-	int i;
-	char c;
-	u8 *pGames;
-
-	set_full_pointer((void**)&pGames, GAME_LIST_BANK, 0xc800);
-
-	for (i = 0; i < gamesList.count; i++)
-	{
-		gbaCardAlphabeticalIdx.alphaToLogical[i] = i;
-	}
-
-	quick_sort(gbaCardAlphabeticalIdx.alphaToLogical, 0, gamesList.count, cmp_game_titles);
-}
-
-
-// Returns non-zero if the games list can scroll in the given direction
-//
-int can_games_list_scroll(scrollDirection_t direction)
-{
-	if ((direction == DIRECTION_DOWN) &&
-		(gamesList.firstShown + NUMBER_OF_GAMES_TO_SHOW < gamesList.count))
-	{
-			return 1;
-	}
-	else if ((direction == DIRECTION_UP) &&
-			 (gamesList.firstShown))
-	{
-		return 1;
-	}
-
-	return 0;
-}
-
-
-
 void update_game_params()
 {
 	int i;
@@ -432,7 +303,7 @@ void update_game_params()
 	else
 	{
 		set_full_pointer((void**)&pGame, GAME_LIST_BANK,
-		                 0xc800 + (gbaCardAlphabeticalIdx.alphaToLogical[gamesList.highlighted] << 6));
+		                 0xc800 + (gbaCardAlphabeticalIdx[gamesList.highlighted] << 6));
 	}
 
 	if (pGame[0] == 0xff)
@@ -494,11 +365,11 @@ void print_meta_string(u16 msNum)
 }
 
 
-void printxy(char *pStr, u16 x, u16 y, u16 attribs)
+void printxy(char *pStr, u16 x, u16 y, u16 attribs, u16 maxChars)
 {
-	int i;
-
-	u16 vramOffs = (y << 5) | x;
+	int i = x;
+	u16 printed = 0;
+	u16 vramOffs = (y << 6) + x + x;
 
 	for (;;)
 	{
@@ -510,6 +381,12 @@ void printxy(char *pStr, u16 x, u16 y, u16 attribs)
 		bg0Buffer[vramOffs++] = *pStr;
 		bg0Buffer[vramOffs++] = attribs;
 		pStr++;
+		if (++printed >= maxChars) break;
+		if (++i >= 28)
+		{
+			i = x;
+			vramOffs = ((++y) << 6) + x + x;
+		}
 	}
 	bg0BufferDirty = 1;
 }
@@ -527,7 +404,7 @@ void puts_game_title(u16 gameNum, u16 vramOffs, u8 attributes)
 	else
 	{
 		set_full_pointer((void**)&pGame, GAME_LIST_BANK,
-		                 0xc800 + (gbaCardAlphabeticalIdx.alphaToLogical[gameNum] << 6));
+		                 0xc800 + (gbaCardAlphabeticalIdx[gameNum] << 6));
 	}
 
 	// Make sure that the chunk begins with 0xff
@@ -566,7 +443,7 @@ void print_highlighted_game_info()
 	else
 	{
 		set_full_pointer((void**)&pGame, GAME_LIST_BANK,
-		                 0xc800 + (gbaCardAlphabeticalIdx.alphaToLogical[gamesList.highlighted] << 6));
+		                 0xc800 + (gbaCardAlphabeticalIdx[gamesList.highlighted] << 6));
 	}
 
 	// Print "GAME (nnn)"
@@ -665,7 +542,16 @@ void print_hw_card_rev()
 
 void run_game_from_gba_card_c()
 {
-	void (*run_game)(void) = run_game_from_gba_card & 0x7fff;
+	void (*run_game)(void);
+
+	if (gameMode == 4)
+	{
+		run_game = run_game_from_gba_card & 0x7fff;
+	}
+	else if (gameMode == 32)
+	{
+		run_game = play_spc_from_gba_card & 0x7fff;
+	}
 
 	// The AND-operation above will not mask out bits 16-23, so we only add 0x7d to the bank here
 	// to get the result we want (0x7e).
@@ -684,17 +570,6 @@ void run_secondary_cart_c()
 	run_cart();
 }
 
-
-void play_spc_from_gba_card_c()
-{
-	void (*play_spc)(void) = play_spc_from_gba_card & 0x7fff;
-
-	// The AND-operation above will not mask out bits 16-23, so we only add 0x7d to the bank here
-	// to get the result we want (0x7e).
-	add_full_pointer((void**)&play_spc, 0x7d, 0x8000);
-
-	play_spc();
-}
 
 
 int main()
@@ -722,6 +597,12 @@ int main()
 	copy_ram_code();
 
 	REG_DISPCNT = 0x80;				// Turn screen off
+
+	// Mark all Game Genie codes as unused
+	for (i = 0; i < MAX_GG_CODES; i++)
+	{
+		ggCodes[i].used = 0;
+	}
 
 	expand_font_data();
 	load_font_colors();
@@ -758,18 +639,17 @@ int main()
 
 	REG_NMI_TIMEN = 1;
 
-	// Clear the BG0 RAM buffer
-	clear_screen();
+	switch_to_menu(MID_MAIN_MENU);
 
-	print_meta_string(0);
-	print_meta_string(4);
-	print_hw_card_rev();
-	print_games_list();
-
-	update_game_params();
 	dma_bg0_buffer();
 
 	REG_BGCNT = 3;			// Enable BG0 and BG1
+
+
+	////// DEBUG
+	for (i = 0; i < 8; i++) ggCodes[0].code[i] = ggTestCode[i];
+	gg_decode(ggCodes[0].code, &(ggCodes[0].bank), &(ggCodes[0].offset), &(ggCodes[0].val)); ggCodes[0].used = 1;
+	////////////
 
 	while (1)
 	{
@@ -780,46 +660,17 @@ int main()
 
 		keys = read_joypad();
 
-		if (keys & 0x8000)
+		switch (currentMenu)
 		{
-			// B
-			run_game_from_gba_card_c();
-		}
-		else if (keys & 0x4000)
-		{
-			// Y
-			run_secondary_cart_c();
-		}
-		if (keys & 0x0040)
-		{
-			// X
-			play_spc_from_gba_card_c();
-		}
-		else if (keys & 0x2000)
-		{
-			// Select
-			sortOrder = (sortOrder == SORT_LOGICALLY)?SORT_ALPHABETICALLY:SORT_LOGICALLY;
-			print_games_list();
-		}
-		else if (keys & 0x0800)
-		{
-			// Up
-			move_to_previous_game();
-		}
-		else if (keys & 0x0400)
-		{
-			// Down
-			move_to_next_game();
-		}
-		else if (keys & 0x0010)
-		{
-			// R
-			move_to_next_page();
-		}
-		else if (keys & 0x0020)
-		{
-			// L
-			move_to_previous_page();
+			case MID_EXT_RUN_MENU:
+				extended_run_menu_process_keypress(keys);
+				break;
+			case MID_GG_ENTRY_MENU:
+				gg_code_entry_menu_process_keypress(keys);
+				break;
+			default:
+				main_menu_process_keypress(keys);
+				break;
 		}
 	}
 

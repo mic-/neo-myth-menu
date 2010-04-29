@@ -1,14 +1,16 @@
 #ifndef _NAVIGATION_H_
 #define _NAVIGATION_H_
 
+#include "snes.h"
+
 #define NUMBER_OF_GAMES_TO_SHOW 9
 
-typedef struct
-{
-	u16 count;
-	u16 firstShown;
-	u16 highlighted;
-} gamesList_t;
+// Menu IDs
+#define MID_MAIN_MENU 0			// Main menu (games list)
+#define MID_EXT_RUN_MENU 1		// Extended run menu (ROM type selection etc)
+#define MID_GG_ENTRY_MENU 2		// Game Genie code entry menu
+
+extern u8 currentMenu;
 
 extern u16 read_joypad();
 
@@ -17,7 +19,14 @@ extern void move_to_next_page();
 extern void move_to_previous_game();
 extern void move_to_previous_page();
 
-extern void update_game_params();
-extern void print_games_list();
+extern u16 count_games_on_gba_card();
+extern void create_alphabetical_index();
+extern int can_games_list_scroll(scrollDirection_t);
+
+extern void main_menu_process_keypress(u16);
+extern void extended_run_menu_process_keypress(u16);
+extern void gg_code_entry_menu_process_keypress(u16);
+
+extern void switch_to_menu(u8);
 
 #endif
