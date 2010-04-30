@@ -10,8 +10,16 @@
 #include "string.h"
 
 
-u8 currentMenu;
-u8 highlightedGgCode;
+u8 currentMenu = MID_MAIN_MENU;
+u8 highlightedOption[16];
+
+char *extRunMenuOptions[] =
+{
+	// Name			Value
+	"MODE:",		0,
+	"GAME GENIE",	0,
+	0
+};
 
 
 // Return an unsigned short that contains the status of all 8 buttons and the dpad
@@ -191,6 +199,18 @@ void create_alphabetical_index()
 }
 
 
+void navigation_init()
+{
+	int i;
+
+	for (i = 0; i < 16; i++) highlightedOption[i] = 0;
+
+	gamesList.highlighted = gamesList.firstShown = 0;
+	gamesList.count = count_games_on_gba_card();
+	create_alphabetical_index();
+}
+
+
 // Returns non-zero if the games list can scroll in the given direction
 //
 int can_games_list_scroll(scrollDirection_t direction)
@@ -303,100 +323,121 @@ void move_to_previous_page()
 }
 
 
-void switch_to_menu(u8 newMenu)
+void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 {
+	int i;
+
+	if (!reusePrevScreen)
+	{
+		if (newMenu != currentMenu)
+		{
+			mosaic_up();
+			clear_screen();
+		}
+
+		print_hw_card_rev();
+		print_meta_string(MS_VERSION_COPYRIGHT);
+	}
+
 	switch (newMenu)
 	{
 		case MID_EXT_RUN_MENU:
-			mosaic_up();
-			clear_screen();
-			print_hw_card_rev();
-			print_meta_string(0);
-			print_meta_string(74);
-			printxy("MODE:", 2, 9, 2*4, 32);
-			printxy(&(metaStrings[48 + romRunMode][4]), 8, 9, 2*4, 32);
-			dma_bg0_buffer();
-			mosaic_down();
+			keypress_handler = extended_run_menu_process_keypress;
+			REG_BGCNT = 3;			// Enable BG0 and BG1 (disable OBJ)
+			print_meta_string(74);	// Print instructions
+			extRunMenuOptions[1] = &(metaStrings[48 + romRunMode][4]);
+			for (i = 0; i < 16; i+=2)
+			{
+				if (extRunMenuOptions[i] == 0) break;
+				printxy(extRunMenuOptions[i], 2, 9+(i>>1), (highlightedOption[MID_EXT_RUN_MENU]==(i>>1))?8:24, 32);
+				if (extRunMenuOptions[i+1]) printxy(extRunMenuOptions[i+1], 13, 9+(i>>1), (highlightedOption[MID_EXT_RUN_MENU]==(i>>1))?8:24, 32);
+			}
 			break;
 
 		case MID_GG_ENTRY_MENU:
-			mosaic_up();
-			clear_screen();
-			highlightedGgCode = 0;
-			print_meta_string(0);
-			print_meta_string(76);
-			print_hw_card_rev();
+			keypress_handler = gg_code_entry_menu_process_keypress;
+			REG_BGCNT = 0x13;		// Enable BG0, BG1 and OBJ
+			print_meta_string(MS_GG_ENTRY_MENU_INSTRUCTIONS);
 			printxy("0 1 2 3 4 5 6 7", 6, 9, 7*4, 32);
 			printxy("8 9 A B C D E F", 6, 11, 7*4, 32);
-			print_gg_code(&ggCodes[0], 6, 14, 2*4);
-			print_gg_code(&ggCodes[1], 6, 15, 6*4);
-			print_gg_code(&ggCodes[2], 6, 16, 6*4);
-			print_gg_code(&ggCodes[3], 6, 17, 6*4);
-			dma_bg0_buffer();
-			mosaic_down();
+			for (i = 0; i < MAX_GG_CODES; i++)
+			{
+				print_gg_code(&ggCodes[i], 6, 14+i, (i==highlightedOption[MID_GG_ENTRY_MENU])?8:24);
+			}
 			break;
 
-		default:
-			mosaic_up();
-			clear_screen();
-			print_meta_string(0);
-			print_meta_string(75);
-			print_meta_string(4);
-			print_hw_card_rev();
+		case MID_GG_EDIT_MENU:
+			keypress_handler = gg_code_edit_menu_process_keypress;
+			clear_status_window();
+			print_meta_string(MS_GG_EDIT_MENU_INSTRUCTIONS);
+			break;
+
+		default:					// Main menu
+			keypress_handler = main_menu_process_keypress;
+			print_meta_string(MS_MAIN_MENU_INSTRUCTIONS);
+			print_meta_string(MS_GAME_NUMBER);
 			print_games_list();
 			update_game_params();
+			break;
+	}
+
+	if (!reusePrevScreen)
+	{
+		if (newMenu != currentMenu)
+		{
 			dma_bg0_buffer();
 			mosaic_down();
-			break;
+		}
 	}
 
 	currentMenu = newMenu;
 }
 
 
+
 void main_menu_process_keypress(u16 keys)
 {
-	if (keys & 0x8000)
+	if (keys & JOY_B)
 	{
 		// B
 		run_game_from_gba_card_c();
 	}
-	else if (keys & 0x4000)
+	else if (keys & JOY_Y)
 	{
 		// Y
 		run_secondary_cart_c();
 	}
-	if (keys & 0x0040)
+	if (keys & JOY_X)
 	{
 		// X
-		switch_to_menu(MID_EXT_RUN_MENU);
+		switch_to_menu(MID_EXT_RUN_MENU, 0);
 	}
-	else if (keys & 0x2000)
+	else if (keys & JOY_SELECT)
 	{
 		// Select
 	}
-	else if (keys & 0x0800)
+	else if (keys & JOY_UP)
 	{
 		// Up
 		move_to_previous_game();
 	}
-	else if (keys & 0x0400)
+	else if (keys & JOY_DOWN)
 	{
 		// Down
 		move_to_next_game();
 	}
-	else if (keys & 0x0020)
+	else if (keys & JOY_L)
 	{
 		// L
 		sortOrder = (sortOrder == SORT_LOGICALLY) ? SORT_ALPHABETICALLY : SORT_LOGICALLY;
 		print_games_list();
 	}
-	else if (keys & 0x0100)
+	else if (keys & JOY_RIGHT)
 	{
 		// Right
 		move_to_next_page();
 	}
-	else if (keys & 0x0200)
+	else if (keys & JOY_LEFT)
 	{
 		// Left
 		move_to_previous_page();
@@ -404,48 +445,113 @@ void main_menu_process_keypress(u16 keys)
 }
 
 
+
 void extended_run_menu_process_keypress(u16 keys)
 {
-	if (keys & 0x0040)
+	if (keys & JOY_A)
 	{
-		// X
-		switch_to_menu(MID_GG_ENTRY_MENU);
+		// A
+		if (highlightedOption[MID_EXT_RUN_MENU] == 0)
+		{
+			// Switch HIROM/LOROM
+			romRunMode ^= 1;
+			extRunMenuOptions[1] = &(metaStrings[48 + romRunMode][4]);
+			printxy(extRunMenuOptions[1], 13, 9, (highlightedOption[MID_EXT_RUN_MENU]==0)?8:24, 32);
+		}
+		else if (highlightedOption[MID_EXT_RUN_MENU] == 1)
+		{
+			// Go to the game genie screen
+			switch_to_menu(MID_GG_ENTRY_MENU, 0);
+		}
 	}
-	else if (keys & 0x4000)
+	else if (keys & JOY_UP)
+	{
+		// Up
+		if (highlightedOption[MID_EXT_RUN_MENU])
+		{
+			// Un-highlight the previously highlighted string(s), and highlight the new one(s)
+			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]<<1], 2, 9+highlightedOption[MID_EXT_RUN_MENU], 24, 32);
+			if (extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+1])
+				printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+1], 13, 9+highlightedOption[MID_EXT_RUN_MENU], 24, 32);
+
+			printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)-2], 2, 8+highlightedOption[MID_EXT_RUN_MENU], 8, 32);
+			if (extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)-1])
+				printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)-1], 13, 8+highlightedOption[MID_EXT_RUN_MENU], 8, 32);
+
+			highlightedOption[MID_EXT_RUN_MENU]--;
+		}
+	}
+	else if (keys & JOY_DOWN)
+	{
+		// Down
+		if (highlightedOption[MID_EXT_RUN_MENU] < 2)
+		{
+			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]<<1], 2, 9+highlightedOption[MID_EXT_RUN_MENU], 24, 32);
+			if (extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+1])
+				printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+1], 13, 9+highlightedOption[MID_EXT_RUN_MENU], 24, 32);
+
+			printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+2], 2, 10+highlightedOption[MID_EXT_RUN_MENU], 8, 32);
+			if (extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+3])
+				printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+3], 13, 10+highlightedOption[MID_EXT_RUN_MENU], 8, 32);
+
+			highlightedOption[MID_EXT_RUN_MENU]++;
+		}
+	}
+	else if (keys & JOY_Y)
 	{
 		// Y
-		switch_to_menu(MID_MAIN_MENU);
+		switch_to_menu(MID_MAIN_MENU, 0);
 	}
 }
+
 
 
 void gg_code_entry_menu_process_keypress(u16 keys)
 {
-	if (keys & 0x4000)
+	if (keys & JOY_A)
+	{
+		// A
+		switch_to_menu(MID_GG_EDIT_MENU, 1);
+	}
+	else if (keys & JOY_B)
+	{
+		// B
+		run_game_from_gba_card_c();
+	}
+	else if (keys & JOY_Y)
 	{
 		// Y
-		switch_to_menu(MID_EXT_RUN_MENU);
+		switch_to_menu(MID_EXT_RUN_MENU, 0);
 	}
-	else if (keys & 0x0800)
+	else if (keys & JOY_UP)
 	{
 		// Up
-		if (highlightedGgCode)
+		if (highlightedOption[MID_GG_ENTRY_MENU])
 		{
-			print_gg_code(&ggCodes[highlightedGgCode], 6, 14+highlightedGgCode, 6*4);
-			print_gg_code(&ggCodes[highlightedGgCode-1], 6, 13+highlightedGgCode, 2*4);
-			highlightedGgCode--;
+			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]], 6, 14+highlightedOption[MID_GG_ENTRY_MENU], 6*4);
+			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]-1], 6, 13+highlightedOption[MID_GG_ENTRY_MENU], 2*4);
+			highlightedOption[MID_GG_ENTRY_MENU]--;
 		}
 	}
-	else if (keys & 0x0400)
+	else if (keys & JOY_DOWN)
 	{
 		// Down
-		if (highlightedGgCode < MAX_GG_CODES - 1)
+		if (highlightedOption[MID_GG_ENTRY_MENU] < MAX_GG_CODES - 1)
 		{
-			print_gg_code(&ggCodes[highlightedGgCode], 6, 14+highlightedGgCode, 6*4);
-			print_gg_code(&ggCodes[highlightedGgCode+1], 6, 15+highlightedGgCode, 2*4);
-			highlightedGgCode++;
+			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]], 6, 14+highlightedOption[MID_GG_ENTRY_MENU], 6*4);
+			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]+1], 6, 15+highlightedOption[MID_GG_ENTRY_MENU], 2*4);
+			highlightedOption[MID_GG_ENTRY_MENU]++;
 		}
 	}
 }
 
+
+void gg_code_edit_menu_process_keypress(u16 keys)
+{
+	if (keys & JOY_A)
+	{
+		// A
+		switch_to_menu(MID_GG_ENTRY_MENU, 1);
+	}
+}
 

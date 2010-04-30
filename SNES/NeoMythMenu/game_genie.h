@@ -2,6 +2,7 @@
 #define _GAME_GENIE_H_
 
 #include "snes.h"
+#include "common.h"
 
 extern void gg_decode(u8 *, u8 *, u16 *, u8*);
 

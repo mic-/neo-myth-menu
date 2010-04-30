@@ -1,5 +1,6 @@
 REM Convert graphics data
 tools\sixpack -image -opt -target snes -format p4 -o assets\menu_bg.lzs -pack assets\menu_bg2.bmp
+tools\sixpack -image -target snes -format p4 -o assets\marker.chr assets\marker.bmp
 
 REM C -> ASM / S
 ..\bin\816-tcc.exe -Wall -I../include -o main.ps -c main.c
@@ -43,7 +44,7 @@ del font.s
 del navigation.s
 del navigopt.s
 REM del mainopt.s
-REM del *.s
+del *.s
 del *.obj
 REM del *.sym
 

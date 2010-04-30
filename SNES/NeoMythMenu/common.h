@@ -13,7 +13,29 @@
 #define GAME_LIST_BANK 0
 #endif
 
+// Maximum number of Game Genie codes allowed
 #define MAX_GG_CODES 4
+
+// Metastring IDs
+#define MS_VERSION_COPYRIGHT		0
+#define MS_GAME_NUMBER				4
+#define MS_MAIN_MENU_INSTRUCTIONS	75
+#define MS_GG_ENTRY_MENU_INSTRUCTIONS 76
+#define MS_GG_EDIT_MENU_INSTRUCTIONS 77
+
+// Masks for the joypad data returned by read_joypad
+#define JOY_R 		0x0010
+#define JOY_L 		0x0020
+#define JOY_X		0x0040
+#define JOY_A 		0x0080
+#define JOY_RIGHT 	0x0100
+#define JOY_LEFT 	0x0200
+#define JOY_DOWN 	0x0400
+#define JOY_UP 		0x0800
+#define JOY_START	0x1000
+#define JOY_SELECT 	0x2000
+#define JOY_Y		0x4000
+#define JOY_B 		0x8000
 
 
 typedef struct
@@ -55,6 +77,7 @@ extern char *metaStrings[];
 extern ggCode_t ggCodes[MAX_GG_CODES];
 extern u16 gbaCardAlphabeticalIdx[500];
 extern sortOrder_t sortOrder;
+extern void (*keypress_handler)(u16);
 
 extern void set_full_pointer(void **, u8, u16);
 extern void dma_bg0_buffer();
@@ -64,6 +87,7 @@ extern void play_spc_from_gba_card_c();
 extern void run_secondary_cart_c();
 
 extern void clear_screen();
+extern void clear_status_window();
 extern void print_meta_string(u16);
 extern void print_games_list();
 extern void print_hw_card_rev();

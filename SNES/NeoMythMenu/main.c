@@ -10,6 +10,7 @@
 #include "myth.h"
 #include "neo2.h"
 #include "navigation.h"
+#include "game_genie.h"
 #include "common.h"
 
 
@@ -17,6 +18,7 @@
 extern char bg_patterns, bg_patterns_end;
 extern char bg_palette[];
 extern char bg_map, bg_map_end;
+extern char obj_marker;
 
 extern u8 font[];
 
@@ -34,6 +36,8 @@ char sortLetter = 'A';
 u16 gbaCardAlphabeticalIdx[500];
 
 gamesList_t gamesList;
+
+void (*keypress_handler)(u16);
 
 // All the text strings are written to this buffer and then sent to VRAM using DMA in order to
 // improve performance.
@@ -137,9 +141,10 @@ char *metaStrings[] =
     "\xff\x12\x01\x02 S-PPU2 V3",
     // 73
 	"\xff\x06\x02\x07GAMES\xff\x17\x03\x03Y\xff\x17\x04\x07: GO BACK\xff\x09\x01\x07 SPC LOAD TEST",
-	"\xff\x06\x02\x07OPTION\xff\x17\x03\x03Y\xff\x17\x04\x07: GO BACK",
-    "\xff\x06\x02\x07GAMES\xff\x17\x03\x03\x42\xff\x17\x04\x07: RUN, \xff\x17\x0c\x03Y\xff\x17\x0d\x07: RUN 2ND CART",
+    "\xff\x06\x02\x07OPTION\xff\x17\x03\x03\x42\xff\x17\x04\x07: RUN, \xff\x17\x0f\x03Y\xff\x17\x10\x07: GO BACK\xff\x16\x03\x03\x41\xff\x16\x04\x07: EDIT",
+    "\xff\x06\x02\x07GAMES\xff\x17\x03\x03\x42/X\xff\x17\x06\x07: RUN, \xff\x17\x0e\x03Y\xff\x17\x0f\x07: RUN 2ND CART",
     "\xff\x06\x02\x07\x43ODES\xff\x17\x03\x03\x42\xff\x17\x04\x07: RUN, \xff\x17\x0f\x03Y\xff\x17\x10\x07: GO BACK\xff\x16\x03\x03\x44PAD\xff\x16\x07\x07: PICK, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: EDIT",
+    "\xff\x17\x03\x03\x42\xff\x17\x04\x07: ADD, \xff\x17\x0f\x03Y\xff\x17\x10\x07: DELETE\xff\x16\x03\x03\x44PAD\xff\x16\x07\x07: PICK, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: CANCEL",
 };
 
 
@@ -590,11 +595,9 @@ int main()
 
 	cardModel = *(u8*)0x00fff0;
 
-	gamesList.highlighted = gamesList.firstShown = 0;
-	gamesList.count = count_games_on_gba_card();
-	create_alphabetical_index();
-
 	copy_ram_code();
+
+	navigation_init();
 
 	REG_DISPCNT = 0x80;				// Turn screen off
 
@@ -639,7 +642,7 @@ int main()
 
 	REG_NMI_TIMEN = 1;
 
-	switch_to_menu(MID_MAIN_MENU);
+	switch_to_menu(MID_MAIN_MENU, 0);
 
 	dma_bg0_buffer();
 
@@ -660,18 +663,7 @@ int main()
 
 		keys = read_joypad();
 
-		switch (currentMenu)
-		{
-			case MID_EXT_RUN_MENU:
-				extended_run_menu_process_keypress(keys);
-				break;
-			case MID_GG_ENTRY_MENU:
-				gg_code_entry_menu_process_keypress(keys);
-				break;
-			default:
-				main_menu_process_keypress(keys);
-				break;
-		}
+		keypress_handler(keys);
 	}
 
 
