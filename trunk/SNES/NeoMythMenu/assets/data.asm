@@ -14,4 +14,7 @@ bg_map_end:
 bg_palette:
 .incbin "assets/menu_bg.pal"
 
+obj_marker:
+.incbin "assets/marker.chr"
+
 .ends
