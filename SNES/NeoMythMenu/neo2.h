@@ -12,7 +12,5 @@ extern void run_secondary_cart();
 
 extern void play_spc_from_gba_card();
 
-extern void mosaic_up();
-extern void mosaic_down();
 
 #endif

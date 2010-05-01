@@ -1,10 +1,10 @@
 // SNES Myth Menu
-// C version 0.21
+// C version 0.22
 //
 // Mic, 2010
 
 #include "snes.h"
-#include "dma.h"
+#include "ppu.h"
 #include "hw_math.h"
 #include "lzss_decode.h"
 #include "myth.h"
@@ -57,7 +57,7 @@ char MS4[] = "\xff\x15\x02\x02 GAME (001)";
 //
 char *metaStrings[] =
 {
-    "\xff\x03\x01\x07 MENU V 0.21\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
+    "\xff\x03\x01\x07 MENU V 0.22\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
 	"\xff\x01\xfe\x0f\x0a\x68\x69\x6A\x20\x71\x72\x73\x20\x7a\x7b\x7c\x83\x84\x85\xfe\x10\x0a\x6b\x6c\x6d\x20\x74\x75 \
 	 \x76\x20\x7d\x7e\x7f\x86\x87\x88xfe\x11\x0a\x6e\x6f\x70\x20\x77\x78\x79\x20\x80\x81\x82\x89\x8a\x8b\xfe\x17\x06 \
 	 \x06\xff\x04                             ",
@@ -141,9 +141,9 @@ char *metaStrings[] =
     "\xff\x12\x01\x02 S-PPU2 V3",
     // 73
 	"\xff\x06\x02\x07GAMES\xff\x17\x03\x03Y\xff\x17\x04\x07: GO BACK\xff\x09\x01\x07 SPC LOAD TEST",
-    "\xff\x06\x02\x07OPTION\xff\x17\x03\x03\x42\xff\x17\x04\x07: RUN, \xff\x17\x0f\x03Y\xff\x17\x10\x07: GO BACK\xff\x16\x03\x03\x41\xff\x16\x04\x07: EDIT",
+    "\xff\x06\x02\x07OPTION\xff\x17\x03\x03\x42\xff\x17\x04\x07: RUN, \xff\x17\x0f\x03Y\xff\x17\x10\x07: GO BACK\xff\x16\x03\x03\x41\xff\x16\x04\x07: EDIT  ",
     "\xff\x06\x02\x07GAMES\xff\x17\x03\x03\x42/X\xff\x17\x06\x07: RUN, \xff\x17\x0e\x03Y\xff\x17\x0f\x07: RUN 2ND CART",
-    "\xff\x06\x02\x07\x43ODES\xff\x17\x03\x03\x42\xff\x17\x04\x07: RUN, \xff\x17\x0f\x03Y\xff\x17\x10\x07: GO BACK\xff\x16\x03\x03\x44PAD\xff\x16\x07\x07: PICK, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: EDIT",
+    "\xff\x06\x02\x07\x43ODES\xff\x17\x03\x03\x42\xff\x17\x04\x07: RUN, \xff\x17\x0f\x03Y\xff\x17\x10\x07: GO BACK\xff\x16\x03\x03X\xff\x16\x04\x07: DELETE, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: EDIT  ",
     "\xff\x17\x03\x03\x42\xff\x17\x04\x07: ADD, \xff\x17\x0f\x03Y\xff\x17\x10\x07: DELETE\xff\x16\x03\x03\x44PAD\xff\x16\x07\x07: PICK, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: CANCEL",
 };
 
@@ -157,7 +157,7 @@ u8 ggTestCode[] = {0x2,0x2,0xB,0xB,0xA,0xD,0x0,0x1};  // Infinite lives in Contr
 
 const u8 ppuRegData1[12] =
 {
-     3,		// OBJ data select
+     0x60,	// OBJ size (16x16) and pattern address (0x0000)
 	 0,		// OAM address low
 	 0,		// OAM address high
 	 0,		// OAM data
@@ -173,7 +173,7 @@ const u8 ppuRegData1[12] =
 
 const u8 ppuRegData2[9] =
 {
-     2,		// Enable BG1. BG0 is enabled separately.
+     2,		// Enable BG1. BG0 and OBJ are enabled separately.
 	 0,		// Sub screen
 	 0,		// Window mask
 	 0,		// Window mask
@@ -190,6 +190,12 @@ const u16 fontColors[] =
 	0x1fc6, 0x7f18, 0x31ed, 0x4292 //0x718f
 };
 
+
+const u16 objColors[] =
+{
+	0x4292, 0x7fff, 0x7fff, 0x47f1,
+	0x1fc6, 0x7f18, 0x31ed, 0x4292
+};
 
 
 void wait_nmi()
@@ -232,10 +238,11 @@ void add_full_pointer(void **pptr, u8 bank, u16 offset)
 }
 
 
-void dma_bg0_buffer()
+void update_screen()
 {
 	wait_nmi();
 	load_vram(bg0Buffer, 0x2000, 0x800);
+	update_oam(&marker, 0, 1);
 	bg0BufferDirty = 0;
 }
 
@@ -292,6 +299,19 @@ void load_font_colors()
 		REG_CGRAM_ADDR = (i << 4) + 1;
 		REG_CGRAM_DATAW = (u8)fontColors[i];
 		REG_CGRAM_DATAW = fontColors[i] >> 8;
+	}
+}
+
+
+void load_obj_colors()
+{
+	u8 i;
+
+	for (i = 0; i < 8; i++)
+	{
+		REG_CGRAM_ADDR = 128 + (i << 4) + 1;
+		REG_CGRAM_DATAW = (u8)objColors[i];
+		REG_CGRAM_DATAW = objColors[i] >> 8;
 	}
 }
 
@@ -392,6 +412,26 @@ void printxy(char *pStr, u16 x, u16 y, u16 attribs, u16 maxChars)
 			i = x;
 			vramOffs = ((++y) << 6) + x + x;
 		}
+	}
+	bg0BufferDirty = 1;
+}
+
+
+// Mainly for debugging purposes
+//
+void print_hex(u8 val, u16 x, u16 y, u16 attribs)
+{
+	u16 vramOffs = (y << 6) + x + x;
+	int i;
+	u8 b;
+
+	for (i = 0; i < 2; i++)
+	{
+		b = (val >> 4) + '0';
+		if (b > '9') b += 7;
+		bg0Buffer[vramOffs++] = b;
+		bg0Buffer[vramOffs++] = attribs;
+		val <<= 4;
 	}
 	bg0BufferDirty = 1;
 }
@@ -597,8 +637,6 @@ int main()
 
 	copy_ram_code();
 
-	navigation_init();
-
 	REG_DISPCNT = 0x80;				// Turn screen off
 
 	// Mark all Game Genie codes as unused
@@ -615,6 +653,10 @@ int main()
   	load_cgram(bg_palette, 0, 32);
    	load_vram(&bg_map, 0x3000,(&bg_map_end - &bg_map));
 
+	// Load sprite patterns
+	load_vram(&obj_marker, 200*16, 2*32);
+	load_vram((&obj_marker)+64, 216*16, 2*32);
+
 	// Setup various PPU registers
 	bp = &(REG_OBSEL);
 	for (i = 0; i < 12; i++)
@@ -626,6 +668,18 @@ int main()
 	{
 		*bp++ = ppuRegData2[i];
 	}
+
+	// Clear OAM
+	REG_OAMADDL = 0;
+	REG_OAMADDH = 0;
+	for (i = 0; i < 512+32; i++)
+	{
+		REG_OAMDATA = 0;
+	}
+
+	load_obj_colors();
+
+	navigation_init();
 
 	// Setup color addition parameters
 	REG_COLDATA = 0x22;
@@ -644,21 +698,21 @@ int main()
 
 	switch_to_menu(MID_MAIN_MENU, 0);
 
-	dma_bg0_buffer();
+	update_screen();
 
 	REG_BGCNT = 3;			// Enable BG0 and BG1
 
 
 	////// DEBUG
-	for (i = 0; i < 8; i++) ggCodes[0].code[i] = ggTestCode[i];
-	gg_decode(ggCodes[0].code, &(ggCodes[0].bank), &(ggCodes[0].offset), &(ggCodes[0].val)); ggCodes[0].used = 1;
+	/*for (i = 0; i < 8; i++) ggCodes[0].code[i] = ggTestCode[i];
+	gg_decode(ggCodes[0].code, &(ggCodes[0].bank), &(ggCodes[0].offset), &(ggCodes[0].val)); ggCodes[0].used = 1;*/
 	////////////
 
 	while (1)
 	{
 		if (bg0BufferDirty)
 		{
-			dma_bg0_buffer();
+			update_screen();
 		}
 
 		keys = read_joypad();

@@ -7,11 +7,14 @@
 #include "navigation.h"
 #include "common.h"
 #include "game_genie.h"
+#include "ppu.h"
 #include "string.h"
 
 
 u8 currentMenu = MID_MAIN_MENU;
 u8 highlightedOption[16];
+
+oamEntry_t marker;
 
 char *extRunMenuOptions[] =
 {
@@ -208,6 +211,13 @@ void navigation_init()
 	gamesList.highlighted = gamesList.firstShown = 0;
 	gamesList.count = count_games_on_gba_card();
 	create_alphabetical_index();
+
+	marker.chr = 200;
+	marker.x = 44;
+	marker.y = 67;
+	marker.palette = 0;
+	marker.prio = 3;
+	marker.flip = 0;
 }
 
 
@@ -352,6 +362,15 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 				printxy(extRunMenuOptions[i], 2, 9+(i>>1), (highlightedOption[MID_EXT_RUN_MENU]==(i>>1))?8:24, 32);
 				if (extRunMenuOptions[i+1]) printxy(extRunMenuOptions[i+1], 13, 9+(i>>1), (highlightedOption[MID_EXT_RUN_MENU]==(i>>1))?8:24, 32);
 			}
+			highlightedOption[MID_GG_ENTRY_MENU] = 0;
+
+			////// DEBUG
+			/*print_hex(ggCodes[0].val, 2, 13, 8);
+			print_hex(ggCodes[0].bank, 5, 13, 8);
+			print_hex((u8)(ggCodes[0].offset>>8), 8, 13, 8);
+			print_hex((u8)(ggCodes[0].offset), 10, 13, 8);*/
+			////////
+
 			break;
 
 		case MID_GG_ENTRY_MENU:
@@ -364,12 +383,17 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			{
 				print_gg_code(&ggCodes[i], 6, 14+i, (i==highlightedOption[MID_GG_ENTRY_MENU])?8:24);
 			}
+			marker.x = 44;
+			marker.y = 67;
+			marker.palette = 0;
 			break;
 
 		case MID_GG_EDIT_MENU:
 			keypress_handler = gg_code_edit_menu_process_keypress;
 			clear_status_window();
 			print_meta_string(MS_GG_EDIT_MENU_INSTRUCTIONS);
+			marker.palette = 1;
+			highlightedOption[MID_GG_EDIT_MENU] = 0;
 			break;
 
 		default:					// Main menu
@@ -385,7 +409,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 	{
 		if (newMenu != currentMenu)
 		{
-			dma_bg0_buffer();
+			update_screen();
 			mosaic_down();
 		}
 	}
@@ -523,6 +547,12 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 		// Y
 		switch_to_menu(MID_EXT_RUN_MENU, 0);
 	}
+	else if (keys & JOY_X)
+	{
+		// X
+		ggCodes[highlightedOption[MID_GG_ENTRY_MENU]].used = 0;
+		print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]], 6, 14+highlightedOption[MID_GG_ENTRY_MENU], 8);
+	}
 	else if (keys & JOY_UP)
 	{
 		// Up
@@ -548,10 +578,67 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 
 void gg_code_edit_menu_process_keypress(u16 keys)
 {
+	u8 b;
+	u16 whichCode;
+
 	if (keys & JOY_A)
 	{
 		// A
 		switch_to_menu(MID_GG_ENTRY_MENU, 1);
+	}
+	else if (keys & JOY_B)
+	{
+		// B
+		whichCode = highlightedOption[MID_GG_ENTRY_MENU];
+		b = ((marker.x - 44) >> 4) + ((marker.y - 67) >> 1);
+		ggCodes[whichCode].code[highlightedOption[MID_GG_EDIT_MENU]] = b;
+		b += '0'; if (b > '9') b += 7;
+		printxy(&b, 6+highlightedOption[MID_GG_EDIT_MENU]+((highlightedOption[MID_GG_EDIT_MENU]>3)?1:0), 14+whichCode, 8, 1);
+		if (++highlightedOption[MID_GG_EDIT_MENU] == 8)
+		{
+			gg_decode(ggCodes[whichCode].code, &(ggCodes[whichCode].bank), &(ggCodes[whichCode].offset), &(ggCodes[whichCode].val));
+			ggCodes[whichCode].used = 1;
+			switch_to_menu(MID_GG_ENTRY_MENU, 1);
+		}
+	}
+	else if (keys & JOY_Y)
+	{
+		// Y
+		if (highlightedOption[MID_GG_EDIT_MENU])
+		{
+			highlightedOption[MID_GG_EDIT_MENU]--;
+			whichCode = highlightedOption[MID_GG_ENTRY_MENU];
+			printxy("_", 6+highlightedOption[MID_GG_EDIT_MENU]+((highlightedOption[MID_GG_EDIT_MENU]>3)?1:0), 14+whichCode, 8, 1);
+			ggCodes[whichCode].used = 0;
+		}
+	}
+	else if (keys & JOY_UP)
+	{
+		// Up
+		marker.y -= 16;
+		if (marker.y < 67) marker.y = 83;
+		update_screen();
+	}
+	else if (keys & JOY_DOWN)
+	{
+		// Down
+		marker.y += 16;
+		if (marker.y > 83) marker.y = 67;
+		update_screen();
+	}
+	else if (keys & JOY_LEFT)
+	{
+		// Left
+		marker.x -= 16;
+		if (marker.x < 44) marker.x = 44+112;
+		update_screen();
+	}
+	else if (keys & JOY_RIGHT)
+	{
+		// Left
+		marker.x += 16;
+		if (marker.x > 44+112) marker.x = 44;
+		update_screen();
 	}
 }
 

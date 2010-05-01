@@ -258,7 +258,7 @@ run_secondary_cart:
 	jsl	print_meta_string
 	pla
 	
-	jsl	dma_bg0_buffer
+	jsl	update_screen
 
 	jsl	mosaic_down + $7D0000
 	
@@ -290,7 +290,7 @@ run_secondary_cart:
 	pla
 	jsl	print_hw_card_rev
 	jsl	print_games_list
-	jsl	dma_bg0_buffer
+	jsl	update_screen
 	jsl	mosaic_down + $7D0000
 	plx
 	rtl
@@ -512,7 +512,7 @@ SET_NEOCMD:
 
 run_game_from_gba_card:
 	jsl	clear_status_window
-	jsl	dma_bg0_buffer
+	jsl	update_screen
 	
 	sep	#$20
 	
