@@ -28,9 +28,8 @@ void gg_decode(u8 *ggCode, u8 *bank, u16 *offset, u8* val)
 
 	for (i = 0; i < 3; i++)
 	{
-		ggCodeTemp[i] = (ggCodeTemp[i + 2] << 4) | ggCodeTemp[i + 3];
+		ggCodeTemp[i] = (ggCodeTemp[i + i + 2] << 4) | ggCodeTemp[i + i + 3];
 	}
-
 
 	*bank = ((ggCodeTemp[1] & 0x3C) << 2) | ((ggCodeTemp[2] & 0x3C) >> 2);
 	*offset = ((ggCodeTemp[0] & 0xF0) << 8) | ((ggCodeTemp[2] & 0x03) << 10) | ((ggCodeTemp[1] & 0xC0) << 2);

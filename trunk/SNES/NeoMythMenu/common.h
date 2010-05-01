@@ -2,6 +2,7 @@
 #define _COMMON_H_
 
 #include "snes.h"
+#include "ppu.h"
 
 
 // The default header that comes with SNESC specifies a LOROM configuration. Remove this define if HIROM is used.
@@ -55,6 +56,7 @@ typedef struct
 	u8 code[8];
 } ggCode_t;
 
+
 // For use with can_games_list_scroll
 typedef enum
 {
@@ -77,10 +79,11 @@ extern char *metaStrings[];
 extern ggCode_t ggCodes[MAX_GG_CODES];
 extern u16 gbaCardAlphabeticalIdx[500];
 extern sortOrder_t sortOrder;
+extern oamEntry_t marker;
 extern void (*keypress_handler)(u16);
 
 extern void set_full_pointer(void **, u8, u16);
-extern void dma_bg0_buffer();
+extern void update_screen();
 
 extern void run_game_from_gba_card_c();
 extern void play_spc_from_gba_card_c();
@@ -92,6 +95,7 @@ extern void print_meta_string(u16);
 extern void print_games_list();
 extern void print_hw_card_rev();
 extern void printxy(char *, u16, u16, u16, u16);
+extern void print_hex(u8, u16, u16, u16);
 extern void update_game_params();
 
 #endif

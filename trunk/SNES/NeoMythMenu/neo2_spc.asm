@@ -25,7 +25,7 @@ play_spc_from_gba_card:
 	pla
 	jsl	print_hw_card_rev
 
-	jsl	dma_bg0_buffer
+	jsl	update_screen
 	
 	sep	#$20
 	
