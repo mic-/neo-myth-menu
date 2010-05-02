@@ -4,7 +4,8 @@
 
 .include "hdr.asm"
 
-.section ".text_dma" superfree
+.bank 3 slot 0
+.section ".text_dma" 
 
 
 load_cgram:

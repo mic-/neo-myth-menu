@@ -7,7 +7,8 @@
 
 .include "hdr.asm"
 
-.section ".text_lzss" superfree
+.bank 3 slot 0
+.section ".text_lzss"
 
 .DEFINE LZSS_DICTIONARY_SIZE 4096
 .DEFINE LZSS_THRESHOLD 2

@@ -19,8 +19,8 @@ oamEntry_t marker;
 char *extRunMenuOptions[] =
 {
 	// Name			Value
-	"MODE:",		0,
-	"GAME GENIE",	0,
+	"Game Genie",	0,
+	"Mode:",		0,
 	0
 };
 
@@ -355,7 +355,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			keypress_handler = extended_run_menu_process_keypress;
 			REG_BGCNT = 3;			// Enable BG0 and BG1 (disable OBJ)
 			print_meta_string(74);	// Print instructions
-			extRunMenuOptions[1] = &(metaStrings[48 + romRunMode][4]);
+			extRunMenuOptions[3] = &(metaStrings[48 + romRunMode][4]);
 			for (i = 0; i < 16; i+=2)
 			{
 				if (extRunMenuOptions[i] == 0) break;
@@ -368,7 +368,8 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			/*print_hex(ggCodes[0].val, 2, 13, 8);
 			print_hex(ggCodes[0].bank, 5, 13, 8);
 			print_hex((u8)(ggCodes[0].offset>>8), 8, 13, 8);
-			print_hex((u8)(ggCodes[0].offset), 10, 13, 8);*/
+			print_hex((u8)(ggCodes[0].offset), 10, 13, 8);
+			print_hex(ggCodes[0].used, 13, 13, 8);*/
 			////////
 
 			break;
@@ -472,21 +473,26 @@ void main_menu_process_keypress(u16 keys)
 
 void extended_run_menu_process_keypress(u16 keys)
 {
-	if (keys & JOY_A)
+	if (keys & JOY_B)
 	{
 		// A
-		if (highlightedOption[MID_EXT_RUN_MENU] == 0)
+		if (highlightedOption[MID_EXT_RUN_MENU] == 1)
 		{
 			// Switch HIROM/LOROM
 			romRunMode ^= 1;
-			extRunMenuOptions[1] = &(metaStrings[48 + romRunMode][4]);
-			printxy(extRunMenuOptions[1], 13, 9, (highlightedOption[MID_EXT_RUN_MENU]==0)?8:24, 32);
+			extRunMenuOptions[3] = &(metaStrings[48 + romRunMode][4]);
+			printxy(extRunMenuOptions[3], 13, 10, (highlightedOption[MID_EXT_RUN_MENU]==1)?8:24, 32);
 		}
-		else if (highlightedOption[MID_EXT_RUN_MENU] == 1)
+		else if (highlightedOption[MID_EXT_RUN_MENU] == 0)
 		{
 			// Go to the game genie screen
 			switch_to_menu(MID_GG_ENTRY_MENU, 0);
 		}
+	}
+	else if (keys & JOY_START)
+	{
+		// B
+		run_game_from_gba_card_c();
 	}
 	else if (keys & JOY_UP)
 	{
@@ -532,12 +538,12 @@ void extended_run_menu_process_keypress(u16 keys)
 
 void gg_code_entry_menu_process_keypress(u16 keys)
 {
-	if (keys & JOY_A)
+	if (keys & JOY_B)
 	{
 		// A
 		switch_to_menu(MID_GG_EDIT_MENU, 1);
 	}
-	else if (keys & JOY_B)
+	else if (keys & JOY_START)
 	{
 		// B
 		run_game_from_gba_card_c();

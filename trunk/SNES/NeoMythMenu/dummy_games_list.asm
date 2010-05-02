@@ -1,8 +1,8 @@
 .include "hdr.asm"
 
-	;.BANK 1
-	;.ORG	$4000
-	;.DSB	$800,0
+	.BANK 1
+	.ORG	$4000
+	.DSB	$800,0
 
 ;  XY
 ; $00 IF FF HAVE GAME
@@ -83,5 +83,9 @@
       
       	; Fill everything up to 4FFF, to avoid the compiler from putting anything else here
       	.ORG	$4AC0
- 	.DSB 	$540,0
- 	
+ 	.DSB 	$34f1,0
+ 
+ 	; Prevent the linker from putting any code/data at $100000-$17ffff
+ 	.BANK 2 SLOT 0                
+ 	.ORG 0                         
+	.DSB $8000,0

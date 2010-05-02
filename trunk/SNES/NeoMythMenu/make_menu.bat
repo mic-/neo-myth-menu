@@ -1,6 +1,7 @@
 REM Convert graphics data
 tools\sixpack -image -target snes -format p4 -planes 4 -o assets\marker.chr assets\marker.bmp
-tools\sixpack -image -opt -target snes -format p4 -o assets\menu_bg.lzs -pack assets\menu_bg2.bmp
+tools\sixpack -image -target snes -format p1 -o assets\adore.chr assets\adore.bmp
+tools\sixpack -image -target snes -format p4 -o assets\menu_bg.lzs -pack assets\menu_bg2.bmp
 
 
 REM C -> ASM / S
@@ -8,7 +9,7 @@ REM C -> ASM / S
 ..\bin\816-tcc.exe -Wall -I../include -o navigation.ps -c navigation.c
 ..\bin\816-tcc.exe -Wall -I../include -o game_genie.ps -c game_genie.c
 ..\bin\816-tcc.exe -Wall -I../include -o ppuc.ps -c ppuc.c
-..\bin\816-tcc.exe -Wall -I../include -o font.s -c assets\font.c
+REM ..\bin\816-tcc.exe -Wall -I../include -o font.s -c assets\font.c
 
 REM Optimize ASM files
 tools\stripcom main.ps main.ps2
@@ -38,10 +39,10 @@ REM ASM -> OBJ
 ..\bin\wla-65816.exe -io navigopt.s navigation.obj
 ..\bin\wla-65816.exe -io game_genie.s game_genie.obj
 ..\bin\wla-65816.exe -io ppucopt.s ppuc.obj
-..\bin\wla-65816.exe -io font.s font.obj
+REM ..\bin\wla-65816.exe -io font.s font.obj
 
 REM OBJ -> SMC
-..\bin\wlalink.exe -dvo main.obj navigation.obj ppuc.obj data.obj dma.obj font.obj game_genie.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj dummy_games_list.obj NEOSNES.BIN
+..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj dummy_games_list.obj NEOSNES.BIN
 
 REM Delete files
 del *.ps2
