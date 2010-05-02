@@ -17,4 +17,7 @@ bg_palette:
 obj_marker:
 .incbin "assets/marker.chr"
 
+font:
+.incbin "assets/adore.chr"
+
 .ends

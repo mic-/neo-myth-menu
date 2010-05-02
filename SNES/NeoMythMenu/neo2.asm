@@ -316,8 +316,97 @@ run_secondary_cart:
 	rtl
 	
 
+
 ; Apply Game Genie codes to game ROM data that has been copied to PSRAM
 apply_gg_codes:
+	sep	#$30
+	phx
+	phy
+	rep	#$10			; 16-bit X/Y
+
+	ldx	#0
+	ldy	#4			; Maximum number of codes
+-:
+	lda.l	ggCodes,x		; used
+	bne	gg_code_used
+	jmp	next_gg_code
+gg_code_used:
+	lda.l	ggCodes+1,x		; bank (64kB)
+	cmp	tcc__r3			; Should this gg code be applied to the lower 512 kbit that we just copied to PSRAM?
+	bne	gg_upper_bank
+	phx				; Save X
+	lda	#0
+	xba				; Clear high byte of A
+	lda.l	ggCodes+2,x		; val
+	rep	#$20
+	sta	tcc__r4
+	lda.l	ggCodes+4,x		; offset
+	bit	#1			; Odd address?
+	bne	+			; ..Yes
+	tax
+	lda.l	$500000,x		; Read one word ($xxyy) from the game ROM
+	and	#$ff00			; Keep $xx00
+	ora	tcc__r4			; val
+	sta.l	$500000,x		; Write back $xxvv, where vv comes from the game genie code
+	plx				; Restore X
+	bra	next_gg_code
++:
+	dea
+	tax
+	lda.l	$500000,x
+	and	#$00ff
+	xba
+	ora	tcc__r4			; val
+	xba
+	sta.l	$500000,x
+	plx				; Restore X
+	bra	next_gg_code
+	
+gg_upper_bank:
+	dea
+	cmp	tcc__r3			; Should this gg code be applied to the upper 512 kbit that we just copied to PSRAM?
+	bne	next_gg_code
+	phx				; Save X
+	lda	#0
+	xba				; Clear high byte of A
+	lda.l	ggCodes+2,x		; val
+	rep	#$20
+	sta	tcc__r4
+	lda.l	ggCodes+4,x		; offset
+	bit	#1			; Odd address?
+	bne	+			;; ..Yes
+	tax
+	lda.l	$510000,x
+	and	#$ff00
+	ora	tcc__r4			; val
+	sta.l	$510000,x
+	plx				; Restore X
+	bra	next_gg_code
++:
+	dea
+	tax
+	lda.l	$510000,x
+	and	#$00ff
+	xba
+	ora	tcc__r4			; val
+	xba
+	sta.l	$510000,x
+	plx				; Restore X
+	bra	next_gg_code
+next_gg_code:
+	rep	#$20
+	txa
+	clc
+	adc	#14
+	tax
+	sep	#$20
+	dey
+	beq	apply_gg_codes_done
+	jmp	-
+apply_gg_codes_done:	
+	sep	#$10			; 8-bit X/Y
+	ply
+	plx
 	rts
 	
 
@@ -351,10 +440,13 @@ show_loading_progress:
 	inx
 	bra	-
 +:
-
- ;.DEFINE NEO2_DEBUG 1
+	rts
+	
+show_copied_data:
+ .DEFINE NEO2_DEBUG 1
  .IFDEF NEO2_DEBUG
- 	; Read back some of the data that has been copied to PSRAM and display
+ 	jsr.w	_wait_nmi
+  	; Read back some of the data that has been copied to PSRAM and display
  	; it on-screen.
 	rep	#$30
 	lda	#$22c3
@@ -362,7 +454,7 @@ show_loading_progress:
 	sep	#$20
 	ldx	#0
 -:
-	lda.l	$500210,x
+	lda.l	$5014e8,x
 	lsr	a
 	lsr	a
 	lsr	a
@@ -375,9 +467,9 @@ show_loading_progress:
 	adc	#7
 +:
 	sta.l	REG_VRAM_DATAW1
-	lda	#0
+	lda	#8
 	sta.l	REG_VRAM_DATAW2
-	lda.l	$500210,x
+	lda.l	$5014e8,x
 	and	#15
 	clc
 	adc	#'0'
@@ -387,7 +479,7 @@ show_loading_progress:
 	adc	#7
 +:
 	sta.l	REG_VRAM_DATAW1
-	lda	#0
+	lda	#8
 	sta.l	REG_VRAM_DATAW2
 	inx
 	cpx	#8
@@ -399,7 +491,7 @@ show_loading_progress:
          
 
 load_progress:
-	.db "LOADING......(  )",0
+	.db "Loading......(  )",0
 	
 
  .MACRO MOV_PSRAM_SETUP 
@@ -565,7 +657,8 @@ MOV_PSRAM:
 	
          LDA    #$00
          STA    tcc__r1+1
-             
+         sta	tcc__r3
+         
          LDA    #$04       	; COPY MODE !
          STA.L  MYTH_OPTION_IO
 
@@ -620,16 +713,19 @@ MOV_PSRAM_LOOP:
 	 ina
 	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$54
 	
-
          DEC    tcc__r0+1
          LDA    tcc__r0+1        ; L-BYTE
          LDA    tcc__r0h        ; H-BYTE
-
          
          jsr	copy_1mbit_from_gbac_to_psram
 
-	 ;jsr	apply_gg_codes
-	
+	 jsr	apply_gg_codes
+	 inc	tcc__r3
+	 inc	tcc__r3
+	 
+;	 jsr	show_copied_data
+;fubar: bra fubar
+
          DEC    tcc__r0h+1
          BNE    -
          
