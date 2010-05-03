@@ -39,6 +39,14 @@
 #define JOY_B 		0x8000
 
 
+#define SHELL_BGPAL_WHITE 2
+#define SHELL_BGPAL_DARK_OLIVE 6
+#define SHELL_BGPAL_OLIVE 7
+
+#define SHELL_OBJPAL_DARK_OLIVE 0
+#define SHELL_OBJPAL_WHITE 1
+
+
 typedef struct
 {
 	u16 count;
@@ -55,6 +63,8 @@ typedef struct
 	u16 offset;
 	u8 code[8];
 } ggCode_t;
+
+#define arCode_t ggCode_t
 
 
 // For use with can_games_list_scroll
