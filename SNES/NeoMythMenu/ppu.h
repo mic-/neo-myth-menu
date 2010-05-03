@@ -96,6 +96,8 @@ typedef struct
 
 /**********************************************************************************************/
 
+#define TILE_ATTRIBUTE_PAL(ppp) (ppp<<2)
+
 
 extern void load_cgram(char *src, unsigned short cgramOffs, unsigned short numBytes);
 

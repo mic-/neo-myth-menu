@@ -1,4 +1,4 @@
-// Menu navigation code for the SNES Myth
+// Shell navigation code for the SNES Myth
 // Mic, 2010
 
 #include "snes.h"
@@ -11,17 +11,31 @@
 #include "string.h"
 
 
+// Define the top-left corner for some of the text labels and the marker sprite
+#define MARKER_LEFT 12
+#define MARKER_TOP 67
+#define CODE_LEFT 2
+
+
 u8 currentMenu = MID_MAIN_MENU;
 u8 highlightedOption[16];
 
 oamEntry_t marker;
 
-char *extRunMenuOptions[] =
+typedef struct
 {
-	// Name			Value
-	"Game Genie",	0,
-	"Mode:",		0,
-	0
+	char *label;
+	char *optionValue;
+	u8 row;
+	u8 optionColumn;
+} menuOption_t;
+
+menuOption_t extRunMenuOptions[4] =
+{
+	{"Game Genie", 0, 9, 0},
+	{"Action Replay", 0, 10, 0},
+	{"Mode:", 0, 12, 8},
+	{0,0,0,0}	// Terminator
 };
 
 
@@ -213,9 +227,9 @@ void navigation_init()
 	create_alphabetical_index();
 
 	marker.chr = 200;
-	marker.x = 44;
-	marker.y = 67;
-	marker.palette = 0;
+	marker.x = MARKER_LEFT;
+	marker.y = MARKER_TOP;
+	marker.palette = SHELL_OBJPAL_DARK_OLIVE;
 	marker.prio = 3;
 	marker.flip = 0;
 }
@@ -355,12 +369,23 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			keypress_handler = extended_run_menu_process_keypress;
 			REG_BGCNT = 3;			// Enable BG0 and BG1 (disable OBJ)
 			print_meta_string(74);	// Print instructions
-			extRunMenuOptions[3] = &(metaStrings[48 + romRunMode][4]);
-			for (i = 0; i < 16; i+=2)
+			extRunMenuOptions[2].optionValue = &(metaStrings[48 + romRunMode][4]);
+			for (i = 0; i < 16; i++)
 			{
-				if (extRunMenuOptions[i] == 0) break;
-				printxy(extRunMenuOptions[i], 2, 9+(i>>1), (highlightedOption[MID_EXT_RUN_MENU]==(i>>1))?8:24, 32);
-				if (extRunMenuOptions[i+1]) printxy(extRunMenuOptions[i+1], 13, 9+(i>>1), (highlightedOption[MID_EXT_RUN_MENU]==(i>>1))?8:24, 32);
+				if (extRunMenuOptions[i].label == 0) break;
+				printxy(extRunMenuOptions[i].label,
+				        2,
+				        extRunMenuOptions[i].row,
+				        (highlightedOption[MID_EXT_RUN_MENU]==i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+				        32);
+				if (extRunMenuOptions[i].optionValue)
+				{
+					printxy(extRunMenuOptions[i].optionValue,
+					        extRunMenuOptions[i].optionColumn,
+					        extRunMenuOptions[i].row,
+					        (highlightedOption[MID_EXT_RUN_MENU]==i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+					        32);
+				}
 			}
 			highlightedOption[MID_GG_ENTRY_MENU] = 0;
 
@@ -378,23 +403,52 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			keypress_handler = gg_code_entry_menu_process_keypress;
 			REG_BGCNT = 0x13;		// Enable BG0, BG1 and OBJ
 			print_meta_string(MS_GG_ENTRY_MENU_INSTRUCTIONS);
-			printxy("0 1 2 3 4 5 6 7", 6, 9, 7*4, 32);
-			printxy("8 9 A B C D E F", 6, 11, 7*4, 32);
+			printxy("0 1 2 3 4 5 6 7", CODE_LEFT, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+			printxy("8 9 A B C D E F", CODE_LEFT, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
 			for (i = 0; i < MAX_GG_CODES; i++)
 			{
-				print_gg_code(&ggCodes[i], 6, 14+i, (i==highlightedOption[MID_GG_ENTRY_MENU])?8:24);
+				print_gg_code(&ggCodes[i],
+				              CODE_LEFT,
+				              14 + i,
+				              (i==highlightedOption[MID_GG_ENTRY_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 			}
-			marker.x = 44;
-			marker.y = 67;
-			marker.palette = 0;
+			marker.x = MARKER_LEFT;
+			marker.y = MARKER_TOP;
+			marker.palette = SHELL_OBJPAL_DARK_OLIVE;
 			break;
 
 		case MID_GG_EDIT_MENU:
 			keypress_handler = gg_code_edit_menu_process_keypress;
 			clear_status_window();
 			print_meta_string(MS_GG_EDIT_MENU_INSTRUCTIONS);
-			marker.palette = 1;
+			marker.palette = SHELL_OBJPAL_WHITE;
 			highlightedOption[MID_GG_EDIT_MENU] = 0;
+			break;
+
+		case MID_AR_ENTRY_MENU:
+			keypress_handler = ar_code_entry_menu_process_keypress;
+			REG_BGCNT = 0x13;		// Enable BG0, BG1 and OBJ
+			print_meta_string(MS_GG_ENTRY_MENU_INSTRUCTIONS);
+			printxy("0 1 2 3 4 5 6 7", CODE_LEFT, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+			printxy("8 9 A B C D E F", CODE_LEFT, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+			for (i = 0; i < MAX_GG_CODES; i++)
+			{
+				print_ar_code(&ggCodes[i+MAX_GG_CODES],
+				              CODE_LEFT,
+				              14 + i,
+				              (i==highlightedOption[MID_AR_ENTRY_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE): TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			}
+			marker.x = MARKER_LEFT;
+			marker.y = MARKER_TOP;
+			marker.palette = SHELL_OBJPAL_DARK_OLIVE;
+			break;
+
+		case MID_AR_EDIT_MENU:
+			keypress_handler = ar_code_edit_menu_process_keypress;
+			clear_status_window();
+			print_meta_string(MS_GG_EDIT_MENU_INSTRUCTIONS);
+			marker.palette = SHELL_OBJPAL_WHITE;
+			highlightedOption[MID_AR_EDIT_MENU] = 0;
 			break;
 
 		default:					// Main menu
@@ -476,12 +530,21 @@ void extended_run_menu_process_keypress(u16 keys)
 	if (keys & JOY_B)
 	{
 		// A
-		if (highlightedOption[MID_EXT_RUN_MENU] == 1)
+		if (highlightedOption[MID_EXT_RUN_MENU] == 2)
 		{
 			// Switch HIROM/LOROM
 			romRunMode ^= 1;
-			extRunMenuOptions[3] = &(metaStrings[48 + romRunMode][4]);
-			printxy(extRunMenuOptions[3], 13, 10, (highlightedOption[MID_EXT_RUN_MENU]==1)?8:24, 32);
+			extRunMenuOptions[2].optionValue = &(metaStrings[48 + romRunMode][4]);
+			printxy(extRunMenuOptions[2].optionValue,
+			        extRunMenuOptions[2].optionColumn,
+			        extRunMenuOptions[2].row,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+			        32);
+		}
+		else if (highlightedOption[MID_EXT_RUN_MENU] == 1)
+		{
+			// Go to the action replay screen
+			switch_to_menu(MID_AR_ENTRY_MENU, 0);
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == 0)
 		{
@@ -500,14 +563,32 @@ void extended_run_menu_process_keypress(u16 keys)
 		if (highlightedOption[MID_EXT_RUN_MENU])
 		{
 			// Un-highlight the previously highlighted string(s), and highlight the new one(s)
-			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]<<1], 2, 9+highlightedOption[MID_EXT_RUN_MENU], 24, 32);
-			if (extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+1])
-				printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+1], 13, 9+highlightedOption[MID_EXT_RUN_MENU], 24, 32);
-
-			printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)-2], 2, 8+highlightedOption[MID_EXT_RUN_MENU], 8, 32);
-			if (extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)-1])
-				printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)-1], 13, 8+highlightedOption[MID_EXT_RUN_MENU], 8, 32);
-
+			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].label,
+			        2,
+			        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].row,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+			        32);
+			if (extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionValue)
+			{
+				printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionValue,
+				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionColumn,
+				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].row,
+				        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+				        32);
+			}
+			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].label,
+			        2,
+			        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].row,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+			        32);
+			if (extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].optionValue)
+			{
+				printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].optionValue,
+				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].optionColumn,
+				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].row,
+				        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+				        32);
+			}
 			highlightedOption[MID_EXT_RUN_MENU]--;
 		}
 	}
@@ -516,13 +597,32 @@ void extended_run_menu_process_keypress(u16 keys)
 		// Down
 		if (highlightedOption[MID_EXT_RUN_MENU] < 2)
 		{
-			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]<<1], 2, 9+highlightedOption[MID_EXT_RUN_MENU], 24, 32);
-			if (extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+1])
-				printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+1], 13, 9+highlightedOption[MID_EXT_RUN_MENU], 24, 32);
-
-			printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+2], 2, 10+highlightedOption[MID_EXT_RUN_MENU], 8, 32);
-			if (extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+3])
-				printxy(extRunMenuOptions[(highlightedOption[MID_EXT_RUN_MENU]<<1)+3], 13, 10+highlightedOption[MID_EXT_RUN_MENU], 8, 32);
+			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].label,
+			        2,
+			        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].row,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+			        32);
+			if (extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionValue)
+			{
+				printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionValue,
+				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionColumn,
+				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].row,
+				        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+				        32);
+			}
+			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].label,
+			        2,
+			        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].row,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+			        32);
+			if (extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].optionValue)
+			{
+				printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].optionValue,
+				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].optionColumn,
+				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].row,
+				        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+				        32);
+			}
 
 			highlightedOption[MID_EXT_RUN_MENU]++;
 		}
@@ -557,15 +657,24 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 	{
 		// X
 		ggCodes[highlightedOption[MID_GG_ENTRY_MENU]].used = 0;
-		print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]], 6, 14+highlightedOption[MID_GG_ENTRY_MENU], 8);
+		print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]],
+		              CODE_LEFT,
+		              14 + highlightedOption[MID_GG_ENTRY_MENU],
+		              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	}
 	else if (keys & JOY_UP)
 	{
 		// Up
 		if (highlightedOption[MID_GG_ENTRY_MENU])
 		{
-			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]], 6, 14+highlightedOption[MID_GG_ENTRY_MENU], 6*4);
-			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]-1], 6, 13+highlightedOption[MID_GG_ENTRY_MENU], 2*4);
+			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]],
+			              CODE_LEFT,
+			              14 + highlightedOption[MID_GG_ENTRY_MENU],
+			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]-1],
+			              CODE_LEFT,
+			              13 + highlightedOption[MID_GG_ENTRY_MENU],
+			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 			highlightedOption[MID_GG_ENTRY_MENU]--;
 		}
 	}
@@ -574,8 +683,14 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 		// Down
 		if (highlightedOption[MID_GG_ENTRY_MENU] < MAX_GG_CODES - 1)
 		{
-			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]], 6, 14+highlightedOption[MID_GG_ENTRY_MENU], 6*4);
-			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]+1], 6, 15+highlightedOption[MID_GG_ENTRY_MENU], 2*4);
+			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]],
+			              CODE_LEFT,
+			              14 + highlightedOption[MID_GG_ENTRY_MENU],
+			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]+1],
+			              CODE_LEFT,
+			              15 + highlightedOption[MID_GG_ENTRY_MENU],
+			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 			highlightedOption[MID_GG_ENTRY_MENU]++;
 		}
 	}
@@ -596,13 +711,20 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 	{
 		// B
 		whichCode = highlightedOption[MID_GG_ENTRY_MENU];
-		b = ((marker.x - 44) >> 4) + ((marker.y - 67) >> 1);
+		b = ((marker.x - MARKER_LEFT) >> 4) + ((marker.y - MARKER_TOP) >> 1);
 		ggCodes[whichCode].code[highlightedOption[MID_GG_EDIT_MENU]] = b;
 		b += '0'; if (b > '9') b += 7;
-		printxy(&b, 6+highlightedOption[MID_GG_EDIT_MENU]+((highlightedOption[MID_GG_EDIT_MENU]>3)?1:0), 14+whichCode, 8, 1);
+		printxy(&b,
+		        CODE_LEFT + highlightedOption[MID_GG_EDIT_MENU] + ((highlightedOption[MID_GG_EDIT_MENU]>3)?1:0),
+		        14 + whichCode,
+		        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+		        1);
 		if (++highlightedOption[MID_GG_EDIT_MENU] == 8)
 		{
-			gg_decode(ggCodes[whichCode].code, &(ggCodes[whichCode].bank), &(ggCodes[whichCode].offset), &(ggCodes[whichCode].val));
+			gg_decode(ggCodes[whichCode].code,
+			          &(ggCodes[whichCode].bank),
+			          &(ggCodes[whichCode].offset),
+			          &(ggCodes[whichCode].val));
 			ggCodes[whichCode].used = 1;
 			switch_to_menu(MID_GG_ENTRY_MENU, 1);
 		}
@@ -614,7 +736,11 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 		{
 			highlightedOption[MID_GG_EDIT_MENU]--;
 			whichCode = highlightedOption[MID_GG_ENTRY_MENU];
-			printxy("_", 6+highlightedOption[MID_GG_EDIT_MENU]+((highlightedOption[MID_GG_EDIT_MENU]>3)?1:0), 14+whichCode, 8, 1);
+			printxy("_",
+			        CODE_LEFT + highlightedOption[MID_GG_EDIT_MENU] + ((highlightedOption[MID_GG_EDIT_MENU]>3)?1:0),
+			        14 + whichCode,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+			        1);
 			ggCodes[whichCode].used = 0;
 		}
 	}
@@ -622,28 +748,173 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 	{
 		// Up
 		marker.y -= 16;
-		if (marker.y < 67) marker.y = 83;
+		if (marker.y < MARKER_TOP) marker.y = MARKER_TOP+16;
 		update_screen();
 	}
 	else if (keys & JOY_DOWN)
 	{
 		// Down
 		marker.y += 16;
-		if (marker.y > 83) marker.y = 67;
+		if (marker.y > MARKER_TOP+16) marker.y = MARKER_TOP;
 		update_screen();
 	}
 	else if (keys & JOY_LEFT)
 	{
 		// Left
 		marker.x -= 16;
-		if (marker.x < 44) marker.x = 44+112;
+		if (marker.x < MARKER_LEFT) marker.x = MARKER_LEFT + 112;
 		update_screen();
 	}
 	else if (keys & JOY_RIGHT)
 	{
 		// Left
 		marker.x += 16;
-		if (marker.x > 44+112) marker.x = 44;
+		if (marker.x > MARKER_LEFT + 112) marker.x = MARKER_LEFT;
+		update_screen();
+	}
+}
+
+
+
+void ar_code_entry_menu_process_keypress(u16 keys)
+{
+	if (keys & JOY_B)
+	{
+		// A
+		switch_to_menu(MID_AR_EDIT_MENU, 1);
+	}
+	else if (keys & JOY_START)
+	{
+		// B
+		run_game_from_gba_card_c();
+	}
+	else if (keys & JOY_Y)
+	{
+		// Y
+		switch_to_menu(MID_EXT_RUN_MENU, 0);
+	}
+	else if (keys & JOY_X)
+	{
+		// X
+		ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]].used = 0;
+
+		print_ar_code(&ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]],
+		              CODE_LEFT,
+		              14 + highlightedOption[MID_AR_ENTRY_MENU],
+		              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	}
+	else if (keys & JOY_UP)
+	{
+		// Up
+		if (highlightedOption[MID_AR_ENTRY_MENU])
+		{
+			print_ar_code(&ggCodes[MAX_GG_CODES + highlightedOption[MID_AR_ENTRY_MENU]],
+			              CODE_LEFT,
+			              14 + highlightedOption[MID_AR_ENTRY_MENU],
+			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+
+			print_ar_code(&ggCodes[MAX_GG_CODES + highlightedOption[MID_AR_ENTRY_MENU]-1],
+			              CODE_LEFT,
+			              13 + highlightedOption[MID_AR_ENTRY_MENU],
+			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+			highlightedOption[MID_AR_ENTRY_MENU]--;
+		}
+	}
+	else if (keys & JOY_DOWN)
+	{
+		// Down
+		if (highlightedOption[MID_AR_ENTRY_MENU] < MAX_GG_CODES - 1)
+		{
+			print_ar_code(&ggCodes[MAX_GG_CODES + highlightedOption[MID_AR_ENTRY_MENU]],
+			              CODE_LEFT,
+			              14 + highlightedOption[MID_AR_ENTRY_MENU],
+			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+
+			print_ar_code(&ggCodes[MAX_GG_CODES + highlightedOption[MID_AR_ENTRY_MENU]+1],
+			              CODE_LEFT,
+			              15 + highlightedOption[MID_AR_ENTRY_MENU],
+			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+			highlightedOption[MID_AR_ENTRY_MENU]++;
+		}
+	}
+}
+
+
+void ar_code_edit_menu_process_keypress(u16 keys)
+{
+	u8 b;
+	u16 whichCode;
+
+	if (keys & JOY_A)
+	{
+		// A
+		switch_to_menu(MID_AR_ENTRY_MENU, 1);
+	}
+	else if (keys & JOY_B)
+	{
+		// B
+		whichCode = MAX_GG_CODES + highlightedOption[MID_AR_ENTRY_MENU];
+		b = ((marker.x - MARKER_LEFT) >> 4) + ((marker.y - MARKER_TOP) >> 1);
+		ggCodes[whichCode].code[highlightedOption[MID_AR_EDIT_MENU]] = b;
+		b += '0'; if (b > '9') b += 7;
+		printxy(&b,
+		        CODE_LEFT + highlightedOption[MID_AR_EDIT_MENU],
+		        14 + whichCode - MAX_GG_CODES,
+		        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+		        1);
+		if (++highlightedOption[MID_AR_EDIT_MENU] == 8)	// Has the user entered an entire 8-character code?
+		{
+			ar_decode(ggCodes[whichCode].code,
+			          &(ggCodes[whichCode].bank),
+			          &(ggCodes[whichCode].offset),
+			          &(ggCodes[whichCode].val));
+			ggCodes[whichCode].used = 1;
+			switch_to_menu(MID_AR_ENTRY_MENU, 1);
+		}
+	}
+	else if (keys & JOY_Y)
+	{
+		// Y
+		if (highlightedOption[MID_AR_EDIT_MENU])
+		{
+			highlightedOption[MID_AR_EDIT_MENU]--;
+			whichCode = highlightedOption[MID_AR_ENTRY_MENU];
+			printxy("_",
+			        CODE_LEFT + highlightedOption[MID_AR_EDIT_MENU],
+			        14 + whichCode,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+			        1);
+			ggCodes[MAX_GG_CODES + whichCode].used = 0;
+		}
+	}
+	else if (keys & JOY_UP)
+	{
+		// Up
+		marker.y -= 16;
+		if (marker.y < MARKER_TOP) marker.y = MARKER_TOP + 16;
+		update_screen();
+	}
+	else if (keys & JOY_DOWN)
+	{
+		// Down
+		marker.y += 16;
+		if (marker.y > MARKER_TOP + 16) marker.y = MARKER_TOP;
+		update_screen();
+	}
+	else if (keys & JOY_LEFT)
+	{
+		// Left
+		marker.x -= 16;
+		if (marker.x < MARKER_LEFT) marker.x = MARKER_LEFT + 112;
+		update_screen();
+	}
+	else if (keys & JOY_RIGHT)
+	{
+		// Left
+		marker.x += 16;
+		if (marker.x > MARKER_LEFT + 112) marker.x = MARKER_LEFT;
 		update_screen();
 	}
 }

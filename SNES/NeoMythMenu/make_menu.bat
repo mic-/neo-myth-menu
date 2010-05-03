@@ -8,6 +8,7 @@ REM C -> ASM / S
 ..\bin\816-tcc.exe -Wall -I../include -o main.ps -c main.c
 ..\bin\816-tcc.exe -Wall -I../include -o navigation.ps -c navigation.c
 ..\bin\816-tcc.exe -Wall -I../include -o game_genie.ps -c game_genie.c
+..\bin\816-tcc.exe -Wall -I../include -o action_replay.ps -c action_replay.c
 ..\bin\816-tcc.exe -Wall -I../include -o ppuc.ps -c ppuc.c
 REM ..\bin\816-tcc.exe -Wall -I../include -o font.s -c assets\font.c
 
@@ -15,14 +16,18 @@ REM Optimize ASM files
 tools\stripcom main.ps main.ps2
 tools\stripcom navigation.ps navigation.ps2
 tools\stripcom game_genie.ps game_genie.ps2
+tools\stripcom action_replay.ps action_replay.ps2
 tools\stripcom ppuc.ps ppuc.ps2
 del *.ps 
 ..\bin\816-opt.py main.ps2 > main.s
 ..\bin\816-opt.py navigation.ps2 > navigation.s
 ..\bin\816-opt.py game_genie.ps2 > game_genie.s
+..\bin\816-opt.py action_replay.ps2 > action_replay.s
 ..\bin\816-opt.py ppuc.ps2 > ppuc.s
 tools\optimore-816 main.s mainopt.s
 tools\optimore-816 navigation.s navigopt.s
+tools\optimore-816 game_genie.s ggopt.s
+tools\optimore-816 action_replay.s aropt.s
 tools\optimore-816 ppuc.s ppucopt.s
 
 REM ASM -> OBJ
@@ -37,12 +42,13 @@ REM ASM -> OBJ
 
 ..\bin\wla-65816.exe -io mainopt.s main.obj
 ..\bin\wla-65816.exe -io navigopt.s navigation.obj
-..\bin\wla-65816.exe -io game_genie.s game_genie.obj
+..\bin\wla-65816.exe -io ggopt.s game_genie.obj
+..\bin\wla-65816.exe -io aropt.s action_replay.obj
 ..\bin\wla-65816.exe -io ppucopt.s ppuc.obj
 REM ..\bin\wla-65816.exe -io font.s font.obj
 
 REM OBJ -> SMC
-..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj dummy_games_list.obj NEOSNES.BIN
+..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj dummy_games_list.obj NEOSNES.BIN
 
 REM Delete files
 del *.ps2
