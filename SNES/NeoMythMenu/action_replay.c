@@ -20,15 +20,14 @@ void ar_decode(u8 *arCode, u8 *bank, u16 *offset, u8* val)
 //
 void print_ar_code(arCode_t *arCode, u16 x, u16 y, u16 attribs)
 {
-	int i, j;
+	int i;
 
 	if (arCode->used)
 	{
-		j = 0;
 		for (i = 0; i < 8; i++)
 		{
-			arCodeTemp[j] = arCode->code[i] + '0';
-			if (arCodeTemp[j] > '9') arCodeTemp[j] += 7;
+			arCodeTemp[i] = arCode->code[i] + '0';
+			if (arCodeTemp[i] > '9') arCodeTemp[i] += 7;
 		}
 
 		printxy(arCodeTemp, x, y, attribs, 8);

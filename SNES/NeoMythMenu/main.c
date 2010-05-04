@@ -1,4 +1,4 @@
-// SNES Myth Shell
+// SNES Myth Menu
 // C version 0.23
 //
 // Mic, 2010
@@ -19,7 +19,6 @@ extern char bg_patterns, bg_patterns_end;
 extern char bg_palette[];
 extern char bg_map, bg_map_end;
 extern char obj_marker;
-
 extern u8 font[];
 
 
@@ -57,7 +56,7 @@ char MS4[] = "\xff\x15\x02\x02 Game (001)";
 //
 char *metaStrings[] =
 {
-    "\xff\x03\x01\x07 Shell v 0.23\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
+    "\xff\x03\x01\x07 Menu v 0.23\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
 	"\xff\x01\xfe\x0f\x0a\x68\x69\x6A\x20\x71\x72\x73\x20\x7a\x7b\x7c\x83\x84\x85\xfe\x10\x0a\x6b\x6c\x6d\x20\x74\x75 \
 	 \x76\x20\x7d\x7e\x7f\x86\x87\x88xfe\x11\x0a\x6e\x6f\x70\x20\x77\x78\x79\x20\x80\x81\x82\x89\x8a\x8b\xfe\x17\x06 \
 	 \x06\xff\x04                             ",
@@ -148,12 +147,9 @@ char *metaStrings[] =
 };
 
 
-// Allow for MAX_GG_CODES Game Genie codes, follow by an equal number of Action Replay codes
+// Allow for MAX_GG_CODES Game Genie codes, followed by an equal number of Action Replay codes
 ggCode_t ggCodes[MAX_GG_CODES*2];
-
-////// DEBUG
-u8 ggTestCode[] = {0x2,0x2,0xB,0xB,0xA,0xD,0x0,0x1};  // Infinite lives in Contra 3
-////////////
+u8 anyRamCheats = 0;
 
 
 const u8 ppuRegData1[12] =
@@ -600,25 +596,24 @@ void run_game_from_gba_card_c()
 		run_game = play_spc_from_gba_card & 0x7fff;
 	}
 
-	if (romRunMode == 1)
+	for (i = 0; i < MAX_GG_CODES * 2; i++)
 	{
-		// Convert LOROM addresses to file offsets
-		for (i = 0; i < MAX_GG_CODES; i++)
+		if (romRunMode == 1)
 		{
-			if (ggCodes[i].used)
+			// Convert LOROM addresses to file offsets
+			if (ggCodes[i].used == CODE_TYPE_ROM)
 			{
 				ggCodes[i].offset &= 0x7fff;
 				if (ggCodes[i].bank & 1) ggCodes[i].offset |= 0x8000;
 				ggCodes[i].bank >>= 1;
 			}
 		}
+		if (ggCodes[i].used == CODE_TYPE_RAM)
+		{
+			anyRamCheats = 1;
+		}
 	}
 
-	/*		print_hex(ggCodes[0].val, 2, 4, 8);
-			print_hex(ggCodes[0].bank, 5, 4, 8);
-			print_hex((u8)(ggCodes[0].offset>>8), 8, 4, 8);
-			print_hex((u8)(ggCodes[0].offset), 10, 4, 8);
-			print_hex(ggCodes[0].used, 13, 4, 8);*/
 
 	// The AND-operation above will not mask out bits 16-23, so we only add 0x7d to the bank here
 	// to get the result we want (0x7e).
@@ -662,9 +657,9 @@ int main()
 	REG_DISPCNT = 0x80;				// Turn screen off
 
 	// Mark all Game Genie codes as unused
-	for (i = 0; i < MAX_GG_CODES; i++)
+	for (i = 0; i < MAX_GG_CODES * 2; i++)
 	{
-		ggCodes[i].used = 0;
+		ggCodes[i].used = CODE_TYPE_UNUSED;
 	}
 
 	expand_font_data();
@@ -723,12 +718,6 @@ int main()
 	update_screen();
 
 	REG_BGCNT = 3;			// Enable BG0 and BG1
-
-
-	////// DEBUG
-	/*for (i = 0; i < 8; i++) ggCodes[0].code[i] = ggTestCode[i];
-	gg_decode(ggCodes[0].code, &(ggCodes[0].bank), &(ggCodes[0].offset), &(ggCodes[0].val)); ggCodes[0].used = 1;*/
-	////////////
 
 	while (1)
 	{
