@@ -857,8 +857,20 @@ neo_run_myth_psram:
         movea.l 4.w,a3
         jmp     (a3)
 9:
+        move.w  #0x0006,PRAM_BIO(a1)    /* set psram to bank 6 */
+        move.w  #0x00F0,PRAM_ZIO(a1)    /* psram bank size = 2MB */
         move.w  #0x0007,OPTION_IO(a1)   /* set run mode for game */
         move.w  #0x0006,WE_IO(a1)       /* write-enable psram, map bank 7 to 0x300000 */
+
+        /* copy data from 0x200000 to 0x300000 */
+        move.l  4(sp),d0                /* psize */
+        lea     0x200000,a0
+        lea     0x300000,a1
+8:
+        move.w  (a0)+,(a1)+
+        subq.l  #2,d0
+        bne.b   8b
+
         movea.l 0x300000,a7
         movea.l 0x300004,a3
         jmp     (a3)

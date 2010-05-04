@@ -153,9 +153,9 @@ static short int gManageSaves = 0;
 static short int gSRAMgrServiceStatus = SMGR_STATUS_NULL;
 
 #ifndef RUN_IN_PSRAM
-static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.2";
+static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.3";
 #else
-static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.2";
+static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.3";
 #endif
 
 #define printToScreen(_TEXT_,_X_,_Y_,_COLOR_) { gCursorX = _X_; gCursorY = _Y_; put_str(_TEXT_,_COLOR_);}
@@ -3762,7 +3762,7 @@ void do_options(void)
                     }
                     else
                     {
-                        int pstart = (runmode == 0x27) ? 0x700000 : 0;
+                        int pstart = (runmode == 0x27) ? 0x600000 : 0;
                         //int ix;
                         // copy flash to myth psram
                         copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
@@ -3835,7 +3835,7 @@ void do_options(void)
                     }
                     else
                     {
-                        int pstart = (runmode == 0x27) ? 0x700000 : 0;
+                        int pstart = (runmode == 0x27) ? 0x600000 : 0;
                         //int ix;
                         // copy file to myth psram
                         copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
@@ -4073,7 +4073,7 @@ void run_rom(int reset_mode)
         }
         else
         {
-            int pstart = (gSelections[gCurEntry].run == 0x27) ? 0x700000 : 0;
+            int pstart = (gSelections[gCurEntry].run == 0x27) ? 0x600000 : 0;
             // copy flash to myth psram
             copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
 
@@ -4223,7 +4223,7 @@ void run_rom(int reset_mode)
         }
         else
         {
-            int pstart = (gSelections[gCurEntry].run == 0x27) ? 0x700000 : 0;
+            int pstart = (gSelections[gCurEntry].run == 0x27) ? 0x600000 : 0;
 
             // copy file to myth psram
             copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
@@ -4815,7 +4815,7 @@ int main(void)
     Z80_endReset();
 
 	Z80_THREAD_IDLE();//idle state
-	
+
 	/*do_profilingPrint(
 			"utility_memset",
 			utility_memset((char*)&buffer[0],'\0',WORK_RAM_SIZE),
