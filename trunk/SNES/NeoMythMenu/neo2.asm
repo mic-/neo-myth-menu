@@ -131,57 +131,57 @@ run_3800:
 	lda.l	ggCodes+4*14
 	cmp	#2
 	bne	+
-	sta.l	$7d0000+CHEAT+4
+	sta.l	$7d0000+ram_cheat1+1
 	lda.l	ggCodes+4*14+2		; val
-	sta.l	$7d0000+CHEAT+8
+	sta.l	$7d0000+ram_cheat1+5
 	lda.l	ggCodes+4*14+4		; offset low
-	sta.l	$7d0000+CHEAT+10
+	sta.l	$7d0000+ram_cheat1+7
 	lda.l	ggCodes+4*14+5		; offset high
-	sta.l	$7d0000+CHEAT+11
+	sta.l	$7d0000+ram_cheat1+8
 	lda.l	ggCodes+4*14+1		; bank
-	sta.l	$7d0000+CHEAT+12
+	sta.l	$7d0000+ram_cheat1+9
 	+:
 	
 	lda.l	ggCodes+5*14
 	cmp	#2
 	bne	+
-	sta.l	$7d0000+CHEAT+14
+	sta.l	$7d0000+ram_cheat2+1
 	lda.l	ggCodes+5*14+2		; val
-	sta.l	$7d0000+CHEAT+18
+	sta.l	$7d0000+ram_cheat2+5
 	lda.l	ggCodes+5*14+4		; offset low
-	sta.l	$7d0000+CHEAT+20
+	sta.l	$7d0000+ram_cheat2+7
 	lda.l	ggCodes+5*14+5		; offset high
-	sta.l	$7d0000+CHEAT+21
+	sta.l	$7d0000+ram_cheat2+8
 	lda.l	ggCodes+5*14+1		; bank
-	sta.l	$7d0000+CHEAT+22
+	sta.l	$7d0000+ram_cheat2+9
 	+:
 
 	lda.l	ggCodes+6*14
 	cmp	#2
 	bne	+
-	sta.l	$7d0000+CHEAT+24
+	sta.l	$7d0000+ram_cheat3+1
 	lda.l	ggCodes+6*14+2		; val
-	sta.l	$7d0000+CHEAT+28
+	sta.l	$7d0000+ram_cheat3+5
 	lda.l	ggCodes+6*14+4		; offset low
-	sta.l	$7d0000+CHEAT+30
+	sta.l	$7d0000+ram_cheat3+7
 	lda.l	ggCodes+6*14+5		; offset high
-	sta.l	$7d0000+CHEAT+31
+	sta.l	$7d0000+ram_cheat3+8
 	lda.l	ggCodes+6*14+1		; bank
-	sta.l	$7d0000+CHEAT+32
+	sta.l	$7d0000+ram_cheat3+9
 	+:
 
 	lda.l	ggCodes+7*14
 	cmp	#2
 	bne	+
-	sta.l	$7d0000+CHEAT+34
+	sta.l	$7d0000+ram_cheat4+1
 	lda.l	ggCodes+7*14+2		; val
-	sta.l	$7d0000+CHEAT+38
+	sta.l	$7d0000+ram_cheat4+5
 	lda.l	ggCodes+7*14+4		; offset low
-	sta.l	$7d0000+CHEAT+40
+	sta.l	$7d0000+ram_cheat4+7
 	lda.l	ggCodes+7*14+5		; offset high
-	sta.l	$7d0000+CHEAT+41
+	sta.l	$7d0000+ram_cheat4+8
 	lda.l	ggCodes+7*14+1		; bank
-	sta.l	$7d0000+CHEAT+42
+	sta.l	$7d0000+ram_cheat4+9
 	+:
 	
         LDX     #$00                 ;0  MOVE CHEAT CODE TO SRAM
@@ -232,6 +232,7 @@ CPLD_RAM:
 
 
 CHEAT:
+	pha
 	php
 	sep	#$20
 ram_cheat1:		
@@ -259,6 +260,7 @@ ram_cheat4:
 	sta.l	$030201		;addr@+40
 +:
 	plp
+	pla
 branch_to_real_nmi:
 	jmp.l	$000000		;addr@+45
 	
