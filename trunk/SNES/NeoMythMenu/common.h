@@ -24,6 +24,10 @@
 #define MS_GG_ENTRY_MENU_INSTRUCTIONS 76
 #define MS_GG_EDIT_MENU_INSTRUCTIONS 77
 
+#define CODE_TYPE_UNUSED 0
+#define CODE_TYPE_ROM 1
+#define CODE_TYPE_RAM 2
+
 // Masks for the joypad data returned by read_joypad
 #define JOY_R 		0x0010
 #define JOY_L 		0x0020

@@ -1,4 +1,4 @@
-// Shell navigation code for the SNES Myth
+// Menu navigation code for the SNES Myth
 // Mic, 2010
 
 #include "snes.h"
@@ -6,6 +6,7 @@
 #include "hw_math.h"
 #include "navigation.h"
 #include "common.h"
+#include "action_replay.h"
 #include "game_genie.h"
 #include "ppu.h"
 #include "string.h"
@@ -656,7 +657,7 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 	else if (keys & JOY_X)
 	{
 		// X
-		ggCodes[highlightedOption[MID_GG_ENTRY_MENU]].used = 0;
+		ggCodes[highlightedOption[MID_GG_ENTRY_MENU]].used = CODE_TYPE_UNUSED;
 		print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]],
 		              CODE_LEFT,
 		              14 + highlightedOption[MID_GG_ENTRY_MENU],
@@ -725,7 +726,7 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 			          &(ggCodes[whichCode].bank),
 			          &(ggCodes[whichCode].offset),
 			          &(ggCodes[whichCode].val));
-			ggCodes[whichCode].used = 1;
+			ggCodes[whichCode].used = ((ggCodes[whichCode].bank == 0x7e) || (ggCodes[whichCode].bank == 0x7f)) ? CODE_TYPE_RAM : CODE_TYPE_ROM;
 			switch_to_menu(MID_GG_ENTRY_MENU, 1);
 		}
 	}
@@ -741,7 +742,7 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 			        14 + whichCode,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        1);
-			ggCodes[whichCode].used = 0;
+			ggCodes[whichCode].used = CODE_TYPE_UNUSED;
 		}
 	}
 	else if (keys & JOY_UP)
@@ -762,7 +763,7 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 	{
 		// Left
 		marker.x -= 16;
-		if (marker.x < MARKER_LEFT) marker.x = MARKER_LEFT + 112;
+		if ((marker.x < MARKER_LEFT) || (marker.x > MARKER_LEFT + 112)) marker.x = MARKER_LEFT + 112;
 		update_screen();
 	}
 	else if (keys & JOY_RIGHT)
@@ -796,7 +797,7 @@ void ar_code_entry_menu_process_keypress(u16 keys)
 	else if (keys & JOY_X)
 	{
 		// X
-		ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]].used = 0;
+		ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]].used = CODE_TYPE_UNUSED;
 
 		print_ar_code(&ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]],
 		              CODE_LEFT,
@@ -870,7 +871,7 @@ void ar_code_edit_menu_process_keypress(u16 keys)
 			          &(ggCodes[whichCode].bank),
 			          &(ggCodes[whichCode].offset),
 			          &(ggCodes[whichCode].val));
-			ggCodes[whichCode].used = 1;
+			ggCodes[whichCode].used = ((ggCodes[whichCode].bank == 0x7e) || (ggCodes[whichCode].bank == 0x7f)) ? CODE_TYPE_RAM : CODE_TYPE_ROM;
 			switch_to_menu(MID_AR_ENTRY_MENU, 1);
 		}
 	}
@@ -886,7 +887,7 @@ void ar_code_edit_menu_process_keypress(u16 keys)
 			        14 + whichCode,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        1);
-			ggCodes[MAX_GG_CODES + whichCode].used = 0;
+			ggCodes[MAX_GG_CODES + whichCode].used = CODE_TYPE_UNUSED;
 		}
 	}
 	else if (keys & JOY_UP)
@@ -907,7 +908,7 @@ void ar_code_edit_menu_process_keypress(u16 keys)
 	{
 		// Left
 		marker.x -= 16;
-		if (marker.x < MARKER_LEFT) marker.x = MARKER_LEFT + 112;
+		if ((marker.x < MARKER_LEFT) || (marker.x > MARKER_LEFT + 112)) marker.x = MARKER_LEFT + 112;
 		update_screen();
 	}
 	else if (keys & JOY_RIGHT)

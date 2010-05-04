@@ -128,6 +128,62 @@ run_3800:
         INX
         BNE     -                   ;0
 
+	lda.l	ggCodes+4*14
+	cmp	#2
+	bne	+
+	sta.l	$7d0000+CHEAT+4
+	lda.l	ggCodes+4*14+2		; val
+	sta.l	$7d0000+CHEAT+8
+	lda.l	ggCodes+4*14+4		; offset low
+	sta.l	$7d0000+CHEAT+10
+	lda.l	ggCodes+4*14+5		; offset high
+	sta.l	$7d0000+CHEAT+11
+	lda.l	ggCodes+4*14+1		; bank
+	sta.l	$7d0000+CHEAT+12
+	+:
+	
+	lda.l	ggCodes+5*14
+	cmp	#2
+	bne	+
+	sta.l	$7d0000+CHEAT+14
+	lda.l	ggCodes+5*14+2		; val
+	sta.l	$7d0000+CHEAT+18
+	lda.l	ggCodes+5*14+4		; offset low
+	sta.l	$7d0000+CHEAT+20
+	lda.l	ggCodes+5*14+5		; offset high
+	sta.l	$7d0000+CHEAT+21
+	lda.l	ggCodes+5*14+1		; bank
+	sta.l	$7d0000+CHEAT+22
+	+:
+
+	lda.l	ggCodes+6*14
+	cmp	#2
+	bne	+
+	sta.l	$7d0000+CHEAT+24
+	lda.l	ggCodes+6*14+2		; val
+	sta.l	$7d0000+CHEAT+28
+	lda.l	ggCodes+6*14+4		; offset low
+	sta.l	$7d0000+CHEAT+30
+	lda.l	ggCodes+6*14+5		; offset high
+	sta.l	$7d0000+CHEAT+31
+	lda.l	ggCodes+6*14+1		; bank
+	sta.l	$7d0000+CHEAT+32
+	+:
+
+	lda.l	ggCodes+7*14
+	cmp	#2
+	bne	+
+	sta.l	$7d0000+CHEAT+34
+	lda.l	ggCodes+7*14+2		; val
+	sta.l	$7d0000+CHEAT+38
+	lda.l	ggCodes+7*14+4		; offset low
+	sta.l	$7d0000+CHEAT+40
+	lda.l	ggCodes+7*14+5		; offset high
+	sta.l	$7d0000+CHEAT+41
+	lda.l	ggCodes+7*14+1		; bank
+	sta.l	$7d0000+CHEAT+42
+	+:
+	
         LDX     #$00                 ;0  MOVE CHEAT CODE TO SRAM
 -:      LDA.L   CHEAT+$7D0000,X     ;0
         STA.L   $3E00,X             ;0  CPLD SRAM
@@ -174,17 +230,50 @@ CPLD_RAM:
         XCE              ;SET 65C02 MODE
         JMP     ($FFFC)
 
-CHEAT:
-        LDA   #$63
-        STA.L $7EFA91
-        
-        LDA   #$01
--:
-        BIT   $4012
-        BNE   -
-        RTL
-        
 
+CHEAT:
+	php
+	sep	#$20
+ram_cheat1:		
+	lda	#0		;#0@+4
+	beq	+
+	lda	#1		;#1@+8
+	sta.l	$030201		;addr@+10
++:
+ram_cheat2:
+	lda	#0		;#0@+14
+	beq	+
+	lda	#2		;#2@+18
+	sta.l	$030201		;addr@+20
++:
+ram_cheat3:
+	lda	#0		;#0@+24
+	beq	+
+	lda	#3		;#3@+28
+	sta.l	$030201		;addr@+30
++:
+ram_cheat4:
+	lda	#0		;#0@+34
+	beq	+
+	lda	#4		;#4@+38
+	sta.l	$030201		;addr@+40
++:
+	plp
+branch_to_real_nmi:
+	jmp.l	$000000		;addr@+45
+	
+	
+	
+;        LDA   #$63
+;        STA.L $7EFA91
+;        
+;        LDA   #$01
+;-:
+;        BIT   $4012
+;        BNE   -
+;        RTL
+        
+	
 	
 run_secondary_cart:
 	rep	#$30
@@ -317,23 +406,24 @@ run_secondary_cart:
 	
 
 
-; Apply Game Genie codes to game ROM data that has been copied to PSRAM
-apply_gg_codes:
+; Apply Game Genie / Action Replay codes to game ROM data that has been copied to PSRAM
+apply_cheat_codes:
 	sep	#$30
 	phx
 	phy
 	rep	#$10			; 16-bit X/Y
 
 	ldx	#0
-	ldy	#4			; Maximum number of codes
+	ldy	#8			; Maximum number of codes
 -:
 	lda.l	ggCodes,x		; used
-	bne	gg_code_used
-	jmp	next_gg_code
-gg_code_used:
+	cmp	#1			; Does this code apply to ROM?
+	beq	cheat_type_rom
+	jmp	next_cheat_code
+cheat_type_rom:
 	lda.l	ggCodes+1,x		; bank (64kB)
 	cmp	tcc__r3			; Should this gg code be applied to the lower 512 kbit that we just copied to PSRAM?
-	bne	gg_upper_bank
+	bne	cheat_upper_bank
 	phx				; Save X
 	lda	#0
 	xba				; Clear high byte of A
@@ -349,7 +439,7 @@ gg_code_used:
 	ora	tcc__r4			; val
 	sta.l	$500000,x		; Write back $xxvv, where vv comes from the game genie code
 	plx				; Restore X
-	bra	next_gg_code
+	bra	next_cheat_code
 +:
 	dea
 	tax
@@ -360,12 +450,12 @@ gg_code_used:
 	xba
 	sta.l	$500000,x
 	plx				; Restore X
-	bra	next_gg_code
+	bra	next_cheat_code
 	
-gg_upper_bank:
+cheat_upper_bank:
 	dea
 	cmp	tcc__r3			; Should this gg code be applied to the upper 512 kbit that we just copied to PSRAM?
-	bne	next_gg_code
+	bne	next_cheat_code
 	phx				; Save X
 	lda	#0
 	xba				; Clear high byte of A
@@ -381,7 +471,7 @@ gg_upper_bank:
 	ora	tcc__r4			; val
 	sta.l	$510000,x
 	plx				; Restore X
-	bra	next_gg_code
+	bra	next_cheat_code
 +:
 	dea
 	tax
@@ -392,8 +482,8 @@ gg_upper_bank:
 	xba
 	sta.l	$510000,x
 	plx				; Restore X
-	bra	next_gg_code
-next_gg_code:
+	bra	next_cheat_code
+next_cheat_code:
 	rep	#$20
 	txa
 	clc
@@ -401,9 +491,9 @@ next_gg_code:
 	tax
 	sep	#$20
 	dey
-	beq	apply_gg_codes_done
+	beq	apply_cheat_codes_done
 	jmp	-
-apply_gg_codes_done:	
+apply_cheat_codes_done:	
 	sep	#$10			; 8-bit X/Y
 	ply
 	plx
@@ -719,7 +809,30 @@ MOV_PSRAM_LOOP:
          
          jsr	copy_1mbit_from_gbac_to_psram
 
-	 jsr	apply_gg_codes
+	; Replace the NMI vector with the cheat routine if needed
+	 lda	tcc__r3
+	 bne	+
+	 lda.l	anyRamCheats
+	 beq	+
+	 lda.l	romRunMode
+	 bne	patch_nmi_lorom
+	 rep	#$20
+	 lda.l	$50ffea
+	 sta.l	$7d0000+branch_to_real_nmi+1
+	 lda	#$3e00
+	 sta.l	$50ffea		; Native mode vector
+	 sep	#$20
+	 bra	+
+	 patch_nmi_lorom:
+	 rep	#$20
+	 lda.l	$507fea
+	 sta.l	$7d0000+branch_to_real_nmi+1
+	 lda	#$3e00
+	 sta.l	$507fea		; Native mode vector
+	 sep	#$20
+	 +:
+	
+	 jsr	apply_cheat_codes
 	 inc	tcc__r3
 	 inc	tcc__r3
 	 
@@ -727,7 +840,9 @@ MOV_PSRAM_LOOP:
 ;fubar: bra fubar
 
          DEC    tcc__r0h+1
-         BNE    -
+         BEQ	+
+         JMP    -
+         +:
          
          LDA    tcc__r1
          CMP    tcc__r1+1
