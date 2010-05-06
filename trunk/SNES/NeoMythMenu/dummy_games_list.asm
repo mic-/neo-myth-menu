@@ -1,5 +1,6 @@
 .include "hdr.asm"
 
+	
 	.BANK 1
 	.ORG	$4000
 	.DSB	$800,0
@@ -85,7 +86,5 @@
       	.ORG	$4AC0
  	.DSB 	$34f1,0
  
- 	; Prevent the linker from putting any code/data at $100000-$17ffff
- 	.BANK 2 SLOT 0                
- 	.ORG 0                         
-	.DSB $8000,0
+
+	

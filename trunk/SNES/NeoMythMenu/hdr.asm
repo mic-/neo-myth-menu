@@ -56,5 +56,6 @@
 .org 0
 ;nop
 
+
 .EMPTYFILL $00                  ; fill unused areas with $00, opcode for BRK.  
                                 ; BRK will crash the snes if executed.

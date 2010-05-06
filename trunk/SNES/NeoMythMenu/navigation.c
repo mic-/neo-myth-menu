@@ -10,6 +10,7 @@
 #include "game_genie.h"
 #include "ppu.h"
 #include "string.h"
+#include "cheats/cheat.h"
 
 
 // Define the top-left corner for some of the text labels and the marker sprite
@@ -20,6 +21,10 @@
 
 u8 currentMenu = MID_MAIN_MENU;
 u8 highlightedOption[16];
+u8 cheatGameId = 2;
+
+extern ggCode_t ggCodes[MAX_GG_CODES * 2];
+extern const cheatDbEntry_t cheatDatabase[];
 
 oamEntry_t marker;
 
@@ -38,6 +43,17 @@ menuOption_t extRunMenuOptions[4] =
 	{"Mode:", 0, 12, 8},
 	{0,0,0,0}	// Terminator
 };
+
+
+// Prototypes
+void main_menu_process_keypress(u16);
+void extended_run_menu_process_keypress(u16);
+void gg_code_entry_menu_process_keypress(u16);
+void gg_code_edit_menu_process_keypress(u16);
+void ar_code_entry_menu_process_keypress(u16);
+void ar_code_edit_menu_process_keypress(u16);
+void cheat_db_menu_process_keypress(u16);
+
 
 
 // Return an unsigned short that contains the status of all 8 buttons and the dpad
@@ -348,9 +364,33 @@ void move_to_previous_page()
 }
 
 
+
+// Returns non-zero if the cheat list can scroll in the given direction
+//
+int can_cheat_list_scroll(scrollDirection_t direction)
+{
+	cheat_t *cheats = cheatDatabase[cheatGameId].cheats;
+
+	if ((direction == DIRECTION_DOWN) &&
+		(gamesList.firstShown + NUMBER_OF_GAMES_TO_SHOW < gamesList.count))
+	{
+			return 1;
+	}
+	else if ((direction == DIRECTION_UP) &&
+			 (highlightedOption[MID_CHEAT_DB_MENU]))
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+
 void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 {
 	int i;
+	u8 y;
+	cheat_t *cheats;
 
 	if (!reusePrevScreen)
 	{
@@ -437,7 +477,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 				print_ar_code(&ggCodes[i+MAX_GG_CODES],
 				              CODE_LEFT,
 				              14 + i,
-				              (i==highlightedOption[MID_AR_ENTRY_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE): TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+				              (i == highlightedOption[MID_AR_ENTRY_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE): TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 			}
 			marker.x = MARKER_LEFT;
 			marker.y = MARKER_TOP;
@@ -450,6 +490,28 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			print_meta_string(MS_GG_EDIT_MENU_INSTRUCTIONS);
 			marker.palette = SHELL_OBJPAL_WHITE;
 			highlightedOption[MID_AR_EDIT_MENU] = 0;
+			break;
+
+		case MID_CHEAT_DB_MENU:
+			keypress_handler = cheat_db_menu_process_keypress;
+			print_meta_string(78);
+			highlightedOption[MID_CHEAT_DB_MENU] = 0;
+
+			y = 10;
+			cheats = cheatDatabase[cheatGameId].cheats;
+			for (i = 0; i < cheatDatabase[cheatGameId].numCheats; i++)
+			{
+				printxy(cheats[i].description,
+				        2,
+				        y,
+				        (i == highlightedOption[MID_CHEAT_DB_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE):TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+				        128);
+				y += hw_div16_8_quot16(strlen(cheats[i].description), 26) + 1;
+				if (y > 17) break;
+			}
+
+			printxy("SUPER MARIO WORLD", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+			printxy("Remaining code slots: 16", 3, 23, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
 			break;
 
 		default:					// Main menu
@@ -471,6 +533,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 	}
 
 	currentMenu = newMenu;
+	show_scroll_indicators();
 }
 
 
@@ -495,6 +558,8 @@ void main_menu_process_keypress(u16 keys)
 	else if (keys & JOY_SELECT)
 	{
 		// Select
+		switch_to_menu(MID_CHEAT_DB_MENU, 0);
+
 	}
 	else if (keys & JOY_UP)
 	{
@@ -530,7 +595,7 @@ void extended_run_menu_process_keypress(u16 keys)
 {
 	if (keys & JOY_B)
 	{
-		// A
+		// B
 		if (highlightedOption[MID_EXT_RUN_MENU] == 2)
 		{
 			// Switch HIROM/LOROM
@@ -657,7 +722,7 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 	else if (keys & JOY_X)
 	{
 		// X
-		ggCodes[highlightedOption[MID_GG_ENTRY_MENU]].used = CODE_TYPE_UNUSED;
+		ggCodes[highlightedOption[MID_GG_ENTRY_MENU]].used = CODE_UNUSED;
 		print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]],
 		              CODE_LEFT,
 		              14 + highlightedOption[MID_GG_ENTRY_MENU],
@@ -726,7 +791,7 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 			          &(ggCodes[whichCode].bank),
 			          &(ggCodes[whichCode].offset),
 			          &(ggCodes[whichCode].val));
-			ggCodes[whichCode].used = ((ggCodes[whichCode].bank == 0x7e) || (ggCodes[whichCode].bank == 0x7f)) ? CODE_TYPE_RAM : CODE_TYPE_ROM;
+			ggCodes[whichCode].used = ((ggCodes[whichCode].bank == 0x7e) || (ggCodes[whichCode].bank == 0x7f)) ? CODE_TARGET_RAM : CODE_TARGET_ROM;
 			switch_to_menu(MID_GG_ENTRY_MENU, 1);
 		}
 	}
@@ -742,7 +807,7 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 			        14 + whichCode,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        1);
-			ggCodes[whichCode].used = CODE_TYPE_UNUSED;
+			ggCodes[whichCode].used = CODE_UNUSED;
 		}
 	}
 	else if (keys & JOY_UP)
@@ -797,7 +862,7 @@ void ar_code_entry_menu_process_keypress(u16 keys)
 	else if (keys & JOY_X)
 	{
 		// X
-		ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]].used = CODE_TYPE_UNUSED;
+		ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]].used = CODE_UNUSED;
 
 		print_ar_code(&ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]],
 		              CODE_LEFT,
@@ -871,7 +936,7 @@ void ar_code_edit_menu_process_keypress(u16 keys)
 			          &(ggCodes[whichCode].bank),
 			          &(ggCodes[whichCode].offset),
 			          &(ggCodes[whichCode].val));
-			ggCodes[whichCode].used = ((ggCodes[whichCode].bank == 0x7e) || (ggCodes[whichCode].bank == 0x7f)) ? CODE_TYPE_RAM : CODE_TYPE_ROM;
+			ggCodes[whichCode].used = ((ggCodes[whichCode].bank == 0x7e) || (ggCodes[whichCode].bank == 0x7f)) ? CODE_TARGET_RAM : CODE_TARGET_ROM;
 			switch_to_menu(MID_AR_ENTRY_MENU, 1);
 		}
 	}
@@ -887,7 +952,7 @@ void ar_code_edit_menu_process_keypress(u16 keys)
 			        14 + whichCode,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        1);
-			ggCodes[MAX_GG_CODES + whichCode].used = CODE_TYPE_UNUSED;
+			ggCodes[MAX_GG_CODES + whichCode].used = CODE_UNUSED;
 		}
 	}
 	else if (keys & JOY_UP)
@@ -917,6 +982,16 @@ void ar_code_edit_menu_process_keypress(u16 keys)
 		marker.x += 16;
 		if (marker.x > MARKER_LEFT + 112) marker.x = MARKER_LEFT;
 		update_screen();
+	}
+}
+
+
+void cheat_db_menu_process_keypress(u16 keys)
+{
+	if (keys & JOY_Y)
+	{
+		// Y
+		switch_to_menu(MID_MAIN_MENU, 0);
 	}
 }
 

@@ -74,5 +74,5 @@ hw_div16_8_quot8_rem8:
 	rep	#$20
 	sta.b 	tcc__r0		; Store return value
 	rtl
-
+	
 .ends

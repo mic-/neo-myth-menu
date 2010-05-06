@@ -12,6 +12,7 @@
 #define MID_GG_EDIT_MENU 3		// Same screen as GG_ENTRY_MENU, but now the user is editing a code
 #define MID_AR_ENTRY_MENU 4		// Action Replay code entry menu
 #define MID_AR_EDIT_MENU 5		// Same screen as AR_ENTRY_MENU, but now the user is editing a code
+#define MID_CHEAT_DB_MENU 6
 
 
 extern u8 currentMenu;
@@ -26,13 +27,7 @@ extern void move_to_previous_game();
 extern void move_to_previous_page();
 
 extern int can_games_list_scroll(scrollDirection_t);
-
-extern void main_menu_process_keypress(u16);
-extern void extended_run_menu_process_keypress(u16);
-extern void gg_code_entry_menu_process_keypress(u16);
-extern void gg_code_edit_menu_process_keypress(u16);
-extern void ar_code_entry_menu_process_keypress(u16);
-extern void ar_code_edit_menu_process_keypress(u16);
+extern int can_cheat_list_scroll(scrollDirection_t);
 
 extern void switch_to_menu(u8, u8);
 

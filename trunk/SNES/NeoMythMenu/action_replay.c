@@ -3,6 +3,7 @@
 
 #include "snes.h"
 #include "common.h"
+#include "cheats/cheat.h"
 
 char arCodeTemp[9];
 

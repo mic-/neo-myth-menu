@@ -3,6 +3,7 @@
 
 #include "snes.h"
 #include "common.h"
+#include "cheats/cheat.h"
 
 const u8 ggSubstCipher[16] = {0x4, 0x6, 0xD, 0xE,
                               0x2, 0x7, 0x8, 0x3,

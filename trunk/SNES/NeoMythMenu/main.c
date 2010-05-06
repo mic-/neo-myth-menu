@@ -12,7 +12,7 @@
 #include "navigation.h"
 #include "game_genie.h"
 #include "common.h"
-
+#include "cheats/cheat.h"
 
 // Some resources defined in separate source files
 extern char bg_patterns, bg_patterns_end;
@@ -144,8 +144,10 @@ char *metaStrings[] =
     "\xff\x06\x02\x07Games\xff\x17\x03\x03\x42/X\xff\x17\x06\x07: Run, \xff\x17\x0e\x03Y\xff\x17\x0f\x07: Run 2nd cart",
     "\xff\x06\x02\x07\x43odes\xff\x17\x03\x03Start\xff\x17\x08\x07: Run, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Go back\xff\x16\x03\x03X\xff\x16\x04\x07: Delete, \xff\x16\x0f\x03\x42\xff\x16\x10\x07: Edit  ",
     "\xff\x17\x03\x03\x42\xff\x17\x04\x07: Add, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Delete\xff\x16\x03\x03\x44pad\xff\x16\x07\x07: Pick, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: Cancel",
+    "\xff\x06\x02\x07\x43heats\xff\x16\x03\x03Start\xff\x16\x08\x07: Run, \xff\x15\x0f\x03\x42\xff\x15\x10\x07: Add \xff\x15\x03\x03\x44pad\xff\x15\x07\x07: Pick, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: Cancel",
 };
 
+extern const cheatDbEntry_t cheatDatabase[];
 
 // Allow for MAX_GG_CODES Game Genie codes, followed by an equal number of Action Replay codes
 ggCode_t ggCodes[MAX_GG_CODES*2];
@@ -404,10 +406,11 @@ void printxy(char *pStr, u16 x, u16 y, u16 attribs, u16 maxChars)
 		bg0Buffer[vramOffs++] = attribs;
 		pStr++;
 		if (++printed >= maxChars) break;
-		if (++i >= 28)
+		if (++i >= 29)
 		{
 			i = x;
 			vramOffs = ((++y) << 6) + x + x;
+			while (*pStr == ' ') pStr++;
 		}
 	}
 	bg0BufferDirty = 1;
@@ -507,9 +510,24 @@ void print_highlighted_game_info()
 
 void show_scroll_indicators()
 {
-	// Metastring 33 and 34 are the up/down arrows. 35 and 36 are spaces with the same positions
-	print_meta_string(35 - (can_games_list_scroll(DIRECTION_UP) << 1));
-	print_meta_string(36 - (can_games_list_scroll(DIRECTION_DOWN) << 1));
+	if (currentMenu == MID_MAIN_MENU)
+	{
+		// Metastring 33 and 34 are the up/down arrows. 35 and 36 are spaces with the same positions
+		print_meta_string(35 - (can_games_list_scroll(DIRECTION_UP) << 1));
+		print_meta_string(36 - (can_games_list_scroll(DIRECTION_DOWN) << 1));
+	}
+	else if (currentMenu == MID_CHEAT_DB_MENU)
+	{
+		if (can_cheat_list_scroll(DIRECTION_UP))
+			printxy("\x86", 29,  8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
+		else
+			printxy(" ",    29,  8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
+
+		if (can_cheat_list_scroll(DIRECTION_DOWN))
+			printxy("\x87", 29, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
+		else
+			printxy(" ",    29, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
+	}
 }
 
 
@@ -598,19 +616,23 @@ void run_game_from_gba_card_c()
 
 	for (i = 0; i < MAX_GG_CODES * 2; i++)
 	{
+		if (ggCodes[i].used == CODE_TARGET_RAM)
+		{
+			anyRamCheats = 1;
+		}
+		else
+		{
+			ggCodes[i].bank &= 0x3f;
+		}
 		if (romRunMode == 1)
 		{
 			// Convert LOROM addresses to file offsets
-			if (ggCodes[i].used == CODE_TYPE_ROM)
+			if (ggCodes[i].used == CODE_TARGET_ROM)
 			{
 				ggCodes[i].offset &= 0x7fff;
 				if (ggCodes[i].bank & 1) ggCodes[i].offset |= 0x8000;
 				ggCodes[i].bank >>= 1;
 			}
-		}
-		if (ggCodes[i].used == CODE_TYPE_RAM)
-		{
-			anyRamCheats = 1;
 		}
 	}
 
@@ -631,6 +653,7 @@ void run_secondary_cart_c()
 
 	run_cart();
 }
+
 
 
 
@@ -659,7 +682,7 @@ int main()
 	// Mark all Game Genie codes as unused
 	for (i = 0; i < MAX_GG_CODES * 2; i++)
 	{
-		ggCodes[i].used = CODE_TYPE_UNUSED;
+		ggCodes[i].used = CODE_UNUSED;
 	}
 
 	expand_font_data();
@@ -672,7 +695,7 @@ int main()
 
 	// Load sprite patterns
 	load_vram(&obj_marker, 200*16, 2*32);
-	load_vram((&obj_marker)+64, 216*16, 2*32);
+	load_vram(&obj_marker+64, 216*16, 2*32);
 
 	// Setup various PPU registers
 	bp = &(REG_OBSEL);

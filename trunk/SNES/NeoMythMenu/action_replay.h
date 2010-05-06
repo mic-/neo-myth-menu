@@ -2,7 +2,7 @@
 #define _ACTION_REPLAY_H_
 
 #include "snes.h"
-#include "common.h"
+#include "cheats/cheat.h"
 
 extern void ar_decode(u8 *, u8 *, u16 *, u8*);
 
