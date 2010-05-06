@@ -24,9 +24,6 @@
 #define MS_GG_ENTRY_MENU_INSTRUCTIONS 76
 #define MS_GG_EDIT_MENU_INSTRUCTIONS 77
 
-#define CODE_TYPE_UNUSED 0
-#define CODE_TYPE_ROM 1
-#define CODE_TYPE_RAM 2
 
 // Masks for the joypad data returned by read_joypad
 #define JOY_R 		0x0010
@@ -44,6 +41,7 @@
 
 
 #define SHELL_BGPAL_WHITE 2
+#define SHELL_BGPAL_LIGHT_BLUE 5
 #define SHELL_BGPAL_DARK_OLIVE 6
 #define SHELL_BGPAL_OLIVE 7
 
@@ -57,18 +55,6 @@ typedef struct
 	u16 firstShown;
 	u16 highlighted;
 } gamesList_t;
-
-
-typedef struct
-{
-	u8 used;
-	u8 bank;
-	u8 val;
-	u16 offset;
-	u8 code[8];
-} ggCode_t;
-
-#define arCode_t ggCode_t
 
 
 // For use with can_games_list_scroll
@@ -90,7 +76,6 @@ extern u8 extDsp, extSram;
 extern gamesList_t gamesList;
 extern char MS4[];
 extern char *metaStrings[];
-extern ggCode_t ggCodes[MAX_GG_CODES];
 extern u16 gbaCardAlphabeticalIdx[500];
 extern sortOrder_t sortOrder;
 extern oamEntry_t marker;
@@ -110,6 +95,7 @@ extern void print_games_list();
 extern void print_hw_card_rev();
 extern void printxy(char *, u16, u16, u16, u16);
 extern void print_hex(u8, u16, u16, u16);
+extern void show_scroll_indicators();
 extern void update_game_params();
 
 #endif

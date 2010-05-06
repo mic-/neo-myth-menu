@@ -10,7 +10,8 @@ REM C -> ASM / S
 ..\bin\816-tcc.exe -Wall -I../include -o game_genie.ps -c game_genie.c
 ..\bin\816-tcc.exe -Wall -I../include -o action_replay.ps -c action_replay.c
 ..\bin\816-tcc.exe -Wall -I../include -o ppuc.ps -c ppuc.c
-REM ..\bin\816-tcc.exe -Wall -I../include -o font.s -c assets\font.c
+..\bin\816-tcc.exe -Wall -I../include -o cheat_db.s -c cheats\cheat_database.c
+
 
 REM Optimize ASM files
 tools\stripcom main.ps main.ps2
@@ -39,6 +40,7 @@ REM ASM -> OBJ
 ..\bin\wla-65816.exe -io neo2_spc.asm neo2_spc.obj
 ..\bin\wla-65816.exe -io ppu.asm ppu.obj
 ..\bin\wla-65816.exe -io dummy_games_list.asm dummy_games_list.obj
+..\bin\wla-65816.exe -io cheat_db.s cheat_db.obj
 
 ..\bin\wla-65816.exe -io mainopt.s main.obj
 ..\bin\wla-65816.exe -io navigopt.s navigation.obj
@@ -48,7 +50,7 @@ REM ASM -> OBJ
 REM ..\bin\wla-65816.exe -io font.s font.obj
 
 REM OBJ -> SMC
-..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj dummy_games_list.obj NEOSNES.BIN
+..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj cheat_db.obj dummy_games_list.obj NEOSNES.BIN
 
 REM Delete files
 del *.ps2

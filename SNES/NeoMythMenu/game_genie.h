@@ -3,6 +3,7 @@
 
 #include "snes.h"
 #include "common.h"
+#include "cheats/cheat.h"
 
 extern void gg_decode(u8 *, u8 *, u16 *, u8*);
 
