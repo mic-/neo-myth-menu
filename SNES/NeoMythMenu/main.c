@@ -34,7 +34,7 @@ char sortLetter = 'A';
 
 u16 gbaCardAlphabeticalIdx[500];
 
-gamesList_t gamesList;
+itemList_t gamesList;
 
 void (*keypress_handler)(u16);
 
@@ -151,7 +151,10 @@ extern const cheatDbEntry_t cheatDatabase[];
 
 // Allow for MAX_GG_CODES Game Genie codes, followed by an equal number of Action Replay codes
 ggCode_t ggCodes[MAX_GG_CODES*2];
+itemList_t cheatList;
 u8 anyRamCheats = 0;
+
+u8 doRegionPatch = 0;
 
 
 const u8 ppuRegData1[12] =

@@ -266,15 +266,7 @@ branch_to_real_nmi:
 	
 	
 	
-;        LDA   #$63
-;        STA.L $7EFA91
-;        
-;        LDA   #$01
-;-:
-;        BIT   $4012
-;        BNE   -
-;        RTL
-        
+     
 	
 	
 run_secondary_cart:
@@ -453,7 +445,6 @@ cheat_type_rom:
 	sta.l	$500000,x
 	plx				; Restore X
 	bra	next_cheat_code
-	
 cheat_upper_bank:
 	dea
 	cmp	tcc__r3			; Should this gg code be applied to the upper 512 kbit that we just copied to PSRAM?
@@ -502,6 +493,40 @@ apply_cheat_codes_done:
 	rts
 	
 
+; Region-checking patterns found in some NTSC games - and what to replace them with
+; to make them run on a PAL system.
+ntsc_pattern0: .db $AD, $3F, $21, $29, $10		; lda $213f / and #$10
+ntsc_to_pal_pattern0: .db $AD, $3F, $21, $A9, $00	; lda $213f / lda #0
+ntsc_pattern1: .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
+ntsc_to_pal_pattern1: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
+ntsc_pattern2: .db $AD, $3F, $21, $89, $10		; lda $213f / bit #$10
+ntsc_to_pal_pattern2: .db $AD, $3F, $21, $A9, $00	; lda $213f / lda #0
+ntsc_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
+ntsc_to_pal_pattern3: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
+
+; Region-checking patterns found in some PAL games - and what to replace them with
+; to make them run on a NTSC system.
+pal_pattern0: .db $AD, $3F, $21, $29, $10		; lda $213f / and #$10
+pal_to_ntsc_pattern0: .db $AD, $3F, $21, $A9, $10	; lda $213f / lda #$10
+pal_pattern1: .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
+pal_to_ntsc_pattern1: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #$10
+pal_pattern2: .db $AD, $3F, $21, $89, $10		; lda $213f / bit #$10
+pal_to_ntsc_pattern2: .db $AD, $3F, $21, $A9, $00	; lda $213f / lda #$10
+pal_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
+pal_to_ntsc_pattern3: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #$10
+
+
+fix_region_checks:
+	sep	#$30
+	phx
+	phy
+	rep	#$10			; 16-bit X/Y
+
+	sep	#$10			; 8-bit X/Y
+	ply
+	plx
+	rts
+	
 
 ; Updates and displays the "LOADING......(nn)" string 
 show_loading_progress:
@@ -811,6 +836,11 @@ MOV_PSRAM_LOOP:
          
          jsr	copy_1mbit_from_gbac_to_psram
 
+	 lda.l	doRegionPatch
+	 beq	+
+	 jsr	fix_region_checks
+	 +:
+	 
 	; Replace the NMI vector with the cheat routine if needed
 	 lda	tcc__r3
 	 bne	+
@@ -839,7 +869,6 @@ MOV_PSRAM_LOOP:
 	 inc	tcc__r3
 	 
 ;	 jsr	show_copied_data
-;fubar: bra fubar
 
          DEC    tcc__r0h+1
          BEQ	+

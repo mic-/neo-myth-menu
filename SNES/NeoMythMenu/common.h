@@ -54,7 +54,7 @@ typedef struct
 	u16 count;
 	u16 firstShown;
 	u16 highlighted;
-} gamesList_t;
+} itemList_t;
 
 
 // For use with can_games_list_scroll
@@ -73,7 +73,7 @@ typedef enum
 
 extern u8 romSize, romRunMode, sramSize, sramBank, sramMode;
 extern u8 extDsp, extSram;
-extern gamesList_t gamesList;
+extern itemList_t gamesList;
 extern char MS4[];
 extern char *metaStrings[];
 extern u16 gbaCardAlphabeticalIdx[500];
