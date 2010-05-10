@@ -1057,10 +1057,10 @@ MOV_PSRAM_LOOP:
 
 	 lda.l	doRegionPatch
 	 beq	+
-	 lda	#0
+	 lda	#$50
 	 sta	tcc__r4
 	 jsr	fix_region_checks
-	 lda	#1
+	 lda	#$51
 	 sta	tcc__r4
 	 jsr	fix_region_checks
 	 +:

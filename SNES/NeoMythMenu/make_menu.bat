@@ -1,6 +1,6 @@
 REM Convert graphics data
 tools\sixpack -image -target snes -format p4 -planes 4 -o assets\marker.chr assets\marker.bmp
-tools\sixpack -image -target snes -format p1 -o assets\adore.chr assets\adore.bmp
+tools\sixpack -image -target snes -format p1 -bg 6,0 -o assets\font.chr assets\adore.bmp
 tools\sixpack -image -target snes -format p4 -o assets\menu_bg.lzs -pack assets\menu_bg2.bmp
 
 
