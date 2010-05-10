@@ -76,7 +76,7 @@ extern u8 extDsp, extSram;
 extern itemList_t gamesList;
 extern itemList_t cheatList;
 extern char MS4[];
-extern char *metaStrings[];
+extern const char *metaStrings[];
 extern u16 gbaCardAlphabeticalIdx[500];
 extern sortOrder_t sortOrder;
 extern u8 snesRomInfo[0x40];

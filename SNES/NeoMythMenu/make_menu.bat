@@ -31,6 +31,9 @@ tools\optimore-816 game_genie.s ggopt.s
 tools\optimore-816 action_replay.s aropt.s
 tools\optimore-816 ppuc.s ppucopt.s
 
+tools\constify main.c mainopt.s mainopt2.s
+tools\constify cheats\cheat_database.c cheat_db.s cheat_db2.s
+
 REM ASM -> OBJ
 ..\bin\wla-65816.exe -io assets\data.asm data.obj
 ..\bin\wla-65816.exe -io dma.asm dma.obj
@@ -40,9 +43,9 @@ REM ASM -> OBJ
 ..\bin\wla-65816.exe -io neo2_spc.asm neo2_spc.obj
 ..\bin\wla-65816.exe -io ppu.asm ppu.obj
 ..\bin\wla-65816.exe -io dummy_games_list.asm dummy_games_list.obj
-..\bin\wla-65816.exe -io cheat_db.s cheat_db.obj
+..\bin\wla-65816.exe -io cheat_db2.s cheat_db.obj
 
-..\bin\wla-65816.exe -io mainopt.s main.obj
+..\bin\wla-65816.exe -io mainopt2.s main.obj
 ..\bin\wla-65816.exe -io navigopt.s navigation.obj
 ..\bin\wla-65816.exe -io ggopt.s game_genie.obj
 ..\bin\wla-65816.exe -io aropt.s action_replay.obj
