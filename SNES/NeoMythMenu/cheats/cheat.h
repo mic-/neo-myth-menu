@@ -3,12 +3,18 @@
 #ifndef _CHEAT_H_
 #define _CHEAT_H_
 
-#define CODE_UNUSED 0
-#define CODE_TARGET_ROM 1
-#define CODE_TARGET_RAM 2
+enum
+{
+	CODE_UNUSED,
+	CODE_TARGET_ROM,
+	CODE_TARGET_RAM
+};
 
-#define CODE_TYPE_GG 1
-#define CODE_TYPE_AR 2
+enum
+{
+	CODE_TYPE_GG,
+	CODE_TYPE_AR
+};
 
 
 typedef struct

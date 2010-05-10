@@ -6,16 +6,26 @@
 #define NUMBER_OF_GAMES_TO_SHOW 9
 
 // Menu IDs
-#define MID_MAIN_MENU 0			// Main menu (games list)
-#define MID_EXT_RUN_MENU 1		// Extended run menu (ROM type selection etc)
-#define MID_GG_ENTRY_MENU 2		// Game Genie code entry menu
-#define MID_GG_EDIT_MENU 3		// Same screen as GG_ENTRY_MENU, but now the user is editing a code
-#define MID_AR_ENTRY_MENU 4		// Action Replay code entry menu
-#define MID_AR_EDIT_MENU 5		// Same screen as AR_ENTRY_MENU, but now the user is editing a code
-#define MID_CHEAT_DB_MENU 6
+enum
+{
+	MID_MAIN_MENU = 0,			// Main menu (games list).
+	MID_EXT_RUN_MENU,			// Extended run menu (ROM type selection etc).
+	MID_GG_ENTRY_MENU,			// Game Genie code entry menu.
+	MID_GG_EDIT_MENU,			// Same screen as GG_ENTRY_MENU, but now the user is editing a code.
+	MID_AR_ENTRY_MENU,			// Action Replay code entry menu.
+	MID_AR_EDIT_MENU,			// Same screen as AR_ENTRY_MENU, but now the user is editing a code.
+	MID_CHEAT_DB_MENU,
+	MID_CHEAT_DB_NO_CODES_MENU,	// The menu shown when the user presses Select and no cheats are found in the database for
+								// the highlighted game.
+
+	MID_LAST_MENU
+};
 
 
 extern u8 currentMenu;
+extern u8 cheatGameIdx;
+extern u8 gameFoundInDb;
+extern u8 highlightedOption[MID_LAST_MENU];
 
 extern u16 read_joypad();
 

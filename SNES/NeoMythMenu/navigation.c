@@ -20,8 +20,9 @@
 
 
 u8 currentMenu = MID_MAIN_MENU;
-u8 highlightedOption[16];
-u8 cheatGameId = 2;
+u8 highlightedOption[MID_LAST_MENU];
+u8 cheatGameIdx = 0;
+u8 gameFoundInDb = 0;
 
 extern ggCode_t ggCodes[MAX_GG_CODES * 2];
 extern const cheatDbEntry_t cheatDatabase[];
@@ -36,11 +37,12 @@ typedef struct
 	u8 optionColumn;
 } menuOption_t;
 
-menuOption_t extRunMenuOptions[4] =
+menuOption_t extRunMenuOptions[5] =
 {
 	{"Game Genie", 0, 9, 0},
 	{"Action Replay", 0, 10, 0},
 	{"Mode:", 0, 12, 8},
+	{"Autofix region:", 0, 13, 18},
 	{0,0,0,0}	// Terminator
 };
 
@@ -53,6 +55,7 @@ void gg_code_edit_menu_process_keypress(u16);
 void ar_code_entry_menu_process_keypress(u16);
 void ar_code_edit_menu_process_keypress(u16);
 void cheat_db_menu_process_keypress(u16);
+void cheat_db_no_codes_menu_process_keypress(u16);
 
 
 
@@ -369,7 +372,7 @@ void move_to_previous_page()
 //
 int can_cheat_list_scroll(scrollDirection_t direction)
 {
-	cheat_t *cheats = cheatDatabase[cheatGameId].cheats;
+	cheat_t const *cheats = cheatDatabase[cheatGameIdx].cheats;
 
 	if ((direction == DIRECTION_DOWN) &&
 		(gamesList.firstShown + NUMBER_OF_GAMES_TO_SHOW < gamesList.count))
@@ -386,11 +389,55 @@ int can_cheat_list_scroll(scrollDirection_t direction)
 }
 
 
+// Move to the next entry in the cheat list
+//
+void move_to_next_cheat()
+{
+	if (++cheatList.highlighted >= cheatList.count)
+	{
+		cheatList.highlighted--;
+	}
+	else
+	{
+		// Check if the games list needs to be scrolled
+		if ((gamesList.firstShown + ((NUMBER_OF_GAMES_TO_SHOW / 2) - 1) < gamesList.highlighted) &&
+			(gamesList.firstShown + NUMBER_OF_GAMES_TO_SHOW < gamesList.count))
+		{
+			gamesList.firstShown++;
+		}
+	}
+
+	print_cheat_list();
+}
+
+
+// Move to the previous entry in the games list
+//
+void move_to_previous_cheat()
+{
+	if (cheatList.highlighted)
+	{
+		cheatList.highlighted--;
+
+		// Check if the games list needs to be scrolled
+		if ((gamesList.firstShown) &&
+			(gamesList.firstShown + ((NUMBER_OF_GAMES_TO_SHOW / 2) - 1) >= gamesList.highlighted))
+		{
+			gamesList.firstShown--;
+		}
+	}
+
+	print_cheat_list();
+}
+
+
+
 void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 {
 	int i;
 	u8 y;
-	cheat_t *cheats;
+	cheat_t const *cheats;
+	void (*get_info)(void);
 
 	if (!reusePrevScreen)
 	{
@@ -410,7 +457,10 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			keypress_handler = extended_run_menu_process_keypress;
 			REG_BGCNT = 3;			// Enable BG0 and BG1 (disable OBJ)
 			print_meta_string(74);	// Print instructions
+
 			extRunMenuOptions[2].optionValue = &(metaStrings[48 + romRunMode][4]);
+			extRunMenuOptions[3].optionValue = (doRegionPatch) ? "On " : "Off";
+
 			for (i = 0; i < 16; i++)
 			{
 				if (extRunMenuOptions[i].label == 0) break;
@@ -429,16 +479,8 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 				}
 			}
 			highlightedOption[MID_GG_ENTRY_MENU] = 0;
-
-			////// DEBUG
-			/*print_hex(ggCodes[0].val, 2, 13, 8);
-			print_hex(ggCodes[0].bank, 5, 13, 8);
-			print_hex((u8)(ggCodes[0].offset>>8), 8, 13, 8);
-			print_hex((u8)(ggCodes[0].offset), 10, 13, 8);
-			print_hex(ggCodes[0].used, 13, 13, 8);*/
-			////////
-
 			break;
+
 
 		case MID_GG_ENTRY_MENU:
 			keypress_handler = gg_code_entry_menu_process_keypress;
@@ -458,6 +500,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			marker.palette = SHELL_OBJPAL_DARK_OLIVE;
 			break;
 
+
 		case MID_GG_EDIT_MENU:
 			keypress_handler = gg_code_edit_menu_process_keypress;
 			clear_status_window();
@@ -465,6 +508,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			marker.palette = SHELL_OBJPAL_WHITE;
 			highlightedOption[MID_GG_EDIT_MENU] = 0;
 			break;
+
 
 		case MID_AR_ENTRY_MENU:
 			keypress_handler = ar_code_entry_menu_process_keypress;
@@ -484,6 +528,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			marker.palette = SHELL_OBJPAL_DARK_OLIVE;
 			break;
 
+
 		case MID_AR_EDIT_MENU:
 			keypress_handler = ar_code_edit_menu_process_keypress;
 			clear_status_window();
@@ -492,27 +537,69 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			highlightedOption[MID_AR_EDIT_MENU] = 0;
 			break;
 
+
 		case MID_CHEAT_DB_MENU:
 			keypress_handler = cheat_db_menu_process_keypress;
 			print_meta_string(78);
 			highlightedOption[MID_CHEAT_DB_MENU] = 0;
 
-			y = 10;
-			cheats = cheatDatabase[cheatGameId].cheats;
-			for (i = 0; i < cheatDatabase[cheatGameId].numCheats; i++)
+			// Get ROM info
+			get_info = get_rom_info & 0x7fff;
+			add_full_pointer((void**)&get_info, 0x7d, 0x8000);
+			get_info();
+
+			gameFoundInDb = 0;
+			for (cheatGameIdx = 0; ; cheatGameIdx++)
 			{
-				printxy(cheats[i].description,
-				        2,
-				        y,
-				        (i == highlightedOption[MID_CHEAT_DB_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE):TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
-				        128);
-				y += hw_div16_8_quot16(strlen(cheats[i].description), 26) + 1;
-				if (y > 17) break;
+				if (cheatDatabase[cheatGameIdx].cheats)
+				{
+					if ((cheatDatabase[cheatGameIdx].romChecksum == (snesRomInfo[0x1e] + (snesRomInfo[0x1f] << 8))) &&
+					    (cheatDatabase[cheatGameIdx].romChecksumCompl == (snesRomInfo[0x1c] + (snesRomInfo[0x1d] << 8))))
+					{
+						gameFoundInDb = 1;
+						break;
+					}
+				}
+				else
+				{
+					break;
+				}
 			}
 
-			printxy("SUPER MARIO WORLD", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
-			printxy("Remaining code slots: 16", 3, 23, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+			if (gameFoundInDb)
+			{
+				y = 10;
+				cheats = cheatDatabase[cheatGameIdx].cheats;
+				for (i = 0; i < cheatDatabase[cheatGameIdx].numCheats; i++)
+				{
+					printxy(cheats[i].description,
+							2,
+							y,
+							(i == highlightedOption[MID_CHEAT_DB_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE):TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+							128);
+					y += hw_div16_8_quot16(strlen(cheats[i].description), 27) + 1;
+					if (y > 17) break;
+				}
+
+				printxy(snesRomInfo, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);	// ROM title
+				printxy("Remaining code slots: 16", 3, 23, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+				break;
+			}
+			else
+			{
+				newMenu = MID_CHEAT_DB_NO_CODES_MENU;
+				// Fall through..
+			}
+		case MID_CHEAT_DB_NO_CODES_MENU:
+			keypress_handler = cheat_db_no_codes_menu_process_keypress;
+			printxy(snesRomInfo, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);	// ROM title
+			printxy("No cheats found in the database for this ROM. Pick one of the menues below to manually enter a cheat code, or press Y to go back to the main menu.",
+			        2,
+			        10,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+			        200);
 			break;
+
 
 		default:					// Main menu
 			keypress_handler = main_menu_process_keypress;
@@ -607,6 +694,16 @@ void extended_run_menu_process_keypress(u16 keys)
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        32);
 		}
+		else if (highlightedOption[MID_EXT_RUN_MENU] == 3)
+		{
+			doRegionPatch ^= 1;
+			extRunMenuOptions[3].optionValue = (doRegionPatch) ? "On " : "Off";
+			printxy(extRunMenuOptions[3].optionValue,
+			        extRunMenuOptions[3].optionColumn,
+			        extRunMenuOptions[3].row,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+			        32);
+		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == 1)
 		{
 			// Go to the action replay screen
@@ -661,7 +758,7 @@ void extended_run_menu_process_keypress(u16 keys)
 	else if (keys & JOY_DOWN)
 	{
 		// Down
-		if (highlightedOption[MID_EXT_RUN_MENU] < 2)
+		if (highlightedOption[MID_EXT_RUN_MENU] < 3)
 		{
 			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].label,
 			        2,
@@ -995,3 +1092,12 @@ void cheat_db_menu_process_keypress(u16 keys)
 	}
 }
 
+
+void cheat_db_no_codes_menu_process_keypress(u16 keys)
+{
+	if (keys & JOY_Y)
+	{
+		// Y
+		switch_to_menu(MID_MAIN_MENU, 0);
+	}
+}

@@ -74,14 +74,19 @@ typedef enum
 extern u8 romSize, romRunMode, sramSize, sramBank, sramMode;
 extern u8 extDsp, extSram;
 extern itemList_t gamesList;
+extern itemList_t cheatList;
 extern char MS4[];
 extern char *metaStrings[];
 extern u16 gbaCardAlphabeticalIdx[500];
 extern sortOrder_t sortOrder;
+extern u8 snesRomInfo[0x40];
+extern u8 doRegionPatch;
 extern oamEntry_t marker;
 extern void (*keypress_handler)(u16);
 
 extern void set_full_pointer(void **, u8, u16);
+extern void add_full_pointer(void **, u8, u16);
+
 extern void update_screen();
 
 extern void run_game_from_gba_card_c();
@@ -92,6 +97,7 @@ extern void clear_screen();
 extern void clear_status_window();
 extern void print_meta_string(u16);
 extern void print_games_list();
+extern void print_cheat_list();
 extern void print_hw_card_rev();
 extern void printxy(char *, u16, u16, u16, u16);
 extern void print_hex(u8, u16, u16, u16);

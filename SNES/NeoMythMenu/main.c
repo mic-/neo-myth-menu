@@ -1,5 +1,5 @@
 // SNES Myth Menu
-// C version 0.23
+// C version 0.25
 //
 // Mic, 2010
 
@@ -13,6 +13,8 @@
 #include "game_genie.h"
 #include "common.h"
 #include "cheats/cheat.h"
+#include "string.h"
+
 
 // Some resources defined in separate source files
 extern char bg_patterns, bg_patterns_end;
@@ -56,7 +58,7 @@ char MS4[] = "\xff\x15\x02\x02 Game (001)";
 //
 char *metaStrings[] =
 {
-    "\xff\x03\x01\x07 Menu v 0.23\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
+    "\xff\x03\x01\x07 Menu v 0.25\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
 	"\xff\x01\xfe\x0f\x0a\x68\x69\x6A\x20\x71\x72\x73\x20\x7a\x7b\x7c\x83\x84\x85\xfe\x10\x0a\x6b\x6c\x6d\x20\x74\x75 \
 	 \x76\x20\x7d\x7e\x7f\x86\x87\x88xfe\x11\x0a\x6e\x6f\x70\x20\x77\x78\x79\x20\x80\x81\x82\x89\x8a\x8b\xfe\x17\x06 \
 	 \x06\xff\x04                             ",
@@ -144,7 +146,7 @@ char *metaStrings[] =
     "\xff\x06\x02\x07Games\xff\x17\x03\x03\x42/X\xff\x17\x06\x07: Run, \xff\x17\x0e\x03Y\xff\x17\x0f\x07: Run 2nd cart",
     "\xff\x06\x02\x07\x43odes\xff\x17\x03\x03Start\xff\x17\x08\x07: Run, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Go back\xff\x16\x03\x03X\xff\x16\x04\x07: Delete, \xff\x16\x0f\x03\x42\xff\x16\x10\x07: Edit  ",
     "\xff\x17\x03\x03\x42\xff\x17\x04\x07: Add, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Delete\xff\x16\x03\x03\x44pad\xff\x16\x07\x07: Pick, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: Cancel",
-    "\xff\x06\x02\x07\x43heats\xff\x16\x03\x03Start\xff\x16\x08\x07: Run, \xff\x15\x0f\x03\x42\xff\x15\x10\x07: Add \xff\x15\x03\x03\x44pad\xff\x15\x07\x07: Pick, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: Cancel",
+    "\xff\x06\x02\x07\x43heats\xff\x16\x03\x03Start\xff\x16\x08\x07: Run, \xff\x15\x0f\x03\x42\xff\x15\x10\x07: Add \xff\x15\x03\x03\x44pad\xff\x15\x07\x07: Pick, \xff\x16\x0f\x03Y\xff\x16\x10\x07: Cancel",
 };
 
 extern const cheatDbEntry_t cheatDatabase[];
@@ -152,9 +154,11 @@ extern const cheatDbEntry_t cheatDatabase[];
 // Allow for MAX_GG_CODES Game Genie codes, followed by an equal number of Action Replay codes
 ggCode_t ggCodes[MAX_GG_CODES*2];
 itemList_t cheatList;
-u8 anyRamCheats = 0;
+u8 anyRamCheats = 0;		// Do any of the cheats target RAM?
 
-u8 doRegionPatch = 0;
+u8 doRegionPatch = 0;		// Should we scan the game for region checks and patch them?
+
+u8 snesRomInfo[0x40];
 
 
 const u8 ppuRegData1[12] =
@@ -530,6 +534,30 @@ void show_scroll_indicators()
 			printxy("\x87", 29, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
 		else
 			printxy(" ",    29, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
+	}
+}
+
+
+void print_cheat_list()
+{
+	int i;
+	u16 y;
+	cheat_t const *cheats;
+
+	if (gameFoundInDb)
+	{
+		y = 10;
+		cheats = cheatDatabase[cheatGameIdx].cheats;
+		for (i = 0; i < cheatDatabase[cheatGameIdx].numCheats; i++)
+		{
+			printxy(cheats[i].description,
+					2,
+					y,
+					(i == highlightedOption[MID_CHEAT_DB_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE):TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+					128);
+			y += hw_div16_8_quot16(strlen(cheats[i].description), 27) + 1;
+			if (y > 17) break;
+		}
 	}
 }
 

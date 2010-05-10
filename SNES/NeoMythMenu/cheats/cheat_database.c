@@ -1,6 +1,12 @@
 #include "cheats/cheat.h"
 
 
+#define NCHEATS(c)	(sizeof(c)/sizeof(cheat_t))
+
+
+const short testconst[] = {1,2,3,4,5,6,7,8};
+
+
 const cheat_t captain_america_and_the_avengers_u_cheats[] =
 {
 	{"7E16A820", "Invincibility (Player 1)", CODE_TYPE_AR},
@@ -165,15 +171,15 @@ const cheat_t xmen_mutant_apocalypse_u_cheats[] =
 const cheatDbEntry_t cheatDatabase[] =
 {
 	// Super Mario World (E) (V1.1) [!]
-   {0xC536, 0x3AC9, super_mario_world_u_cheats, sizeof(super_mario_world_u_cheats) / sizeof(cheat_t)},
-    // Super Mario World (U) [!]
-   {0xA0DA, 0x5F25, super_mario_world_u_cheats, sizeof(super_mario_world_u_cheats) / sizeof(cheat_t)},
+	{0xC536, 0x3AC9, super_mario_world_u_cheats, NCHEATS(super_mario_world_u_cheats)},
+	// Super Mario World (U) [!]
+	{0xA0DA, 0x5F25, super_mario_world_u_cheats, NCHEATS(super_mario_world_u_cheats)},
+	// Contra 3 (U)
+	{0x0C3C, 0xF3C3, contra_3_u_cheats, NCHEATS(contra_3_u_cheats)},
+	// Captain America And The Avengers (U)
+	{0xC971, 0x368E, captain_america_and_the_avengers_u_cheats, NCHEATS(captain_america_and_the_avengers_u_cheats)},
+	// X-Men - Mutant Apocalypse (U)
+	{0x3807, 0xC7F8, xmen_mutant_apocalypse_u_cheats, NCHEATS(xmen_mutant_apocalypse_u_cheats)},
 
-    // Captain America And The Avengers (U)
-   {0xC971, 0x368E, captain_america_and_the_avengers_u_cheats, sizeof(captain_america_and_the_avengers_u_cheats) / sizeof(cheat_t)},
-
-    // X-Men - Mutant Apocalypse (U)
-   {0x3807, 0xC7F8, xmen_mutant_apocalypse_u_cheats, sizeof(xmen_mutant_apocalypse_u_cheats) / sizeof(cheat_t)},
-
-   {0,0,0,0}	// Terminator
+	{0,0,0,0}	// Terminator
 };

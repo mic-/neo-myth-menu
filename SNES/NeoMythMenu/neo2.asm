@@ -197,9 +197,10 @@ run_3800:
 CPLD_RAM:
         REP	#$30        ; A,8 & X,Y 16 BIT
         LDX     #$0000
+        LDA     #$0000      
+	; Clear RAM
 -:
-        LDA     #$0000      ; READ GBA CARD
-        STA.L   $7E0000,X  ; CLERA SRAM
+        STA.L   $7E0000,X  
         INX
         INX
         BNE     -
@@ -292,7 +293,7 @@ run_secondary_cart:
 	cpx	#20
 	bne	-
 	
-	lda	#$00
+	lda	#MAP_MENU_FLASH_TO_ROM
 	sta.l	MYTH_OPTION_IO
 
 	rep	#$20
@@ -412,12 +413,12 @@ apply_cheat_codes:
 -:
 	lda.l	ggCodes,x		; used
 	cmp	#1			; Does this code apply to ROM?
-	beq	cheat_type_rom
-	jmp	next_cheat_code
-cheat_type_rom:
+	beq	_cheat_type_rom
+	jmp	_next_cheat_code
+_cheat_type_rom:
 	lda.l	ggCodes+1,x		; bank (64kB)
 	cmp	tcc__r3			; Should this gg code be applied to the lower 512 kbit that we just copied to PSRAM?
-	bne	cheat_upper_bank
+	bne	_cheat_upper_bank
 	phx				; Save X
 	lda	#0
 	xba				; Clear high byte of A
@@ -433,7 +434,7 @@ cheat_type_rom:
 	ora	tcc__r4			; val
 	sta.l	$500000,x		; Write back $xxvv, where vv comes from the game genie code
 	plx				; Restore X
-	bra	next_cheat_code
+	bra	_next_cheat_code
 +:
 	dea
 	tax
@@ -444,11 +445,11 @@ cheat_type_rom:
 	xba
 	sta.l	$500000,x
 	plx				; Restore X
-	bra	next_cheat_code
-cheat_upper_bank:
+	bra	_next_cheat_code
+_cheat_upper_bank:
 	dea
 	cmp	tcc__r3			; Should this gg code be applied to the upper 512 kbit that we just copied to PSRAM?
-	bne	next_cheat_code
+	bne	_next_cheat_code
 	phx				; Save X
 	lda	#0
 	xba				; Clear high byte of A
@@ -464,7 +465,7 @@ cheat_upper_bank:
 	ora	tcc__r4			; val
 	sta.l	$510000,x
 	plx				; Restore X
-	bra	next_cheat_code
+	bra	_next_cheat_code
 +:
 	dea
 	tax
@@ -475,8 +476,8 @@ cheat_upper_bank:
 	xba
 	sta.l	$510000,x
 	plx				; Restore X
-	bra	next_cheat_code
-next_cheat_code:
+	bra	_next_cheat_code
+_next_cheat_code:
 	rep	#$20
 	txa
 	clc
@@ -484,49 +485,192 @@ next_cheat_code:
 	tax
 	sep	#$20
 	dey
-	beq	apply_cheat_codes_done
+	beq	_apply_cheat_codes_done
 	jmp	-
-apply_cheat_codes_done:	
+_apply_cheat_codes_done:	
 	sep	#$10			; 8-bit X/Y
 	ply
 	plx
 	rts
 	
 
+
 ; Region-checking patterns found in some NTSC games - and what to replace them with
 ; to make them run on a PAL system.
-ntsc_pattern0: .db $AD, $3F, $21, $29, $10		; lda $213f / and #$10
-ntsc_to_pal_pattern0: .db $AD, $3F, $21, $A9, $00	; lda $213f / lda #0
-ntsc_pattern1: .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
-ntsc_to_pal_pattern1: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
-ntsc_pattern2: .db $AD, $3F, $21, $89, $10		; lda $213f / bit #$10
-ntsc_to_pal_pattern2: .db $AD, $3F, $21, $A9, $00	; lda $213f / lda #0
-ntsc_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
-ntsc_to_pal_pattern3: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
+ntsc_game_pattern0: .db $AD, $3F, $21, $29, $10			; lda $213f / and #$10
+ntsc_game_pattern1: .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
+ntsc_game_pattern2: .db $AD, $3F, $21, $89, $10			; lda $213f / bit #$10
+ntsc_game_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
+ntsc_game_to_pal_pattern0: .db $AD, $3F, $21, $A9, $00		; lda $213f / lda #0
+ntsc_game_to_pal_pattern1: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
+ntsc_game_to_pal_pattern2: .db $AD, $3F, $21, $A9, $00		; lda $213f / lda #0
+ntsc_game_to_pal_pattern3: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
 
 ; Region-checking patterns found in some PAL games - and what to replace them with
 ; to make them run on a NTSC system.
-pal_pattern0: .db $AD, $3F, $21, $29, $10		; lda $213f / and #$10
-pal_to_ntsc_pattern0: .db $AD, $3F, $21, $A9, $10	; lda $213f / lda #$10
-pal_pattern1: .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
-pal_to_ntsc_pattern1: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #$10
-pal_pattern2: .db $AD, $3F, $21, $89, $10		; lda $213f / bit #$10
-pal_to_ntsc_pattern2: .db $AD, $3F, $21, $A9, $00	; lda $213f / lda #$10
-pal_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
-pal_to_ntsc_pattern3: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #$10
+pal_game_pattern0: .db $AD, $3F, $21, $29, $10			; lda $213f / and #$10
+pal_game_pattern1: .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
+pal_game_pattern2: .db $AD, $3F, $21, $89, $10			; lda $213f / bit #$10
+pal_game_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
+pal_game_to_ntsc_pattern0: .db $AD, $3F, $21, $A9, $10		; lda $213f / lda #$10
+pal_game_to_ntsc_pattern1: .db $AF, $3F, $21, $00, $A9, $10	; lda.l $00213f / lda #$10
+pal_game_to_ntsc_pattern2: .db $AD, $3F, $21, $A9, $10		; lda $213f / lda #$10
+pal_game_to_ntsc_pattern3: .db $AF, $3F, $21, $00, $A9, $10	; lda.l $00213f / lda #$10
+
+.db 0
+suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
 
 
+ .macro REGION_CHECK_SCAN_AND_REPLACE
+	sep	#$20
+	ldx	#\2
+-:
+	lda.l	$7d0000+suspect_pattern,x
+	cmp.l	$7d0000+\1,x
+	bne	++
+	dex
+	bpl	-
+	plx	; PSRAM position
+	txa
+	and	#1
+	beq	+
+	dex
++:
+	lda	#\4
+	sta.l	$7d0000+suspect_pattern+1+\3
+	lda	#\5
+	sta.l	$7d0000+suspect_pattern+2+\3
+	rep	#$20
+	lda.l	$7d0000+suspect_pattern+\3
+	sta.w	$0002,x
+	lda.l	$7d0000+suspect_pattern+2+\3
+	sta.w	$0004,x
+	jmp	_frc_50hz_next
+++:
+ .endm
+ 
+ 
 fix_region_checks:
 	sep	#$30
+	phb
 	phx
 	phy
 	rep	#$10			; 16-bit X/Y
 
-	sep	#$10			; 8-bit X/Y
+	lda.b 	tcc__r4
+	pha
+	plb				; DBR = $5x (PSRAM)
+	
+	lda.l	REG_STAT78
+	and	#$10
+	beq	_frc_ppu_is_60hz
+	rep	#$30
+	ldx	#0
+-:
+	lda.w	$0000,x			; Read PSRAM
+	phx
+	tay
+	and	#$ff
+	cmp	#$ad
+	beq	_frc_possible_ntsc_pattern
+	cmp	#$af
+	beq	_frc_possible_ntsc_pattern
+	tya
+	xba
+	and	#$ff
+	cmp	#$ad
+	beq	_frc_possible_ntsc_pattern_odd
+	cmp	#$af
+	beq	_frc_possible_ntsc_pattern_odd
+_frc_50hz_next:
+	plx
+	inx
+	inx
+	bne	-
+	sep	#$30			; 8-bit A/X/Y
 	ply
 	plx
+	plb
 	rts
 	
+_frc_ppu_is_60hz:
+	rep	#$30
+	ldx	#0
+-:
+	lda.w	$0000,x			; Read PSRAM
+	tay
+	and	#$ff
+	cmp	#$ad
+	beq	_frc_possible_pal_pattern
+	cmp	#$af
+	beq	_frc_possible_pal_pattern
+	tya
+	xba
+	and	#$ff
+	cmp	#$ad
+	beq	_frc_possible_pal_pattern_odd
+	cmp	#$af
+	beq	_frc_possible_pal_pattern_odd
+_frc_60hz_next:
+	inx
+	inx
+	bne	-
+	sep	#$30			; 8-bit A/X/Y
+	ply
+	plx
+	plb
+	rts
+
+_frc_possible_pal_pattern_odd:
+	inx	
+_frc_possible_pal_pattern:
+	jmp	_frc_check_for_pal_patterns
+	
+_frc_possible_ntsc_pattern_odd:
+	inx	
+_frc_possible_ntsc_pattern:
+	phx
+	jsr	_frc_copy_pattern
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern0,4,2,$a9,$00	
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern2,4,2,$a9,$00	
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern1,5,4,$a9,$00	
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern3,5,4,$a9,$00	
+	jmp	_frc_50hz_next
+	
+_frc_check_for_pal_patterns
+	phx
+	jsr	_frc_copy_pattern
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern0,4,2,$a9,$10	
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern2,4,2,$a9,$10	
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern1,5,4,$a9,$10	
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern3,5,4,$a9,$10	
+	jmp	_frc_60hz_next
+	
+_frc_copy_pattern:
+	txy
+	ldx	#1	
+	tya
+	and	#1
+	beq	+
+	dex
+	dey
++:	
+-:
+	lda.w	$0000,y			; Read PSRAM
+	iny
+	iny
+	sta.l	$7d0000+suspect_pattern-1,x
+	inx
+	inx
+	cpx	#8
+	beq	+
+	cpx	#9
+	beq	+
+	bra	-
++:
+	rts
+
+
 
 ; Updates and displays the "LOADING......(nn)" string 
 show_loading_progress:
@@ -605,6 +749,81 @@ show_copied_data:
  
 	rts
  
+
+
+; Reads the 64-byte "header" (ROM title, country code, checksum etc) from the currently highlighted ROM and stores it in snesRomInfo.
+get_rom_info:
+	php
+	sep	#$20
+	
+	lda.l	romAddressPins
+	sta	tcc__r2h
+
+	LDA    #$20      	; OFF A21
+	STA.L  MYTH_GBAC_ZIO
+	JSR    SET_NEOCMA  	;
+	JSR    SET_NEOCMB  	;
+	JSR    SET_NEOCMC  	; ON_NEO CARD A24 & A25 + SA16 & SA17
+
+	LDA.L   romAddressPins+1
+	STA.L   MYTH_GBAC_HIO	; SET AH25,AH25
+
+	LDA     #$01
+	STA.L   MYTH_EXTM_ON   ; A25,A24 ON
+
+	LDA    #$04       	; COPY MODE !
+	STA.L  MYTH_OPTION_IO
+
+	LDA    #$F8
+	STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+
+	LDA.L  romAddressPins
+	STA.L  MYTH_GBAC_LIO
+
+	lda.l	romRunMode
+	beq	_gri_hirom
+	rep	#$30
+	ldx	#0
+-:
+	lda.l	$407fc0,x
+	sta.l	snesRomInfo,x
+	inx
+	inx
+	cpx	#$40
+	bne	-
+	bra	+
+_gri_hirom:
+	rep	#$30
+	ldx	#0
+-:
+	lda.l	$40ffc0,x
+	sta.l	snesRomInfo,x
+	inx
+	inx
+	cpx	#$40
+	bne	-
++:
+
+	sep	#$20
+	
+	LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
+	STA.L   MYTH_OPTION_IO
+
+	LDA     #$00
+	STA.L   MYTH_EXTM_ON   ; A25,A24 ON
+	
+	LDA     #$20       	; OFF A21
+	STA.L   MYTH_GBAC_ZIO
+	JSR     SET_NEOCMD	; SET MENU
+
+	LDA     #$00
+	STA.L   MYTH_GBAC_LIO
+	STA.L   MYTH_GBAC_HIO
+	STA.L   MYTH_GBAC_ZIO
+   
+   	plp
+   	rtl
+   	
          
 
 load_progress:
@@ -838,6 +1057,11 @@ MOV_PSRAM_LOOP:
 
 	 lda.l	doRegionPatch
 	 beq	+
+	 lda	#0
+	 sta	tcc__r4
+	 jsr	fix_region_checks
+	 lda	#1
+	 sta	tcc__r4
 	 jsr	fix_region_checks
 	 +:
 	 
