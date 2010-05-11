@@ -4,8 +4,6 @@
 #define NCHEATS(c)	(sizeof(c)/sizeof(cheat_t))
 
 
-const short testconst[] = {1,2,3,4,5,6,7,8};
-
 
 const cheat_t captain_america_and_the_avengers_u_cheats[] =
 {

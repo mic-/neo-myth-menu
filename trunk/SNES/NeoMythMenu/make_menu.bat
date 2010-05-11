@@ -32,6 +32,7 @@ tools\optimore-816 action_replay.s aropt.s
 tools\optimore-816 ppuc.s ppucopt.s
 
 tools\constify main.c mainopt.s mainopt2.s
+tools\constify navigation.c navigopt.s navigopt2.s
 tools\constify cheats\cheat_database.c cheat_db.s cheat_db2.s
 
 REM ASM -> OBJ

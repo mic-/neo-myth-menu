@@ -579,6 +579,9 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 				}
 			}
 
+			// DEBUG
+			gameFoundInDb = 1; cheatGameIdx = 0;
+
 			if (gameFoundInDb)
 			{
 				y = 10;
