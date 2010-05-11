@@ -23,6 +23,7 @@
 #define MS_MAIN_MENU_INSTRUCTIONS	75
 #define MS_GG_ENTRY_MENU_INSTRUCTIONS 76
 #define MS_GG_EDIT_MENU_INSTRUCTIONS 77
+#define MS_ROM_INFO_MENU_INSTRUCTIONS 80
 
 
 // Masks for the joypad data returned by read_joypad
@@ -79,6 +80,7 @@ extern char MS4[];
 extern const char * const metaStrings[];
 extern u16 gbaCardAlphabeticalIdx[500];
 extern sortOrder_t sortOrder;
+extern u8 freeCodeSlots;
 extern u8 snesRomInfo[0x40];
 extern u8 doRegionPatch;
 extern oamEntry_t marker;
