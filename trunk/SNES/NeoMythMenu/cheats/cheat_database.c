@@ -41,6 +41,15 @@ const cheat_t contra_3_u_cheats[] =
 };
 
 
+const cheat_t death_and_return_of_superman_u_cheats[] =
+{
+	{"2D6BCF6DED6CCFAD","Invincibility", CODE_TYPE_GG},
+	{"C92DC7DD992DC70D622DC76D242DC7ADD32FCDDD","Infinite energy", CODE_TYPE_GG},
+	{"33243F6D","Infinite lives", CODE_TYPE_GG},
+	{"3323C76DD323C7AD","Infinite special attacks", CODE_TYPE_GG},
+};
+
+
 const cheat_t megaman_x_u_cheats[] =
 {
 	{"7E0C1311", "Unlimited energy", CODE_TYPE_AR},
@@ -86,13 +95,11 @@ const cheat_t super_mario_world_u_cheats[] =
    	{"D6B46F07", "Start with 9 lives", CODE_TYPE_GG},
    	{"009E2562", "Start with 99 lives", CODE_TYPE_AR},
 	{"C222D4DD","Infinite lives", CODE_TYPE_GG},
-
    	{"7E0DAA80", "Can't jump", CODE_TYPE_AR},
    	{"D02CAF6F", "Low jump", CODE_TYPE_GG},
    	{"D42CAF6F", "Super jump", CODE_TYPE_GG},
    	{"DF2CAF6F", "Mega jump", CODE_TYPE_GG},
    	{"3E2CAF6F", "Unlimited jumps", CODE_TYPE_GG},
-
    	{"7E0DC101", "Always have Yoshi", CODE_TYPE_AR},
 	{"7E001900","Always Small Mario", CODE_TYPE_AR},
 	{"7E001901","Always Big Mario", CODE_TYPE_AR},
@@ -100,21 +107,16 @@ const cheat_t super_mario_world_u_cheats[] =
 	{"7E001903","Always Fire Mario", CODE_TYPE_AR},
    	{"009E35E6", "Start as Super Mario", CODE_TYPE_AR},
    	{"CBB76D67D4B76DA73CB76FD769B76F07",   "Start as Caped Mario", CODE_TYPE_GG},
-
 	{"89E4AFD989C6D4DB","Invincibility (Yoshi)", CODE_TYPE_GG},
 	{"7E1497FF","Invincibility (Walk Though Enemies)", CODE_TYPE_AR},
 	{"7E1490FF","Invincibility (Starman Effect)", CODE_TYPE_AR},
 	{"C2EC0700","Infinite flying time for Yoshi", CODE_TYPE_GG},
-
    	{"7E0F3099", "Fast timer", CODE_TYPE_AR},
    	{"008E2888", "Timer doesn't count down", CODE_TYPE_AR},
    	{"7E0DBF63", "Infinite coins", CODE_TYPE_AR},
-
    	{"00D0B6A9", "Keep powerups when you fall and die", CODE_TYPE_AR},
-
 	{"DDC164DDDDC56DAD","Nintendo's Debug", CODE_TYPE_GG},
 	{"DDA6DF07","Nintendo's Debug 2", CODE_TYPE_GG},
-
    	{"DFCE64A0", "Little Yoshi grows into big Yoshi after eating 1 enemy", CODE_TYPE_GG},
 };
 
@@ -150,6 +152,31 @@ const cheat_t super_metroid_u_cheats[] =
 };
 
 
+const cheat_t super_punch_out_u_cheats[] =
+{
+	{"7E099F01", "Opponent is down with one hit", CODE_TYPE_AR},
+	{"7E089F01", "Player is down with one hit", CODE_TYPE_AR},
+	{"7E089F50", "Unlimited energy", CODE_TYPE_AR},
+	{"DDB70704", "No rematches", CODE_TYPE_GG},
+	{"C2B864A5", "Unlimited rematches", CODE_TYPE_GG},
+	{"DFABDDDDAF6DD190DFABAFDD", "Most opponents stay down for the count", CODE_TYPE_GG},
+	{"C9E364DD", "Unlimited match time", CODE_TYPE_GG},
+	{"DFB8D4A1D48AD7D13C8AD701", "Start on World Circuit", CODE_TYPE_GG},
+};
+
+
+const cheat_t super_star_wars_cheats[] =
+{
+	{"7E0A7920", "Unlimited energy", CODE_TYPE_AR},
+	{"DE35CDA0", "Start with 16 lives", CODE_TYPE_GG},
+	{"DD3BC760", "Start with no continues", CODE_TYPE_GG},
+	{"DC3BC760", "Start with 10 continues", CODE_TYPE_GG},
+	{"4A2114D5", "Unlimited continues", CODE_TYPE_GG},
+	{"DDB0C767", "Start with the Light Saber", CODE_TYPE_GG},
+	{"1D34C704", "Invincible, except to falls", CODE_TYPE_GG},
+};
+
+
 const cheat_t xmen_mutant_apocalypse_u_cheats[] =
 {
 	{"7E0C4C21", "Untouchable", CODE_TYPE_AR},
@@ -176,6 +203,8 @@ const cheatDbEntry_t cheatDatabase[] =
 	{0x0C3C, 0xF3C3, contra_3_u_cheats, NCHEATS(contra_3_u_cheats)},
 	// Captain America And The Avengers (U)
 	{0xC971, 0x368E, captain_america_and_the_avengers_u_cheats, NCHEATS(captain_america_and_the_avengers_u_cheats)},
+	// Death And Return of Superman, The (U)
+	{0x01A3, 0xFE5C, death_and_return_of_superman_u_cheats, NCHEATS(death_and_return_of_superman_u_cheats)},
 	// X-Men - Mutant Apocalypse (U)
 	{0x3807, 0xC7F8, xmen_mutant_apocalypse_u_cheats, NCHEATS(xmen_mutant_apocalypse_u_cheats)},
 
