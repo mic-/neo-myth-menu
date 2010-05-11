@@ -16,12 +16,15 @@ using namespace std;
 
 vector<string> constVars;
 vector<string> asmSections[3];
+int blockDepth;
+int lineNum = 0;
 
 void check_for_const(string s)
 {
 	int i, j;
 
-	if ( (s.find("const") != string::npos) && (s.find("extern") == string::npos) )
+	// We are only interested in global consts that are initialized in this file
+	if ( (s.find("const") != string::npos) && (s.find("extern") == string::npos) && (blockDepth == 0))
 	{
 		for (i = 0; i < s.length(); i++)
 		{
@@ -33,18 +36,21 @@ void check_for_const(string s)
 
 		if (i < s.length())
 		{
-			while ((s[i] == ' ') || (s[i] == '\t'))
+			if ((s.rfind("const") > s.find("*")) || (s.find("*") == string::npos))
 			{
-				i--;
-			}
-			j = i - 1;
-			while ((s[j] != ' ') && (s[j] != '\t') && (s[j] != '*'))
-			{
-				j--;
-			}
+				while ((s[i] == ' ') || (s[i] == '\t'))
+				{
+					i--;
+				}
+				j = i - 1;
+				while ((s[j] != ' ') && (s[j] != '\t') && (s[j] != '*'))
+				{
+					j--;
+				}
 
-			//printf("Found const named %s\n", s.substr(j + 1, i-j-1).data());
-			constVars.push_back(s.substr(j + 1, i-j-1));
+				//printf("Found const named %s on line %d\n", s.substr(j + 1, i-j-1).data(), lineNum);
+				constVars.push_back(s.substr(j + 1, i-j-1));
+			}
 		}
 	}
 }
@@ -72,12 +78,17 @@ int main(int argc, char **argv)
 		{
 			if ((ch == 10) || (ch == 13))
 			{
+				lineNum += (ch == 10) ? 1 : 0;
 				check_for_const(oneLine);
 				oneLine.clear();
 			}
 			else
 			{
 				oneLine += (char)ch;
+				if (ch == '{')
+					blockDepth++;
+				else if (ch == '}')
+					blockDepth--;
 			}
 		}
 		else

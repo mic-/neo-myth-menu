@@ -56,7 +56,7 @@ char MS4[] = "\xff\x15\x02\x02 Game (001)";
 // Each of these metastrings are onm the format 0xff,row,column,palette,"actual text". A single metastring can go on
 // indefinitely until a null-terminator is reached.
 //
-const char *metaStrings[] =
+const char * const metaStrings[] =
 {
     "\xff\x03\x01\x07 Menu v 0.25\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
 	"\xff\x01\xfe\x0f\x0a\x68\x69\x6A\x20\x71\x72\x73\x20\x7a\x7b\x7c\x83\x84\x85\xfe\x10\x0a\x6b\x6c\x6d\x20\x74\x75 \
