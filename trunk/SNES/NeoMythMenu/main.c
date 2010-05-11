@@ -46,6 +46,8 @@ void (*keypress_handler)(u16);
 char bg0Buffer[0x800];
 u8 bg0BufferDirty;
 
+char tempString[32];
+
 // These three strings are modified at runtime by the shell, so they are declared separately in order to get them into
 // the .data section rather than .rodata.
 //
@@ -93,8 +95,8 @@ const char * const metaStrings[] =
 	"\xff\x09\x01\x02 TESTING PSRAM... ",
 	"\xff\x0b\x01\x03 PSRAM TEST OK    ",
 	"\xff\x0b\x01\x01 PSRAM TEST ERROR!",
-	"\xff\x08\x10\x07\x66",		// Up arrow
-	"\xff\x12\x10\x07\x67",		// Down arrow
+	"\xff\x08\x10\x07\x86",		// Up arrow
+	"\xff\x12\x10\x07\x87",		// Down arrow
 	"\xff\x08\x10\x07 ",		// Up arrow clear
 	"\xff\x12\x10\x07 ",		// Down arrow clear
 	// Game sizes (strings nbr 37-47)
@@ -148,6 +150,8 @@ const char * const metaStrings[] =
     "\xff\x17\x03\x03\x42\xff\x17\x04\x07: Add, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Delete\xff\x16\x03\x03\x44pad\xff\x16\x07\x07: Pick, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: Cancel",
     "\xff\x06\x02\x07\x43heats\xff\x16\x03\x03Start\xff\x16\x08\x07: Run, \xff\x15\x0f\x03\x42\xff\x15\x10\x07: Add \xff\x15\x03\x03\x44pad\xff\x15\x07\x07: Pick, \xff\x16\x0f\x03Y\xff\x16\x10\x07: Cancel",
     "\xff\x17\x03\x03\x42\xff\x17\x04\x07: Edit, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Go back",
+    // 80
+    "\xff\x06\x02\x07Info\xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
 };
 
 extern const cheatDbEntry_t cheatDatabase[];
@@ -156,6 +160,7 @@ extern const cheatDbEntry_t cheatDatabase[];
 ggCode_t ggCodes[MAX_GG_CODES*2];
 itemList_t cheatList;
 u8 anyRamCheats = 0;		// Do any of the cheats target RAM?
+u8 freeCodeSlots = MAX_GG_CODES * 2;
 
 u8 doRegionPatch = 0;		// Should we scan the game for region checks and patch them?
 
@@ -443,6 +448,23 @@ void print_hex(u8 val, u16 x, u16 y, u16 attribs)
 	}
 	bg0BufferDirty = 1;
 }
+
+
+void print_dec(u16 val, u16 x, u16 y, u16 attribs)
+{
+	char *p = &tempString[32];
+	char c;
+	u16 chars = 0;
+
+	do
+	{
+		*(--p) = hw_div16_8_rem16(val, 10) + '0';
+		chars++;
+		val = hw_div16_8_quot16(val, 10);
+	} while (val != 0);
+	printxy(p, x, y, attribs, chars);
+}
+
 
 
 void puts_game_title(u16 gameNum, u16 vramOffs, u8 attributes)

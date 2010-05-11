@@ -410,11 +410,11 @@ apply_cheat_codes:
 
 	ldx	#0
 	ldy	#8			; Maximum number of codes
--:
+_acc_loop:
 	lda.l	ggCodes,x		; used
 	cmp	#1			; Does this code apply to ROM?
 	beq	_cheat_type_rom
-	jmp	_next_cheat_code
+	jmp.l	$7d0000+_next_cheat_code
 _cheat_type_rom:
 	lda.l	ggCodes+1,x		; bank (64kB)
 	cmp	tcc__r3			; Should this gg code be applied to the lower 512 kbit that we just copied to PSRAM?
@@ -486,7 +486,7 @@ _next_cheat_code:
 	sep	#$20
 	dey
 	beq	_apply_cheat_codes_done
-	jmp	-
+	jmp.l	$7d0000+_acc_loop
 _apply_cheat_codes_done:	
 	sep	#$10			; 8-bit X/Y
 	ply
@@ -522,7 +522,7 @@ suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
 
 
  .macro REGION_CHECK_SCAN_AND_REPLACE
-	sep	#$20
+	sep	#$20	; 8-bit A
 	ldx	#\2
 -:
 	lda.l	$7d0000+suspect_pattern,x
@@ -530,7 +530,7 @@ suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
 	bne	++
 	dex
 	bpl	-
-	plx	; PSRAM position
+	plx		; PSRAM position
 	txa
 	and	#1
 	beq	+
@@ -540,18 +540,18 @@ suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
 	sta.l	$7d0000+suspect_pattern+1+\3
 	lda	#\5
 	sta.l	$7d0000+suspect_pattern+2+\3
-	rep	#$20
+	rep	#$20	; 16-bit A
 	lda.l	$7d0000+suspect_pattern+\3
 	sta.w	$0002,x
 	lda.l	$7d0000+suspect_pattern+2+\3
 	sta.w	$0004,x
-	jmp	_frc_50hz_next
+	jmp.l	$7d0000+\6
 ++:
  .endm
  
  
 fix_region_checks:
-	sep	#$30
+	sep	#$30			; 8-bit A/X/Y
 	phb
 	phx
 	phy
@@ -564,7 +564,7 @@ fix_region_checks:
 	lda.l	REG_STAT78
 	and	#$10
 	beq	_frc_ppu_is_60hz
-	rep	#$30
+	rep	#$30			; 16-bit A/X/Y
 	ldx	#0
 -:
 	lda.w	$0000,x			; Read PSRAM
@@ -622,31 +622,39 @@ _frc_60hz_next:
 	rts
 
 _frc_possible_pal_pattern_odd:
+	rep	#$30
 	inx	
 _frc_possible_pal_pattern:
-	jmp	_frc_check_for_pal_patterns
+	jmp.l	$7d0000+_frc_check_for_pal_patterns
 	
 _frc_possible_ntsc_pattern_odd:
 	inx	
 _frc_possible_ntsc_pattern:
+	rep	#$30
 	phx
 	jsr	_frc_copy_pattern
-	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern0,4,2,$a9,$00	
-	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern2,4,2,$a9,$00	
-	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern1,5,4,$a9,$00	
-	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern3,5,4,$a9,$00	
-	jmp	_frc_50hz_next
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern0,4,2,$a9,$00,_frc_50hz_next	
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern2,4,2,$a9,$00,_frc_50hz_next	
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern1,5,4,$a9,$00,_frc_50hz_next	
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern3,5,4,$a9,$00,_frc_50hz_next
+	rep	#$30
+	plx
+	jmp.l	$7d0000+_frc_50hz_next
 	
 _frc_check_for_pal_patterns
+	rep	#$30
 	phx
 	jsr	_frc_copy_pattern
-	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern0,4,2,$a9,$10	
-	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern2,4,2,$a9,$10	
-	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern1,5,4,$a9,$10	
-	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern3,5,4,$a9,$10	
-	jmp	_frc_60hz_next
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern0,4,2,$a9,$10,_frc_60hz_next	
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern2,4,2,$a9,$10,_frc_60hz_next		
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern1,5,4,$a9,$10,_frc_60hz_next		
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern3,5,4,$a9,$10,_frc_60hz_next
+	rep	#$30
+	plx
+	jmp.l	$7d0000+_frc_60hz_next
 	
 _frc_copy_pattern:
+	rep	#$30
 	txy
 	ldx	#1	
 	tya

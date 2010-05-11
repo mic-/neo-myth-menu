@@ -27,6 +27,35 @@ u8 gameFoundInDb = 0;
 extern ggCode_t ggCodes[MAX_GG_CODES * 2];
 extern const cheatDbEntry_t cheatDatabase[];
 
+const char * const countryCodeStrings[] =
+{
+	"(Japan)",
+	"(N America)",
+	"(Europe)",
+	"(Scandinv)",
+	0,
+	0,
+	"(France)",
+	"(Netherls)",
+	"(Spain)",
+	"(Germany)",
+	"(Italy)",
+	"(China)",
+	0,
+	"(Korea)",
+	0,
+	"(Canada)",
+	"(Brazil)",
+	"(Australia",
+};
+
+const char * const romSizeStrings[] =
+{
+	"(4 Mbit)", "(8 Mbit)", "(16 Mbit)",
+	"(32 Mbit)", "(64 Mbit)",
+};
+
+
 oamEntry_t marker;
 
 typedef struct
@@ -36,6 +65,8 @@ typedef struct
 	u8 row;
 	u8 optionColumn;
 } menuOption_t;
+
+////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum
 {
@@ -57,6 +88,8 @@ menuOption_t extRunMenuOptions[MENU1_ITEM_LAST + 1] =
 	{0,0,0,0}	// Terminator
 };
 
+////////////////////////////////////////////////////////////////////////////////////////////////
+
 enum
 {
 	MENU7_ITEM_GAME_GENIE = 0,
@@ -72,6 +105,8 @@ menuOption_t noCodesMenuOptions[MENU7_ITEM_LAST + 1] =
 };
 
 
+////////////////////////////////////////////////////////////////////////////////////////////////
+
 // Prototypes
 void main_menu_process_keypress(u16);
 void extended_run_menu_process_keypress(u16);
@@ -81,7 +116,9 @@ void ar_code_entry_menu_process_keypress(u16);
 void ar_code_edit_menu_process_keypress(u16);
 void cheat_db_menu_process_keypress(u16);
 void cheat_db_no_codes_menu_process_keypress(u16);
+void rom_info_menu_process_keypress(u16);
 
+////////////////////////////////////////////////////////////////////////////////////////////////
 
 
 // Return an unsigned short that contains the status of all 8 buttons and the dpad
@@ -503,7 +540,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 					        32);
 				}
 			}
-			highlightedOption[MID_GG_ENTRY_MENU] = MENU1_ITEM_GAME_GENIE;
+			highlightedOption[MID_GG_ENTRY_MENU] = 0;
 			break;
 
 
@@ -592,7 +629,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			}
 
 			// DEBUG
-			gameFoundInDb = 1; cheatGameIdx = 0;
+			//gameFoundInDb = 1; cheatGameIdx = 0;
 
 			if (gameFoundInDb)
 			{
@@ -628,17 +665,82 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			        10,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE),
 			        200);
+			highlightedOption[MID_CHEAT_DB_NO_CODES_MENU] = MENU7_ITEM_GAME_GENIE;
 			for (i = 0; i < 2; i++)
 			{
 				printxy(noCodesMenuOptions[i].label,
 				        2,
 				        noCodesMenuOptions[i].row,
-				        (highlightedOption[MID_EXT_RUN_MENU]==i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+				        (highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]==i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
 				        32);
 			}
-			highlightedOption[MID_CHEAT_DB_NO_CODES_MENU] = MENU7_ITEM_GAME_GENIE;
 			break;
 
+		case MID_ROM_INFO_MENU:
+			keypress_handler = rom_info_menu_process_keypress;
+			print_meta_string(MS_ROM_INFO_MENU_INSTRUCTIONS);
+
+			// Get ROM info
+			get_info = get_rom_info & 0x7fff;
+			add_full_pointer((void**)&get_info, 0x7d, 0x8000);
+			get_info();
+
+			printxy(snesRomInfo, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);	// ROM title
+
+			printxy("Layout:   $", 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			print_hex(snesRomInfo[0x15], 13, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			printxy((snesRomInfo[0x15] & 1) ? "(HIROM)" : "(LOROM)", 16, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+
+			printxy("Type:     $", 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			print_hex(snesRomInfo[0x16], 13, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			if (snesRomInfo[0x16] == 0x02)
+			{
+				printxy("(SRAM)", 16, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			}
+			else if (snesRomInfo[0x16] == 0x03)
+			{
+				printxy("(DSP)", 16, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			}
+			else if (snesRomInfo[0x16] == 0x05)
+			{
+				printxy("(DSP+SRAM)", 16, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			}
+
+			printxy("ROM size: $", 2, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			print_hex(snesRomInfo[0x17], 13, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			if ((snesRomInfo[0x17] >= 0x9) && (snesRomInfo[0x17] <= 0xD))
+			{
+				printxy(romSizeStrings[snesRomInfo[0x17] - 0x9], 16, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			}
+
+			printxy("RAM size: $", 2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			print_hex(snesRomInfo[0x18], 13, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+
+			printxy("Country:  $", 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			print_hex(snesRomInfo[0x19], 13, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			if (snesRomInfo[0x19] < 0x12)
+			{
+				if (countryCodeStrings[snesRomInfo[0x19]])
+				{
+					printxy(countryCodeStrings[snesRomInfo[0x19]], 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				}
+			}
+
+			printxy("Checksum: $", 2, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			print_hex(snesRomInfo[0x1f], 13, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(snesRomInfo[0x1e], 15, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			printxy(", $", 17, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			print_hex(snesRomInfo[0x1d], 20, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(snesRomInfo[0x1c], 22, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+
+			printxy("RESET:    $", 2, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			print_hex(snesRomInfo[0x3d], 13, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(snesRomInfo[0x3c], 15, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+
+			printxy("NMI:      $", 2, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			print_hex(snesRomInfo[0x2b], 13, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(snesRomInfo[0x2a], 15, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			break;
 
 		default:					// Main menu
 			keypress_handler = main_menu_process_keypress;
@@ -742,6 +844,10 @@ void extended_run_menu_process_keypress(u16 keys)
 			        extRunMenuOptions[MENU1_ITEM_FIX_REGION].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        32);
+		}
+		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_ROM_INFO)
+		{
+			switch_to_menu(MID_ROM_INFO_MENU, 0);
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_ACTION_REPLAY)
 		{
@@ -858,6 +964,7 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 	else if (keys & JOY_X)
 	{
 		// X
+		if (ggCodes[highlightedOption[MID_GG_ENTRY_MENU]].used) freeCodeSlots++;
 		ggCodes[highlightedOption[MID_GG_ENTRY_MENU]].used = CODE_UNUSED;
 		print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]],
 		              CODE_LEFT,
@@ -927,6 +1034,7 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 			          &(ggCodes[whichCode].bank),
 			          &(ggCodes[whichCode].offset),
 			          &(ggCodes[whichCode].val));
+			if (ggCodes[whichCode].used == CODE_UNUSED) freeCodeSlots--;
 			ggCodes[whichCode].used = ((ggCodes[whichCode].bank == 0x7e) || (ggCodes[whichCode].bank == 0x7f)) ? CODE_TARGET_RAM : CODE_TARGET_ROM;
 			switch_to_menu(MID_GG_ENTRY_MENU, 1);
 		}
@@ -998,6 +1106,7 @@ void ar_code_entry_menu_process_keypress(u16 keys)
 	else if (keys & JOY_X)
 	{
 		// X
+		if (ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]].used) freeCodeSlots++;
 		ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]].used = CODE_UNUSED;
 
 		print_ar_code(&ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]],
@@ -1072,6 +1181,7 @@ void ar_code_edit_menu_process_keypress(u16 keys)
 			          &(ggCodes[whichCode].bank),
 			          &(ggCodes[whichCode].offset),
 			          &(ggCodes[whichCode].val));
+			          if (ggCodes[whichCode].used == CODE_UNUSED) freeCodeSlots--;
 			ggCodes[whichCode].used = ((ggCodes[whichCode].bank == 0x7e) || (ggCodes[whichCode].bank == 0x7f)) ? CODE_TARGET_RAM : CODE_TARGET_ROM;
 			switch_to_menu(MID_AR_ENTRY_MENU, 1);
 		}
@@ -1158,12 +1268,12 @@ void cheat_db_no_codes_menu_process_keypress(u16 keys)
 			// Un-highlight the previously highlighted string(s), and highlight the new one(s)
 			printxy(noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].label,
 			        2,
-			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].row + 8,
+			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
 			        32);
 			printxy(noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]-1].label,
 			        2,
-			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]-1].row + 8,
+			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]-1].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        32);
 			highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]--;
@@ -1176,15 +1286,25 @@ void cheat_db_no_codes_menu_process_keypress(u16 keys)
 		{
 			printxy(noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].label,
 			        2,
-			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].row + 8,
+			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
 			        32);
 			printxy(noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]+1].label,
 			        2,
-			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]+1].row + 8,
+			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]+1].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        32);
 			highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]++;
 		}
+	}
+}
+
+
+void rom_info_menu_process_keypress(u16 keys)
+{
+	if (keys & JOY_Y)
+	{
+		// Y
+		switch_to_menu(MID_EXT_RUN_MENU, 0);
 	}
 }

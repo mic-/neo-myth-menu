@@ -46,7 +46,7 @@ REM ASM -> OBJ
 ..\bin\wla-65816.exe -io dummy_games_list.asm dummy_games_list.obj
 ..\bin\wla-65816.exe -io cheat_db2.s cheat_db.obj
 
-..\bin\wla-65816.exe -io mainopt2.s main.obj
+..\bin\wla-65816.exe -io mainopt.s main.obj
 ..\bin\wla-65816.exe -io navigopt.s navigation.obj
 ..\bin\wla-65816.exe -io ggopt.s game_genie.obj
 ..\bin\wla-65816.exe -io aropt.s action_replay.obj
@@ -58,7 +58,7 @@ REM OBJ -> SMC
 
 REM Delete files
 del *.ps2
-REM del *.s
+del *.s
 del *.obj
 REM del *.sym
 

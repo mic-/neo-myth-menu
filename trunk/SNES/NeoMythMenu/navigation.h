@@ -17,6 +17,7 @@ enum
 	MID_CHEAT_DB_MENU,
 	MID_CHEAT_DB_NO_CODES_MENU,	// The menu shown when the user presses Select and no cheats are found in the database for
 								// the highlighted game.
+	MID_ROM_INFO_MENU,
 
 	MID_LAST_MENU
 };
