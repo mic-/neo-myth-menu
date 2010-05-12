@@ -42,6 +42,7 @@
 
 
 #define SHELL_BGPAL_WHITE 2
+#define SHELL_BGPAL_TOS_GREEN 4
 #define SHELL_BGPAL_LIGHT_BLUE 5
 #define SHELL_BGPAL_DARK_OLIVE 6
 #define SHELL_BGPAL_OLIVE 7
@@ -79,6 +80,7 @@ extern itemList_t cheatList;
 extern char MS4[];
 extern const char * const metaStrings[];
 extern u16 gbaCardAlphabeticalIdx[500];
+extern u8 cheatApplied[128];
 extern sortOrder_t sortOrder;
 extern u8 freeCodeSlots;
 extern u8 snesRomInfo[0x40];
@@ -97,6 +99,7 @@ extern void run_secondary_cart_c();
 
 extern void clear_screen();
 extern void clear_status_window();
+extern void hide_games_list();
 extern void print_meta_string(u16);
 extern void print_games_list();
 extern void print_cheat_list();

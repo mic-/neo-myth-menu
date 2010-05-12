@@ -30,13 +30,13 @@ extern const cheatDbEntry_t cheatDatabase[];
 const char * const countryCodeStrings[] =
 {
 	"(Japan)",
-	"(N America)",
+	"(USA/Canada)",
 	"(Europe)",
-	"(Scandinv)",
+	"(Scandinavia)",
 	0,
 	0,
 	"(France)",
-	"(Netherls)",
+	"(Netherlands)",
 	"(Spain)",
 	"(Germany)",
 	"(Italy)",
@@ -46,7 +46,7 @@ const char * const countryCodeStrings[] =
 	0,
 	"(Canada)",
 	"(Brazil)",
-	"(Australia",
+	"(Australia)",
 };
 
 const char * const romSizeStrings[] =
@@ -78,7 +78,7 @@ enum
 	MENU1_ITEM_LAST
 };
 
-menuOption_t extRunMenuOptions[MENU1_ITEM_LAST + 1] =
+menuOption_t extRunMenuItems[MENU1_ITEM_LAST + 1] =
 {
 	{"Game Genie", 0, 9, 0},
 	{"Action Replay", 0, 10, 0},
@@ -97,7 +97,7 @@ enum
 	MENU7_ITEM_LAST
 };
 
-menuOption_t noCodesMenuOptions[MENU7_ITEM_LAST + 1] =
+menuOption_t noCodesMenuItems[MENU7_ITEM_LAST + 1] =
 {
 	{"Game Genie", 0, 17, 0},
 	{"Action Replay", 0, 18, 0},
@@ -455,6 +455,11 @@ int can_cheat_list_scroll(scrollDirection_t direction)
 //
 void move_to_next_cheat()
 {
+	u16 y1, y2, i, d;
+	cheat_t const *cheats;
+
+	cheats = cheatDatabase[cheatGameIdx].cheats;
+
 	if (++cheatList.highlighted >= cheatList.count)
 	{
 		cheatList.highlighted--;
@@ -462,11 +467,22 @@ void move_to_next_cheat()
 	else
 	{
 		// Check if the games list needs to be scrolled
-		if ((gamesList.firstShown + ((NUMBER_OF_GAMES_TO_SHOW / 2) - 1) < gamesList.highlighted) &&
-			(gamesList.firstShown + NUMBER_OF_GAMES_TO_SHOW < gamesList.count))
+		if (cheatList.firstShown < (cheatList.count - 1))
 		{
-			gamesList.firstShown++;
+			y1 = y2 = 10;
+			for (i = cheatList.firstShown; i < cheatList.count; i++)
+			{
+				d = hw_div16_8_quot16(strlen(cheats[i].description), 27) + 1;
+				if (i < cheatList.highlighted)
+				{
+					y1 += d;
+				}
+				y2 += d;
+				if (y2 > 17) break;
+			}
+			if ((y1 > 13) && (i < (cheatList.count - 1))) cheatList.firstShown++;
 		}
+		hide_games_list();
 	}
 
 	print_cheat_list();
@@ -477,21 +493,50 @@ void move_to_next_cheat()
 //
 void move_to_previous_cheat()
 {
+	u16 y, i;
+	cheat_t const *cheats;
+
+	cheats = cheatDatabase[cheatGameIdx].cheats;
+
 	if (cheatList.highlighted)
 	{
 		cheatList.highlighted--;
 
 		// Check if the games list needs to be scrolled
-		if ((gamesList.firstShown) &&
-			(gamesList.firstShown + ((NUMBER_OF_GAMES_TO_SHOW / 2) - 1) >= gamesList.highlighted))
+		if (cheatList.firstShown)
 		{
-			gamesList.firstShown--;
+			y = 10;
+			for (i = cheatList.firstShown; i < cheatList.count; i++)
+			{
+				y += hw_div16_8_quot16(strlen(cheats[i].description), 27) + 1;
+				if (i == cheatList.highlighted) break;
+			}
+			if (y < 14) cheatList.firstShown--;
 		}
+		hide_games_list();
 	}
 
 	print_cheat_list();
 }
 
+
+
+void print_menu_item(menuOption_t *items, u16 idx, u16 attribs)
+{
+	printxy(items[idx].label,
+	        2,
+	        items[idx].row,
+			attribs,
+			32);
+	if (items[idx].optionValue)
+	{
+		printxy(items[idx].optionValue,
+		        items[idx].optionColumn,
+		        items[idx].row,
+		        attribs,
+		        32);
+	}
+}
 
 
 void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
@@ -520,25 +565,14 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			REG_BGCNT = 3;			// Enable BG0 and BG1 (disable OBJ)
 			print_meta_string(74);	// Print instructions
 
-			extRunMenuOptions[MENU1_ITEM_RUN_MODE].optionValue = &(metaStrings[48 + romRunMode][4]);
-			extRunMenuOptions[MENU1_ITEM_FIX_REGION].optionValue = (doRegionPatch) ? "On " : "Off";
+			extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue = &(metaStrings[48 + romRunMode][4]);
+			extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue = (doRegionPatch) ? "On " : "Off";
 
-			for (i = 0; i < 16; i++)
+			for (i = 0; i < MENU1_ITEM_LAST; i++)
 			{
-				if (extRunMenuOptions[i].label == 0) break;
-				printxy(extRunMenuOptions[i].label,
-				        2,
-				        extRunMenuOptions[i].row,
-				        (highlightedOption[MID_EXT_RUN_MENU]==i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
-				        32);
-				if (extRunMenuOptions[i].optionValue)
-				{
-					printxy(extRunMenuOptions[i].optionValue,
-					        extRunMenuOptions[i].optionColumn,
-					        extRunMenuOptions[i].row,
-					        (highlightedOption[MID_EXT_RUN_MENU]==i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
-					        32);
-				}
+				print_menu_item(extRunMenuItems,
+				                i,
+				                (highlightedOption[MID_EXT_RUN_MENU]==i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 			}
 			highlightedOption[MID_GG_ENTRY_MENU] = 0;
 			break;
@@ -629,11 +663,15 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			}
 
 			// DEBUG
-			//gameFoundInDb = 1; cheatGameIdx = 0;
+			gameFoundInDb = 1; cheatGameIdx = 0;
+
+			cheatList.count = cheatDatabase[cheatGameIdx].numCheats;
+			cheatList.firstShown = cheatList.highlighted = 0;
 
 			if (gameFoundInDb)
 			{
-				y = 10;
+				for (i = 0; i < 128; i++) cheatApplied[i] = 0;
+				/*y = 10;
 				cheats = cheatDatabase[cheatGameIdx].cheats;
 				for (i = 0; i < cheatDatabase[cheatGameIdx].numCheats; i++)
 				{
@@ -644,7 +682,8 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 							128);
 					y += hw_div16_8_quot16(strlen(cheats[i].description), 27) + 1;
 					if (y > 17) break;
-				}
+				}*/
+				print_cheat_list();
 
 				printxy(snesRomInfo, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);	// ROM title
 				printxy("Remaining code slots: 16", 3, 23, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
@@ -668,9 +707,9 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			highlightedOption[MID_CHEAT_DB_NO_CODES_MENU] = MENU7_ITEM_GAME_GENIE;
 			for (i = 0; i < 2; i++)
 			{
-				printxy(noCodesMenuOptions[i].label,
+				printxy(noCodesMenuItems[i].label,
 				        2,
-				        noCodesMenuOptions[i].row,
+				        noCodesMenuItems[i].row,
 				        (highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]==i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
 				        32);
 			}
@@ -722,7 +761,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			{
 				if (countryCodeStrings[snesRomInfo[0x19]])
 				{
-					printxy(countryCodeStrings[snesRomInfo[0x19]], 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+					printxy(countryCodeStrings[snesRomInfo[0x19]], 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 25);
 				}
 			}
 
@@ -828,20 +867,20 @@ void extended_run_menu_process_keypress(u16 keys)
 		{
 			// Switch HIROM/LOROM
 			romRunMode ^= 1;
-			extRunMenuOptions[MENU1_ITEM_RUN_MODE].optionValue = &(metaStrings[48 + romRunMode][4]);
-			printxy(extRunMenuOptions[MENU1_ITEM_RUN_MODE].optionValue,
-			        extRunMenuOptions[MENU1_ITEM_RUN_MODE].optionColumn,
-			        extRunMenuOptions[MENU1_ITEM_RUN_MODE].row,
+			extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue = &(metaStrings[48 + romRunMode][4]);
+			printxy(extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue,
+			        extRunMenuItems[MENU1_ITEM_RUN_MODE].optionColumn,
+			        extRunMenuItems[MENU1_ITEM_RUN_MODE].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        32);
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_FIX_REGION)
 		{
 			doRegionPatch ^= 1;
-			extRunMenuOptions[MENU1_ITEM_FIX_REGION].optionValue = (doRegionPatch) ? "On " : "Off";
-			printxy(extRunMenuOptions[MENU1_ITEM_FIX_REGION].optionValue,
-			        extRunMenuOptions[MENU1_ITEM_FIX_REGION].optionColumn,
-			        extRunMenuOptions[MENU1_ITEM_FIX_REGION].row,
+			extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue = (doRegionPatch) ? "On " : "Off";
+			printxy(extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue,
+			        extRunMenuItems[MENU1_ITEM_FIX_REGION].optionColumn,
+			        extRunMenuItems[MENU1_ITEM_FIX_REGION].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        32);
 		}
@@ -871,32 +910,13 @@ void extended_run_menu_process_keypress(u16 keys)
 		if (highlightedOption[MID_EXT_RUN_MENU])
 		{
 			// Un-highlight the previously highlighted string(s), and highlight the new one(s)
-			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].label,
-			        2,
-			        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].row,
-			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
-			        32);
-			if (extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionValue)
-			{
-				printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionValue,
-				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionColumn,
-				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].row,
-				        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
-				        32);
-			}
-			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].label,
-			        2,
-			        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].row,
-			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
-			        32);
-			if (extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].optionValue)
-			{
-				printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].optionValue,
-				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].optionColumn,
-				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]-1].row,
-				        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
-				        32);
-			}
+			print_menu_item(extRunMenuItems,
+			                highlightedOption[MID_EXT_RUN_MENU],
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			print_menu_item(extRunMenuItems,
+			                highlightedOption[MID_EXT_RUN_MENU] - 1,
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
 			highlightedOption[MID_EXT_RUN_MENU]--;
 		}
 	}
@@ -905,32 +925,12 @@ void extended_run_menu_process_keypress(u16 keys)
 		// Down
 		if (highlightedOption[MID_EXT_RUN_MENU] < MENU1_ITEM_LAST - 1)
 		{
-			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].label,
-			        2,
-			        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].row,
-			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
-			        32);
-			if (extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionValue)
-			{
-				printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionValue,
-				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].optionColumn,
-				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]].row,
-				        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
-				        32);
-			}
-			printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].label,
-			        2,
-			        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].row,
-			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
-			        32);
-			if (extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].optionValue)
-			{
-				printxy(extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].optionValue,
-				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].optionColumn,
-				        extRunMenuOptions[highlightedOption[MID_EXT_RUN_MENU]+1].row,
-				        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
-				        32);
-			}
+			print_menu_item(extRunMenuItems,
+			                highlightedOption[MID_EXT_RUN_MENU],
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			print_menu_item(extRunMenuItems,
+			                highlightedOption[MID_EXT_RUN_MENU] + 1,
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 
 			highlightedOption[MID_EXT_RUN_MENU]++;
 		}
@@ -1239,6 +1239,14 @@ void cheat_db_menu_process_keypress(u16 keys)
 		// Y
 		switch_to_menu(MID_MAIN_MENU, 0);
 	}
+	else if (keys & JOY_UP)
+	{
+		move_to_previous_cheat();
+	}
+	else if (keys & JOY_DOWN)
+	{
+		move_to_next_cheat();
+	}
 }
 
 
@@ -1266,14 +1274,14 @@ void cheat_db_no_codes_menu_process_keypress(u16 keys)
 		if (highlightedOption[MID_CHEAT_DB_NO_CODES_MENU])
 		{
 			// Un-highlight the previously highlighted string(s), and highlight the new one(s)
-			printxy(noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].label,
+			printxy(noCodesMenuItems[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].label,
 			        2,
-			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].row,
+			        noCodesMenuItems[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
 			        32);
-			printxy(noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]-1].label,
+			printxy(noCodesMenuItems[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]-1].label,
 			        2,
-			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]-1].row,
+			        noCodesMenuItems[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]-1].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        32);
 			highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]--;
@@ -1284,14 +1292,14 @@ void cheat_db_no_codes_menu_process_keypress(u16 keys)
 		// Down
 		if (highlightedOption[MID_CHEAT_DB_NO_CODES_MENU] < 1)
 		{
-			printxy(noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].label,
+			printxy(noCodesMenuItems[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].label,
 			        2,
-			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].row,
+			        noCodesMenuItems[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
 			        32);
-			printxy(noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]+1].label,
+			printxy(noCodesMenuItems[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]+1].label,
 			        2,
-			        noCodesMenuOptions[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]+1].row,
+			        noCodesMenuItems[highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]+1].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        32);
 			highlightedOption[MID_CHEAT_DB_NO_CODES_MENU]++;

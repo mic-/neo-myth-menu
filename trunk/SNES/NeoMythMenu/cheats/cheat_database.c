@@ -50,6 +50,17 @@ const cheat_t death_and_return_of_superman_u_cheats[] =
 };
 
 
+const cheat_t magical_quest_starring_mickey_mouse_cheats[] =
+{
+	{"DCAED4D7", "Start with 10 hearts", CODE_TYPE_GG},
+	{"DB6907A0", "Start with 10 lives", CODE_TYPE_GG},
+	{"1B2D6765F02D67A5", "Higher jumps", CODE_TYPE_GG},
+	{"C23D6FA0", "Longer invincibility after getting hit", CODE_TYPE_GG},
+	{"DFE70708", "Each gold coin worth 10", CODE_TYPE_GG},
+	{"C2E7D462", "Protection from most hits", CODE_TYPE_GG},
+};
+
+
 const cheat_t megaman_x_u_cheats[] =
 {
 	{"7E0C1311", "Unlimited energy", CODE_TYPE_AR},
@@ -57,6 +68,27 @@ const cheat_t megaman_x_u_cheats[] =
 	{"DBBE446F", "Start with 10 lives", CODE_TYPE_GG},
 	{"D58A1FBC", "Jump higher", CODE_TYPE_GG},
 	{"FFA309A4DDA301D465A30104", "All enemies are defeated with 1 X-Buster hit", CODE_TYPE_GG},
+};
+
+
+const cheat_t pocky_and_rocky_cheats[] =
+{
+	{"DB62-A7D4", "9 lives for Pocky", CODE_TYPE_GG},
+	{"DB62-A704", "9 lives for Rocky", CODE_TYPE_GG},
+	{"CB2D-DFDF", "Stop timer", CODE_TYPE_GG},
+	{"CD65-DF00", "Walk through walls", CODE_TYPE_GG},
+	{"C933-A794", "Unlimited energy for Pocky", CODE_TYPE_GG},
+	{"C93E-A797", "Unlimited energy for Rocky", CODE_TYPE_GG},
+};
+
+
+const cheat_t rock_n_roll_racing_cheats[] =
+{
+	{"FDCFCDD5", "Start with $100,000", CODE_TYPE_GG},
+	{"BBCFCDD5", "Start with $990,000", CODE_TYPE_GG},
+	{"DD2634D7", "No damage from most mines", CODE_TYPE_GG},
+	{"3CE5CD67", "No damage from hitting other cars", CODE_TYPE_GG},
+	{"C28BC4A9C28CCF69", "No money deducted when buying items", CODE_TYPE_GG},
 };
 
 
