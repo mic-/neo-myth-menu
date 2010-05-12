@@ -577,7 +577,14 @@ void print_cheat_list()
 			attribs = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE);
 			if (i == cheatList.highlighted)
 			{
-				attribs = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE);
+				if (cheatApplied[i])
+				{
+					attribs = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_LIGHT_GREEN);
+				}
+				else
+				{
+					attribs = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE);
+				}
 			}
 			else if (cheatApplied[i])
 			{
