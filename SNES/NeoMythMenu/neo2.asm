@@ -12,18 +12,18 @@
 
 copy_ram_code:
 	php
-	rep	#$10
-	sep	#$20
+	rep		#$10
+	sep		#$20
 	; Note: it's very important that the correct labels are used here. Look in NEOSNES.SYM if you suspect that
 	; the order of the sections involved has been changed by the linker.
-	ldy	#(neo2_spc_ram_code_end - ppu_ram_code_begin)
-	ldx	#0
+	ldy		#(neo2_spc_ram_code_end - ppu_ram_code_begin)
+	ldx		#0
 -:	
 	lda.l	ppu_ram_code_begin,x
 	sta.l	$7e8000,x
 	inx
 	dey
-	bne	-
+	bne		-
 	plp
 	rtl
 	
@@ -48,37 +48,37 @@ ram_code_begin:
 ; are copied.
 copy_1mbit_from_gbac_to_psram:
 	PHP
-    	SEP	#$20
-    	REP	#$10
-    	PHB        	   ; Save DBR
-    	LDA   	#$40	   ; +$07	
-	LDY	#2	   ; Copy 2 * 512 kbit	
+    SEP		#$20
+    REP		#$10
+    PHB        	   ; Save DBR
+    LDA   	#$40   ; +$07	
+	LDY		#2	   ; Copy 2 * 512 kbit	
 MOV_512K:	
-    	PHA
-    	PLB        	   ; Set DBR
+    PHA
+    PLB        	   ; Set DBR
 
-    	REP	#$30       ; A,16 & X,Y 16 BIT
-    	LDX     #$1FFE
+    REP		#$30   ; A,16 & X,Y 16 BIT
+    LDX     #$1FFE
 -:
-    	LDA.W   $0000,X    ; READ GBA CARD
-    	STA.L   $500000,X  ; WRITE PSRAM ;+$18
-    	LDA.W   $2000,X    ; READ GBA CARD
-    	STA.L   $502000,X  ; WRITE PSRAM 
-    	LDA.W   $4000,X    ; ...
-    	STA.L   $504000,X 
-    	LDA.W   $6000,X   
-    	STA.L   $506000,X 
-    	LDA.W   $8000,X   
-    	STA.L   $508000,X 
-    	LDA.W   $A000,X    
-    	STA.L   $50A000,X 
-    	LDA.W   $C000,X   
-    	STA.L   $50C000,X  
-    	LDA.W   $E000,X   
-    	STA.L   $50E000,X  
-    	DEX
-    	DEX
-    	BPL     -
+    LDA.W   $0000,X    ; READ GBA CARD
+    STA.L   $500000,X  ; WRITE PSRAM ;+$18
+    LDA.W   $2000,X    ; READ GBA CARD
+    STA.L   $502000,X  ; WRITE PSRAM 
+    LDA.W   $4000,X    ; ...
+    STA.L   $504000,X 
+    LDA.W   $6000,X   
+    STA.L   $506000,X 
+    LDA.W   $8000,X   
+    STA.L   $508000,X 
+    LDA.W   $A000,X    
+    STA.L   $50A000,X 
+    LDA.W   $C000,X   
+    STA.L   $50C000,X  
+    LDA.W   $E000,X   
+    STA.L   $50E000,X  
+    DEX
+    DEX
+    BPL     -
 
 	DEY
 	BEQ	+
@@ -100,37 +100,37 @@ MOV_512K:
 	INA
 	BRA	MOV_512K
 +:	
-    	PLB        	   ; Restore DBR
-    	PLP
-    	RTS
+    PLB        	   ; Restore DBR
+    PLP
+    RTS
     	
     	
 ; Used for running the secondary cart (plugged in at the back of the Myth)
 run_3800:
 	sep	#$30
-        LDA     #$01                 ;
-        STA.L   $C00E                ; HARD REST IO
+    LDA     #$01                 ;
+    STA.L   $C00E                ; HARD REST IO
 
-        LDA     #$01                 ;
-        STA.L   $C012                ; CPLD RAM ON
-        STA.L   $C015                ; CPLD RAM ON
+    LDA     #$01                 ;
+    STA.L   $C012                ; CPLD RAM ON
+    STA.L   $C015                ; CPLD RAM ON
               
-        LDA     #$FF                 ; RUN
-        STA.L   MYTH_RST_IO          ; RUN
+    LDA     #$FF                 ; RUN
+    STA.L   MYTH_RST_IO          ; RUN
         
-        LDA     #$0   ;#$00 0000     ;MYTH
-        PHA                          ;
-        PLB
+    LDA     #$0   ;#$00 0000     ;MYTH
+    PHA                          ;
+    PLB
          
-        LDX     #$00                 ;0  MOVE BOOT CODE TO SRAM
--:      LDA.L   CPLD_RAM+$7D0000,X  ;0
-        STA.L   $3800,X             ;0  CPLD SRAM
-        INX
-        BNE     -                   ;0
+    LDX     #$00                 ;0  MOVE BOOT CODE TO SRAM
+-:  LDA.L   CPLD_RAM+$7D0000,X  ;0
+    STA.L   $3800,X             ;0  CPLD SRAM
+    INX
+    BNE     -                   ;0
 
 	lda.l	ggCodes+4*14
-	cmp	#2
-	bne	+
+	cmp		#2
+	bne		+
 	sta.l	$7d0000+ram_cheat1+1
 	lda.l	ggCodes+4*14+2		; val
 	sta.l	$7d0000+ram_cheat1+5
@@ -143,8 +143,8 @@ run_3800:
 	+:
 	
 	lda.l	ggCodes+5*14
-	cmp	#2
-	bne	+
+	cmp		#2
+	bne		+
 	sta.l	$7d0000+ram_cheat2+1
 	lda.l	ggCodes+5*14+2		; val
 	sta.l	$7d0000+ram_cheat2+5
@@ -157,8 +157,8 @@ run_3800:
 	+:
 
 	lda.l	ggCodes+6*14
-	cmp	#2
-	bne	+
+	cmp		#2
+	bne		+
 	sta.l	$7d0000+ram_cheat3+1
 	lda.l	ggCodes+6*14+2		; val
 	sta.l	$7d0000+ram_cheat3+5
@@ -171,8 +171,8 @@ run_3800:
 	+:
 
 	lda.l	ggCodes+7*14
-	cmp	#2
-	bne	+
+	cmp		#2
+	bne		+
 	sta.l	$7d0000+ram_cheat4+1
 	lda.l	ggCodes+7*14+2		; val
 	sta.l	$7d0000+ram_cheat4+5
@@ -184,33 +184,33 @@ run_3800:
 	sta.l	$7d0000+ram_cheat4+9
 	+:
 	
-        LDX     #$00                 ;0  MOVE CHEAT CODE TO SRAM
--:      LDA.L   CHEAT+$7D0000,X     ;0
-        STA.L   $3E00,X             ;0  CPLD SRAM
-        INX
-        BNE     -                   ;0
+    LDX     #$00                 ;0  MOVE CHEAT CODE TO SRAM
+-:  LDA.L   CHEAT+$7D0000,X     ;0
+    STA.L   $3E00,X             ;0  CPLD SRAM
+    INX
+    BNE     -                   ;0
         
-        JMP.L   $003800
+    JMP.L   $003800
 ;===============================================================================
 ; EXIT RAM  $003800~003FFF
 ;===============================================================================
 CPLD_RAM:
-        REP	#$30        ; A,8 & X,Y 16 BIT
-        LDX     #$0000
-        LDA     #$0000      
+    REP	#$30        ; A,8 & X,Y 16 BIT
+    LDX     #$0000
+    LDA     #$0000      
 	; Clear RAM
 -:
-        STA.L   $7E0000,X  
-        INX
-        INX
-        BNE     -
-        SEP	#$30
+    STA.L   $7E0000,X  
+    INX
+    INX
+    BNE     -
+    SEP		#$30
 
-        LDA     #$00                 ;
-        STA.L   REG_DISPCNT
-        STA.L   REG_MDMAEN
-        STA.L   REG_HDMAEN
-        STA.L   REG_NMI_TIMEN
+    LDA     #$00                 ;
+    STA.L   REG_DISPCNT
+    STA.L   REG_MDMAEN
+    STA.L   REG_HDMAEN
+    STA.L   REG_NMI_TIMEN
 	STA.L	REG_BG0MAP
 	STA.L	REG_BG1MAP
 	STA.L	REG_CHRBASE_L
@@ -219,51 +219,51 @@ CPLD_RAM:
 	STA.L	REG_VRAM_ADDR_L
 	STA.L	REG_VRAM_ADDR_H
 	STA.L	REG_BGCNT
-	LDA	#$20
+	LDA		#$20
 	STA.L	REG_COLDATA
-	LDA	#$40
+	LDA		#$40
 	STA.L	REG_COLDATA
-	LDA	#$80
+	LDA		#$80
 	STA.L	REG_COLDATA
 
-        SEI
-        SEC
-        XCE              ;SET 65C02 MODE
-        JMP     ($FFFC)
+    SEI
+    SEC
+    XCE             ; SET 65C02 MODE
+    JMP     ($FFFC)	; Branch to emulation mode RESET vector 
 
 
 CHEAT:
 	pha
 	php
-	sep	#$20
+	sep		#$20
 ram_cheat1:		
-	lda	#0		;#0@+4
-	beq	+
-	lda	#1		;#1@+8
-	sta.l	$030201		;addr@+10
+	lda		#0		;#0@+4
+	beq		+
+	lda		#1		;#1@+8
+	sta.l	$030201	;addr@+10
 +:
 ram_cheat2:
-	lda	#0		;#0@+14
-	beq	+
-	lda	#2		;#2@+18
-	sta.l	$030201		;addr@+20
+	lda		#0		;#0@+14
+	beq		+
+	lda		#2		;#2@+18
+	sta.l	$030201	;addr@+20
 +:
 ram_cheat3:
-	lda	#0		;#0@+24
-	beq	+
-	lda	#3		;#3@+28
-	sta.l	$030201		;addr@+30
+	lda		#0		;#0@+24
+	beq		+
+	lda		#3		;#3@+28
+	sta.l	$030201	;addr@+30
 +:
 ram_cheat4:
-	lda	#0		;#0@+34
-	beq	+
-	lda	#4		;#4@+38
-	sta.l	$030201		;addr@+40
+	lda		#0		;#0@+34
+	beq		+
+	lda		#4		;#4@+38
+	sta.l	$030201	;addr@+40
 +:
 	plp
 	pla
 branch_to_real_nmi:
-	jmp.l	$000000		;addr@+45
+	jmp.l	$000000	;addr@+45
 	
 	
 	
@@ -271,42 +271,42 @@ branch_to_real_nmi:
 	
 	
 run_secondary_cart:
-	rep	#$30
+	rep		#$30
 	phx
 
-	jsl	mosaic_up + $7D0000
+	jsl		mosaic_up + $7D0000
 	
-	jsl	clear_screen
+	jsl		clear_screen
 	
-	sep	#$20
-	lda	#1
+	sep		#$20
+	lda		#1
 	sta.l	$00c017
-	lda	#$05
+	lda		#$05
 	sta.l	MYTH_OPTION_IO
 	
 	; Fill in the cartridge name
-	ldx	#0
+	ldx		#0
 -:
 	lda.l	$00ffc0,x
 	sta.l	MS3+4,x
 	inx
-	cpx	#20
-	bne	-
+	cpx		#20
+	bne		-
 	
-	lda	#MAP_MENU_FLASH_TO_ROM
+	lda		#MAP_MENU_FLASH_TO_ROM
 	sta.l	MYTH_OPTION_IO
 
-	rep	#$20
-	pea	3
-	jsl	print_meta_string			; Print cart name
+	rep		#$20
+	pea		3
+	jsl		print_meta_string			; Print cart name
 	pla
-	pea	0
-	jsl	print_meta_string			; Print instructions
+	pea		0
+	jsl		print_meta_string			; Print instructions
 	pla
-	pea	58
-	jsl	print_meta_string			; Print instructions
+	pea		58
+	jsl		print_meta_string			; Print instructions
 	pla
-	jsl	print_hw_card_rev
+	jsl		print_hw_card_rev
 	
 	; Print region and CPU/PPU1/PPU2 versions
 	lda.l	REG_STAT78
@@ -314,88 +314,88 @@ run_secondary_cart:
 	lsr	a
 	lsr	a
 	lsr	a
-	and	#1
+	and		#1
 	clc
-	adc	#59
+	adc		#59
 	pha
-	jsl	print_meta_string
+	jsl		print_meta_string
 	pla
 	lda.l	REG_RDNMI
-	and	#3
+	and		#3
 	clc
-	adc	#61
+	adc		#61
 	pha
-	jsl	print_meta_string
+	jsl		print_meta_string
 	pla
 	lda.l	REG_STAT77
-	and	#3
-	clc
-	adc	#65
+	and		#3
+	clc	
+	adc		#65
 	pha
-	jsl	print_meta_string
+	jsl		print_meta_string
 	pla
 	lda.l	REG_STAT78
-	and	#3
+	and		#3
 	clc
-	adc	#69
+	adc		#69
 	pha
-	jsl	print_meta_string
+	jsl		print_meta_string
 	pla
 	
-	jsl	update_screen
+	jsl		update_screen
 
-	jsl	mosaic_down + $7D0000
+	jsl		mosaic_down + $7D0000
 	
 	; Wait until B or Y is pressed	
 -:
-	jsl	read_joypad
+	jsl		read_joypad
 	lda.b	tcc__r0
-	and	#$c000
-	beq	-
+	and		#$c000
+	beq		-
 	
 	lda.b	tcc__r0
-	and	#$4000
-	beq	+
+	and		#$4000
+	beq		+
 	; Y was pressed
-	lda	#0
-	sep	#$20
+	lda		#0
+	sep		#$20
 	sta.l	$00c017
-	jsl	mosaic_up + $7D0000
-	rep	#$20
-	jsl	clear_screen
-	pea	0
-	jsl	print_meta_string
+	jsl		mosaic_up + $7D0000
+	rep		#$20
+	jsl		clear_screen
+	pea		0
+	jsl		print_meta_string
 	pla
-	pea	75
-	jsl	print_meta_string
+	pea		75
+	jsl		print_meta_string
 	pla
-	pea	4
-	jsl	print_meta_string
+	pea		4
+	jsl		print_meta_string
 	pla
-	jsl	print_hw_card_rev
-	jsl	print_games_list
-	jsl	update_screen
-	jsl	mosaic_down + $7D0000
+	jsl		print_hw_card_rev
+	jsl		print_games_list
+	jsl		update_screen
+	jsl		mosaic_down + $7D0000
 	plx
 	rtl
 	
 +:
 	lda.b	tcc__r0
-	and	#$8000
-	beq	+
+	and		#$8000
+	beq		+
 	; B was pressed
-	sep	#$20
-	lda	#$05
+	sep		#$20
+	lda		#$05
 	sta.l	MYTH_OPTION_IO
-	lda	#0
+	lda		#0
 	sta.l	$00c017
-	lda	#$05
+	lda		#$05
 	sta.l	MYTH_OPTION_IO
 	plx
 	jmp.w	run_3800 & $ffff
 
 +:
-	rep	#$30
+	rep		#$30
 	plx
 	rtl
 	
@@ -403,92 +403,92 @@ run_secondary_cart:
 
 ; Apply Game Genie / Action Replay codes to game ROM data that has been copied to PSRAM
 apply_cheat_codes:
-	sep	#$30
+	sep		#$30
 	phx
 	phy
-	rep	#$10			; 16-bit X/Y
+	rep		#$10			; 16-bit X/Y
 
-	ldx	#0
-	ldy	#8			; Maximum number of codes
+	ldx		#0
+	ldy		#8				; Maximum number of codes
 _acc_loop:
 	lda.l	ggCodes,x		; used
-	cmp	#1			; Does this code apply to ROM?
-	beq	_cheat_type_rom
+	cmp		#1				; Does this code apply to ROM?
+	beq		_cheat_type_rom
 	jmp.l	$7d0000+_next_cheat_code
 _cheat_type_rom:
 	lda.l	ggCodes+1,x		; bank (64kB)
-	cmp	tcc__r3			; Should this gg code be applied to the lower 512 kbit that we just copied to PSRAM?
-	bne	_cheat_upper_bank
-	phx				; Save X
-	lda	#0
-	xba				; Clear high byte of A
+	cmp		tcc__r3			; Should this gg code be applied to the lower 512 kbit that we just copied to PSRAM?
+	bne		_cheat_upper_bank
+	phx						; Save X
+	lda		#0
+	xba						; Clear high byte of A
 	lda.l	ggCodes+2,x		; val
-	rep	#$20
-	sta	tcc__r4
+	rep		#$20
+	sta		tcc__r4
 	lda.l	ggCodes+4,x		; offset
-	bit	#1			; Odd address?
-	bne	+			; ..Yes
+	bit		#1				; Odd address?
+	bne		+				; ..Yes
 	tax
 	lda.l	$500000,x		; Read one word ($xxyy) from the game ROM
-	and	#$ff00			; Keep $xx00
-	ora	tcc__r4			; val
+	and		#$ff00			; Keep $xx00
+	ora		tcc__r4			; val
 	sta.l	$500000,x		; Write back $xxvv, where vv comes from the game genie code
-	plx				; Restore X
-	bra	_next_cheat_code
+	plx						; Restore X
+	bra		_next_cheat_code
 +:
 	dea
 	tax
 	lda.l	$500000,x
-	and	#$00ff
+	and		#$00ff
 	xba
-	ora	tcc__r4			; val
+	ora		tcc__r4			; val
 	xba
 	sta.l	$500000,x
-	plx				; Restore X
-	bra	_next_cheat_code
+	plx						; Restore X
+	bra		_next_cheat_code
 _cheat_upper_bank:
 	dea
-	cmp	tcc__r3			; Should this gg code be applied to the upper 512 kbit that we just copied to PSRAM?
-	bne	_next_cheat_code
-	phx				; Save X
+	cmp		tcc__r3			; Should this gg code be applied to the upper 512 kbit that we just copied to PSRAM?
+	bne		_next_cheat_code
+	phx						; Save X
 	lda	#0
-	xba				; Clear high byte of A
+	xba						; Clear high byte of A
 	lda.l	ggCodes+2,x		; val
-	rep	#$20
-	sta	tcc__r4
+	rep		#$20
+	sta		tcc__r4
 	lda.l	ggCodes+4,x		; offset
-	bit	#1			; Odd address?
-	bne	+			;; ..Yes
+	bit		#1				; Odd address?
+	bne		+				;; ..Yes
 	tax
 	lda.l	$510000,x
-	and	#$ff00
-	ora	tcc__r4			; val
+	and		#$ff00
+	ora		tcc__r4			; val
 	sta.l	$510000,x
-	plx				; Restore X
-	bra	_next_cheat_code
+	plx						; Restore X
+	bra		_next_cheat_code
 +:
 	dea
 	tax
 	lda.l	$510000,x
-	and	#$00ff
+	and		#$00ff
 	xba
-	ora	tcc__r4			; val
+	ora		tcc__r4			; val
 	xba
 	sta.l	$510000,x
-	plx				; Restore X
-	bra	_next_cheat_code
+	plx						; Restore X
+	bra		_next_cheat_code
 _next_cheat_code:
-	rep	#$20
+	rep		#$20
 	txa
 	clc
-	adc	#14
+	adc		#14
 	tax
-	sep	#$20
+	sep		#$20
 	dey
-	beq	_apply_cheat_codes_done
+	beq		_apply_cheat_codes_done
 	jmp.l	$7d0000+_acc_loop
 _apply_cheat_codes_done:	
-	sep	#$10			; 8-bit X/Y
+	sep		#$10			; 8-bit X/Y
 	ply
 	plx
 	rts
@@ -527,102 +527,105 @@ suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
 -:
 	lda.l	$7d0000+suspect_pattern,x
 	cmp.l	$7d0000+\1,x
-	bne	++
+	bne		++
 	dex
-	bpl	-
-	plx		; PSRAM position
-	txa
-	and	#1
-	beq	+
+	bpl		-
+	ply		; PSRAM position
+	tya
+	ldx		#1
+	and		#1
+	beq		+
 	dex
+	dey
 +:
-	lda	#\4
+	lda		#\4
 	sta.l	$7d0000+suspect_pattern+1+\3
-	lda	#\5
+	lda		#\5
 	sta.l	$7d0000+suspect_pattern+2+\3
-	rep	#$20	; 16-bit A
-	lda.l	$7d0000+suspect_pattern+\3
-	sta.w	$0002,x
-	lda.l	$7d0000+suspect_pattern+2+\3
-	sta.w	$0004,x
+	rep		#$20	; 16-bit A
+	lda.l	$7d0000+suspect_pattern+\3-1,x
+	sta.w	$0002,y	; Write to PSRAM
+	lda.l	$7d0000+suspect_pattern+1+\3,x
+	sta.w	$0004,y	; Write to PSRAM
 	jmp.l	$7d0000+\6
 ++:
  .endm
  
  
 fix_region_checks:
-	sep	#$30			; 8-bit A/X/Y
+	sep		#$30			; 8-bit A/X/Y
 	phb
 	phx
 	phy
-	rep	#$10			; 16-bit X/Y
+	rep		#$10			; 16-bit X/Y
 
 	lda.b 	tcc__r4
 	pha
-	plb				; DBR = $5x (PSRAM)
+	plb						; DBR = $5x (PSRAM)
 	
 	lda.l	REG_STAT78
-	and	#$10
-	beq	_frc_ppu_is_60hz
-	rep	#$30			; 16-bit A/X/Y
-	ldx	#0
+	and		#$10
+	beq		_frc_ppu_is_60hz
+	rep		#$30			; 16-bit A/X/Y
+	ldx		#0
 -:
+	;lda.l	ntsc_game_pattern0-1,x  ; DEBUG
 	lda.w	$0000,x			; Read PSRAM
 	phx
 	tay
-	and	#$ff
-	cmp	#$ad
-	beq	_frc_possible_ntsc_pattern
-	cmp	#$af
-	beq	_frc_possible_ntsc_pattern
+	and		#$ff
+	cmp		#$ad
+	beq		_frc_possible_ntsc_pattern
+	cmp		#$af
+	beq		_frc_possible_ntsc_pattern
 	tya
 	xba
-	and	#$ff
-	cmp	#$ad
-	beq	_frc_possible_ntsc_pattern_odd
-	cmp	#$af
-	beq	_frc_possible_ntsc_pattern_odd
+	and		#$ff
+	cmp		#$ad
+	beq		_frc_possible_ntsc_pattern_odd
+	cmp		#$af
+	beq		_frc_possible_ntsc_pattern_odd
 _frc_50hz_next:
 	plx
 	inx
 	inx
-	bne	-
-	sep	#$30			; 8-bit A/X/Y
+	bne		-
+	sep		#$30			; 8-bit A/X/Y
 	ply
 	plx
 	plb
 	rts
 	
 _frc_ppu_is_60hz:
-	rep	#$30
-	ldx	#0
+	rep		#$30
+	ldx		#0
 -:
 	lda.w	$0000,x			; Read PSRAM
 	tay
-	and	#$ff
-	cmp	#$ad
-	beq	_frc_possible_pal_pattern
-	cmp	#$af
-	beq	_frc_possible_pal_pattern
+	and		#$ff
+	cmp		#$ad
+	beq		_frc_possible_pal_pattern
+	cmp		#$af
+	beq		_frc_possible_pal_pattern
 	tya
 	xba
-	and	#$ff
-	cmp	#$ad
-	beq	_frc_possible_pal_pattern_odd
-	cmp	#$af
-	beq	_frc_possible_pal_pattern_odd
+	and		#$ff
+	cmp		#$ad
+	beq		_frc_possible_pal_pattern_odd
+	cmp		#$af
+	beq		_frc_possible_pal_pattern_odd
 _frc_60hz_next:
 	inx
 	inx
-	bne	-
-	sep	#$30			; 8-bit A/X/Y
+	bne		-
+	sep		#$30			; 8-bit A/X/Y
 	ply
 	plx
 	plb
 	rts
 
 _frc_possible_pal_pattern_odd:
-	rep	#$30
+	rep		#$30
 	inx	
 _frc_possible_pal_pattern:
 	jmp.l	$7d0000+_frc_check_for_pal_patterns
@@ -630,40 +633,41 @@ _frc_possible_pal_pattern:
 _frc_possible_ntsc_pattern_odd:
 	inx	
 _frc_possible_ntsc_pattern:
-	rep	#$30
+	rep		#$30
 	phx
-	jsr	_frc_copy_pattern
+	jsr		_frc_copy_pattern
 	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern0,4,2,$a9,$00,_frc_50hz_next	
 	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern2,4,2,$a9,$00,_frc_50hz_next	
 	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern1,5,4,$a9,$00,_frc_50hz_next	
 	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern3,5,4,$a9,$00,_frc_50hz_next
-	rep	#$30
+	rep		#$30
 	plx
 	jmp.l	$7d0000+_frc_50hz_next
 	
 _frc_check_for_pal_patterns
-	rep	#$30
+	rep		#$30
 	phx
-	jsr	_frc_copy_pattern
+	jsr		_frc_copy_pattern
 	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern0,4,2,$a9,$10,_frc_60hz_next	
 	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern2,4,2,$a9,$10,_frc_60hz_next		
 	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern1,5,4,$a9,$10,_frc_60hz_next		
 	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern3,5,4,$a9,$10,_frc_60hz_next
-	rep	#$30
+	rep		#$30
 	plx
 	jmp.l	$7d0000+_frc_60hz_next
 	
 _frc_copy_pattern:
-	rep	#$30
+	rep		#$30
 	txy
-	ldx	#1	
+	ldx		#1	
 	tya
-	and	#1
-	beq	+
+	and		#1
+	beq		+
 	dex
 	dey
 +:	
 -:
+	;lda.l	ntsc_game_pattern0-1,x	; DEBUG
 	lda.w	$0000,y			; Read PSRAM
 	iny
 	iny

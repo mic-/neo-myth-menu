@@ -159,6 +159,7 @@ extern const cheatDbEntry_t cheatDatabase[];
 // Allow for MAX_GG_CODES Game Genie codes, followed by an equal number of Action Replay codes
 ggCode_t ggCodes[MAX_GG_CODES*2];
 itemList_t cheatList;
+u8 cheatApplied[128];
 u8 anyRamCheats = 0;		// Do any of the cheats target RAM?
 u8 freeCodeSlots = MAX_GG_CODES * 2;
 
@@ -564,19 +565,29 @@ void show_scroll_indicators()
 void print_cheat_list()
 {
 	int i;
-	u16 y;
+	u16 y, attribs;
 	cheat_t const *cheats;
 
 	if (gameFoundInDb)
 	{
 		y = 10;
 		cheats = cheatDatabase[cheatGameIdx].cheats;
-		for (i = 0; i < cheatDatabase[cheatGameIdx].numCheats; i++)
+		for (i = cheatList.firstShown; i < cheatList.count; i++)
 		{
+			attribs = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE);
+			if (i == cheatList.highlighted)
+			{
+				attribs = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE);
+			}
+			else if (cheatApplied[i])
+			{
+				attribs = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_TOS_GREEN);
+			}
+
 			printxy(cheats[i].description,
 					2,
 					y,
-					(i == highlightedOption[MID_CHEAT_DB_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE):TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+					attribs,
 					128);
 			y += hw_div16_8_quot16(strlen(cheats[i].description), 27) + 1;
 			if (y > 17) break;
@@ -597,7 +608,7 @@ void print_games_list()
 	{
 		puts_game_title(gamesList.firstShown + i,
 		                vramOffs,
-		                (gamesList.highlighted == gamesList.firstShown + i)?8:24);
+		                (gamesList.highlighted == gamesList.firstShown + i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 		vramOffs += 0x40;
 	}
 
