@@ -1234,10 +1234,53 @@ void ar_code_edit_menu_process_keypress(u16 keys)
 
 void cheat_db_menu_process_keypress(u16 keys)
 {
+	u16 i, j, n;
+	cheat_t const *cheats;
+
+	cheats = cheatDatabase[cheatGameIdx].cheats;
+
 	if (keys & JOY_Y)
 	{
 		// Y
 		switch_to_menu(MID_MAIN_MENU, 0);
+	}
+	else if (keys & JOY_B)
+	{
+		n = strlen(cheats[cheatList.highlighted].codes) >> 3;	// Number of codes for this cheat
+		if ((freeCodeSlots >= n) && (cheatApplied[cheatList.highlighted] == 0))
+		{
+			while (n)
+			{
+				for (i = 0; i < MAX_GG_CODES * 2; i++)
+				{
+					if (ggCodes[i].used == CODE_UNUSED)
+					{
+						for (j = 0; j < 8; j++) ggCodes[i].code[j] = cheats[cheatList.highlighted].codes[((n - 1) << 3) + j];
+						if (cheats[cheatList.highlighted].codeType == CODE_TYPE_GG)
+						{
+							gg_decode(ggCodes[i].code,
+						              &(ggCodes[i].bank),
+						              &(ggCodes[i].offset),
+						              &(ggCodes[i].val));
+							ggCodes[i].used = ((ggCodes[i].bank == 0x7e) || (ggCodes[i].bank == 0x7f)) ? CODE_TARGET_RAM : CODE_TARGET_ROM;
+						}
+						else if (cheats[cheatList.highlighted].codeType == CODE_TYPE_AR)
+						{
+							ar_decode(ggCodes[i].code,
+						              &(ggCodes[i].bank),
+						              &(ggCodes[i].offset),
+						              &(ggCodes[i].val));
+							ggCodes[i].used = ((ggCodes[i].bank == 0x7e) || (ggCodes[i].bank == 0x7f)) ? CODE_TARGET_RAM : CODE_TARGET_ROM;
+						}
+						freeCodeSlots--;
+						break;
+					}
+				}
+				n--;
+			}
+			cheatApplied[cheatList.highlighted] = 1;
+			print_cheat_list();
+		}
 	}
 	else if (keys & JOY_UP)
 	{
