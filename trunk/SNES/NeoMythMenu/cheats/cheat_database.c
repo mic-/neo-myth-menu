@@ -73,12 +73,12 @@ const cheat_t megaman_x_u_cheats[] =
 
 const cheat_t pocky_and_rocky_cheats[] =
 {
-	{"DB62-A7D4", "9 lives for Pocky", CODE_TYPE_GG},
-	{"DB62-A704", "9 lives for Rocky", CODE_TYPE_GG},
-	{"CB2D-DFDF", "Stop timer", CODE_TYPE_GG},
-	{"CD65-DF00", "Walk through walls", CODE_TYPE_GG},
-	{"C933-A794", "Unlimited energy for Pocky", CODE_TYPE_GG},
-	{"C93E-A797", "Unlimited energy for Rocky", CODE_TYPE_GG},
+	{"DB62A7D4", "9 lives for Pocky", CODE_TYPE_GG},
+	{"DB62A704", "9 lives for Rocky", CODE_TYPE_GG},
+	{"CB2DDFDF", "Stop timer", CODE_TYPE_GG},
+	{"CD65DF00", "Walk through walls", CODE_TYPE_GG},
+	{"C933A794", "Unlimited energy for Pocky", CODE_TYPE_GG},
+	{"C93EA797", "Unlimited energy for Rocky", CODE_TYPE_GG},
 };
 
 
@@ -231,12 +231,32 @@ const cheatDbEntry_t cheatDatabase[] =
 	{0xC536, 0x3AC9, super_mario_world_u_cheats, NCHEATS(super_mario_world_u_cheats)},
 	// Super Mario World (U) [!]
 	{0xA0DA, 0x5F25, super_mario_world_u_cheats, NCHEATS(super_mario_world_u_cheats)},
+
 	// Contra 3 (U)
 	{0x0C3C, 0xF3C3, contra_3_u_cheats, NCHEATS(contra_3_u_cheats)},
+
+	// Megaman X (U)
+	{0x4CC2, 0xB33D, megaman_x_u_cheats, NCHEATS(megaman_x_u_cheats)},
+
+	// Rock 'n Roll Racing (E)
+	{0x4AFD, 0xB502, rock_n_roll_racing_cheats, NCHEATS(rock_n_roll_racing_cheats)},
+
+	// Super Castlevania 4 (E)
+	{0xEA3A, 0x15C5, super_castlevania_4_u_cheats, NCHEATS(super_castlevania_4_u_cheats)},
+
+	// Super Ghouls 'n Ghosts (U)
+	{0x648D, 0x9B72, super_ghouls_n_ghosts_u_cheats, NCHEATS(super_ghouls_n_ghosts_u_cheats)},
+
+	{0xF8DF, 0x0720, super_metroid_u_cheats, NCHEATS(super_metroid_u_cheats)},
+
+	{0x50D5, 0xAF2A, super_punch_out_u_cheats, NCHEATS(super_punch_out_u_cheats)},
+
 	// Captain America And The Avengers (U)
 	{0xC971, 0x368E, captain_america_and_the_avengers_u_cheats, NCHEATS(captain_america_and_the_avengers_u_cheats)},
+
 	// Death And Return of Superman, The (U)
 	{0x01A3, 0xFE5C, death_and_return_of_superman_u_cheats, NCHEATS(death_and_return_of_superman_u_cheats)},
+
 	// X-Men - Mutant Apocalypse (U)
 	{0x3807, 0xC7F8, xmen_mutant_apocalypse_u_cheats, NCHEATS(xmen_mutant_apocalypse_u_cheats)},
 

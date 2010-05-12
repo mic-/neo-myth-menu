@@ -16,7 +16,7 @@
 // Define the top-left corner for some of the text labels and the marker sprite
 #define MARKER_LEFT 12
 #define MARKER_TOP 67
-#define CODE_LEFT 2
+#define CODE_LEFT_MARGIN 2
 
 
 u8 currentMenu = MID_MAIN_MENU;
@@ -480,9 +480,10 @@ void move_to_next_cheat()
 				y2 += d;
 				if (y2 > 17) break;
 			}
-			if ((y1 > 13) && (i < (cheatList.count - 1))) cheatList.firstShown++;
+			//if ((y1 > 13) && (i < (cheatList.count - 1))) cheatList.firstShown++;
+			if ((cheatList.highlighted > ((cheatList.firstShown + i) >> 1)) && (i < (cheatList.count - 1))) cheatList.firstShown++;
 		}
-		hide_games_list();
+		hide_cheat_list();
 	}
 
 	print_cheat_list();
@@ -513,7 +514,7 @@ void move_to_previous_cheat()
 			}
 			if (y < 14) cheatList.firstShown--;
 		}
-		hide_games_list();
+		hide_cheat_list();
 	}
 
 	print_cheat_list();
@@ -582,12 +583,12 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			keypress_handler = gg_code_entry_menu_process_keypress;
 			REG_BGCNT = 0x13;		// Enable BG0, BG1 and OBJ
 			print_meta_string(MS_GG_ENTRY_MENU_INSTRUCTIONS);
-			printxy("0 1 2 3 4 5 6 7", CODE_LEFT, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
-			printxy("8 9 A B C D E F", CODE_LEFT, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+			printxy("0 1 2 3 4 5 6 7", CODE_LEFT_MARGIN, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+			printxy("8 9 A B C D E F", CODE_LEFT_MARGIN, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
 			for (i = 0; i < MAX_GG_CODES; i++)
 			{
 				print_gg_code(&ggCodes[i],
-				              CODE_LEFT,
+				              CODE_LEFT_MARGIN,
 				              14 + i,
 				              (i==highlightedOption[MID_GG_ENTRY_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 			}
@@ -610,12 +611,12 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			keypress_handler = ar_code_entry_menu_process_keypress;
 			REG_BGCNT = 0x13;		// Enable BG0, BG1 and OBJ
 			print_meta_string(MS_GG_ENTRY_MENU_INSTRUCTIONS);
-			printxy("0 1 2 3 4 5 6 7", CODE_LEFT, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
-			printxy("8 9 A B C D E F", CODE_LEFT, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+			printxy("0 1 2 3 4 5 6 7", CODE_LEFT_MARGIN, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+			printxy("8 9 A B C D E F", CODE_LEFT_MARGIN, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
 			for (i = 0; i < MAX_GG_CODES; i++)
 			{
 				print_ar_code(&ggCodes[i+MAX_GG_CODES],
-				              CODE_LEFT,
+				              CODE_LEFT_MARGIN,
 				              14 + i,
 				              (i == highlightedOption[MID_AR_ENTRY_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE): TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 			}
@@ -663,30 +664,20 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			}
 
 			// DEBUG
-			gameFoundInDb = 1; cheatGameIdx = 0;
+			//gameFoundInDb = 1; cheatGameIdx = 0;
 
 			cheatList.count = cheatDatabase[cheatGameIdx].numCheats;
 			cheatList.firstShown = cheatList.highlighted = 0;
 
 			if (gameFoundInDb)
 			{
-				for (i = 0; i < 128; i++) cheatApplied[i] = 0;
-				/*y = 10;
-				cheats = cheatDatabase[cheatGameIdx].cheats;
-				for (i = 0; i < cheatDatabase[cheatGameIdx].numCheats; i++)
-				{
-					printxy(cheats[i].description,
-							2,
-							y,
-							(i == highlightedOption[MID_CHEAT_DB_MENU]) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE):TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
-							128);
-					y += hw_div16_8_quot16(strlen(cheats[i].description), 27) + 1;
-					if (y > 17) break;
-				}*/
+				//for (i = 0; i < 128; i++) cheatApplied[i] = 0;
+
 				print_cheat_list();
 
 				printxy(snesRomInfo, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);	// ROM title
-				printxy("Remaining code slots: 16", 3, 23, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+				printxy("Remaining code slots:   ", 3, 23, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
+				print_dec(freeCodeSlots, 25, 23, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 				break;
 			}
 			else
@@ -967,7 +958,7 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 		if (ggCodes[highlightedOption[MID_GG_ENTRY_MENU]].used) freeCodeSlots++;
 		ggCodes[highlightedOption[MID_GG_ENTRY_MENU]].used = CODE_UNUSED;
 		print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]],
-		              CODE_LEFT,
+		              CODE_LEFT_MARGIN,
 		              14 + highlightedOption[MID_GG_ENTRY_MENU],
 		              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	}
@@ -977,11 +968,11 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 		if (highlightedOption[MID_GG_ENTRY_MENU])
 		{
 			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]],
-			              CODE_LEFT,
+			              CODE_LEFT_MARGIN,
 			              14 + highlightedOption[MID_GG_ENTRY_MENU],
 			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]-1],
-			              CODE_LEFT,
+			              CODE_LEFT_MARGIN,
 			              13 + highlightedOption[MID_GG_ENTRY_MENU],
 			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 			highlightedOption[MID_GG_ENTRY_MENU]--;
@@ -993,11 +984,11 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 		if (highlightedOption[MID_GG_ENTRY_MENU] < MAX_GG_CODES - 1)
 		{
 			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]],
-			              CODE_LEFT,
+			              CODE_LEFT_MARGIN,
 			              14 + highlightedOption[MID_GG_ENTRY_MENU],
 			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 			print_gg_code(&ggCodes[highlightedOption[MID_GG_ENTRY_MENU]+1],
-			              CODE_LEFT,
+			              CODE_LEFT_MARGIN,
 			              15 + highlightedOption[MID_GG_ENTRY_MENU],
 			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 			highlightedOption[MID_GG_ENTRY_MENU]++;
@@ -1024,7 +1015,7 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 		ggCodes[whichCode].code[highlightedOption[MID_GG_EDIT_MENU]] = b;
 		b += '0'; if (b > '9') b += 7;
 		printxy(&b,
-		        CODE_LEFT + highlightedOption[MID_GG_EDIT_MENU] + ((highlightedOption[MID_GG_EDIT_MENU]>3)?1:0),
+		        CODE_LEFT_MARGIN + highlightedOption[MID_GG_EDIT_MENU] + ((highlightedOption[MID_GG_EDIT_MENU]>3)?1:0),
 		        14 + whichCode,
 		        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 		        1);
@@ -1047,7 +1038,7 @@ void gg_code_edit_menu_process_keypress(u16 keys)
 			highlightedOption[MID_GG_EDIT_MENU]--;
 			whichCode = highlightedOption[MID_GG_ENTRY_MENU];
 			printxy("_",
-			        CODE_LEFT + highlightedOption[MID_GG_EDIT_MENU] + ((highlightedOption[MID_GG_EDIT_MENU]>3)?1:0),
+			        CODE_LEFT_MARGIN + highlightedOption[MID_GG_EDIT_MENU] + ((highlightedOption[MID_GG_EDIT_MENU]>3)?1:0),
 			        14 + whichCode,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        1);
@@ -1095,7 +1086,7 @@ void ar_code_entry_menu_process_keypress(u16 keys)
 	}
 	else if (keys & JOY_START)
 	{
-		// B
+		// Start
 		run_game_from_gba_card_c();
 	}
 	else if (keys & JOY_Y)
@@ -1110,7 +1101,7 @@ void ar_code_entry_menu_process_keypress(u16 keys)
 		ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]].used = CODE_UNUSED;
 
 		print_ar_code(&ggCodes[MAX_GG_CODES+highlightedOption[MID_AR_ENTRY_MENU]],
-		              CODE_LEFT,
+		              CODE_LEFT_MARGIN,
 		              14 + highlightedOption[MID_AR_ENTRY_MENU],
 		              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	}
@@ -1120,12 +1111,12 @@ void ar_code_entry_menu_process_keypress(u16 keys)
 		if (highlightedOption[MID_AR_ENTRY_MENU])
 		{
 			print_ar_code(&ggCodes[MAX_GG_CODES + highlightedOption[MID_AR_ENTRY_MENU]],
-			              CODE_LEFT,
+			              CODE_LEFT_MARGIN,
 			              14 + highlightedOption[MID_AR_ENTRY_MENU],
 			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 
 			print_ar_code(&ggCodes[MAX_GG_CODES + highlightedOption[MID_AR_ENTRY_MENU]-1],
-			              CODE_LEFT,
+			              CODE_LEFT_MARGIN,
 			              13 + highlightedOption[MID_AR_ENTRY_MENU],
 			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 
@@ -1138,12 +1129,12 @@ void ar_code_entry_menu_process_keypress(u16 keys)
 		if (highlightedOption[MID_AR_ENTRY_MENU] < MAX_GG_CODES - 1)
 		{
 			print_ar_code(&ggCodes[MAX_GG_CODES + highlightedOption[MID_AR_ENTRY_MENU]],
-			              CODE_LEFT,
+			              CODE_LEFT_MARGIN,
 			              14 + highlightedOption[MID_AR_ENTRY_MENU],
 			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 
 			print_ar_code(&ggCodes[MAX_GG_CODES + highlightedOption[MID_AR_ENTRY_MENU]+1],
-			              CODE_LEFT,
+			              CODE_LEFT_MARGIN,
 			              15 + highlightedOption[MID_AR_ENTRY_MENU],
 			              TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 
@@ -1171,7 +1162,7 @@ void ar_code_edit_menu_process_keypress(u16 keys)
 		ggCodes[whichCode].code[highlightedOption[MID_AR_EDIT_MENU]] = b;
 		b += '0'; if (b > '9') b += 7;
 		printxy(&b,
-		        CODE_LEFT + highlightedOption[MID_AR_EDIT_MENU],
+		        CODE_LEFT_MARGIN + highlightedOption[MID_AR_EDIT_MENU],
 		        14 + whichCode - MAX_GG_CODES,
 		        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 		        1);
@@ -1194,7 +1185,7 @@ void ar_code_edit_menu_process_keypress(u16 keys)
 			highlightedOption[MID_AR_EDIT_MENU]--;
 			whichCode = highlightedOption[MID_AR_ENTRY_MENU];
 			printxy("_",
-			        CODE_LEFT + highlightedOption[MID_AR_EDIT_MENU],
+			        CODE_LEFT_MARGIN + highlightedOption[MID_AR_EDIT_MENU],
 			        14 + whichCode,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        1);
@@ -1244,6 +1235,11 @@ void cheat_db_menu_process_keypress(u16 keys)
 		// Y
 		switch_to_menu(MID_MAIN_MENU, 0);
 	}
+	else if (keys & JOY_START)
+	{
+		// Start
+		run_game_from_gba_card_c();
+	}
 	else if (keys & JOY_B)
 	{
 		n = strlen(cheats[cheatList.highlighted].codes) >> 3;	// Number of codes for this cheat
@@ -1255,7 +1251,11 @@ void cheat_db_menu_process_keypress(u16 keys)
 				{
 					if (ggCodes[i].used == CODE_UNUSED)
 					{
-						for (j = 0; j < 8; j++) ggCodes[i].code[j] = cheats[cheatList.highlighted].codes[((n - 1) << 3) + j];
+						for (j = 0; j < 8; j++)
+						{
+							ggCodes[i].code[j] = cheats[cheatList.highlighted].codes[((n - 1) << 3) + j] - '0';
+							if (ggCodes[i].code[j] > 0xF) ggCodes[i].code[j] -= 7;
+						}
 						if (cheats[cheatList.highlighted].codeType == CODE_TYPE_GG)
 						{
 							gg_decode(ggCodes[i].code,
@@ -1280,6 +1280,8 @@ void cheat_db_menu_process_keypress(u16 keys)
 			}
 			cheatApplied[cheatList.highlighted] = 1;
 			print_cheat_list();
+			printxy("  ", 25, 23, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 2);
+			print_dec(freeCodeSlots, 25, 23, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 		}
 	}
 	else if (keys & JOY_UP)

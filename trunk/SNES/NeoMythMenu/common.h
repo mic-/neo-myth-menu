@@ -60,6 +60,13 @@ typedef struct
 } itemList_t;
 
 
+typedef struct
+{
+	u16 x1, y1;
+	u16 x2, y2;
+} rect_t;
+
+
 // For use with can_games_list_scroll
 typedef enum
 {
@@ -101,12 +108,17 @@ extern void run_secondary_cart_c();
 extern void clear_screen();
 extern void clear_status_window();
 extern void hide_games_list();
+extern void hide_cheat_list();
+
 extern void print_meta_string(u16);
 extern void print_games_list();
 extern void print_cheat_list();
 extern void print_hw_card_rev();
 extern void printxy(char *, u16, u16, u16, u16);
 extern void print_hex(u8, u16, u16, u16);
+extern void print_dec(u16, u16, u16, u16);
+extern void set_printxy_clip_rect(u16 x1, u16 y1, u16 x2, u16 y2);
+
 extern void show_scroll_indicators();
 extern void update_game_params();
 
