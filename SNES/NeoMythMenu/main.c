@@ -43,10 +43,11 @@ void (*keypress_handler)(u16);
 // All the text strings are written to this buffer and then sent to VRAM using DMA in order to
 // improve performance.
 //
-char bg0Buffer[0x800];
-u8 bg0BufferDirty;
+static char bg0Buffer[0x800];
+static u8 bg0BufferDirty;
 
-char tempString[32];
+static char tempString[32];
+static rect_t printxyClipRect;
 
 // These three strings are modified at runtime by the shell, so they are declared separately in order to get them into
 // the .data section rather than .rodata.
@@ -148,7 +149,7 @@ const char * const metaStrings[] =
     "\xff\x06\x02\x07Games\xff\x17\x03\x03\x42/X\xff\x17\x06\x07: Run, \xff\x17\x0e\x03Y\xff\x17\x0f\x07: Run 2nd cart",
     "\xff\x06\x02\x07\x43odes\xff\x17\x03\x03Start\xff\x17\x08\x07: Run, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Go back\xff\x16\x03\x03X\xff\x16\x04\x07: Delete, \xff\x16\x0f\x03\x42\xff\x16\x10\x07: Edit  ",
     "\xff\x17\x03\x03\x42\xff\x17\x04\x07: Add, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Delete\xff\x16\x03\x03\x44pad\xff\x16\x07\x07: Pick, \xff\x16\x0f\x03\x41\xff\x16\x10\x07: Cancel",
-    "\xff\x06\x02\x07\x43heats\xff\x16\x03\x03Start\xff\x16\x08\x07: Run, \xff\x15\x0f\x03\x42\xff\x15\x10\x07: Add \xff\x15\x03\x03\x44pad\xff\x15\x07\x07: Pick, \xff\x16\x0f\x03Y\xff\x16\x10\x07: Cancel",
+    "\xff\x06\x02\x07\x43heats\xff\x16\x03\x03Start\xff\x16\x08\x07: Run, \xff\x15\x0f\x03\x42\xff\x15\x10\x07: Add \xff\x15\x03\x03\x44pad\xff\x15\x07\x07: Pick, \xff\x16\x0f\x03Y\xff\x16\x10\x07: Go back",
     "\xff\x17\x03\x03\x42\xff\x17\x04\x07: Edit, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Go back",
     // 80
     "\xff\x06\x02\x07Info\xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
@@ -168,7 +169,7 @@ u8 doRegionPatch = 0;		// Should we scan the game for region checks and patch th
 u8 snesRomInfo[0x40];
 
 
-const u8 ppuRegData1[12] =
+static const u8 ppuRegData1[12] =
 {
      0x60,	// OBJ size (16x16) and pattern address (0x0000)
 	 0,		// OAM address low
@@ -184,7 +185,7 @@ const u8 ppuRegData1[12] =
 	 0		// BG2/3 pattern table address
 };
 
-const u8 ppuRegData2[9] =
+static const u8 ppuRegData2[9] =
 {
      2,		// Enable BG1. BG0 and OBJ are enabled separately.
 	 0,		// Sub screen
@@ -197,14 +198,14 @@ const u8 ppuRegData2[9] =
 	 0
 };
 
-const u16 fontColors[] =
+static const u16 fontColors[] =
 {
 	0x7fff, 0x3c7f, 0x7fff, 0x47f1,
 	0x1fc6, 0x7f18, 0x31ed, 0x4292 //0x718f
 };
 
 
-const u16 objColors[] =
+static const u16 objColors[] =
 {
 	0x31ed, 0x7fff, 0x7fff, 0x47f1,
 	0x1fc6, 0x7f18, 0x31ed, 0x4292
@@ -276,7 +277,7 @@ void clear_screen()
 
 // Convert 1-bit font data to 4-bit (the three remaining bitplanes are all zeroed).
 //
-void expand_font_data()
+static void expand_font_data()
 {
 	int i, j;
 	u8 *bp = font;
@@ -303,7 +304,7 @@ void expand_font_data()
 }
 
 
-void load_font_colors()
+static void load_font_colors()
 {
 	u8 i;
 
@@ -316,7 +317,7 @@ void load_font_colors()
 }
 
 
-void load_obj_colors()
+static void load_obj_colors()
 {
 	u8 i;
 
@@ -409,7 +410,7 @@ void printxy(char *pStr, u16 x, u16 y, u16 attribs, u16 maxChars)
 	u16 printed = 0;
 	u16 vramOffs = (y << 6) + x + x;
 
-	for (;;)
+	for (; y < printxyClipRect.y2;)
 	{
 		if (*pStr == 0)
 		{
@@ -420,7 +421,7 @@ void printxy(char *pStr, u16 x, u16 y, u16 attribs, u16 maxChars)
 		bg0Buffer[vramOffs++] = attribs;
 		pStr++;
 		if (++printed >= maxChars) break;
-		if (++i >= 29)
+		if (++i > printxyClipRect.x2) // 28
 		{
 			i = x;
 			vramOffs = ((++y) << 6) + x + x;
@@ -466,6 +467,14 @@ void print_dec(u16 val, u16 x, u16 y, u16 attribs)
 	printxy(p, x, y, attribs, chars);
 }
 
+
+void set_printxy_clip_rect(u16 x1, u16 y1, u16 x2, u16 y2)
+{
+	printxyClipRect.x1 = x1;
+	printxyClipRect.y1 = y1;
+	printxyClipRect.x2 = x2;
+	printxyClipRect.y2 = y2;
+}
 
 
 void puts_game_title(u16 gameNum, u16 vramOffs, u8 attributes)
@@ -549,7 +558,7 @@ void show_scroll_indicators()
 	}
 	else if (currentMenu == MID_CHEAT_DB_MENU)
 	{
-		if (can_cheat_list_scroll(DIRECTION_UP))
+		/*if (can_cheat_list_scroll(DIRECTION_UP))
 			printxy("\x86", 29,  8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
 		else
 			printxy(" ",    29,  8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
@@ -557,7 +566,7 @@ void show_scroll_indicators()
 		if (can_cheat_list_scroll(DIRECTION_DOWN))
 			printxy("\x87", 29, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
 		else
-			printxy(" ",    29, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
+			printxy(" ",    29, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);*/
 	}
 }
 
@@ -567,6 +576,8 @@ void print_cheat_list()
 	int i;
 	u16 y, attribs;
 	cheat_t const *cheats;
+
+	set_printxy_clip_rect(2, 0, 28, 18);
 
 	if (gameFoundInDb)
 	{
@@ -600,6 +611,8 @@ void print_cheat_list()
 			if (y > 17) break;
 		}
 	}
+
+	set_printxy_clip_rect(2, 0, 28, 31);
 }
 
 
@@ -634,6 +647,19 @@ void hide_games_list()
 	{
 		bg0Buffer[0x240 + i + i] = ' ';
 		bg0Buffer[0x240 + i + i + 1] = 0;
+	}
+	bg0BufferDirty = 1;
+}
+
+
+void hide_cheat_list()
+{
+	int i;
+
+	for (i = 0; i < 288; i++)
+	{
+		bg0Buffer[0x280 + i + i] = ' ';
+		bg0Buffer[0x280 + i + i + 1] = 0;
 	}
 	bg0BufferDirty = 1;
 }
@@ -759,6 +785,8 @@ int main()
 
 	expand_font_data();
 	load_font_colors();
+
+	set_printxy_clip_rect(2, 0, 28, 31);
 
 	// Load the background graphics data
 	lzss_decode_vram(&bg_patterns, 0x4000, (&bg_patterns_end - &bg_patterns));

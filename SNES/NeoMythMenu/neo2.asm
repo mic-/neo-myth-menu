@@ -128,61 +128,67 @@ run_3800:
     INX
     BNE     -                   ;0
 
-	lda.l	ggCodes+4*14
+	ldx		#0
+	ldy		#1
+	lda		#<ram_cheat1
+	sta		tcc__r0
+	lda		#>ram_cheat1
+	sta		tcc__r0+1
+	lda		#$7e
+	sta		tcc__r0h
+	lda		#0
+	sta		tcc__r0h+1
+-:
+	lda.l	ggCodes,x
 	cmp		#2
 	bne		+
-	sta.l	$7d0000+ram_cheat1+1
-	lda.l	ggCodes+4*14+2		; val
-	sta.l	$7d0000+ram_cheat1+5
-	lda.l	ggCodes+4*14+4		; offset low
-	sta.l	$7d0000+ram_cheat1+7
-	lda.l	ggCodes+4*14+5		; offset high
-	sta.l	$7d0000+ram_cheat1+8
-	lda.l	ggCodes+4*14+1		; bank
-	sta.l	$7d0000+ram_cheat1+9
+	sta		[tcc__r0],y
+	iny
+	iny
+	iny
+	iny
+	lda.l	ggCodes+2,x			; val
+	sta		[tcc__r0],y
+	iny
+	iny
+	lda.l	ggCodes+4,x			; offset low
+	sta		[tcc__r0],y
+	iny
+	lda.l	ggCodes+5,x			; offset high
+	sta		[tcc__r0],y
+	iny
+	lda.l	ggCodes+1,x			; bank
+	sta		[tcc__r0],y
+	iny
+	iny
+	bra		++
 	+:
+	tya
+	clc
+	adc		#10
+	tay
+++:
+	txa
+	clc
+	adc		#14
+	tax
+	cpx		#8*14
+	bne		-
 	
-	lda.l	ggCodes+5*14
-	cmp		#2
-	bne		+
-	sta.l	$7d0000+ram_cheat2+1
-	lda.l	ggCodes+5*14+2		; val
-	sta.l	$7d0000+ram_cheat2+5
-	lda.l	ggCodes+5*14+4		; offset low
-	sta.l	$7d0000+ram_cheat2+7
-	lda.l	ggCodes+5*14+5		; offset high
-	sta.l	$7d0000+ram_cheat2+8
-	lda.l	ggCodes+5*14+1		; bank
-	sta.l	$7d0000+ram_cheat2+9
-	+:
 
-	lda.l	ggCodes+6*14
-	cmp		#2
-	bne		+
-	sta.l	$7d0000+ram_cheat3+1
-	lda.l	ggCodes+6*14+2		; val
-	sta.l	$7d0000+ram_cheat3+5
-	lda.l	ggCodes+6*14+4		; offset low
-	sta.l	$7d0000+ram_cheat3+7
-	lda.l	ggCodes+6*14+5		; offset high
-	sta.l	$7d0000+ram_cheat3+8
-	lda.l	ggCodes+6*14+1		; bank
-	sta.l	$7d0000+ram_cheat3+9
-	+:
-
-	lda.l	ggCodes+7*14
-	cmp		#2
-	bne		+
-	sta.l	$7d0000+ram_cheat4+1
-	lda.l	ggCodes+7*14+2		; val
-	sta.l	$7d0000+ram_cheat4+5
-	lda.l	ggCodes+7*14+4		; offset low
-	sta.l	$7d0000+ram_cheat4+7
-	lda.l	ggCodes+7*14+5		; offset high
-	sta.l	$7d0000+ram_cheat4+8
-	lda.l	ggCodes+7*14+1		; bank
-	sta.l	$7d0000+ram_cheat4+9
-	+:
+;	lda.l	ggCodes+7*14
+;	cmp		#2
+;	bne		+
+;	sta.l	$7d0000+ram_cheat4+1
+;	lda.l	ggCodes+7*14+2		; val
+;	sta.l	$7d0000+ram_cheat4+5
+;	lda.l	ggCodes+7*14+4		; offset low
+;	sta.l	$7d0000+ram_cheat4+7
+;	lda.l	ggCodes+7*14+5		; offset high
+;	sta.l	$7d0000+ram_cheat4+8
+;	lda.l	ggCodes+7*14+1		; bank
+;	sta.l	$7d0000+ram_cheat4+9
+;	+:
 	
     LDX     #$00                 ;0  MOVE CHEAT CODE TO SRAM
 -:  LDA.L   CHEAT+$7D0000,X     ;0
@@ -260,10 +266,36 @@ ram_cheat4:
 	lda		#4		;#4@+38
 	sta.l	$030201	;addr@+40
 +:
+
+ram_cheat5:		
+	lda		#0		
+	beq		+
+	lda		#1		
+	sta.l	$030201	
++:
+ram_cheat6:
+	lda		#0		
+	beq		+
+	lda		#2		
+	sta.l	$030201	
++:
+ram_cheat7:
+	lda		#0		
+	beq		+
+	lda		#3		
+	sta.l	$030201
++:
+ram_cheat8:
+	lda		#0		
+	beq		+
+	lda		#4		
+	sta.l	$030201	
++:
+
 	plp
 	pla
 branch_to_real_nmi:
-	jmp.l	$000000	;addr@+45
+	jmp.l	$000000	;addr@+85
 	
 	
 	
