@@ -602,7 +602,7 @@ void print_cheat_list()
 				attribs = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_TOS_GREEN);
 			}
 
-			printxy(cheats[i].description,
+			printxy((char*)cheats[i].description,
 					2,
 					y,
 					attribs,
@@ -633,6 +633,7 @@ void print_games_list()
 	}
 
 }
+
 
 
 void hide_games_list()
