@@ -58,7 +58,7 @@ REM OBJ -> SMC
 
 REM Delete files
 del *.ps2
-del *.s
+REM del *.s
 del *.obj
 REM del *.sym
 

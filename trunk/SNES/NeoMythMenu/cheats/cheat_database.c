@@ -140,7 +140,7 @@ const cheat_t super_mario_world_u_cheats[] =
    	{"009E35E6", "Start as Super Mario", CODE_TYPE_AR},
    	{"CBB76D67D4B76DA73CB76FD769B76F07",   "Start as Caped Mario", CODE_TYPE_GG},
 	{"89E4AFD989C6D4DB","Invincibility (Yoshi)", CODE_TYPE_GG},
-	{"7E1497FF","Invincibility (Walk Though Enemies)", CODE_TYPE_AR},
+	{"7E1497FF","Invincibility (Walk Through Enemies)", CODE_TYPE_AR},
 	{"7E1490FF","Invincibility (Starman Effect)", CODE_TYPE_AR},
 	{"C2EC0700","Infinite flying time for Yoshi", CODE_TYPE_GG},
    	{"7E0F3099", "Fast timer", CODE_TYPE_AR},

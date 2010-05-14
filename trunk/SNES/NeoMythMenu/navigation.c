@@ -27,6 +27,9 @@ u8 gameFoundInDb = 0;
 extern ggCode_t ggCodes[MAX_GG_CODES * 2];
 extern const cheatDbEntry_t cheatDatabase[];
 
+
+char psramTestData[24] = {0,1,2,3,4,5,6,7,7,6,5,4,3,2,1,0, 2,3,7,11,13,17,19,23};
+
 const char * const countryCodeStrings[] =
 {
 	"(Japan)",
@@ -566,7 +569,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			REG_BGCNT = 3;			// Enable BG0 and BG1 (disable OBJ)
 			print_meta_string(74);	// Print instructions
 
-			extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue = &(metaStrings[48 + romRunMode][4]);
+			extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue = (char*)&(metaStrings[48 + romRunMode][4]);
 			extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue = (doRegionPatch) ? "On " : "Off";
 
 			for (i = 0; i < MENU1_ITEM_LAST; i++)
@@ -740,7 +743,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			print_hex(snesRomInfo[0x17], 13, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 			if ((snesRomInfo[0x17] >= 0x9) && (snesRomInfo[0x17] <= 0xD))
 			{
-				printxy(romSizeStrings[snesRomInfo[0x17] - 0x9], 16, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				printxy((char*)romSizeStrings[snesRomInfo[0x17] - 0x9], 16, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 			}
 
 			printxy("RAM size: $", 2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
@@ -752,7 +755,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			{
 				if (countryCodeStrings[snesRomInfo[0x19]])
 				{
-					printxy(countryCodeStrings[snesRomInfo[0x19]], 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 25);
+					printxy((char*)countryCodeStrings[snesRomInfo[0x19]], 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 25);
 				}
 			}
 
@@ -798,6 +801,10 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 
 void main_menu_process_keypress(u16 keys)
 {
+	int i;
+	void (*psram_read)(char*,u16,u16,u16);
+	void (*psram_write)(char*,u16,u16,u16);
+
 	if (keys & JOY_B)
 	{
 		// B
@@ -808,7 +815,24 @@ void main_menu_process_keypress(u16 keys)
 		// Y
 		run_secondary_cart_c();
 	}
-	if (keys & JOY_X)
+
+	// DEBUG
+	/*else if (keys & JOY_START)
+	{
+		psram_read = neo2_myth_psram_read & 0x7fff;
+		psram_write = neo2_myth_psram_write & 0x7fff;
+		add_full_pointer((void**)&psram_read, 0x7d, 0x8000);
+		add_full_pointer((void**)&psram_write, 0x7d, 0x8000);
+
+		psram_write(&psramTestData[16], 0x12, 0x0000, 8);
+		psram_read(&psramTestData[2], 0x12, 0x0000, 6);
+		for (i = 0; i < 10; i++)
+		{
+			print_hex(psramTestData[i], 2+i+i, 4, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		}
+	}*/
+
+	else if (keys & JOY_X)
 	{
 		// X
 		switch_to_menu(MID_EXT_RUN_MENU, 0);
@@ -858,7 +882,7 @@ void extended_run_menu_process_keypress(u16 keys)
 		{
 			// Switch HIROM/LOROM
 			romRunMode ^= 1;
-			extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue = &(metaStrings[48 + romRunMode][4]);
+			extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue = (char*)&(metaStrings[48 + romRunMode][4]);
 			printxy(extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue,
 			        extRunMenuItems[MENU1_ITEM_RUN_MODE].optionColumn,
 			        extRunMenuItems[MENU1_ITEM_RUN_MODE].row,

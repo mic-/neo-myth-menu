@@ -815,7 +815,7 @@ get_rom_info:
 	LDA     #$01
 	STA.L   MYTH_EXTM_ON   ; A25,A24 ON
 
-	LDA    #$04       	; COPY MODE !
+	LDA    #GBAC_TO_PSRAM_COPY_MODE
 	STA.L  MYTH_OPTION_IO
 
 	LDA    #$F8
@@ -868,8 +868,160 @@ _gri_hirom:
    	plp
    	rtl
    	
+   	
+
+; void neo2_myth_psram_read(char *dest, u16 psramBank, u16 psramOffset, u16 length)
+neo2_myth_psram_read:
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+	
+	lda		14,s		; psramBank
+	tax
+	lsr		a
+	lsr		a
+	lsr		a
+	lsr		a
+	sep		#$20
+	pha
+
+    lda     #$01
+    sta.l   MYTH_EXTM_ON   	; A25,A24 ON
+
+    lda    #GBAC_TO_PSRAM_COPY_MODE      
+    sta.l  MYTH_OPTION_IO
+
+    lda    #$01       		; PSRAM WE ON !
+    sta.l  MYTH_WE_IO
+                         
+    lda    #$F8
+    sta.l  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
+
+	pla         
+    sta.l  MYTH_PRAM_BIO
+
+	lda		12,s			; dest bank
+	pha
+	plb
+	txa						; psramBank lower 8 bits
+	and		#$0F
+	ora		#$50
+	sta.l	$7d0000+_ncfmp_read+3
+	
+	rep		#$20
+	lda		16,s			; psramOffset
+	tax
+	lda		18,s			; length
+	lsr		a
+	sta.b	tcc__r4
+	lda		10,s			; dest offset
+	tay
+_ncfmp_read:
+	lda.l	$500000,x
+	sta.w	$0000,y
+	inx
+	inx
+	iny
+	iny
+	dec		tcc__r4
+	bne		_ncfmp_read
+	
+	sep		#$20
+    lda     #$00       ;
+    sta.l   MYTH_WE_IO     ; PSRAM WRITE OFF
+
+	lda     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
+	sta.l   MYTH_OPTION_IO
+
+	lda     #$00
+	sta.l   MYTH_EXTM_ON   ; A25,A24 OFF
+	
+ 	plb
+ 	ply
+ 	plx
+ 	plp
+	rtl
          
 
+; void neo2_myth_psram_write(char *src, u16 psramBank, u16 psramOffset, u16 length)
+neo2_myth_psram_write:
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+	
+	lda		14,s		; psramBank
+	tax
+	lsr		a
+	lsr		a
+	lsr		a
+	lsr		a
+	sep		#$20
+	pha
+
+    lda     #$01
+    sta.l   MYTH_EXTM_ON   	; A25,A24 ON
+
+    lda    #GBAC_TO_PSRAM_COPY_MODE      
+    sta.l  MYTH_OPTION_IO
+
+    lda    #$01       		; PSRAM WE ON !
+    sta.l  MYTH_WE_IO
+                         
+    lda    #$F8
+    sta.l  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
+
+	pla         
+    sta.l  MYTH_PRAM_BIO
+
+	lda		12,s			; src bank
+	pha
+	plb
+	txa						; psramBank lower 8 bits
+	and		#$0F
+	ora		#$50
+	sta.l	$7d0000+_nctmp_write+3
+	
+	rep		#$20
+	lda		16,s			; psramOffset
+	tax
+	lda		18,s			; length
+	lsr		a
+	sta.b	tcc__r4
+	lda		10,s			; src offset
+	tay
+-:
+	lda.w	$0000,y
+_nctmp_write:
+	sta.l	$500000,x
+	inx
+	inx
+	iny
+	iny
+	dec		tcc__r4
+	bne		-
+	
+	sep		#$20
+    lda     #$00       ;
+    sta.l   MYTH_WE_IO     ; PSRAM WRITE OFF
+
+	lda     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
+	sta.l   MYTH_OPTION_IO
+
+	lda     #$00
+	sta.l   MYTH_EXTM_ON   ; A25,A24 OFF
+	
+ 	plb
+ 	ply
+ 	plx
+ 	plp
+	rtl
+	
+
+         
 load_progress:
 	.db "Loading......(  )",0
 	
@@ -1039,7 +1191,7 @@ MOV_PSRAM:
          STA    tcc__r1+1
          sta	tcc__r3
          
-         LDA    #$04       	; COPY MODE !
+         LDA    #GBAC_TO_PSRAM_COPY_MODE
          STA.L  MYTH_OPTION_IO
 
          LDA    #$01       	; PSRAM WE ON !
