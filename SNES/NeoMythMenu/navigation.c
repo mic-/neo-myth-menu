@@ -28,7 +28,8 @@ extern ggCode_t ggCodes[MAX_GG_CODES * 2];
 extern const cheatDbEntry_t cheatDatabase[];
 
 
-char psramTestData[24] = {0,1,2,3,4,5,6,7,7,6,5,4,3,2,1,0, 2,3,7,11,13,17,19,23};
+//DEBUG
+//char psramTestData[24] = {0,1,2,3,4,5,6,7,7,6,5,4,3,2,1,0, 2,3,7,11,13,17,19,23};
 
 const char * const countryCodeStrings[] =
 {
@@ -58,6 +59,10 @@ const char * const romSizeStrings[] =
 	"(32 Mbit)", "(64 Mbit)",
 };
 
+const char * const regionPatchStrings[] =
+{
+	"Off", "Quick", "Complete",
+};
 
 oamEntry_t marker;
 
@@ -570,8 +575,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			print_meta_string(74);	// Print instructions
 
 			extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue = (char*)&(metaStrings[48 + romRunMode][4]);
-			extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue = (doRegionPatch) ? "On " : "Off";
-
+			extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue = (char*)regionPatchStrings[doRegionPatch];
 			for (i = 0; i < MENU1_ITEM_LAST; i++)
 			{
 				print_menu_item(extRunMenuItems,
@@ -891,8 +895,9 @@ void extended_run_menu_process_keypress(u16 keys)
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_FIX_REGION)
 		{
-			doRegionPatch ^= 1;
-			extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue = (doRegionPatch) ? "On " : "Off";
+			doRegionPatch++; if (doRegionPatch > 2) doRegionPatch = 0;
+			extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue = (char*)regionPatchStrings[doRegionPatch];
+
 			printxy(extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue,
 			        extRunMenuItems[MENU1_ITEM_FIX_REGION].optionColumn,
 			        extRunMenuItems[MENU1_ITEM_FIX_REGION].row,

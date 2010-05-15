@@ -533,10 +533,10 @@ ntsc_game_pattern0: .db $AD, $3F, $21, $29, $10			; lda $213f / and #$10
 ntsc_game_pattern1: .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
 ntsc_game_pattern2: .db $AD, $3F, $21, $89, $10			; lda $213f / bit #$10
 ntsc_game_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
-ntsc_game_to_pal_pattern0: .db $AD, $3F, $21, $A9, $00		; lda $213f / lda #0
-ntsc_game_to_pal_pattern1: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
-ntsc_game_to_pal_pattern2: .db $AD, $3F, $21, $A9, $00		; lda $213f / lda #0
-ntsc_game_to_pal_pattern3: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
+;ntsc_game_to_pal_pattern0: .db $AD, $3F, $21, $A9, $00		; lda $213f / lda #0
+;ntsc_game_to_pal_pattern1: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
+;ntsc_game_to_pal_pattern2: .db $AD, $3F, $21, $A9, $00		; lda $213f / lda #0
+;ntsc_game_to_pal_pattern3: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
 
 ; Region-checking patterns found in some PAL games - and what to replace them with
 ; to make them run on a NTSC system.
@@ -544,10 +544,10 @@ pal_game_pattern0: .db $AD, $3F, $21, $29, $10			; lda $213f / and #$10
 pal_game_pattern1: .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
 pal_game_pattern2: .db $AD, $3F, $21, $89, $10			; lda $213f / bit #$10
 pal_game_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
-pal_game_to_ntsc_pattern0: .db $AD, $3F, $21, $A9, $10		; lda $213f / lda #$10
-pal_game_to_ntsc_pattern1: .db $AF, $3F, $21, $00, $A9, $10	; lda.l $00213f / lda #$10
-pal_game_to_ntsc_pattern2: .db $AD, $3F, $21, $A9, $10		; lda $213f / lda #$10
-pal_game_to_ntsc_pattern3: .db $AF, $3F, $21, $00, $A9, $10	; lda.l $00213f / lda #$10
+;pal_game_to_ntsc_pattern0: .db $AD, $3F, $21, $A9, $10		; lda $213f / lda #$10
+;pal_game_to_ntsc_pattern1: .db $AF, $3F, $21, $00, $A9, $10	; lda.l $00213f / lda #$10
+;pal_game_to_ntsc_pattern2: .db $AD, $3F, $21, $A9, $10		; lda $213f / lda #$10
+;pal_game_to_ntsc_pattern3: .db $AF, $3F, $21, $00, $A9, $10	; lda.l $00213f / lda #$10
 
 .db 0
 suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
@@ -583,14 +583,40 @@ suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
 ++:
  .endm
  
- 
+
+; IN:
+; tcc__r2: first PSRAM bank
+; tcc__r3: Number of 64kB banks that have been copied so far
 fix_region_checks:
 	sep		#$30			; 8-bit A/X/Y
 	phb
 	phx
 	phy
-	rep		#$10			; 16-bit X/Y
 
+	lda.l	doRegionPatch
+	beq		++
+	dea
+	bne		+
+	cmp.b	tcc__r3			; make sure that ((doRegionPatch == 2) || (banksCopied == 0)) is true
+	bne		++
++:
+	lda.b	tcc__r2
+	sta.b	tcc__r4
+	jsr		_fix_region_checks
+	inc.b	tcc__r4
+	jsr		_fix_region_checks
+++:
+	sep		#$30			; 8-bit A/X/Y
+	ply
+	plx
+	plb
+	rts
+
+	
+_fix_region_checks:	
+	rep		#$10			; 16-bit X/Y
+	sep		#$20			; 8-bit A
+	
 	lda.b 	tcc__r4
 	pha
 	plb						; DBR = $5x (PSRAM)
@@ -601,7 +627,6 @@ fix_region_checks:
 	rep		#$30			; 16-bit A/X/Y
 	ldx		#0
 -:
-	;lda.l	ntsc_game_pattern0-1,x  ; DEBUG
 	lda.w	$0000,x			; Read PSRAM
 	phx
 	tay
@@ -622,10 +647,6 @@ _frc_50hz_next:
 	inx
 	inx
 	bne		-
-	sep		#$30			; 8-bit A/X/Y
-	ply
-	plx
-	plb
 	rts
 	
 _frc_ppu_is_60hz:
@@ -650,10 +671,6 @@ _frc_60hz_next:
 	inx
 	inx
 	bne		-
-	sep		#$30			; 8-bit A/X/Y
-	ply
-	plx
-	plb
 	rts
 
 _frc_possible_pal_pattern_odd:
@@ -699,7 +716,6 @@ _frc_copy_pattern:
 	dey
 +:	
 -:
-	;lda.l	ntsc_game_pattern0-1,x	; DEBUG
 	lda.w	$0000,y			; Read PSRAM
 	iny
 	iny
@@ -1147,17 +1163,17 @@ run_game_from_gba_card:
 	lda.l	romAddressPins
 	sta	tcc__r2h
 	
-         LDA    #$20      	; OFF A21
-         STA.L  MYTH_GBAC_ZIO
-         JSR    SET_NEOCMA  	;
-         JSR    SET_NEOCMB  	;
-         JSR    SET_NEOCMC  	; ON_NEO CARD A24 & A25 + SA16 & SA17
+	 LDA    #$20      	; OFF A21
+	 STA.L  MYTH_GBAC_ZIO
+	 JSR    SET_NEOCMA  	;
+	 JSR    SET_NEOCMB  	;
+	 JSR    SET_NEOCMC  	; ON_NEO CARD A24 & A25 + SA16 & SA17
 
-         LDA.L   romAddressPins+1
-         STA.L   MYTH_GBAC_HIO	; SET AH25,AH25
-         
-         LDA     #$01
-         STA.L   MYTH_EXTM_ON   ; A25,A24 ON
+	 LDA.L   romAddressPins+1
+	 STA.L   MYTH_GBAC_HIO	; SET AH25,AH25
+
+	 LDA     #$01
+	 STA.L   MYTH_EXTM_ON   ; A25,A24 ON
 
 
 ; MOVE   PSRAM
@@ -1187,46 +1203,46 @@ MOV_PSRAM:
 	lda	tcc__r0h
 	sta.w	load_progress+14
 	
-         LDA    #$00
-         STA    tcc__r1+1
-         sta	tcc__r3
-         
-         LDA    #GBAC_TO_PSRAM_COPY_MODE
-         STA.L  MYTH_OPTION_IO
+	 LDA    #$00
+	 STA    tcc__r1+1
+	 sta	tcc__r3
 
-         LDA    #$01       	; PSRAM WE ON !
-         STA.L  MYTH_WE_IO
-                         
-         LDA    #$F8
-         STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
-         STA.L  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
+	 LDA    #GBAC_TO_PSRAM_COPY_MODE
+	 STA.L  MYTH_OPTION_IO
 
-         LDA.L  romAddressPins
-         STA.L  MYTH_GBAC_LIO
-         
-         LDA    #$00
-         STA.L  MYTH_PRAM_BIO
+	 LDA    #$01       	; PSRAM WE ON !
+	 STA.L  MYTH_WE_IO
+
+	 LDA    #$F8
+	 STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+	 STA.L  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
+
+	 LDA.L  romAddressPins
+	 STA.L  MYTH_GBAC_LIO
+
+	 LDA    #$00
+	 STA.L  MYTH_PRAM_BIO
 
 MOV_PSRAM_LOOP:
-         LDA    #$3E
-         STA    tcc__r1h
-         LDA    #$4E
-         STA    tcc__r2
-         
-         LDA    #$3F
-         STA    tcc__r1h+1
-         
-         LDA    #$4F
-         STA    tcc__r2+1
-         
+	 LDA    #$3E
+	 STA    tcc__r1h
+	 LDA    #$4E
+	 STA    tcc__r2
+
+	 LDA    #$3F
+	 STA    tcc__r1h+1
+
+	 LDA    #$4F
+	 STA    tcc__r2+1
+
 -:
-         INC    tcc__r1h
-         INC    tcc__r2
-         INC    tcc__r2+1
-         
-         INC    tcc__r1h
-         INC    tcc__r2
-         INC    tcc__r2+1
+	 INC    tcc__r1h
+	 INC    tcc__r2
+	 INC    tcc__r2+1
+
+	 INC    tcc__r1h
+	 INC    tcc__r2
+	 INC    tcc__r2+1
 
 	 jsr	show_loading_progress
 
@@ -1245,21 +1261,21 @@ MOV_PSRAM_LOOP:
 	 ina
 	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$54
 	
-         DEC    tcc__r0+1
-         LDA    tcc__r0+1        ; L-BYTE
-         LDA    tcc__r0h        ; H-BYTE
-         
-         jsr	copy_1mbit_from_gbac_to_psram
+	 DEC    tcc__r0+1
+	 LDA    tcc__r0+1        ; L-BYTE
+	 LDA    tcc__r0h        ; H-BYTE
 
-	 lda.l	doRegionPatch
-	 beq	+
-	 lda	#$50
-	 sta	tcc__r4
+	 jsr	copy_1mbit_from_gbac_to_psram
+
+	; lda.l	doRegionPatch
+	; beq	+
+	; lda	#$50
+	; sta	tcc__r4
 	 jsr	fix_region_checks
-	 lda	#$51
-	 sta	tcc__r4
-	 jsr	fix_region_checks
-	 +:
+	; lda	#$51
+	; sta	tcc__r4
+	; jsr	fix_region_checks
+	; +:
 	 
 	; Replace the NMI vector with the cheat routine if needed
 	 lda	tcc__r3
@@ -1290,168 +1306,168 @@ MOV_PSRAM_LOOP:
 	 
 ;	 jsr	show_copied_data
 
-         DEC    tcc__r0h+1
-         BEQ	+
-         JMP    -
-         +:
-         
-         LDA    tcc__r1
-         CMP    tcc__r1+1
-         BNE    MOV_PSRAM_1
-         JMP    MOV_PSRAM_DONE
+	 DEC    tcc__r0h+1
+	 BEQ	+
+	 JMP    -
+	 +:
+
+	 LDA    tcc__r1
+	 CMP    tcc__r1+1
+	 BNE    MOV_PSRAM_1
+	 JMP    MOV_PSRAM_DONE
 MOV_PSRAM_1:
 ;===============================================================================
-         INC    tcc__r1+1
-         LDA    tcc__r1+1
-         CMP    #$01
-         BNE    +
-         
-         LDA    #$01        ;16M
-         STA.L  MYTH_PRAM_BIO
+	 INC    tcc__r1+1
+	 LDA    tcc__r1+1
+	 CMP    #$01
+	 BNE    +
 
-         CLC
-         LDA    #$08
-         ADC    tcc__r2h
-         STA    tcc__r2h
-         STA.L  MYTH_GBAC_LIO
-         
-         LDA    #$8
-         STA    tcc__r0h+1      ;
-         JMP    MOV_PSRAM_LOOP
+	 LDA    #$01        ;16M
+	 STA.L  MYTH_PRAM_BIO
+
+	 CLC
+	 LDA    #$08
+	 ADC    tcc__r2h
+	 STA    tcc__r2h
+	 STA.L  MYTH_GBAC_LIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_PSRAM_LOOP
 ;-------------------------------------------------------------------------------
 +:       CMP    #$02        ;24M
-         BNE    +
-         LDA    #$02
-         STA.L  MYTH_PRAM_BIO
+	 BNE    +
+	 LDA    #$02
+	 STA.L  MYTH_PRAM_BIO
 
-         CLC
-         LDA    #$08
-         ADC    tcc__r2h
-         STA    tcc__r2h
-         STA.L  MYTH_GBAC_LIO
-         
-         LDA    #$8
-         STA    tcc__r0h+1
-         JMP    MOV_PSRAM_LOOP
+	 CLC
+	 LDA    #$08
+	 ADC    tcc__r2h
+	 STA    tcc__r2h
+	 STA.L  MYTH_GBAC_LIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1
+	 JMP    MOV_PSRAM_LOOP
 ;-------------------------------------------------------------------------------
 +:       CMP    #$03        ;32M
-         BNE    +
-         LDA    #$03
-         STA.L  MYTH_PRAM_BIO
-         
-         CLC
-         LDA    #$08
-         ADC    tcc__r2h
-         STA    tcc__r2h
-         STA.L  MYTH_GBAC_LIO
-         
-         LDA    #$8
-         STA    tcc__r0h+1      ;
-         JMP    MOV_PSRAM_LOOP
+	 BNE    +
+	 LDA    #$03
+	 STA.L  MYTH_PRAM_BIO
+
+	 CLC
+	 LDA    #$08
+	 ADC    tcc__r2h
+	 STA    tcc__r2h
+	 STA.L  MYTH_GBAC_LIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_PSRAM_LOOP
 ;-------------------------------------------------------------------------------
 +:       CMP    #$04        ;40M
-         BNE    +
-         LDA    #$04
-         STA.L  MYTH_PRAM_BIO
+	 BNE    +
+	 LDA    #$04
+	 STA.L  MYTH_PRAM_BIO
 
-         CLC
-         LDA    #$08
-         ADC    tcc__r2h
-         STA    tcc__r2h
-         STA.L  MYTH_GBAC_LIO
-         
-         
-         LDA    #$8
-         STA    tcc__r0h+1      ;
-         JMP    MOV_PSRAM_LOOP
+	 CLC
+	 LDA    #$08
+	 ADC    tcc__r2h
+	 STA    tcc__r2h
+	 STA.L  MYTH_GBAC_LIO
+
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_PSRAM_LOOP
 ;-------------------------------------------------------------------------------
-+:       CMP    #$05        ;48M
-         BNE    +
-         LDA    #$05
-         STA.L  MYTH_PRAM_BIO
-         
-         CLC
-         LDA    #$08
-         ADC    tcc__r2h
-         STA    tcc__r2h
-         STA.L  MYTH_GBAC_LIO
-         
-         LDA    #$8
-         STA    tcc__r0h+1      ;
-         JMP    MOV_PSRAM_LOOP
++:      CMP    #$05        ;48M
+	 BNE    +
+	 LDA    #$05
+	 STA.L  MYTH_PRAM_BIO
+
+	 CLC
+	 LDA    #$08
+	 ADC    tcc__r2h
+	 STA    tcc__r2h
+	 STA.L  MYTH_GBAC_LIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_PSRAM_LOOP
 ;-------------------------------------------------------------------------------
 +:       CMP    #$06        ;56M
-         BNE    +
-         LDA    #$06
-         STA.L  MYTH_PRAM_BIO
-         
-         CLC
-         LDA    #$08
-         ADC    tcc__r2h
-         STA    tcc__r2h
-         STA.L  MYTH_GBAC_LIO
-         
-         LDA    #$8
-         STA    tcc__r0h+1      ;
-         JMP    MOV_PSRAM_LOOP
+	 BNE    +
+	 LDA    #$06
+	 STA.L  MYTH_PRAM_BIO
+
+	 CLC
+	 LDA    #$08
+	 ADC    tcc__r2h
+	 STA    tcc__r2h
+	 STA.L  MYTH_GBAC_LIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_PSRAM_LOOP
 ;-------------------------------------------------------------------------------
 +:       CMP    #$07        ;64M
-         BNE    MOV_PSRAM_DONE
-         LDA    #$07
-         STA.L  MYTH_PRAM_BIO
-         
-         CLC
-         LDA    #$08
-         ADC    tcc__r2h
-         STA    tcc__r2h
-         STA.L  MYTH_GBAC_LIO
-         
-         LDA    #$8
-         STA    tcc__r0h+1      ;
-         JMP    MOV_PSRAM_LOOP
+	 BNE    MOV_PSRAM_DONE
+	 LDA    #$07
+	 STA.L  MYTH_PRAM_BIO
+
+	 CLC
+	 LDA    #$08
+	 ADC    tcc__r2h
+	 STA    tcc__r2h
+	 STA.L  MYTH_GBAC_LIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_PSRAM_LOOP
 MOV_PSRAM_DONE:
 ;===============================================================================
-         LDA     #$00       ;
-         STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
+	 LDA     #$00       ;
+	 STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
 ;-------------------------------------------------------------------------------
 ;neo gba card menu ,swap back to power on mode
 
-         LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
-         STA.L   MYTH_OPTION_IO
+	 LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
+	 STA.L   MYTH_OPTION_IO
 
-         LDA     #$20       	; OFF A21
-         STA.L   MYTH_GBAC_ZIO
-         JSR     SET_NEOCMD	; SET MENU
+	 LDA     #$20       	; OFF A21
+	 STA.L   MYTH_GBAC_ZIO
+	 JSR     SET_NEOCMD	; SET MENU
 
-         LDA     #$00
-         STA.L   MYTH_GBAC_LIO
-         STA.L   MYTH_GBAC_HIO
-         STA.L   MYTH_GBAC_ZIO
+	 LDA     #$00
+	 STA.L   MYTH_GBAC_LIO
+	 STA.L   MYTH_GBAC_HIO
+	 STA.L   MYTH_GBAC_ZIO
 ;-------------------------------------------------------------------------------
 ;SET  SNES PSRAM RUN
-         LDA     #$01       	; SET PSRAM RUN
-         STA.L   MYTH_OPTION_IO
+	 LDA     #$01       	; SET PSRAM RUN
+	 STA.L   MYTH_OPTION_IO
 
-         LDA     #$00
-         STA.L   MYTH_PRAM_BIO
-        
-         LDA     tcc__r0
-         STA.L   MYTH_PRAM_ZIO
+	 LDA     #$00
+	 STA.L   MYTH_PRAM_BIO
 
-         LDA.L   sramBank
-         LDA     #$00
-         STA.L   MYTH_GBAS_BIO
+	 LDA     tcc__r0
+	 STA.L   MYTH_PRAM_ZIO
+
+	 LDA.L   sramBank
+	 LDA     #$00
+	 STA.L   MYTH_GBAS_BIO
 ;===============================================================================
 ;SET  GAME SAVE  SIZE & BANK
-         LDA.L   sramSize
-         CMP     #$00
-         BNE     MAP_SRAM
-         CMP     #$00
-         STA.L   MYTH_SRAM_TYPE ;  OFF SRAM TYPE
-         JMP     SET_EXT_DSP
+	 LDA.L   sramSize
+	 CMP     #$00
+	 BNE     MAP_SRAM
+	 CMP     #$00
+	 STA.L   MYTH_SRAM_TYPE ;  OFF SRAM TYPE
+	 JMP     SET_EXT_DSP
 ;-------------------------------------------------------------------------------
 MAP_SRAM:
-         LDA.L   sramMode
+	 LDA.L   sramMode
 
  	MAP_SRAM_CHECK $01, $02
  	MAP_SRAM_CHECK $08, $03
@@ -1461,119 +1477,119 @@ MAP_SRAM:
  	MAP_SRAM_CHECK $04, $0F
  	
 MAP_SRAM_DONE:
-         LDA     #$01
-         STA.L   MYTH_SRAM_WE    ; GBA SRAM WE ON !
+	 LDA     #$01
+	 STA.L   MYTH_SRAM_WE    ; GBA SRAM WE ON !
 ;-------------------------------------------------------------------------------
 ;SET SAVE SRAM BANK
 
-         LDA.L   sramSize
-         CMP     #$01
-         BNE     +
-         LDA     #$FF    ;2K  SIZE
-         STA.L   MYTH_GBAS_ZIO
-         
-         LDA.L   sramBank
-         ASL     A
-         ASL     A
-         AND     #$FC
-         STA.L   MYTH_GBAS_BIO
-         JMP     SET_EXT_DSP
+	 LDA.L   sramSize
+	 CMP     #$01
+	 BNE     +
+	 LDA     #$FF    ;2K  SIZE
+	 STA.L   MYTH_GBAS_ZIO
+
+	 LDA.L   sramBank
+	 ASL     A
+	 ASL     A
+	 AND     #$FC
+	 STA.L   MYTH_GBAS_BIO
+	 JMP     SET_EXT_DSP
 
 +:
-         CMP     #$02
-         BNE     +
-         LDA     #$FC    ;8K   SIZE
-         STA.L   MYTH_GBAS_ZIO
-         
-         LDA.L   sramBank
-         ASL     A
-         ASL     A
-         AND     #$FC
-         STA.L   MYTH_GBAS_BIO
-         STA.L   MYTH_GBAS_BIO
-         JMP     SET_EXT_DSP
-         
-+:
-         CMP     #$03
-         BNE     +
-         LDA     #$F0    ;32K  SIZE
-         STA.L   MYTH_GBAS_ZIO
+	 CMP     #$02
+	 BNE     +
+	 LDA     #$FC    ;8K   SIZE
+	 STA.L   MYTH_GBAS_ZIO
 
-         LDA.L   sramBank
-         ASL     A
-         ASL     A
-         ASL     A
-         ASL     A
-         AND     #$F0
-         STA.L   MYTH_GBAS_BIO
-         JMP     SET_EXT_DSP
+	 LDA.L   sramBank
+	 ASL     A
+	 ASL     A
+	 AND     #$FC
+	 STA.L   MYTH_GBAS_BIO
+	 STA.L   MYTH_GBAS_BIO
+	 JMP     SET_EXT_DSP
+
++:
+	 CMP     #$03
+	 BNE     +
+	 LDA     #$F0    ;32K  SIZE
+	 STA.L   MYTH_GBAS_ZIO
+
+	 LDA.L   sramBank
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 AND     #$F0
+	 STA.L   MYTH_GBAS_BIO
+	 JMP     SET_EXT_DSP
 ;-------------------------------------------------------------------------------
 +:
-         CMP     #$04
-         BNE     +
-         LDA     #$E0    ;64K SIZE
-         STA.L   MYTH_GBAS_ZIO
+	 CMP     #$04
+	 BNE     +
+	 LDA     #$E0    ;64K SIZE
+	 STA.L   MYTH_GBAS_ZIO
 
-         LDA.L   sramBank
-         ASL     A
-         ASL     A
-         ASL     A
-         ASL     A
-         ASL     A
-         AND     #$F0
-         STA.L   MYTH_GBAS_BIO
-         JMP     SET_EXT_DSP
+	 LDA.L   sramBank
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 AND     #$F0
+	 STA.L   MYTH_GBAS_BIO
+	 JMP     SET_EXT_DSP
 ;-------------------------------------------------------------------------------
 +:
-         CMP     #$05
-         BNE     +
-         LDA     #$C0    ;128K SIZE
-         STA.L   MYTH_GBAS_ZIO
+	 CMP     #$05
+	 BNE     +
+	 LDA     #$C0    ;128K SIZE
+	 STA.L   MYTH_GBAS_ZIO
 
-         LDA.L   sramBank
-         ASL     A
-         ASL     A
-         ASL     A
-         ASL     A
-         ASL     A
-         ASL     A
-         AND     #$C0
-         STA.L   MYTH_GBAS_BIO
-         JMP     SET_EXT_DSP
+	 LDA.L   sramBank
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 AND     #$C0
+	 STA.L   MYTH_GBAS_BIO
+	 JMP     SET_EXT_DSP
 +:
-         ;JMP    MENU
-         rtl
+	 ;JMP    MENU
+	 rtl
 ;-------------------------------------------------------------------------------
 ;SET EXIT DSP
 SET_EXT_DSP:
 
-         LDA.L   extDsp
-         CMP     #$00
-         BNE     +
-         STA.L   MYTH_DSP_TYPE
-         LDA     #$00
-         STA.L   MYTH_DSP_MAP
-         JMP     MAP_DSP_DONE
+	 LDA.L   extDsp
+	 CMP     #$00
+	 BNE     +
+	 STA.L   MYTH_DSP_TYPE
+	 LDA     #$00
+	 STA.L   MYTH_DSP_MAP
+	 JMP     MAP_DSP_DONE
 ;-------------------------------------------------------------------------------
 +:
-         LDA.L   extDsp
-         CMP     #$01
-         BNE     +
-         STA.L   MYTH_DSP_TYPE
-         LDA     #$00
-         STA.L   MYTH_DSP_MAP
-         JMP     MAP_DSP_DONE
+	 LDA.L   extDsp
+	 CMP     #$01
+	 BNE     +
+	 STA.L   MYTH_DSP_TYPE
+	 LDA     #$00
+	 STA.L   MYTH_DSP_MAP
+	 JMP     MAP_DSP_DONE
 ;-------------------------------------------------------------------------------
 +:
-         CMP     #$03
-         BNE     +
-         STA.L   MYTH_DSP_TYPE   ;EXT DSP
-         LDA.L   romSize
-         CMP     #$04     ;4M ROM
-         BNE     +
-         LDA     #$03     ;$300000
-         STA.L   MYTH_DSP_MAP
-         JMP     MAP_DSP_DONE
+	 CMP     #$03
+	 BNE     +
+	 STA.L   MYTH_DSP_TYPE   ;EXT DSP
+	 LDA.L   romSize
+	 CMP     #$04     ;4M ROM
+	 BNE     +
+	 LDA     #$03     ;$300000
+	 STA.L   MYTH_DSP_MAP
+	 JMP     MAP_DSP_DONE
 ;-------------------------------------------------------------------------------
 +:
          LDA     #$03
