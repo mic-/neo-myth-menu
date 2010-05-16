@@ -671,7 +671,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			}
 
 			// DEBUG
-			//gameFoundInDb = 1; cheatGameIdx = 0;
+			//gameFoundInDb = 1; cheatGameIdx = 5;
 
 			cheatList.count = cheatDatabase[cheatGameIdx].numCheats;
 			cheatList.firstShown = cheatList.highlighted = 0;
