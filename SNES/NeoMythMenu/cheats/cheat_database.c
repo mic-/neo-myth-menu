@@ -58,13 +58,16 @@ const cheat_t magical_quest_starring_mickey_mouse_cheats[] =
 	{"C23D6FA0", "Longer invincibility after getting hit", CODE_TYPE_GG},
 	{"DFE70708", "Each gold coin worth 10", CODE_TYPE_GG},
 	{"C2E7D462", "Protection from most hits", CODE_TYPE_GG},
+	{"C262DD61", "Stop timer", CODE_TYPE_GG},
 };
 
 
 const cheat_t megaman_x_u_cheats[] =
 {
 	{"7E0C1311", "Unlimited energy", CODE_TYPE_AR},
-	{"9DB04F01", "Automatic rapid fire", CODE_TYPE_GG},
+	//{"9DB04F01", "Automatic rapid fire", CODE_TYPE_GG},
+	//{"9DB04FD1", "Invincible after first hit", CODE_TYPE_GG},
+	{"9DB04F61", "Can't charge X-Buster", CODE_TYPE_GG},
 	{"DBBE446F", "Start with 10 lives", CODE_TYPE_GG},
 	{"D58A1FBC", "Jump higher", CODE_TYPE_GG},
 	{"FFA309A4DDA301D465A30104", "All enemies are defeated with 1 X-Buster hit", CODE_TYPE_GG},

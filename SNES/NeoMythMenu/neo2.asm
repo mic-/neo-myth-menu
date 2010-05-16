@@ -479,6 +479,7 @@ _cheat_type_rom:
 	plx						; Restore X
 	bra		_next_cheat_code
 _cheat_upper_bank:
+	sep		#$20
 	dea
 	cmp		tcc__r3			; Should this gg code be applied to the upper 512 kbit that we just copied to PSRAM?
 	bne		_next_cheat_code
@@ -654,6 +655,7 @@ _frc_ppu_is_60hz:
 	ldx		#0
 -:
 	lda.w	$0000,x			; Read PSRAM
+	phx
 	tay
 	and		#$ff
 	cmp		#$ad
@@ -668,6 +670,7 @@ _frc_ppu_is_60hz:
 	cmp		#$af
 	beq		_frc_possible_pal_pattern_odd
 _frc_60hz_next:
+	plx
 	inx
 	inx
 	bne		-
