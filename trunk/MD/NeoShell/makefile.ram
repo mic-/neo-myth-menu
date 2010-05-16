@@ -1,0 +1,70 @@
+CC := $(GENDEV)/m68k/bin/gcc
+AS := $(GENDEV)/m68k/bin/as
+RM := rm -f
+OBJC := $(GENDEV)/m68k/bin/objcopy
+ASMZ80 := $(GENDEV)/bin/zasm
+BINTOC := $(GENDEV)/bin/bin2c
+
+OBJS := crt0.o main.o neo2.o font.o myth_io.o sd_io.o u_strings.o
+
+OPTION := -DRUN_IN_PSRAM
+INCS := -I$(GENDEV)/m68k/include -I$(GENDEV)/m68k/sdk/include -I.
+CCFLAGS := $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -fshort-wchar $(INCS)
+Z80FLAGS := -vb2
+ASFLAGS := -m68000 --register-prefix-optional --defsym RUN_IN_PSRAM=1
+LIBS := -L$(GENDEV)/m68k/lib -L$(GENDEV)/m68k/sdk/lib -lff -lc -lgcc
+LINKFLAGS := -T $(GENDEV)/m68k/lib/md-neo-ram.ld
+BUILD := build_ram
+TARGET := MDEBIOS.BIN
+
+ifneq ($(BUILD),$(notdir $(CURDIR)))
+
+export OUTPUT  := $(CURDIR)/$(TARGET)
+export VPATH   := $(CURDIR) $(CURDIR)/gui $(CURDIR)/hal $(CURDIR)/myth_io $(CURDIR)/utils
+export DEPENDS := $(OBJS:.o=.d)
+export INCLUDE := $(foreach dir,$(VPATH),-I$(dir)) -I$(CURDIR) -I$(CURDIR)/$(BUILD)
+
+.PHONY: $(BUILD) clean install
+
+$(BUILD):
+	@[ -d $@ ] || mkdir -p $@
+	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/makefile.ram
+
+clean:
+	@echo cleaning ...
+	@rm -fr $(BUILD) $(OUTPUT)
+
+install: $(BUILD)
+	neocmd --menu $(OUTPUT)
+
+all: $(BUILD)
+
+else
+
+ELF := $(notdir $(OUTPUT)).elf
+
+$(OUTPUT): $(ELF)
+	@$(OBJC) -O binary $(ELF) $@
+
+$(ELF): $(OBJS)
+	@echo Linking $(TARGET)...
+	@$(CC) $(LINKFLAGS) -nostdlib $(OBJS) $(LIBS) -o $(ELF)
+
+%.o80: %.s80
+	@echo Compiling $(notdir $<)...
+	@$(ASMZ80) $(Z80FLAGS) -o $@ $<
+
+%.c: %.o80
+	@$(BINTOC) $<
+
+%.o: %.c
+	@echo Compiling $(notdir $<)...
+	@$(CC) -MMD $(CCFLAGS) $(INCLUDE) -c $< -o $@
+
+%.o: %.s
+	@echo Compiling $(notdir $<)...
+	@$(AS) --MD $(@:.o=.d) $(ASFLAGS) $< -o $@
+
+-include $(DEPENDS)
+
+endif
