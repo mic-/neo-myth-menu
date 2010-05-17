@@ -21,11 +21,11 @@ NEOSNES.BIN:
 
 # Convert graphics data
 assets/menu_bg.lzs: assets/menu_bg2.bmp
-	$(SIXPACK) -image -opt -target snes -format p4 -o $@ -pack $<
+	$(SIXPACK) -image -target snes -format p4 -o $@ -pack $<
 assets/font.chr: assets/adore.bmp
-	$(SIXPACK) -image -target snes -format p1 -planes 0 -o $@ $<
+	$(SIXPACK) -image -target snes -format p1 -bg 6,0 -o $@ $<
 assets/marker.chr: assets/marker.bmp
-	$(SIXPACK) -image -target snes -format p4 -o $@ $<
+	$(SIXPACK) -image -target snes -format p4 -planes 4 -o $@ $<
 
 # C -> ASM - optimize asm afterwards
 %.a0: %.c
@@ -40,6 +40,9 @@ assets/marker.chr: assets/marker.bmp
 %.a3: %.a2
 	$(OPTIMORE) $< $@
 
+%.a4: %.a3
+	$(CONSTIFY) $*.c $< $@
+
 %.obj: %.asm
 	$(AS) -io $< $@
 
@@ -49,5 +52,8 @@ assets/marker.chr: assets/marker.bmp
 %.obj: %.a3
 	$(AS) -io $< $@
 
+cheats/cheat_database.obj: cheats/cheat_database.a4
+	$(AS) -io $< $@
+
 clean:
-	$(RM) NEOSNES.BIN *.obj *.s *.a2 *.a1 *.a0 *.sym assets/*.obj assets/*.lzs assets/*.chr
+	$(RM) NEOSNES.BIN *.obj *.s *.sym assets/*.obj assets/*.lzs assets/*.chr cheats/*.obj
