@@ -29,6 +29,6 @@ font:
 ; because that tends to screw up the addressing. So we fill up the rest of the (32kB) bank
 ; here. I haven't figured out a way to make the assembler calculate the size automatically,
 ; so I hardcoded it. 
-.dsb 32768-11190,0
+.dsb 32768-10122,0
 
 .ends
