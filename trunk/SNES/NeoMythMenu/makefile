@@ -21,7 +21,7 @@ NEOSNES.BIN:
 
 # Convert graphics data
 assets/menu_bg.lzs: assets/menu_bg2.bmp
-	$(SIXPACK) -image -target snes -format p4 -o $@ -pack $<
+	$(SIXPACK) -image -target snes -opt -format p4 -o $@ -pack $<
 assets/font.chr: assets/adore.bmp
 	$(SIXPACK) -image -target snes -format p1 -bg 6,0 -o $@ $<
 assets/marker.chr: assets/marker.bmp
