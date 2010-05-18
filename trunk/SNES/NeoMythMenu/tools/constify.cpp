@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <string>
 #include <vector>
 #include <iterator>
@@ -19,12 +20,38 @@ vector<string> asmSections[3];
 int blockDepth;
 int lineNum = 0;
 
+
+bool is_whitespace(char c)
+{
+	return ((c == ' ') || (c == '\t') || (c == -1));
+}
+
+
+int safe_string_access(string s, int pos)
+{
+	if ((pos >= 0) && (pos < s.length()))
+		return s[pos];
+	return -1;
+}
+
+
+// Finds a word (i.e. word=="foo" would match on "foo bar" or "a foo bar" but not on "foobar")
+int find_word(string s, const char *word)
+{
+	int p = s.find(word);
+	if (is_whitespace(safe_string_access(s, p - 1)) && is_whitespace(safe_string_access(s, p + strlen(word))))
+		return p;
+	return string::npos;
+}
+
+
 void check_for_const(string s)
 {
-	int i, j;
-
+	int i, j, p;
+	const string staticPrefix = "__tccs_";
+	
 	// We are only interested in global consts that are initialized in this file
-	if ( (s.find("const") != string::npos) && (s.find("extern") == string::npos) && (blockDepth == 0))
+	if ( (find_word(s, "const") != string::npos) && (s.find("extern") == string::npos) && (blockDepth == 0))
 	{
 		for (i = 0; i < s.length(); i++)
 		{
@@ -38,18 +65,22 @@ void check_for_const(string s)
 		{
 			if ((s.rfind("const") > s.find("*")) || (s.find("*") == string::npos))
 			{
-				while ((s[i] == ' ') || (s[i] == '\t'))
+				while (is_whitespace(s[i]))
 				{
 					i--;
 				}
 				j = i - 1;
-				while ((s[j] != ' ') && (s[j] != '\t') && (s[j] != '*'))
+				while ((!is_whitespace(s[j])) && (s[j] != '*'))
 				{
 					j--;
 				}
 
 				//printf("Found const named %s on line %d\n", s.substr(j + 1, i-j-1).data(), lineNum);
-				constVars.push_back(s.substr(j + 1, i-j-1));
+
+				if (find_word(s, "static") != string::npos)
+					constVars.push_back(staticPrefix + s.substr(j + 1, i-j-1));
+				else	
+					constVars.push_back(s.substr(j + 1, i-j-1));
 			}
 		}
 	}
