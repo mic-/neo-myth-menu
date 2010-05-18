@@ -1,7 +1,7 @@
 REM Convert graphics data
 tools\sixpack -image -target snes -format p4 -planes 4 -o assets\marker.chr assets\marker.bmp
 tools\sixpack -image -target snes -format p1 -bg 6,0 -o assets\font.chr assets\adore.bmp
-tools\sixpack -image -target snes -format p4 -o assets\menu_bg.lzs -pack assets\menu_bg2.bmp
+tools\sixpack -image -target snes -format p4 -opt -o assets\menu_bg.lzs -pack assets\menu_bg2.bmp
 
 
 REM C -> ASM / S
@@ -10,7 +10,7 @@ REM C -> ASM / S
 ..\bin\816-tcc.exe -Wall -I../include -o game_genie.ps -c game_genie.c
 ..\bin\816-tcc.exe -Wall -I../include -o action_replay.ps -c action_replay.c
 ..\bin\816-tcc.exe -Wall -I../include -o ppuc.ps -c ppuc.c
-..\bin\816-tcc.exe -Wall -I../include -o cheat_db.s -c cheats\cheat_database.c
+..\bin\816-tcc.exe -Wall -I../include -o cheat_db.ps -c cheats\cheat_database.c
 
 
 REM Optimize ASM files
@@ -19,12 +19,14 @@ tools\stripcom navigation.ps navigation.ps2
 tools\stripcom game_genie.ps game_genie.ps2
 tools\stripcom action_replay.ps action_replay.ps2
 tools\stripcom ppuc.ps ppuc.ps2
+tools\stripcom cheat_db.ps cheat_db.s
 del *.ps 
 ..\bin\816-opt.py main.ps2 > main.s
 ..\bin\816-opt.py navigation.ps2 > navigation.s
 ..\bin\816-opt.py game_genie.ps2 > game_genie.s
 ..\bin\816-opt.py action_replay.ps2 > action_replay.s
 ..\bin\816-opt.py ppuc.ps2 > ppuc.s
+
 tools\optimore-816 main.s mainopt.s
 tools\optimore-816 navigation.s navigopt.s
 tools\optimore-816 game_genie.s ggopt.s
@@ -46,8 +48,8 @@ REM ASM -> OBJ
 ..\bin\wla-65816.exe -io dummy_games_list.asm dummy_games_list.obj
 ..\bin\wla-65816.exe -io cheat_db2.s cheat_db.obj
 
-..\bin\wla-65816.exe -io mainopt.s main.obj
-..\bin\wla-65816.exe -io navigopt.s navigation.obj
+..\bin\wla-65816.exe -io mainopt2.s main.obj
+..\bin\wla-65816.exe -io navigopt2.s navigation.obj
 ..\bin\wla-65816.exe -io ggopt.s game_genie.obj
 ..\bin\wla-65816.exe -io aropt.s action_replay.obj
 ..\bin\wla-65816.exe -io ppucopt.s ppuc.obj
@@ -58,7 +60,7 @@ REM OBJ -> SMC
 
 REM Delete files
 del *.ps2
-REM del *.s
+del *.s
 del *.obj
 REM del *.sym
 
