@@ -49,10 +49,7 @@ assets/marker.chr: assets/marker.bmp
 %.obj: %.s
 	$(AS) -io $< $@
 
-%.obj: %.a3
-	$(AS) -io $< $@
-
-cheats/cheat_database.obj: cheats/cheat_database.a4
+%.obj: %.a4
 	$(AS) -io $< $@
 
 clean:
