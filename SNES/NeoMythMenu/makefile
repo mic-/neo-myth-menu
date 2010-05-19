@@ -10,14 +10,22 @@ SIXPACK = wine ./tools/sixpack.exe
 
 OBJS = main.obj navigation.obj ppuc.obj assets/data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj cheats/cheat_database.obj dummy_games_list.obj
 
+EMUOBJS = main.eobj navigation.eobj ppuc.eobj assets/data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.eobj neo2_spc.eobj ppu.eobj cheats/cheat_database.obj dummy_games_list.obj
+
 CFLAGS = -Wall
+CFLAGSEMU = -Wall -DEMULATOR
 IFLAGS = -I./ -I$(SNESSDK)/include
 
 all: assets/menu_bg.lzs assets/font.chr assets/marker.chr $(OBJS) NEOSNES.BIN
+all_emu: assets/menu_bg.lzs assets/font.chr assets/marker.chr $(EMUOBJS) NEOSNESEMU.BIN
 
 # OBJ -> SMC
 NEOSNES.BIN:
 	$(LD) -dvso $(OBJS) NEOSNES.BIN
+
+# OBJ -> SMC
+NEOSNESEMU.BIN:
+	$(LD) -dvso $(EMUOBJS) NEOSNESEMU.BIN
 
 # Convert graphics data
 assets/menu_bg.lzs: assets/menu_bg2.bmp
@@ -52,5 +60,27 @@ assets/marker.chr: assets/marker.bmp
 %.obj: %.a4
 	$(AS) -io $< $@
 
+
+%.a0e: %.c
+	$(CC) $(CFLAGSEMU) $(IFLAGS) -o $@ -c $<
+
+%.a1e: %.a0e
+	$(STRIPCOM) $< $@
+
+%.a2e: %.a1e
+	$(OPTIMIZE) $< >$@
+
+%.a3e: %.a2e
+	$(OPTIMORE) $< $@
+
+%.a4e: %.a3e
+	$(CONSTIFY) $*.c $< $@
+
+%.eobj: %.asm
+	$(AS) -io -DEMULATOR $< $@
+
+%.eobj: %.a4e
+	$(AS) -io $< $@
+
 clean:
-	$(RM) NEOSNES.BIN *.obj *.s *.sym assets/*.obj assets/*.lzs assets/*.chr cheats/*.obj
+	$(RM) NEOSNES.BIN NEOSNESEMU.BIN *.obj *.eobj *.s *.sym assets/*.obj assets/*.lzs assets/*.chr cheats/*.obj
