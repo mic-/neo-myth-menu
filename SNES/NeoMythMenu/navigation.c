@@ -29,7 +29,9 @@ extern const cheatDbEntry_t cheatDatabase[];
 
 
 //DEBUG
-//char psramTestData[24] = {0,1,2,3,4,5,6,7,7,6,5,4,3,2,1,0, 2,3,7,11,13,17,19,23};
+#ifdef EMULATOR
+static char psramTestData[24] = {0,1,2,3,4,5,6,7,7,6,5,4,3,2,1,0, 2,3,7,11,13,17,19,23};
+#endif
 
 const char * const countryCodeStrings[] =
 {
@@ -670,9 +672,11 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 				}
 			}
 
-			// DEBUG
-			//gameFoundInDb = 1; cheatGameIdx = 5;
 
+			// DEBUG
+#ifdef EMULATOR
+			gameFoundInDb = 1; cheatGameIdx = 5;
+#endif
 			cheatList.count = cheatDatabase[cheatGameIdx].numCheats;
 			cheatList.firstShown = cheatList.highlighted = 0;
 
@@ -821,7 +825,8 @@ void main_menu_process_keypress(u16 keys)
 	}
 
 	// DEBUG
-	/*else if (keys & JOY_START)
+#ifdef EMULATOR
+	else if (keys & JOY_START)
 	{
 		psram_read = neo2_myth_psram_read & 0x7fff;
 		psram_write = neo2_myth_psram_write & 0x7fff;
@@ -834,7 +839,8 @@ void main_menu_process_keypress(u16 keys)
 		{
 			print_hex(psramTestData[i], 2+i+i, 4, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 		}
-	}*/
+	}
+#endif
 
 	else if (keys & JOY_X)
 	{

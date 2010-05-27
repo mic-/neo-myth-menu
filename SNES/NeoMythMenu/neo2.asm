@@ -10,6 +10,17 @@
 .section ".text_neo2" superfree
 
 
+.IFDEF EMULATOR
+.DEFINE PSRAM_BANK $7f
+.DEFINE PSRAM_OFFS $8000
+.DEFINE PSRAM_ADDR $7f8000
+.ELSE
+.DEFINE PSRAM_BANK $50
+.DEFINE PSRAM_OFFS $0000
+.DEFINE PSRAM_ADDR $500000
+.ENDIF
+
+
 copy_ram_code:
 	php
 	rep		#$10
@@ -60,22 +71,22 @@ MOV_512K:
     REP		#$30   ; A,16 & X,Y 16 BIT
     LDX     #$1FFE
 -:
-    LDA.W   $0000,X    ; READ GBA CARD
-    STA.L   $500000,X  ; WRITE PSRAM ;+$18
-    LDA.W   $2000,X    ; READ GBA CARD
-    STA.L   $502000,X  ; WRITE PSRAM 
+    LDA.W   $0000,X   	 	; READ GBA CARD
+    STA.L   PSRAM_ADDR,X  	; WRITE PSRAM ;+$18
+    LDA.W   $2000,X    		; READ GBA CARD
+    STA.L   PSRAM_ADDR+$2000,X  ; WRITE PSRAM 
     LDA.W   $4000,X    ; ...
-    STA.L   $504000,X 
+    STA.L   PSRAM_ADDR+$4000,X 
     LDA.W   $6000,X   
-    STA.L   $506000,X 
+    STA.L   PSRAM_ADDR+$6000,X 
     LDA.W   $8000,X   
-    STA.L   $508000,X 
+    STA.L   PSRAM_ADDR+$8000,X 
     LDA.W   $A000,X    
-    STA.L   $50A000,X 
+    STA.L   PSRAM_ADDR+$A000,X 
     LDA.W   $C000,X   
-    STA.L   $50C000,X  
+    STA.L   PSRAM_ADDR+$C000,X  
     LDA.W   $E000,X   
-    STA.L   $50E000,X  
+    STA.L   PSRAM_ADDR+$E000,X  
     DEX
     DEX
     BPL     -
@@ -83,8 +94,8 @@ MOV_512K:
 	DEY
 	BEQ	+
 ;+$51	
-	SEP	#$20
-	LDA	#$51		;+$54
+	SEP		#$20
+	LDA		#PSRAM_BANK+1		;+$54
 	STA.L	$7d0000+copy_1mbit_from_gbac_to_psram+$18	; Increase the MSB of all the addresses above on the form $5xxxxx
 	STA.L	$7d0000+copy_1mbit_from_gbac_to_psram+$1F	; ...
 	STA.L	$7d0000+copy_1mbit_from_gbac_to_psram+$26
@@ -176,20 +187,6 @@ run_3800:
 	bne		-
 	
 
-;	lda.l	ggCodes+7*14
-;	cmp		#2
-;	bne		+
-;	sta.l	$7d0000+ram_cheat4+1
-;	lda.l	ggCodes+7*14+2		; val
-;	sta.l	$7d0000+ram_cheat4+5
-;	lda.l	ggCodes+7*14+4		; offset low
-;	sta.l	$7d0000+ram_cheat4+7
-;	lda.l	ggCodes+7*14+5		; offset high
-;	sta.l	$7d0000+ram_cheat4+8
-;	lda.l	ggCodes+7*14+1		; bank
-;	sta.l	$7d0000+ram_cheat4+9
-;	+:
-	
     LDX     #$00                 ;0  MOVE CHEAT CODE TO SRAM
 -:  LDA.L   CHEAT+$7D0000,X     ;0
     STA.L   $3E00,X             ;0  CPLD SRAM
@@ -461,21 +458,21 @@ _cheat_type_rom:
 	bit		#1				; Odd address?
 	bne		+				; ..Yes
 	tax
-	lda.l	$500000,x		; Read one word ($xxyy) from the game ROM
+	lda.l	PSRAM_ADDR,x	; Read one word ($xxyy) of the game ROM that has been copied to PSRAM
 	and		#$ff00			; Keep $xx00
 	ora		tcc__r4			; val
-	sta.l	$500000,x		; Write back $xxvv, where vv comes from the game genie code
+	sta.l	PSRAM_ADDR,x	; Write back $xxvv, where vv comes from the game genie code
 	plx						; Restore X
 	bra		_next_cheat_code
 +:
 	dea
 	tax
-	lda.l	$500000,x
+	lda.l	PSRAM_ADDR,x
 	and		#$00ff
 	xba
 	ora		tcc__r4			; val
 	xba
-	sta.l	$500000,x
+	sta.l	PSRAM_ADDR,x
 	plx						; Restore X
 	bra		_next_cheat_code
 _cheat_upper_bank:
@@ -493,21 +490,21 @@ _cheat_upper_bank:
 	bit		#1				; Odd address?
 	bne		+				;; ..Yes
 	tax
-	lda.l	$510000,x
+	lda.l	PSRAM_ADDR+$010000,x
 	and		#$ff00
 	ora		tcc__r4			; val
-	sta.l	$510000,x
+	sta.l	PSRAM_ADDR+$010000,x
 	plx						; Restore X
 	bra		_next_cheat_code
 +:
 	dea
 	tax
-	lda.l	$510000,x
+	lda.l	PSRAM_ADDR+$010000,x
 	and		#$00ff
 	xba
 	ora		tcc__r4			; val
 	xba
-	sta.l	$510000,x
+	sta.l	PSRAM_ADDR+$010000,x
 	plx						; Restore X
 	bra		_next_cheat_code
 _next_cheat_code:
@@ -577,9 +574,9 @@ suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
 	sta.l	$7d0000+suspect_pattern+2+\3
 	rep		#$20	; 16-bit A
 	lda.l	$7d0000+suspect_pattern+\3-1,x
-	sta.w	$0002,y	; Write to PSRAM
+	sta.w	PSRAM_OFFS+2,y	; Write to PSRAM
 	lda.l	$7d0000+suspect_pattern+1+\3,x
-	sta.w	$0004,y	; Write to PSRAM
+	sta.w	PSRAM_OFFS+4,y
 	jmp.l	$7d0000+\6
 ++:
  .endm
@@ -618,7 +615,11 @@ _fix_region_checks:
 	rep		#$10			; 16-bit X/Y
 	sep		#$20			; 8-bit A
 	
+	.IFDEF EMULATOR
+	lda		#PSRAM_BANK
+	.ELSE
 	lda.b 	tcc__r4
+	.ENDIF
 	pha
 	plb						; DBR = $5x (PSRAM)
 	
@@ -628,7 +629,7 @@ _fix_region_checks:
 	rep		#$30			; 16-bit A/X/Y
 	ldx		#0
 -:
-	lda.w	$0000,x			; Read PSRAM
+	lda.w	PSRAM_OFFS,x
 	phx
 	tay
 	and		#$ff
@@ -654,7 +655,7 @@ _frc_ppu_is_60hz:
 	rep		#$30
 	ldx		#0
 -:
-	lda.w	$0000,x			; Read PSRAM
+	lda.w	PSRAM_OFFS,x
 	phx
 	tay
 	and		#$ff
@@ -719,7 +720,7 @@ _frc_copy_pattern:
 	dey
 +:	
 -:
-	lda.w	$0000,y			; Read PSRAM
+	lda.w	PSRAM_OFFS,y
 	iny
 	iny
 	sta.l	$7d0000+suspect_pattern-1,x
@@ -938,7 +939,7 @@ neo2_myth_psram_read:
 	lda		10,s			; dest offset
 	tay
 _ncfmp_read:
-	lda.l	$500000,x
+	lda.l	PSRAM_ADDR,x
 	sta.w	$0000,y
 	inx
 	inx
@@ -1015,7 +1016,7 @@ neo2_myth_psram_write:
 -:
 	lda.w	$0000,y
 _nctmp_write:
-	sta.l	$500000,x
+	sta.l	PSRAM_ADDR,x
 	inx
 	inx
 	iny
@@ -1229,13 +1230,13 @@ MOV_PSRAM:
 MOV_PSRAM_LOOP:
 	 LDA    #$3E
 	 STA    tcc__r1h
-	 LDA    #$4E
+	 LDA    #PSRAM_BANK-2
 	 STA    tcc__r2
 
 	 LDA    #$3F
 	 STA    tcc__r1h+1
 
-	 LDA    #$4F
+	 LDA    #PSRAM_BANK-1
 	 STA    tcc__r2+1
 
 -:
