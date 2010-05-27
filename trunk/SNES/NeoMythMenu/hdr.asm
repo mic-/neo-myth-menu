@@ -45,16 +45,20 @@
 
 .BANK 0 SLOT 0                  ; Defines the ROM bank and the slot it is inserted in memory.
 .ORG 0                          ; .ORG 0 is really $8000, because the slot starts at $8000
-.DSB $8000,0
-;.SECTION "EmptyVectors" SEMIFREE
+.db $AD, $3F, $21, $29, $10			; lda $213f / and #$10
+.db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
+.db $AD, $3F, $21, $89, $10			; lda $213f / bit #$10
+.db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
 
-;EmptyHandler:
-;       rti
+.db $AD, $3F, $21, $29, $10			; lda $213f / and #$10
+.db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
+.db $AD, $3F, $21, $89, $10			; lda $213f / bit #$10
+.db $AF, $3F, $21, $00, $29, $10	
 
-;.ENDS
+.DSB $8000-44,0
+
 .bank 1 slot 0
 .org 0
-;nop
 
 
 .EMPTYFILL $00                  ; fill unused areas with $00, opcode for BRK.  
