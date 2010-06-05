@@ -31,8 +31,8 @@
 | MD support code goes in the code segment
 
 | Support equates
-		.equ	CMD_INTS_OFF,	0x2700
-		.equ	CMD_INTS_ON,	0x2000
+                .equ    CMD_INTS_OFF,   0x2700
+                .equ    CMD_INTS_ON,    0x2000
 
         .text
 
@@ -52,14 +52,14 @@ set_sr:
 | void ints_on();
         .global ints_on
 ints_on:
-		move.w #CMD_INTS_ON,sr
-	rts
+                move.w #CMD_INTS_ON,sr
+        rts
 
 | void ints_off();
         .global ints_off
 ints_off:
-		move.w #CMD_INTS_OFF,sr
-	rts
+                move.w #CMD_INTS_OFF,sr
+        rts
 
 | buttons = get_pad(pad)
 | entry: arg = pad control port
@@ -1147,6 +1147,79 @@ neo2_recv_sd:
         move.l  (sp)+,d2
         rts
 
+| int neo2_recv_sd_multi(unsigned char *buf, int count);
+        .global neo2_recv_sd_multi
+neo2_recv_sd_multi:
+        movem.l d2-d3,-(sp)
+        lea     0xA10000,a1
+        movea.l 12(sp),a0               /* buf */
+        move.l  16(sp),d3               /* count */
+        subq.w  #1,d3
+
+        move.w  #0x0087,GBAC_LIO(a1)
+0:
+        move.w  #1023,d0
+1:
+        moveq   #1,d1
+        and.w   0x6060.w,d1
+        dbeq    d0,1b
+        bne.b   9f                      /* timeout */
+
+        moveq   #127,d0
+2:
+        move.w  0x6060.w,d1
+        lsl.b   #4,d1
+        move.w  0x6060.w,d2
+        andi.w  #0x000F,d2
+        or.b    d2,d1                   /* sector byte */
+        move.b  d1,(a0)+
+
+        move.w  0x6060.w,d1
+        lsl.b   #4,d1
+        move.w  0x6060.w,d2
+        andi.w  #0x000F,d2
+        or.b    d2,d1                   /* sector byte */
+        move.b  d1,(a0)+
+
+        move.w  0x6060.w,d1
+        lsl.b   #4,d1
+        move.w  0x6060.w,d2
+        andi.w  #0x000F,d2
+        or.b    d2,d1                   /* sector byte */
+        move.b  d1,(a0)+
+
+        move.w  0x6060.w,d1
+        lsl.b   #4,d1
+        move.w  0x6060.w,d2
+        andi.w  #0x000F,d2
+        or.b    d2,d1                   /* sector byte */
+        move.b  d1,(a0)+
+
+        dbra    d0,2b
+
+        moveq   #7,d0
+3:
+        move.w  0x6060.w,d1
+        lsl.b   #4,d1
+        move.w  0x6060.w,d2
+        andi.w  #0x000F,d2
+        or.b    d2,d1
+|       move.b  d1,(a0)+                /* CRC byte */
+        dbra    d0,3b
+
+        move.w  0x6060.w,d1             /* end bit */
+
+        dbra    d3,0b
+
+        move.w  #0x0080,GBAC_LIO(a1)
+        movem.l (sp)+,d2-d3
+        moveq   #1,d0                   /* TRUE */
+        rts
+9:
+        move.w  #0x0080,GBAC_LIO(a1)
+        movem.l (sp)+,d2-d3
+        moveq   #0,d0                   /* FALSE */
+        rts
 
 neo_mode:
         .word   0
