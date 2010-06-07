@@ -4,6 +4,16 @@
 typedef unsigned char u8;
 typedef unsigned short u16;
 
+typedef char int8_t;
+typedef short int16_t;
+typedef unsigned char uint8_t;
+typedef unsigned short uint16_t;
+
+typedef int8_t int8;
+typedef int16_t int16;
+typedef uint8_t uint8;
+typedef uint16_t uint16;
+
 
 #define REG_APUI00			*(u8*)0x2140
 #define REG_APUI01			*(u8*)0x2141

@@ -38,6 +38,11 @@ const cheat_t contra_3_u_cheats[] =
     {"7E09C6FF", "Eternal tank", CODE_TYPE_AR},
     {"598B2235", "Keep gun after losing life", CODE_TYPE_GG},
     {"6986AD01", "Less enemies on side-view levels", CODE_TYPE_GG},
+
+    {"D0C864AF", "Watch CPU playing demo", CODE_TYPE_GG},
+    {"D9C864AF", "Sound check mode", CODE_TYPE_GG},
+    {"D5C864AF", "Stage select", CODE_TYPE_GG},
+
 };
 
 
@@ -64,6 +69,14 @@ const cheat_t magical_quest_starring_mickey_mouse_cheats[] =
 
 const cheat_t megaman_x_u_cheats[] =
 {
+	{"C2B03DA4", "Infinite Lives 1", CODE_TYPE_GG},
+	{"C2B91497", "Infinite Energy", CODE_TYPE_GG},
+	{"C9BE44D9", "Infinite Weapons", CODE_TYPE_GG},
+	{"7E1F990F", "All Armor Upgrades", CODE_TYPE_AR},
+	{"7E0E8F01", "1 Shot Kills Everything", CODE_TYPE_AR},
+	{"7E0BDD00", "Shoot More Than 3 Shots At A Time", CODE_TYPE_AR},
+
+	/*
 	{"7E0C1311", "Unlimited energy", CODE_TYPE_AR},
 	//{"9DB04F01", "Automatic rapid fire", CODE_TYPE_GG},
 	//{"9DB04FD1", "Invincible after first hit", CODE_TYPE_GG},
@@ -71,6 +84,7 @@ const cheat_t megaman_x_u_cheats[] =
 	{"DBBE446F", "Start with 10 lives", CODE_TYPE_GG},
 	{"D58A1FBC", "Jump higher", CODE_TYPE_GG},
 	{"FFA309A4DDA301D465A30104", "All enemies are defeated with 1 X-Buster hit", CODE_TYPE_GG},
+	*/
 };
 
 
@@ -109,13 +123,19 @@ const cheat_t super_ghouls_n_ghosts_u_cheats[] =
 {
 	{"7E02A409", "9 lives", CODE_TYPE_AR},
 	{"D427640F1027646FDD2764AF", "99 lives", CODE_TYPE_GG},
-	{"1025A4A9D325A7D93125A709", "Invincible", CODE_TYPE_GG},
+	//{"1025A4A9D325A7D93125A709", "Invincible", CODE_TYPE_GG},
+	{"7E027602", "Invincible", CODE_TYPE_AR},
 	{"C22DDDA1", "No bouncing", CODE_TYPE_GG},
 	{"DDB667FF", "Unlimited continues", CODE_TYPE_GG},
-	{"D72767DFDF27670FDB27676F", "Start at mid-level 1", CODE_TYPE_GG},
-	{"D02767DFDF27670FDB27676F", "Start at level 2", CODE_TYPE_GG},
-	{"D92767DFDF27670FDB27676F", "Start at mid-level 2", CODE_TYPE_GG},
-	{"D12767DFDF27670FDB27676F", "Start at level 3", CODE_TYPE_GG},
+	//{"D72767DFDF27670FDB27676F", "Start at mid-level 1", CODE_TYPE_GG},
+	//{"D02767DFDF27670FDB27676F", "Start at level 2", CODE_TYPE_GG},
+	//{"D92767DFDF27670FDB27676F", "Start at mid-level 2", CODE_TYPE_GG},
+	//{"D12767DFDF27670FDB27676F", "Start at level 3", CODE_TYPE_GG},
+	{"00D63C0300D63D0100D63E09", "Start at mid-level 1", CODE_TYPE_AR},
+	{"00D63C0400D63D0100D63E09", "Start at level 2", CODE_TYPE_AR},
+	{"00D63C0500D63D0100D63E09", "Start at mid-level 2", CODE_TYPE_AR},
+	{"00D63C0600D63D0100D63E09", "Start at level 3", CODE_TYPE_AR},
+
 	{"D62767DFDF27670FDB27676F", "Start at level 4", CODE_TYPE_GG},
 	{"DC2767DFDF27670FDB27676F", "Start at level 5", CODE_TYPE_GG},
 	{"DA2767DFDF27670FDB27676F", "Start at level 6", CODE_TYPE_GG},
@@ -227,6 +247,20 @@ const cheat_t xmen_mutant_apocalypse_u_cheats[] =
 };
 
 
+const cheat_t wild_guns_u_cheats[] =
+{
+	{"7E1FB263", "Infinite Lives P1", CODE_TYPE_AR},
+	{"7E024699", "Infinite Time", CODE_TYPE_AR},
+	{"7E1FA009", "Infinite Blasts P1 (Purple Orbs)", CODE_TYPE_AR},
+	{"7E1FB099", "Infinite Secondary Weapon Bullets P1", CODE_TYPE_AR},
+	{"7E1FA800"  "P1 has no gun (Can't Shoot)", CODE_TYPE_AR},
+	{"7E1FA806", "P1 has S. Gun", CODE_TYPE_AR},
+	{"7E1FA80A", "P1 has G. Gun", CODE_TYPE_AR},
+	{"7E1FA80E", "P1 has M. Gun", CODE_TYPE_AR},
+	{"7E1FA812", "P1 has P. Gun", CODE_TYPE_AR},
+	{"7E1FA816", "P1 has V. Gun", CODE_TYPE_AR},
+};
+
 
 const cheatDbEntry_t cheatDatabase[] =
 {
@@ -259,6 +293,9 @@ const cheatDbEntry_t cheatDatabase[] =
 
 	// Death And Return of Superman, The (U)
 	{0x01A3, 0xFE5C, death_and_return_of_superman_u_cheats, NCHEATS(death_and_return_of_superman_u_cheats)},
+
+	// Wild Guns
+	{0x5A75, 0xA58A, wild_guns_u_cheats, NCHEATS(wild_guns_u_cheats)},
 
 	// X-Men - Mutant Apocalypse (U)
 	{0x3807, 0xC7F8, xmen_mutant_apocalypse_u_cheats, NCHEATS(xmen_mutant_apocalypse_u_cheats)},

@@ -56,7 +56,7 @@ REM ASM -> OBJ
 ..\bin\wla-65816.exe -io -DEMULATOR ppucopt.s ppuc.obj
 
 REM OBJ -> SMC
-..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj cheat_db.obj dummy_games_list.obj NEOSNES.TMP
+..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj cheat_db.obj dummy_games_list.obj NEOSNESEMU.BIN
 
 REM Delete files
 del *.ps2
