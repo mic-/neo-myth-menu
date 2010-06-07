@@ -19,11 +19,11 @@ enum
 
 typedef struct
 {
-	u8 used;
-	u8 bank;
-	u8 val;
-	u16 offset;
-	u8 code[8];
+	uint8 used;
+	uint8 bank;
+	uint8 val;
+	uint16 offset;
+	uint8 code[8];
 } ggCode_t;
 
 #define arCode_t ggCode_t
@@ -33,16 +33,16 @@ typedef struct
 {
    const char *codes;
    const char *description;
-   const u8 codeType;
+   const uint8 codeType;
 } cheat_t;
 
 
 typedef struct
 {
-   u16 romChecksum;
-   u16 romChecksumCompl;
+   uint16 romChecksum;
+   uint16 romChecksumCompl;
    cheat_t const *cheats;
-   u16 numCheats;
+   uint16 numCheats;
 } cheatDbEntry_t;
 
 

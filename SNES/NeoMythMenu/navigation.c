@@ -63,7 +63,7 @@ const char * const romSizeStrings[] =
 
 const char * const regionPatchStrings[] =
 {
-	"Off", "Quick", "Complete",
+	"Off     ", "Quick   ", "Complete",
 };
 
 oamEntry_t marker;
