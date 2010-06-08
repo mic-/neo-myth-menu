@@ -5,6 +5,12 @@
 #include <string.h>
 #include <stdio.h>
 
+/*timing*/
+#define SD_READ_TIME_NTSC_MIN (32)
+#define SD_READ_TIME_NTSC_MAX (42)
+#define SD_READ_TIME_PAL_MIN (22)
+#define SD_READ_TIME_PAL_MAX (32)
+
 /*io*/
 #include <diskio.h>
 #include <ff.h>
@@ -1049,9 +1055,9 @@ void get_sd_info(int entry)
     gMythHdr = 0;
 
     if(getClockType())
-        gRomDly_default_sd = 20;
+        gRomDly_default_sd = SD_READ_TIME_PAL_MIN;
     else
-        gRomDly_default_sd = 28;
+        gRomDly_default_sd = SD_READ_TIME_NTSC_MIN;
 
     //get_sd_cheat(gSelections[entry].name);
     //get_sd_ips(entry);
@@ -1127,7 +1133,7 @@ void get_sd_info(int entry)
         else
             utility_memcpy((char *)&rom_hdr[0x20], "No GD3 Tag", 10);
 
-        gRomDly_default_sd = 5;
+
         return;
     }
     else if ((buffer[8] == 0xAA) & (buffer[9] == 0xBB))
@@ -1196,7 +1202,7 @@ void get_sd_info(int entry)
 
     if( !(gTime2-gTime1) )
     {
-        gRomDly_default_sd = 1;
+        gRomDly_default_sd = (getClockType()) ? SD_READ_TIME_PAL_MAX : SD_READ_TIME_NTSC_MAX;
         return;
     }
 
@@ -1204,23 +1210,19 @@ void get_sd_info(int entry)
 
     if(getClockType())
     {
-        if(gRomDly_default_sd >= 28)
-            gRomDly_default_sd >>= 1;
+        if(gRomDly_default_sd > SD_READ_TIME_PAL_MAX)
+            gRomDly_default_sd = SD_READ_TIME_PAL_MAX;
 
-        if(gRomDly_default_sd > 20)
-            gRomDly_default_sd = 20;
-        else if(gRomDly_default_sd < 8)
-            gRomDly_default_sd = 8;
+        if(gRomDly_default_sd < SD_READ_TIME_PAL_MIN)
+            gRomDly_default_sd = SD_READ_TIME_PAL_MIN;
     }
     else
     {
-        if(gRomDly_default_sd >= 38)
-            gRomDly_default_sd >>= 1;
+        if(gRomDly_default_sd > SD_READ_TIME_NTSC_MAX)
+            gRomDly_default_sd = SD_READ_TIME_NTSC_MAX;
 
-        if(gRomDly_default_sd > 28)
-            gRomDly_default_sd = 28;
-        else if(gRomDly_default_sd < 20)
-            gRomDly_default_sd = 20;
+        if(gRomDly_default_sd < SD_READ_TIME_NTSC_MIN)
+            gRomDly_default_sd = SD_READ_TIME_NTSC_MIN;
     }
 }
 
