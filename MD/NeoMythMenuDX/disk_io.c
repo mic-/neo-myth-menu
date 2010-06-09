@@ -796,25 +796,23 @@ DRESULT MMC_disk_read (
         neo2_pre_sd();
         if (!sdReadStartMulti(sector << ((cardType & 1) ? 0 : 9)))
         {
-            // start multiple sector read failed
-            neo2_post_sd();
-            //debugPrint("Read failed!");
-            return RES_ERROR;
+            // read failed, retry once
+            if (!sdReadStartMulti(sector << ((cardType & 1) ? 0 : 9)))
+            {
+                // start multiple sector read failed
+                neo2_post_sd();
+                //debugPrint("Read failed!");
+                return RES_ERROR;
+            }
+            if (!neo2_recv_sd_multi(buff, count))
+            {
+                // read failed
+                neo2_post_sd();
+                //debugPrint("Read failed!");
+                return RES_ERROR;
+            }
         }
-//      for (ix=0; ix<count; ix++)
-//      {
-//          int i = 1024 * 8;
-            // wait on start bit
-//          while ((rdMmcDatBit4()&1) != 0)
-//              if (i-- <= 0)
-//              {
-//                  debugMmcPrint("Timeout");
-//                  return FALSE;                // timeout on start bit
-//              }
-            // read one block
-//          neo2_recv_sd(buff + ix*512);
-//      }
-        if (!neo2_recv_sd_multi(buff, count))
+	else if (!neo2_recv_sd_multi(buff, count))
 	{
             // read failed, retry once
             if (!sdReadStartMulti(sector << ((cardType & 1) ? 0 : 9)))
