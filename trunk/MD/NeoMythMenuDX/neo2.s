@@ -18,6 +18,7 @@
         .equ    CPLD_ID,    0x301E      /* on V12 Neo Myth */
         .equ    WE_IO,      0x3020
         .equ    RST_SEL,    0x3024      /* on V12 Neo Myth */
+	.equ	DAT_SWAP,   0x3026	/* on V5 Neo Myth */
         .equ    EXTM_ON,    0x3028
 
 | Neo2/3 Flash Cart equates (the useful ones)
@@ -407,24 +408,25 @@ _neo_select_game:
 | entry: a1 = hardware base (0xA10000)
 _neo_select_psram:
         move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
+        move.w  #0x0707,WE_IO(a1)       /* map bank 7, write enable myth psram & flash psram, set SYS */
 
-        move.l  #0x08E21500,d0
+        move.l  #0x00E21500,d0
         bsr     _neo_asic_cmd           /* set flash & psram write enable */
-        move.l  #0x08373202,d0
+        move.l  #0x00372203,d0
         bsr     _neo_asic_cmd           /* set cr = flash & psram we, select game flash */
-|       move.l  #0x00DAAF4E,d0
-        move.l  #0x08DA0F4E,d0
+        move.l  #0x00DAAF44,d0
         bsr     _neo_asic_cmd           /* set iosr = enable psram */
-        move.l  #0x08C40000,d0
+        move.l  #0x00C40000,d0
         bsr     _neo_asic_cmd           /* set flash bank to 0 */
 
+	move.w	#0x0000,DAT_SWAP(a1)	/* enable byte swap function */
         move.w  #0x0000,GBAC_LIO(a1)    /* clear low bank select reg */
         move.w  #0x0000,GBAC_HIO(a1)    /* clear high bank select reg */
         move.w  #0x00F8,GBAC_ZIO(a1)    /* set bank size reg to 1MB */
         move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
         move.w  #0x00F0,PRAM_ZIO(a1)    /* psram bank size = 2MB */
-        move.w  #0x0007,WE_IO(a1)       /* map bank 7, write enable myth psram & flash psram */
-        move.w  #0x0007,OPTION_IO(a1)   /* set mode 7 (copy mode) */
+        move.w  #0x0707,WE_IO(a1)       /* map bank 7, write enable myth psram & flash psram, set SYS */
+        move.w  #0x0707,OPTION_IO(a1)   /* set mode 7 (copy mode) */
         rts
 
 | select Neo Flash Menu Flash ROM
@@ -775,9 +777,9 @@ neo_run_psram:
         lea     0xA10000,a1
         bsr     _neo_select_psram       /* select flash cart PSRAM */
 
-        move.w  #0x0000,WE_IO(a1)       /* write-protect psram */
-        move.l  #0x00E2D200,d0
-        bsr     _neo_asic_cmd           /* write-protect flash cart psram */
+|        move.w  #0x0000,WE_IO(a1)       /* write-protect psram */
+|        move.l  #0x00E2D200,d0
+|        bsr     _neo_asic_cmd           /* write-protect flash cart psram */
 
 neo_chk_mahb:
         cmpi.l  #7,20(sp)               /* check for EBIOS run mode */
@@ -790,7 +792,7 @@ neo_chk_mahb:
         move.w  #0x0007,OPTION_IO(a1)   /* set mode 7 (copy mode) */
         move.w  #0x0006,PRAM_BIO(a1)    /* set the neo myth psram bank register */
         move.w  #0x00F8,PRAM_ZIO(a1)    /* set the neo myth psram bank size to 1MB */
-        move.w  #0x0006,WE_IO(a1)       /* write-enable psram, map bank 7 to top of rom space */
+        move.w  #0x0707,WE_IO(a1)       /* write-enable psram, map bank 7 to top of rom space */
         bsr     _clear_hw
         movea.l 0.w,a7
         movea.l 4.w,a3
@@ -905,6 +907,7 @@ neo_copy_game:
 neo_copyto_psram:
         lea     0xA10000,a1
         bsr     _neo_select_psram       /* select flash cart PSRAM (write-enabled) */
+	move.w	#0xFFFF,DAT_SWAP(a1)	/* disable byte swap function */
 
         movea.l 4(sp),a0                /* src */
         movea.l 8(sp),a1                /* pstart */
@@ -912,11 +915,14 @@ neo_copyto_psram:
         lsr.l   #1,d0                   /* # words to copy */
         subq.w  #1,d0
 1:
-        move.w  (a0)+,(a1)+
+        move.w  (a0)+,d1
+	ror.w	#8,d1
+	move.w	d1,(a1)+
         dbra    d0,1b
 
         lea     0xA10000,a1
         move.w  #0x0000,WE_IO(a1)       /* write-protect psram */
+	move.w	#0x0000,DAT_SWAP(a1)	/* enable byte swap function */
         move.l  #0x00E2D200,d0
         bsr     _neo_asic_cmd           /* write-protect flash cart psram */
         bra     _neo_select_menu        /* select Menu Flash */

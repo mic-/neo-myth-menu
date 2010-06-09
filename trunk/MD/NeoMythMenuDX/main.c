@@ -1890,9 +1890,13 @@ void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(u
         (dst)(&buffer[gFileType ? XFER_SIZE : 0], doffset + iy, XFER_SIZE);
         update_progress(str1, str2, iy, length);
     }
-    utility_memset(buffer, 0x00, XFER_SIZE);
-    for (iy=length; iy<(length + 0x020000); iy+=XFER_SIZE)
-        (dst)(buffer, doffset + iy, XFER_SIZE);
+    if ((length == 0x200000) && (dst == &neo_copyto_myth_psram))
+    {
+	// clear past end of rom for S&K
+	utility_memset(buffer, 0x00, XFER_SIZE);
+	for (iy=length; iy<(length + 0x020000); iy+=XFER_SIZE)
+	    (dst)(buffer, doffset + iy, XFER_SIZE);
+    }
 }
 
 void toggleResetMode(int index)
@@ -4745,7 +4749,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
 int main(void)
 {
     int ix;
-//  char temp[12];                      /* keep in sync with RTC print below! */
+//    char temp[44];                      /* keep in sync with RTC print below! */
 
 #ifndef RUN_IN_PSRAM
     init_hardware();                    /* set hardware to a consistent state, clears vram and loads the font */
