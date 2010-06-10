@@ -15,9 +15,9 @@
         .equ    LED_ON,     0x3016
         .equ    RST_IO,     0x3018
         .equ    ID_ON,      0x301A
-        .equ    CPLD_ID,    0x301E      /* on V12 Neo Myth */
+        .equ    CPLD_ID,    0x301E      /* on V4 Neo Myth */
         .equ    WE_IO,      0x3020
-        .equ    RST_SEL,    0x3024      /* on V12 Neo Myth */
+        .equ    RST_SEL,    0x3024      /* on V4 Neo Myth */
 	.equ	DAT_SWAP,   0x3026	/* on V5 Neo Myth */
         .equ    EXTM_ON,    0x3028
 
@@ -675,7 +675,7 @@ neo_check_card:
         .global neo_check_cpld
 neo_check_cpld:
         lea     0xA10000,a1
-	bsr	_neo_select_game
+        move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
 
 	/* get CPLD version */
 	moveq	#3,d0
@@ -685,8 +685,9 @@ neo_check_cpld:
         cmpi.b  #0x63,0x30000A
         bne.b   0f
         move.b  0x300000,d0
-        move.w  #0x0000,CPLD_ID(a1)
 0:
+        move.w  #0x0000,CPLD_ID(a1)
+
 	move.w	d0,-(sp)
         bsr     _neo_select_menu
 	move.w	(sp)+,d0

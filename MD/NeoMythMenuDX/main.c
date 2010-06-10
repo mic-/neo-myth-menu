@@ -1457,9 +1457,12 @@ void update_display(void)
 //  gCursorX = 20 - utility_strlen(temp)/2;     /* center time */
 //  put_str(temp, 0);
 
-    sprintf(temp, " CPLD V%d / Flash Type %c ", gCpldVers, 0x41 + (gCardType & 0xFF));
-    gCursorX = 20 - strlen(temp)/2;
-    put_str(temp, 0);
+    {
+	char flash_type[] = "CBA?????";
+	sprintf(temp, " CPLD V%d / Flash Type %c ", gCpldVers, flash_type[gCardType & 7]);
+	gCursorX = 20 - strlen(temp)/2;
+	put_str(temp, 0);
+    }
 
     // info area
     gCursorX = 1;
