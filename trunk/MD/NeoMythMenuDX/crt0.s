@@ -36,7 +36,7 @@
 | Standard MegaDrive ROM header at 0x100
 
         .ascii  "SEGA GENESIS    "
-        .ascii  "(C)SEGA 2010.APR"
+        .ascii  "(C)SEGA 2010.JUN"
         .ascii  "Neo Super 32X/MD"
         .ascii  "/SMS Flash Cart "
         .ascii  "                "
@@ -444,14 +444,14 @@ _setup_md_myth:
         move.w  #0x0000,RST_SEL(a1)
         move.w  #0x00FF,RST_IO(a1)
 
-        move.w  #0x00FF,CPLD_ID(a1)
-        cmpi.b  #0x63,0x300002
-        bne.b   0f
-        cmpi.b  #0x63,0x30000A
-        bne.b   0f
+|        move.w  #0x00FF,CPLD_ID(a1)
+|        cmpi.b  #0x63,0x300002
+|        bne.b   0f
+|        cmpi.b  #0x63,0x30000A
+|        bne.b   0f
 |        cmpi.b  #0x04,0x300000
 |        bne.b   0f
-        move.w  #0x0000,CPLD_ID(a1)
+|        move.w  #0x0000,CPLD_ID(a1)
 0:
         move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
         move.w  #0x0000,GBAC_ZIO(a1)    /* clear bank size */
