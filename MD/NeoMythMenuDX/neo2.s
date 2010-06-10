@@ -671,6 +671,28 @@ neo_check_card:
         moveq   #-1,d0                  /* Neo2/3 GBA flash card not found! */
         rts
 
+| short int neo_check_cpld(void);
+        .global neo_check_cpld
+neo_check_cpld:
+        lea     0xA10000,a1
+	bsr	_neo_select_game
+
+	/* get CPLD version */
+	moveq	#3,d0
+        move.w  #0x00FF,CPLD_ID(a1)
+        cmpi.b  #0x63,0x300002
+        bne.b   0f
+        cmpi.b  #0x63,0x30000A
+        bne.b   0f
+        move.b  0x300000,d0
+        move.w  #0x0000,CPLD_ID(a1)
+0:
+	move.w	d0,-(sp)
+        bsr     _neo_select_menu
+	move.w	(sp)+,d0
+        rts
+
+
 | void neo_get_rtc(unsigned char *rtc);
 | entry: arg is pointer to array of unsigned bytes large enough for RTC
         .global neo_get_rtc
@@ -915,7 +937,7 @@ neo_copyto_psram:
         lsr.l   #1,d0                   /* # words to copy */
         subq.w  #1,d0
 1:
-        move.w  (a0)+,d1
+	move.w  (a0)+,d1
 	ror.w	#8,d1
 	move.w	d1,(a1)+
         dbra    d0,1b

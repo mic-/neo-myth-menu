@@ -201,6 +201,7 @@ typedef struct selEntry selEntry_t;
 /* global variables */
 
 static unsigned int gSelectionSize;
+short int gCpldVers;			/* 3 = V11 hardware, 4 = V12 hardware, 5 = V5 hardware */
 short int gCardType;                    /* 0 = 512 Mbit Neo2 Flash, 1 = other */
 short int gCardOkay;                    /* 0 = okay, -1 = err */
 short int gCursorX;                     /* range is 0 to 63 (only 0 to 39 onscreen) */
@@ -305,6 +306,7 @@ extern unsigned short int get_pad(int pad);
 extern void clear_screen(void);
 extern void put_str(const char *str, int fcolor);
 extern void set_usb(void);
+extern short int neo_check_cpld(void);
 extern short int neo_check_card(void);
 extern void neo_run_game(int fstart, int fsize, int bbank, int bsize, int run);
 extern void neo_run_psram(int pstart, int psize, int bbank, int bsize, int run);
@@ -1454,6 +1456,10 @@ void update_display(void)
 //  sprintf(temp, " %02d:%01d%01d:%01d%01d ", rtc[4]&31, rtc[3]&7, rtc[2]&15, rtc[1]&7, rtc[0]&15);
 //  gCursorX = 20 - utility_strlen(temp)/2;     /* center time */
 //  put_str(temp, 0);
+
+    sprintf(temp, " CPLD V%d / Flash Type %c ", gCpldVers, 0x41 + (gCardType & 0xFF));
+    gCursorX = 20 - strlen(temp)/2;
+    put_str(temp, 0);
 
     // info area
     gCursorX = 1;
@@ -4757,6 +4763,7 @@ int main(void)
 #else
     gCardOkay = 0;                      /* have Neo Flash card - duh! */
 #endif
+    gCpldVers = neo_check_cpld();	/* get CPLD version */
     gCardType = *(short int *)0x00FFF0; /* get flash card type from menu flash */
 
     ints_on();                          /* allow interrupts */
