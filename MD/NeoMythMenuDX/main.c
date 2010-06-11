@@ -1350,10 +1350,10 @@ inline void update_sd_display()//quick hack to remove flickering
 {
 	static int x1,x2;
 
-	if(gCurEntry <= max( (gStartEntry + 1) , gMaxEntry ) )
+	if((gCurEntry == gStartEntry))
 	{
 		gUpdate = 1;
-		gRomDly = 20;
+		gRomDly = (getClockType()) ? 27 : 37;
 		update_display();
 		return;
 	}
@@ -1362,7 +1362,7 @@ inline void update_sd_display()//quick hack to remove flickering
 	if((gLastEntryIndex == -1) || (gCurEntry == -1) || (gCurMode != MODE_SD) || (gChangedPage) )
 	{
 		gUpdate = 1;
-		gRomDly = 20;
+		gRomDly = (getClockType()) ? 27 : 37;
 		update_display();
 		gChangedPage = 0;
 		return;
@@ -1370,8 +1370,8 @@ inline void update_sd_display()//quick hack to remove flickering
 
 	x1 = ((gLastEntryIndex > PAGE_ENTRIES) ? (gLastEntryIndex % PAGE_ENTRIES) : gLastEntryIndex);
 	x2 = ((gCurEntry > PAGE_ENTRIES) ? (gCurEntry % PAGE_ENTRIES) : gCurEntry);
-	x1 = (x1 > gMaxEntry) ? gMaxEntry : x1;
-	x2 = (x2 > gMaxEntry) ? gMaxEntry : x2;
+	//x1 = (x1 > gMaxEntry) ? gMaxEntry : x1;
+	//x2 = (x2 > gMaxEntry) ? gMaxEntry : x2;
 
 	//prev
 	update_sd_display_make_name(gLastEntryIndex);
