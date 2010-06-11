@@ -1350,8 +1350,16 @@ inline void update_sd_display()//quick hack to remove flickering
 {
 	static int x1,x2;
 
+	if(gCurEntry <= max( (gStartEntry + 1) , gMaxEntry ) )
+	{
+		gUpdate = 1;
+		gRomDly = 20;
+		update_display();
+		return;
+	}
+
 	//Fast update not possible without " "statically" rendered tiles".Reload "map"
-	if((gLastEntryIndex == -1) || (gCurEntry == -1) || (gCurMode != MODE_SD) || (gChangedPage))
+	if((gLastEntryIndex == -1) || (gCurEntry == -1) || (gCurMode != MODE_SD) || (gChangedPage) )
 	{
 		gUpdate = 1;
 		gRomDly = 20;
@@ -1362,6 +1370,8 @@ inline void update_sd_display()//quick hack to remove flickering
 
 	x1 = ((gLastEntryIndex > PAGE_ENTRIES) ? (gLastEntryIndex % PAGE_ENTRIES) : gLastEntryIndex);
 	x2 = ((gCurEntry > PAGE_ENTRIES) ? (gCurEntry % PAGE_ENTRIES) : gCurEntry);
+	x1 = (x1 > gMaxEntry) ? gMaxEntry : x1;
+	x2 = (x2 > gMaxEntry) ? gMaxEntry : x2;
 
 	//prev
 	update_sd_display_make_name(gLastEntryIndex);
@@ -5020,7 +5030,7 @@ int main(void)
                 if (gCurEntry < 0)
                 {
 					gChangedPage = 1;
-                    gCurEntry = gMaxEntry - 1;
+                    gLastEntryIndex = gCurEntry = gMaxEntry - 1;
                     gStartEntry = gMaxEntry - (gMaxEntry % PAGE_ENTRIES);
                 }
 
@@ -5047,7 +5057,7 @@ int main(void)
                 if (gCurEntry == gMaxEntry)
 				{
 					gChangedPage = 1;
-                    gCurEntry = gStartEntry = 0;    // wrap around to top
+                    gLastEntryIndex = gCurEntry = gStartEntry = 0;    // wrap around to top
 				}
 
                 if ((gCurEntry - gStartEntry) == PAGE_ENTRIES)
@@ -5071,7 +5081,7 @@ int main(void)
                 if (gCurEntry >= gMaxEntry)
 				{
 					gChangedPage = 1;
-                    gCurEntry = gStartEntry = 0;    // wrap around to top
+                    gLastEntryIndex = gCurEntry = gStartEntry = 0;    // wrap around to top
 				}
 
                 if ((gCurEntry - gStartEntry) >= PAGE_ENTRIES)
