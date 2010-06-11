@@ -5,12 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 
-/*timing*/
-#define SD_READ_TIME_NTSC_MIN (32)
-#define SD_READ_TIME_NTSC_MAX (42)
-#define SD_READ_TIME_PAL_MIN (22)
-#define SD_READ_TIME_PAL_MAX (32)
-
 /*io*/
 #include <diskio.h>
 #include <ff.h>
@@ -228,11 +222,6 @@ FIL gSDFile;                            /* global file structure for FF */
 
 short int gSdDetected = 0;                   /* 0 - not detected, 1 - detected */
 
-#define gRomDly_default_flash (0)
-
-int gRomDly_default_sd = 20;
-static int gTime1,gTime2;
-
 /* global options table entry definitions */
 
 typedef struct {
@@ -256,6 +245,7 @@ short int gSRAMSize;                    /* size of sram in 8KB units */
 
 short int gYM2413 = 0x0001;             /* 0x0000 = YM2413 disabled, 0x0001 = YM2413 enabled */
 short int gImportIPS = 0;
+static int gLastEntryIndex = -1;
 
 /* arrays */
 const char *gEmptyLine = "                                      ";
@@ -1052,21 +1042,14 @@ void get_sd_info(int entry)
     int eos = utility_wstrlen(path);
     UINT ts;
 
-    gTime1 = gTime2 = 0;
     gFileType = 0;
     gMythHdr = 0;
-
-    if(getClockType())
-        gRomDly_default_sd = SD_READ_TIME_PAL_MIN;
-    else
-        gRomDly_default_sd = SD_READ_TIME_NTSC_MIN;
 
     //get_sd_cheat(gSelections[entry].name);
     //get_sd_ips(entry);
 
     //cache_invalidate_pointers();
 
-    gTime1 = gTicks;
     if (path[eos-1] != (WCHAR)'/')
         utility_c2wstrcat(path, "/");
 
@@ -1082,7 +1065,6 @@ void get_sd_info(int entry)
         sprintf(temp, "!open %s",temp2);
         setStatusMessage(temp);
         path[eos] = 0;
-        gRomDly_default_sd = 1;
         return;
     }
     path[eos] = 0;
@@ -1094,7 +1076,6 @@ void get_sd_info(int entry)
         // SMS ROM header
         gSelections[entry].type = 2; // SMS
         gSelections[entry].run = 0x13; // run mode = SMS + FM
-        gRomDly_default_sd = 1;
         return;
     }
 
@@ -1200,32 +1181,6 @@ void get_sd_info(int entry)
         }
     }
 
-    gTime2 = gTicks;
-
-    if( !(gTime2-gTime1) )
-    {
-        gRomDly_default_sd = (getClockType()) ? SD_READ_TIME_PAL_MAX : SD_READ_TIME_NTSC_MAX;
-        return;
-    }
-
-    gRomDly_default_sd = (int)( ((gTime2-gTime1) * gSelections[entry].length) / 0x20000);
-
-    if(getClockType())
-    {
-        if(gRomDly_default_sd > SD_READ_TIME_PAL_MAX)
-            gRomDly_default_sd = SD_READ_TIME_PAL_MAX;
-
-        if(gRomDly_default_sd < SD_READ_TIME_PAL_MIN)
-            gRomDly_default_sd = SD_READ_TIME_PAL_MIN;
-    }
-    else
-    {
-        if(gRomDly_default_sd > SD_READ_TIME_NTSC_MAX)
-            gRomDly_default_sd = SD_READ_TIME_NTSC_MAX;
-
-        if(gRomDly_default_sd < SD_READ_TIME_NTSC_MIN)
-            gRomDly_default_sd = SD_READ_TIME_NTSC_MIN;
-    }
 }
 
 void get_sd_directory(int entry)
@@ -1235,7 +1190,6 @@ void get_sd_directory(int entry)
     int ix;
 
     gSdDetected = 0;
-    gRomDly_default_sd = 0;
 
     gMaxEntry = 0;
     if (entry == -1)
@@ -1368,6 +1322,58 @@ void get_sd_directory(int entry)
     }
 
     sort_entries();
+}
+
+void update_display(void);
+
+static char entrySNameBuf[64];
+static short int gChangedPage = 0;
+
+inline void update_sd_display_make_name(int e)//single session
+{
+	//convert 16bit -> 8bit string
+	utility_w2cstrcpy((char*)buffer, gSelections[e].name);
+
+	if (gSelections[e].type == 128)
+ 	{
+		utility_strcpy(entrySNameBuf,"[");
+		strncat(entrySNameBuf,(const char *)buffer,34);
+		utility_strcat(entrySNameBuf,"]");
+
+		return;
+	}
+
+	shortenName(entrySNameBuf, (char *)buffer, 36);
+}
+
+inline void update_sd_display()//quick hack to remove flickering
+{
+	static int x1,x2;
+
+	//Fast update not possible without " "statically" rendered tiles".Reload "map"
+	if((gLastEntryIndex == -1) || (gCurEntry == -1) || (gCurMode != MODE_SD) || (gChangedPage))
+	{
+		gUpdate = 1;
+		gRomDly = 20;
+		update_display();
+		gChangedPage = 0;
+		return;
+	}
+
+	x1 = ((gLastEntryIndex > PAGE_ENTRIES) ? (gLastEntryIndex % PAGE_ENTRIES) : gLastEntryIndex);
+	x2 = ((gCurEntry > PAGE_ENTRIES) ? (gCurEntry % PAGE_ENTRIES) : gCurEntry);
+
+	//prev
+	update_sd_display_make_name(gLastEntryIndex);
+	x1 += 3;
+	printToScreen(gFEmptyLine,1,x1,0x2000);
+	printToScreen(entrySNameBuf,20 - (utility_strlen(entrySNameBuf) >> 1),x1,0x0000);
+	
+	//next
+	update_sd_display_make_name(gCurEntry);
+	x2 += 3;
+	printToScreen(gFEmptyLine,1,x2,0x2000);
+	printToScreen(entrySNameBuf,20 - (utility_strlen(entrySNameBuf) >> 1),x2,0x2000);
 }
 
 void update_display(void)
@@ -4923,15 +4929,26 @@ int main(void)
         get_menu_flash();
     }
 
+	unsigned short maxDL;
+
+	maxDL = (getClockType()) ? 50 : 60;
+	gChangedPage = 0;
+	gRomDly = 0;
+	gLastEntryIndex = -1;
+	utility_memset(entrySNameBuf,'\0',64);
+	
     while(1)
     {
         unsigned short int buttons;
 //      unsigned char now[8];
 
+		gRomDly = (gRomDly > maxDL) ? maxDL : gRomDly;
+
         if (gRomDly)
         {
             // decrement time to try loading rom header
             gRomDly--;
+
             if (gRomDly)
                 rom_hdr[0] = rom_hdr[1] = 0xFF;
             else
@@ -4939,7 +4956,7 @@ int main(void)
         }
 
         if (gUpdate)
-            update_display();           /* if flag set, update the display */
+			update_display();
 
         delay(1);
 
@@ -4966,78 +4983,116 @@ int main(void)
                 continue;
             }
         }
+
+		{
+            if (  (buttons & SEGA_CTRL_UP))
+            {
+                // UP pressed, go one entry back
+				gLastEntryIndex = gCurEntry;
+                gCurEntry--;
+
+                if (gCurEntry < 0)
+                {
+					gChangedPage = 1;
+                    gCurEntry = gMaxEntry - 1;
+                    gStartEntry = gMaxEntry - (gMaxEntry % PAGE_ENTRIES);
+                }
+                if (gCurEntry < gStartEntry)
+                {
+					gChangedPage = 1;
+                    gStartEntry -= PAGE_ENTRIES; // previous "page" of entries
+
+                    if (gStartEntry < 0)
+                        gStartEntry = 0;
+                }
+                //rom_hdr[0] = 0xFF;        /* rom header not loaded */
+                update_sd_display(); // quick hack to remove flickering
+                gRomDly += 10;
+				delay( (getClockType()) ? 4 : 6 );
+                continue;
+            }
+            if ( (buttons & SEGA_CTRL_LEFT))
+            {
+                // LEFT pressed, go one page back
+				gLastEntryIndex = gCurEntry;
+                gCurEntry -= PAGE_ENTRIES;
+
+                if (gCurEntry < 0)
+                {
+					gChangedPage = 1;
+                    gCurEntry = gMaxEntry - 1;
+                    gStartEntry = gMaxEntry - (gMaxEntry % PAGE_ENTRIES);
+                }
+
+                if (gCurEntry < gStartEntry)
+                {
+					gChangedPage = 1;
+                    gStartEntry -= PAGE_ENTRIES; // previous "page" of entries
+
+                    if (gStartEntry < 0)
+                        gStartEntry = 0;
+                }
+                //rom_hdr[0] = 0xFF;        /* rom header not loaded */
+                update_sd_display(); // quick hack to remove flickering
+                gRomDly += 10;
+				delay( (getClockType()) ? 4 : 6 );
+                continue;
+            }
+            if (  (buttons & SEGA_CTRL_DOWN))
+            {
+                // DOWN pressed, go one entry forward
+				gLastEntryIndex = gCurEntry;
+                gCurEntry++;
+
+                if (gCurEntry == gMaxEntry)
+				{
+					gChangedPage = 1;
+                    gCurEntry = gStartEntry = 0;    // wrap around to top
+				}
+
+                if ((gCurEntry - gStartEntry) == PAGE_ENTRIES)
+				{
+					gChangedPage = 1;
+                    gStartEntry += PAGE_ENTRIES; // next "page" of entries
+				}
+
+                //rom_hdr[0] = 0xFF;        /* rom header not loaded */
+                update_sd_display(); // quick hack to remove flickering
+                gRomDly += 10;
+				delay( (getClockType()) ? 4 : 6 );
+                continue;
+            }
+            if (  (buttons & SEGA_CTRL_RIGHT))
+            {
+                // RIGHT pressed, go one page forward
+				gLastEntryIndex = gCurEntry;
+                gCurEntry += PAGE_ENTRIES;
+
+                if (gCurEntry >= gMaxEntry)
+				{
+					gChangedPage = 1;
+                    gCurEntry = gStartEntry = 0;    // wrap around to top
+				}
+
+                if ((gCurEntry - gStartEntry) >= PAGE_ENTRIES)
+				{
+					gChangedPage = 1;
+                    gStartEntry += PAGE_ENTRIES; // next "page" of entries
+				}
+
+                //rom_hdr[0] = 0xFF;        /* rom header not loaded */
+                update_sd_display(); // quick hack to remove flickering
+                gRomDly += 10;
+				delay( (getClockType()) ? 4 : 6 );
+                continue;
+            }
+		}
+
         // check if buttons changed
         if ((buttons & SEGA_CTRL_BUTTONS) != gButtons)
         {
             unsigned short int changed = (buttons & SEGA_CTRL_BUTTONS) ^ gButtons;
             gButtons = buttons & SEGA_CTRL_BUTTONS;
-
-            if ((changed & SEGA_CTRL_UP) && (buttons & SEGA_CTRL_UP))
-            {
-                // UP pressed, go one entry back
-                gCurEntry--;
-                if (gCurEntry < 0)
-                {
-                    gCurEntry = gMaxEntry - 1;
-                    gStartEntry = gMaxEntry - (gMaxEntry % PAGE_ENTRIES);
-                }
-                if (gCurEntry < gStartEntry)
-                {
-                    gStartEntry -= PAGE_ENTRIES; // previous "page" of entries
-                    if (gStartEntry < 0)
-                        gStartEntry = 0;
-                }
-                //rom_hdr[0] = 0xFF;        /* rom header not loaded */
-                gUpdate = 1;            /* minor screen update */
-                gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
-                continue;
-            }
-            if ((changed & SEGA_CTRL_LEFT) && (buttons & SEGA_CTRL_LEFT))
-            {
-                // LEFT pressed, go one page back
-                gCurEntry -= PAGE_ENTRIES;
-                if (gCurEntry < 0)
-                {
-                    gCurEntry = gMaxEntry - 1;
-                    gStartEntry = gMaxEntry - (gMaxEntry % PAGE_ENTRIES);
-                }
-                if (gCurEntry < gStartEntry)
-                {
-                    gStartEntry -= PAGE_ENTRIES; // previous "page" of entries
-                    if (gStartEntry < 0)
-                        gStartEntry = 0;
-                }
-                //rom_hdr[0] = 0xFF;        /* rom header not loaded */
-                gUpdate = 1;            /* minor screen update */
-                gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
-                continue;
-            }
-            if ((changed & SEGA_CTRL_DOWN) && (buttons & SEGA_CTRL_DOWN))
-            {
-                // DOWN pressed, go one entry forward
-                gCurEntry++;
-                if (gCurEntry == gMaxEntry)
-                    gCurEntry = gStartEntry = 0;    // wrap around to top
-                if ((gCurEntry - gStartEntry) == PAGE_ENTRIES)
-                    gStartEntry += PAGE_ENTRIES; // next "page" of entries
-                //rom_hdr[0] = 0xFF;        /* rom header not loaded */
-                gUpdate = 1;            /* minor screen update */
-                gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
-                continue;
-            }
-            if ((changed & SEGA_CTRL_RIGHT) && (buttons & SEGA_CTRL_RIGHT))
-            {
-                // RIGHT pressed, go one page forward
-                gCurEntry += PAGE_ENTRIES;
-                if (gCurEntry >= gMaxEntry)
-                    gCurEntry = gStartEntry = 0;    // wrap around to top
-                if ((gCurEntry - gStartEntry) >= PAGE_ENTRIES)
-                    gStartEntry += PAGE_ENTRIES; // next "page" of entries
-                //rom_hdr[0] = 0xFF;        /* rom header not loaded */
-                gUpdate = 1;            /* minor screen update */
-                gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
-                continue;
-            }
 
             if ((changed & SEGA_CTRL_START) && !(buttons & SEGA_CTRL_START))
             {
@@ -5062,8 +5117,7 @@ int main(void)
                 }
 
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
-                gUpdate = -1;           /* clear screen for major screen update */
-                gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
+                gUpdate = -1;
                 continue;
             }
 
@@ -5088,8 +5142,7 @@ int main(void)
                     put_str("Press A to continue", 0);
                     set_usb();
                     ints_on();     /* enable interrupts */
-                    gUpdate = 1;        /* minor screen update */
-                    gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
+                    gUpdate = -1;
                     continue;
                 }
                 else if (gCurMode == MODE_SD)
@@ -5108,8 +5161,7 @@ int main(void)
                     get_sd_directory(gCurEntry);
                     gCurEntry = 0;
                     gStartEntry = 0;
-                    gUpdate = 1;        /* minor screen update */
-                    gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
+                    gUpdate = -1;
                     continue;
                 }
 
@@ -5120,8 +5172,7 @@ int main(void)
                     neo2_enable_sd();
                     get_sd_directory(-1);   /* get root directory of sd card */
                     loadConfig();
-                    gUpdate = -1;           /* clear screen for major screen update */
-                    gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
+                    gUpdate = -1;
                     continue;
                 }
 
@@ -5136,8 +5187,7 @@ int main(void)
                     get_sd_directory(gCurEntry);
                     gCurEntry = 0;
                     gStartEntry = 0;
-                    gUpdate = 1;        /* minor screen update */
-                    gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
+                    gUpdate = -1;
                     continue;
                 }
 
@@ -5149,7 +5199,6 @@ int main(void)
                     get_sd_directory(-1);   /* get root directory of sd card */
                     loadConfig();
                     gUpdate = -1;           /* clear screen for major screen update */
-                    gRomDly = (gCurMode==MODE_FLASH)?gRomDly_default_flash:gRomDly_default_sd; /* delay before loading rom header */
                     continue;
                 }
 
@@ -5160,3 +5209,4 @@ int main(void)
 
     return 0;
 }
+
