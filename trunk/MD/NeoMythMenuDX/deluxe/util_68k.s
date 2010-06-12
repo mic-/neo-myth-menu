@@ -1,4 +1,3 @@
-
 /*
     util68k lib - By conleon1988@gmail.com for ChillyWilly's DX myth menu
     http://code.google.com/p/neo-myth-menu/
@@ -93,8 +92,9 @@ utility_getFileExt:
     .global utility_w2cstrcpy
 
 utility_w2cstrcpy:
-        movea.l 4(sp),a0
-        movea.l 8(sp),a1
+        |movea.l 4(sp),a0 
+        |movea.l 8(sp),a1 
+		movem.l 4(sp),a0-a1
         moveq   #0,d1
 1:
         /*typecast*/
@@ -111,8 +111,9 @@ utility_w2cstrcpy:
     .global utility_wstrcmp
 
 utility_wstrcmp:
-		movea.l 4(sp),a0
-		movea.l 8(sp),a1
+        |movea.l 4(sp),a0 
+        |movea.l 8(sp),a1 
+		movem.l 4(sp),a0-a1
 		moveq   #0,d0
 0:
 		tst.w   (a0)
@@ -133,8 +134,9 @@ utility_wstrcmp:
     .global utility_wstrcpy
 
 utility_wstrcpy:
-        movea.l 4(sp),a0
-        movea.l 8(sp),a1
+        |movea.l 4(sp),a0 
+        |movea.l 8(sp),a1 
+		movem.l 4(sp),a0-a1
 1:
         move.w  (a1)+,(a0)+ 
         bne.b   1b         
@@ -147,8 +149,9 @@ utility_wstrcpy:
     .global utility_strcpy
 
 utility_strcpy:
-        movea.l 4(sp),a0
-        movea.l 8(sp),a1
+        |movea.l 4(sp),a0 
+        |movea.l 8(sp),a1 
+		movem.l 4(sp),a0-a1
 1:
         move.b  (a1)+,(a0)+ 
         bne.b   1b        
@@ -161,8 +164,9 @@ utility_strcpy:
     .global utility_c2wstrcat
 
 utility_c2wstrcat:
-        movea.l 4(sp),a0
-        movea.l 8(sp),a1 
+        |movea.l 4(sp),a0 
+        |movea.l 8(sp),a1 
+		movem.l 4(sp),a0-a1
 1:
         tst.w   (a0)+
         bne.b   1b
@@ -183,8 +187,9 @@ utility_c2wstrcat:
     .global utility_wstrcat
 
 utility_wstrcat:
-        movea.l 4(sp),a0 
-        movea.l 8(sp),a1 
+        |movea.l 4(sp),a0 
+        |movea.l 8(sp),a1 
+		movem.l 4(sp),a0-a1
 
 1:
         tst.w   (a0)+
@@ -203,8 +208,9 @@ utility_wstrcat:
     .global utility_strcat
 
 utility_strcat:
-        movea.l 4(sp),a0 
-        movea.l 8(sp),a1 
+        |movea.l 4(sp),a0 
+        |movea.l 8(sp),a1 
+		movem.l 4(sp),a0-a1
 
 1:
         tst.b   (a0)+
@@ -219,12 +225,38 @@ utility_strcat:
         move.l  a0,d0
         rts
 
+| char* utility_strncat(char* s1,const char* s2,int n)
+    .global utility_strncat
+
+utility_strncat:
+		movem.l 4(sp),a0-a1 
+		move.l 12(sp),d1
+
+1:
+        tst.b   (a0)+
+        bne.b   1b
+
+        subq.l  #1,a0
+2:
+		tst.l d1
+		ble.b 3f
+
+		subq.l #1,d1
+
+        move.b  (a1)+,(a0)+
+        bne.b   2b
+3:
+        subq.l  #1,a0
+        move.l  a0,d0
+        rts
+
 | unsigned short* utility_c2wstrcpy(unsigned short* s1,const char* s2)
     .global utility_c2wstrcpy
 
 utility_c2wstrcpy:
-        movea.l 4(sp),a0
-        movea.l 8(sp),a1
+        |movea.l 4(sp),a0 
+        |movea.l 8(sp),a1 
+		movem.l 4(sp),a0-a1
         moveq   #0,d1
 1:
         move.b  (a1)+,d1
@@ -306,12 +338,12 @@ utility_wstrlen:
 
 utility_isMultipleOf:
         /*!(base & (n - 1))*/
+        move.l  4(sp),d0
         move.l  8(sp),d1
 
         cmpi.w  #1,d1
         blt.b   1f
 
-        move.l  4(sp),d0
         subq    #1,d1
 
         and     d1,d0
@@ -349,4 +381,5 @@ utility_memset:
         dbra    d1,1b
 
         rts
+
 
