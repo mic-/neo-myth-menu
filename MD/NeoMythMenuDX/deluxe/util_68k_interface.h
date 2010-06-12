@@ -28,6 +28,7 @@ extern int utility_strlen2(const char* s);
 extern char* utility_getFileExt(char* src);
 extern char* utility_strcpy(char* ws1,const char* ws2);
 extern char* utility_strcat(char* s1,const char* s2);
+extern char* utility_strncat(char* s1,const char* s2,int n);
 
 //MEM - CHAR
 extern void utility_memcpy(void* dst,const void* src,int len);

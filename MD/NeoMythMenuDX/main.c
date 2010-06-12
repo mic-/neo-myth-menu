@@ -323,6 +323,10 @@ void run_rom(int reset_mode);
 int inputBox(char* result,const char* caption,const char* defaultText,short int  boxX,short int  boxY,
             short int  captionColor,short int boxColor,short int textColor,short int hlTextColor,short int maxChars);
 
+void update_display(void);
+
+static char entrySNameBuf[64];
+static short int gChangedPage = 0;
 static int inputboxDelay = 5;
 
 //macros
@@ -471,22 +475,26 @@ inline UINT getFileSize(const XCHAR* fss)
 
 inline void shortenName(char *dst, char *src, int max)
 {
-    if (utility_strlen(src) <= max)
+	short len,ix,iy,right;
+
+	len = utility_strlen(src);
+
+    if (len <= max)
     {
         // string fits, just copy it
         utility_strcpy(dst, src);
         return;
     }
 
-    // string must be shortened
-    short ix, iy;
-    short right = max/2;
-    short len = utility_strlen(src);
+    right = (max >> 1);
 
     // check right side of string for important name cues
     for (ix=iy=len-1; ix>(len-right); ix--)
+	{
         if ((src[ix] == '.') || (src[ix] == '[') || (src[ix] == '(') || (src[ix] == '-') || ((src[ix] >= '0')&&(src[ix] <= '9')))
             iy = ix;
+	}
+
     if (right > (len - iy))
         right = len - iy; // split at last cue
 
@@ -1324,11 +1332,6 @@ void get_sd_directory(int entry)
     sort_entries();
 }
 
-void update_display(void);
-
-static char entrySNameBuf[64];
-static short int gChangedPage = 0;
-
 inline void update_sd_display_make_name(int e)//single session
 {
 	//convert 16bit -> 8bit string
@@ -1337,7 +1340,7 @@ inline void update_sd_display_make_name(int e)//single session
 	if (gSelections[e].type == 128)
  	{
 		utility_strcpy(entrySNameBuf,"[");
-		strncat(entrySNameBuf,(const char *)buffer,34);
+		utility_strncat(entrySNameBuf,(const char *)buffer,34);
 		utility_strcat(entrySNameBuf,"]");
 
 		return;
@@ -1350,16 +1353,9 @@ inline void update_sd_display()//quick hack to remove flickering
 {
 	static int x1,x2;
 
-	if((gCurEntry == gStartEntry))
-	{
-		gUpdate = 1;
-		gRomDly = (getClockType()) ? 27 : 37;
-		update_display();
-		return;
-	}
-
 	//Fast update not possible without " "statically" rendered tiles".Reload "map"
-	if((gLastEntryIndex == -1) || (gCurEntry == -1) || (gCurMode != MODE_SD) || (gChangedPage) )
+	if((gLastEntryIndex == -1) || (gCurEntry == -1) || (gCurMode != MODE_SD) || (gChangedPage)
+	|| (gLastEntryIndex == gCurEntry) || ((gCurEntry >= gStartEntry) && (gCurEntry <= gStartEntry + 1)) || (gCurEntry >= gMaxEntry) )
 	{
 		gUpdate = 1;
 		gRomDly = (getClockType()) ? 27 : 37;
@@ -1370,8 +1366,6 @@ inline void update_sd_display()//quick hack to remove flickering
 
 	x1 = ((gLastEntryIndex > PAGE_ENTRIES) ? (gLastEntryIndex % PAGE_ENTRIES) : gLastEntryIndex);
 	x2 = ((gCurEntry > PAGE_ENTRIES) ? (gCurEntry % PAGE_ENTRIES) : gCurEntry);
-	//x1 = (x1 > gMaxEntry) ? gMaxEntry : x1;
-	//x2 = (x2 > gMaxEntry) ? gMaxEntry : x2;
 
 	//prev
 	update_sd_display_make_name(gLastEntryIndex);
@@ -1395,7 +1389,6 @@ void update_display(void)
         clear_screen();
 
     gUpdate = 0;
-
     gCursorX = 1;
     gCursorY = 1;
     put_str("\x80\x82\x82 ", 0x2000);
@@ -1437,7 +1430,7 @@ void update_display(void)
                 if (gSelections[gStartEntry + ix].type == 128)
                 {
                     utility_strcpy(temp, "[");
-                    strncat(temp, (const char *)buffer, 34);
+                    utility_strncat(temp, (const char *)buffer, 34);
                     temp[35] = '\0';
                     utility_strcat(temp, "]"); // show directories in brackets
                 }
@@ -1476,9 +1469,10 @@ void update_display(void)
     {
 	char flash_type[] = "CBA?????";
 	sprintf(temp, " CPLD V%d / Flash Type %c ", gCpldVers, flash_type[gCardType & 7]);
-	gCursorX = 20 - strlen(temp)/2;
+	gCursorX = 20 - (strlen(temp) >> 1);
 	put_str(temp, 0);
     }
+
 
     // info area
     gCursorX = 1;
@@ -3393,7 +3387,6 @@ void do_options(void)
     char optCheatFirst = 1;
 
     __options_EntryPoint:
-
     clearStatusMessage();
     setStatusMessage("Checking for cheats...");
     get_sd_cheat(gSelections[gCurEntry].name);
@@ -4962,7 +4955,7 @@ int main(void)
             if (gRomDly)
                 rom_hdr[0] = rom_hdr[1] = 0xFF;
             else
-                gUpdate = 1;            /* minor update - load rom header */
+				gUpdate = 1;
         }
 
         if (gUpdate)
