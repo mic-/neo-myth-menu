@@ -22,6 +22,9 @@
 /*profiling ??*/
 #include "deluxe/profiling.h"
 
+#include <u_memory.h>
+#include <zip_io.h>
+
 #define min(x,y) (((x)<(y))?(x):(y))
 #define max(x,y) (((x)>(y))?(x):(y))
 
@@ -83,13 +86,13 @@ static const char* EEPROM_MAPPERS[EEPROM_MAPPERS_COUNT] =  //shared from genplus
 
 enum
 {
-	/*Save manager service status*/
+    /*Save manager service status*/
     SMGR_STATUS_NULL = 0,
     SMGR_STATUS_BACKUP_SRAM,
 
-	/*Save manager service mode*/
-	SMGR_MODE_MD32X,
-	SMGR_MODE_SMS,
+    /*Save manager service mode*/
+    SMGR_MODE_MD32X,
+    SMGR_MODE_SMS,
 };
 
 /*For the GG/Hex cheats*/
@@ -203,7 +206,7 @@ typedef struct selEntry selEntry_t;
 /* global variables */
 
 static unsigned int gSelectionSize;
-short int gCpldVers;			/* 3 = V11 hardware, 4 = V12 hardware, 5 = V5 hardware */
+short int gCpldVers;            /* 3 = V11 hardware, 4 = V12 hardware, 5 = V5 hardware */
 short int gCardType;                    /* 0 = 512 Mbit Neo2 Flash, 1 = other */
 short int gCardOkay;                    /* 0 = okay, -1 = err */
 short int gCursorX;                     /* range is 0 to 63 (only 0 to 39 onscreen) */
@@ -483,9 +486,9 @@ inline UINT getFileSize(const XCHAR* fss)
 
 inline void shortenName(char *dst, char *src, int max)
 {
-	short len,ix,iy,right;
+    short len,ix,iy,right;
 
-	len = utility_strlen(src);
+    len = utility_strlen(src);
 
     if (len <= max)
     {
@@ -498,29 +501,29 @@ inline void shortenName(char *dst, char *src, int max)
 
     // check right side of string for important name cues
     for (ix=iy=len-1; ix>(len-right); ix--)
-	{
-		switch(*(src + ix))
-		{
-			case '.':
-			case '[':
-			case '(':
-			case '-':
-			case '0':
-			case '1':
-			case '2':
-			case '3':
-			case '4':
-			case '5':
-			case '6':
-			case '7':
-			case '8':
-			case '9':
-				iy = ix;
-			break;
-		}
-	}
+    {
+        switch(*(src + ix))
+        {
+            case '.':
+            case '[':
+            case '(':
+            case '-':
+            case '0':
+            case '1':
+            case '2':
+            case '3':
+            case '4':
+            case '5':
+            case '6':
+            case '7':
+            case '8':
+            case '9':
+                iy = ix;
+            break;
+        }
+    }
 
-	right = (right > (len - iy)) ? (len - iy) : right;
+    right = (right > (len - iy)) ? (len - iy) : right;
     utility_memcpy(dst, src, max);
     dst[max - right - 1] = '~';
     utility_memcpy(&dst[max - right], &src[iy], right);
@@ -758,7 +761,7 @@ inline void neo_copy_sd(unsigned char *dest, int fstart, int len)
 {
     UINT ts;
     ints_on();     /* enable interrupts */
-    f_read(&gSDFile, dest, len, &ts);
+    f_read_zip(&gSDFile, dest, len, &ts);
     ints_off();     /* disable interrupts */
 }
 
@@ -1085,8 +1088,8 @@ void get_sd_info(int entry)
         utility_c2wstrcat(path, "/");
 
     utility_wstrcat(path, gSelections[entry].name);
-    f_close(&gSDFile);
-    if (f_open(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
+    f_close_zip(&gSDFile);
+    if (f_open_zip(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
     {
         // couldn't open file
         char *temp = (char *)buffer;
@@ -1099,9 +1102,10 @@ void get_sd_info(int entry)
         return;
     }
     path[eos] = 0;
+    gSelections[entry].length=gSDFile.fsize;/*ugly hack :)*/
 
-    f_lseek(&gSDFile, 0x7FF0);
-    f_read(&gSDFile, rom_hdr, 16, &ts);
+    f_lseek_zip(&gSDFile, 0x7FF0);
+    f_read_zip(&gSDFile, rom_hdr, 16, &ts);
     if (!utility_memcmp(rom_hdr, "TMR SEGA", 8))
     {
         // SMS ROM header
@@ -1117,8 +1121,8 @@ void get_sd_info(int entry)
     else
         gSelections[entry].run = 4; // 40 Mbit
 
-    f_lseek(&gSDFile, 0);
-    f_read(&gSDFile, buffer, 0x2400, &ts);
+    f_lseek_zip(&gSDFile, 0);
+    f_read_zip(&gSDFile, buffer, 0x2400, &ts);
     if (!utility_memcmp(buffer, "Vgm ", 4))
     {
         int gd3;
@@ -1134,8 +1138,8 @@ void get_sd_info(int entry)
         if (gd3)
         {
             int i;
-            f_lseek(&gSDFile, gd3 + 20); // start of VGM tag data
-            f_read(&gSDFile, buffer, gSelections[entry].length - (gd3 + 20), &ts);
+            f_lseek_zip(&gSDFile, gd3 + 20); // start of VGM tag data
+            f_read_zip(&gSDFile, buffer, gSelections[entry].length - (gd3 + 20), &ts);
             for (i=0; i<0x30; i++)
             {
                 // copy track name
@@ -1357,61 +1361,61 @@ void get_sd_directory(int entry)
 
 inline void update_sd_display_make_name(int e)//single session
 {
-	//convert 16bit -> 8bit string
-	utility_w2cstrcpy((char*)buffer, gSelections[e].name);
+    //convert 16bit -> 8bit string
+    utility_w2cstrcpy((char*)buffer, gSelections[e].name);
 
-	if (gSelections[e].type == 128)
- 	{
-		utility_strcpy(entrySNameBuf,"[");
-		utility_strncat(entrySNameBuf,(const char *)buffer,34);
-		utility_strcat(entrySNameBuf,"]");
+    if (gSelections[e].type == 128)
+    {
+        utility_strcpy(entrySNameBuf,"[");
+        utility_strncat(entrySNameBuf,(const char *)buffer,34);
+        utility_strcat(entrySNameBuf,"]");
 
-		return;
-	}
+        return;
+    }
 
-	shortenName(entrySNameBuf, (char *)buffer, 36);
+    shortenName(entrySNameBuf, (char *)buffer, 36);
 }
 
 inline void update_sd_display()//quick hack to remove flickering
 {
-	static int x1,x2;
+    static int x1,x2;
 
-	//Fast update not possible without " "statically" rendered tiles".Reload "map"
-	if((gLastEntryIndex == -1) || (gCurEntry == -1) /*|| (gCurMode != MODE_SD)*/ || (gChangedPage)
-	|| (gLastEntryIndex == gCurEntry) || ((gCurEntry >= gStartEntry) && (gCurEntry <= gStartEntry + 1)) || (gCurEntry >= gMaxEntry) )
-	{
-		gResponseMsgStatus = 0;
-		gUpdate = 1;
-		gRomDly = (getClockType()) ? 27 : 37;
+    //Fast update not possible without " "statically" rendered tiles".Reload "map"
+    if((gLastEntryIndex == -1) || (gCurEntry == -1) /*|| (gCurMode != MODE_SD)*/ || (gChangedPage)
+    || (gLastEntryIndex == gCurEntry) || ((gCurEntry >= gStartEntry) && (gCurEntry <= gStartEntry + 1)) || (gCurEntry >= gMaxEntry) )
+    {
+        gResponseMsgStatus = 0;
+        gUpdate = 1;
+        gRomDly = (getClockType()) ? 27 : 37;
 
-		if(gChangedPage)
-		{
-			for(x1 = 3; x1 < PAGE_ENTRIES + 3; x1++)
-				printToScreen(gFEmptyLine,1,x1,0x2000);
-		}
+        if(gChangedPage)
+        {
+            for(x1 = 3; x1 < PAGE_ENTRIES + 3; x1++)
+                printToScreen(gFEmptyLine,1,x1,0x2000);
+        }
 
-		update_display();
-		gChangedPage = 0;
-		gLastEntryIndex = -1;
-		return;
-	}
+        update_display();
+        gChangedPage = 0;
+        gLastEntryIndex = -1;
+        return;
+    }
 
-	gResponseMsgStatus = 0;
+    gResponseMsgStatus = 0;
 
-	x1 = ((gLastEntryIndex > PAGE_ENTRIES) ? (gLastEntryIndex % PAGE_ENTRIES) : gLastEntryIndex);
-	x2 = ((gCurEntry > PAGE_ENTRIES) ? (gCurEntry % PAGE_ENTRIES) : gCurEntry);
+    x1 = ((gLastEntryIndex > PAGE_ENTRIES) ? (gLastEntryIndex % PAGE_ENTRIES) : gLastEntryIndex);
+    x2 = ((gCurEntry > PAGE_ENTRIES) ? (gCurEntry % PAGE_ENTRIES) : gCurEntry);
 
-	//prev
-	update_sd_display_make_name(gLastEntryIndex);
-	x1 += 3;
-	printToScreen(gFEmptyLine,1,x1,0x2000);
-	printToScreen(entrySNameBuf,20 - (utility_strlen(entrySNameBuf) >> 1),x1,0x0000);
-	
-	//next
-	update_sd_display_make_name(gCurEntry);
-	x2 += 3;
-	printToScreen(gFEmptyLine,1,x2,0x2000);
-	printToScreen(entrySNameBuf,20 - (utility_strlen(entrySNameBuf) >> 1),x2,0x2000);
+    //prev
+    update_sd_display_make_name(gLastEntryIndex);
+    x1 += 3;
+    printToScreen(gFEmptyLine,1,x1,0x2000);
+    printToScreen(entrySNameBuf,20 - (utility_strlen(entrySNameBuf) >> 1),x1,0x0000);
+
+    //next
+    update_sd_display_make_name(gCurEntry);
+    x2 += 3;
+    printToScreen(gFEmptyLine,1,x2,0x2000);
+    printToScreen(entrySNameBuf,20 - (utility_strlen(entrySNameBuf) >> 1),x2,0x2000);
 }
 
 void update_display(void)
@@ -1453,11 +1457,11 @@ void update_display(void)
     {
         if (gMaxEntry)
         {
-			int lines = ((gMaxEntry - gStartEntry) > PAGE_ENTRIES) ? PAGE_ENTRIES : (gMaxEntry - gStartEntry);
+            int lines = ((gMaxEntry - gStartEntry) > PAGE_ENTRIES) ? PAGE_ENTRIES : (gMaxEntry - gStartEntry);
 
             for (ix = 0; ix < lines; ix++)
             {
-				utility_w2cstrcpy((char*)buffer, gSelections[gStartEntry + ix].name);
+                utility_w2cstrcpy((char*)buffer, gSelections[gStartEntry + ix].name);
 
                 // put centered name
                 if (gSelections[gStartEntry + ix].type == 128)
@@ -1470,13 +1474,13 @@ void update_display(void)
                 else
                     shortenName(temp, (char *)buffer, 36);
 
-				printToScreen(temp,20 - (utility_strlen(temp) >> 1),3 + ix,((gStartEntry + ix) == gCurEntry) ? 0x2000 : 0x0000);
-				printToScreen("\x7c",1,3 + ix,0x2000);printToScreen("\x7c",38,3 + ix,0x2000);
+                printToScreen(temp,20 - (utility_strlen(temp) >> 1),3 + ix,((gStartEntry + ix) == gCurEntry) ? 0x2000 : 0x0000);
+                printToScreen("\x7c",1,3 + ix,0x2000);printToScreen("\x7c",38,3 + ix,0x2000);
             }
 
-			//clear anything that's left
-			//for(;lines < PAGE_ENTRIES; lines++,ix++)
-				//printToScreen(gFEmptyLine,1,3 + ix,0x2000);
+            //clear anything that's left
+            //for(;lines < PAGE_ENTRIES; lines++,ix++)
+                //printToScreen(gFEmptyLine,1,3 + ix,0x2000);
         }
         else
         {
@@ -1495,20 +1499,20 @@ void update_display(void)
 //  put_str(temp, 0);
 
     {
-		char flash_type[] = "CBA?????";
-		sprintf(temp, " CPLD V%d / Flash Type %c ", gCpldVers, flash_type[gCardType & 7]);
-		
-		//batch print
-		gCursorX = 1;
-		gCursorY = 18;
-		put_str(gFEmptyLine, 0x2000);
+        char flash_type[] = "CBA?????";
+        sprintf(temp, " CPLD V%d / Flash Type %c ", gCpldVers, flash_type[gCardType & 7]);
 
-		gCursorX = 1;
-		gCursorY = 19;
-		put_str(gFBottomLine, 0x2000);
+        //batch print
+        gCursorX = 1;
+        gCursorY = 18;
+        put_str(gFEmptyLine, 0x2000);
 
-		gCursorX = 20 - (utility_strlen(temp) >> 1);
-		put_str(temp, 0);
+        gCursorX = 1;
+        gCursorY = 19;
+        put_str(gFBottomLine, 0x2000);
+
+        gCursorX = 20 - (utility_strlen(temp) >> 1);
+        put_str(temp, 0);
     }
 
 
@@ -1542,14 +1546,14 @@ void update_display(void)
         if (gCurMode == MODE_SD)
         {
             if (gMaxEntry && !gRomDly && (gSelections[gCurEntry].type != 128))
-			{
-				printToScreen(gEmptyLine,1,20,0x0000);
-				printToScreen(gEmptyLine,1,21,0x0000);
-				printToScreen("Waiting for response...",20 - (utility_strlen("Waiting for response...") >> 1),21,0x2000);
-				printToScreen(gEmptyLine,1,22,0x0000);
-				printToScreen(gEmptyLine,1,23,0x0000);
+            {
+                printToScreen(gEmptyLine,1,20,0x0000);
+                printToScreen(gEmptyLine,1,21,0x0000);
+                printToScreen("Waiting for response...",20 - (utility_strlen("Waiting for response...") >> 1),21,0x2000);
+                printToScreen(gEmptyLine,1,22,0x0000);
+                printToScreen(gEmptyLine,1,23,0x0000);
                 get_sd_info(gCurEntry); /* also loads rom_hdr */
-			}
+            }
         }
         else if (gCurMode == MODE_FLASH)
         {
@@ -1562,31 +1566,31 @@ void update_display(void)
                 ints_off(); /* disable interrupts */
                 if (gSelections[gCurEntry].type == 2)
                     neo_copy_game(rom_hdr, fstart+0x7FF0, 16);
-				else if (gSelections[gCurEntry].type == 4)
-				{
-					int gd3;
+                else if (gSelections[gCurEntry].type == 4)
+                {
+                    int gd3;
 
-					neo_copy_game(buffer, fstart, 0x2400);
+                    neo_copy_game(buffer, fstart, 0x2400);
 
-					utility_memcpy(rom_hdr, buffer, 4);
-					utility_memset(&rom_hdr[0x20], 0x20, 0x30); // fill name with spaces
+                    utility_memcpy(rom_hdr, buffer, 4);
+                    utility_memset(&rom_hdr[0x20], 0x20, 0x30); // fill name with spaces
 
-					gd3 = buffer[20] | (buffer[21]<<8) | (buffer[22]<<16) | (buffer[23]<<24);
-					if (gd3)
-					{
-						int i;
-						neo_copy_game(buffer, fstart + gd3 + 20, gSelections[gCurEntry].length - (gd3 + 20));
-						for (i=0; i<0x30; i++)
-						{
-							// copy track name
-							if (!buffer[12 + i*2])
-								break;
-							rom_hdr[0x20 + i] = buffer[12 + i*2];
-						}
-					}
-					else
-						utility_memcpy((char *)&rom_hdr[0x20], "No GD3 Tag", 10);
-				}
+                    gd3 = buffer[20] | (buffer[21]<<8) | (buffer[22]<<16) | (buffer[23]<<24);
+                    if (gd3)
+                    {
+                        int i;
+                        neo_copy_game(buffer, fstart + gd3 + 20, gSelections[gCurEntry].length - (gd3 + 20));
+                        for (i=0; i<0x30; i++)
+                        {
+                            // copy track name
+                            if (!buffer[12 + i*2])
+                                break;
+                            rom_hdr[0x20 + i] = buffer[12 + i*2];
+                        }
+                    }
+                    else
+                        utility_memcpy((char *)&rom_hdr[0x20], "No GD3 Tag", 10);
+                }
                 else
                     neo_copy_game(rom_hdr, fstart+0x100, 256);
                 ints_on(); /* enable interrupts */
@@ -1688,7 +1692,7 @@ void update_display(void)
                 gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
 
-				printToScreen(gEmptyLine,1,21,0x0000);
+                printToScreen(gEmptyLine,1,21,0x0000);
                 gCursorX = 1;
                 gCursorY = 21;
                 sprintf(temp, "Run=0x%02X", gSelections[gCurEntry].run);
@@ -1957,10 +1961,10 @@ void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(u
     }
     if ((length == 0x200000) && (dst == &neo_copyto_myth_psram))
     {
-	// clear past end of rom for S&K
-	utility_memset(buffer, 0x00, XFER_SIZE);
-	for (iy=length; iy<(length + 0x020000); iy+=XFER_SIZE)
-	    (dst)(buffer, doffset + iy, XFER_SIZE);
+    // clear past end of rom for S&K
+    utility_memset(buffer, 0x00, XFER_SIZE);
+    for (iy=length; iy<(length + 0x020000); iy+=XFER_SIZE)
+        (dst)(buffer, doffset + iy, XFER_SIZE);
     }
 }
 
@@ -2602,10 +2606,22 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 
     *utility_getFileExtW(fnbuf) = 0;
 
-	if(gSRAMgrServiceMode == SMGR_MODE_SMS)
-		utility_c2wstrcat(fnbuf,BRM_SAVE_EXT);//or .crm
+    if(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)
+    {
+        //sms or bram
+        if(gSRAMgrServiceMode==SMGR_MODE_SMS)
+        {
+            utility_c2wstrcat(fnbuf,SMS_SAVE_EXT);
+        }
+        else
+        {
+            utility_c2wstrcat(fnbuf,BRM_SAVE_EXT);//or .crm
+        }
+    }
     else
+    {
         utility_c2wstrcat(fnbuf,MD_32X_SAVE_EXT);
+    }
 
     //if exists - delete
     deleteFile(fnbuf);
@@ -2617,9 +2633,9 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 
     setStatusMessage("Backing up GAME sram...");
 
-	if(gSRAMgrServiceMode == SMGR_MODE_SMS)
+    if(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)
     {
-		gSRAMgrServiceMode = 0x0000;
+        gSRAMgrServiceMode = 0x0000;
 
         //sms or bram - direct copy
         k=0;
@@ -2668,9 +2684,9 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 
 void sram_mgr_saveGame(int index)
 {
-	gSRAMgrServiceMode = (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X;
+    gSRAMgrServiceMode = (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X;
     sram_mgr_saveGamePA(gSelections[gCurEntry].name);
-	gSRAMgrServiceMode = 0x0000;
+    gSRAMgrServiceMode = 0x0000;
 }
 
 void sram_mgr_restoreGame(int index)
@@ -3852,23 +3868,28 @@ void do_options(void)
                     bbank = gSRAMBank;
                     bsize = gSRAMSize * 8192;
                     runmode = gSelections[gCurEntry].run;
-                    if ((runmode & 0x1F) < 7)
-                        runmode = gSRAMType ? 5 : !bsize ? 6 : (gSelections[gCurEntry].type == 1) ? 3 : (fsize > 0x200200) ? 2 : 1;
+//                    if ((runmode & 0x1F) < 7)
+//                        runmode = gSRAMType ? 5 : !bsize ? 6 : (gSelections[gCurEntry].type == 1) ? 3 : (fsize > 0x200200) ? 2 : 1;
                     // Run selected rom
                     if (path[utility_wstrlen(path)-1] != (WCHAR)'/')
                         utility_c2wstrcat(path, "/");
                     utility_wstrcat(path, gSelections[gCurEntry].name);
 
-                    f_close(&gSDFile);
-                    if (f_open(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
+                    f_close_zip(&gSDFile);
+                    if (f_open_zip(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
                     {
                         // couldn't open file
                         path[eos] = 0;
                         continue;
                     }
                     path[eos] = 0;
+
+                    fsize = gSDFile.fsize;
+                    if ((runmode & 0x1F) < 7)
+                        runmode = gSRAMType ? 5 : !bsize ? 6 : (gSelections[gCurEntry].type == 1) ? 3 : (fsize > 0x200200) ? 2 : 1;
+
                     if (gFileType)
-                        f_read(&gSDFile, buffer, 0x200, &ts);
+                        f_read_zip(&gSDFile, buffer, 0x200, &ts);
 
                     if ((gSelections[gCurEntry].type == 2) || (runmode == 7))
                     {
@@ -3877,7 +3898,7 @@ void do_options(void)
 
                         if(gManageSaves)
                         {
-                            f_close(&gSDFile);
+                            f_close_zip(&gSDFile);
                             clear_screen();
                             gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
                             cache_sync();
@@ -3886,8 +3907,8 @@ void do_options(void)
                             utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                             config_push("romName",p);
 
-							sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
-							config_push("romType",p);
+                            sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
+                            config_push("romType",p);
 
                             updateConfig();
 
@@ -3921,7 +3942,7 @@ void do_options(void)
 
                         if(gManageSaves)
                         {
-                            f_close(&gSDFile);
+                            f_close_zip(&gSDFile);
                             clear_screen();
                             gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
                             cache_sync();
@@ -3930,8 +3951,8 @@ void do_options(void)
                             utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                             config_push("romName",p);
 
-							sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
-							config_push("romType",p);
+                            sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
+                            config_push("romType",p);
 
                             updateConfig();
 
@@ -4212,8 +4233,8 @@ void run_rom(int reset_mode)
         if (path[utility_wstrlen(path)-1] != (WCHAR)'/')
             utility_c2wstrcat(path, "/");
         utility_wstrcat(path, gSelections[gCurEntry].name);
-        f_close(&gSDFile);
-        if (f_open(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
+        f_close_zip(&gSDFile);
+        if (f_open_zip(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
         {
             // couldn't open file
             setStatusMessage("Couldn't open game file");
@@ -4221,8 +4242,11 @@ void run_rom(int reset_mode)
             return;
         }
         path[eos] = 0;
+
+        fsize = gSDFile.fsize;
+
         if (gFileType)
-            f_read(&gSDFile, buffer, 0x200, &ts); // skip header on SMD file
+            f_read_zip(&gSDFile, buffer, 0x200, &ts); // skip header on SMD file
 
         // Look for special file types
         if (gSelections[gCurEntry].type == 4)
@@ -4298,8 +4322,8 @@ void run_rom(int reset_mode)
                 utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                 config_push("romName",p);
 
-				sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
-				config_push("romType",p);
+                sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
+                config_push("romType",p);
 
                 updateConfig();
 
@@ -4334,8 +4358,8 @@ void run_rom(int reset_mode)
                 utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                 config_push("romName",p);
 
-				sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
-				config_push("romType",p);
+                sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
+                config_push("romType",p);
 
                 updateConfig();
 
@@ -4557,10 +4581,10 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
     ints_on();
     clear_screen();
 
-	if(getClockType())
-		inputboxDelay = 3;
-	else
-		inputboxDelay = 5;
+    if(getClockType())
+        inputboxDelay = 3;
+    else
+        inputboxDelay = 5;
 
     for(i = x - 10; i < x + 10; i++)
         printToScreen("\x82",i,y,boxColor);
@@ -4842,6 +4866,7 @@ int main(void)
 {
     int ix;
 //    char temp[44];                      /* keep in sync with RTC print below! */
+    mm_init();
 
 #ifndef RUN_IN_PSRAM
     init_hardware();                    /* set hardware to a consistent state, clears vram and loads the font */
@@ -4849,7 +4874,7 @@ int main(void)
 #else
     gCardOkay = 0;                      /* have Neo Flash card - duh! */
 #endif
-    gCpldVers = neo_check_cpld();	/* get CPLD version */
+    gCpldVers = neo_check_cpld();   /* get CPLD version */
     gCardType = *(short int *)0x00FFF0; /* get flash card type from menu flash */
 
     ints_on();                          /* allow interrupts */
@@ -4894,7 +4919,7 @@ int main(void)
     }
 #endif
 
-	#ifdef  __DO_PROFILING__
+    #ifdef  __DO_PROFILING__
     unsigned int i;
 
     Z80_requestBus(1);
@@ -4913,15 +4938,15 @@ int main(void)
     Z80_releaseBus();
     Z80_endReset();
 
-	Z80_THREAD_IDLE();//idle state
+    Z80_THREAD_IDLE();//idle state
 
-	/*do_profilingPrint(
-			"utility_memset",
-			utility_memset((char*)&buffer[0],'\0',WORK_RAM_SIZE),
-			1,
-			1);
-	delay(100);*/
-	#endif
+    /*do_profilingPrint(
+            "utility_memset",
+            utility_memset((char*)&buffer[0],'\0',WORK_RAM_SIZE),
+            1,
+            1);
+    delay(100);*/
+    #endif
 
 
 //  ints_off();                         /* disable interrupts */
@@ -4964,12 +4989,12 @@ int main(void)
 
                 if(gSRAMgrServiceStatus == SMGR_STATUS_BACKUP_SRAM)
                 {
-					gSRAMgrServiceMode = (short int)config_getI("romType");
+                    gSRAMgrServiceMode = (short int)config_getI("romType");
                     sram_mgr_saveGamePA(buf);
                     setStatusMessage("Loading cache & configuration...");
 
                     config_push("romName","*");
-					config_push("romType","0");
+                    config_push("romType","0");
 
                     gSRAMgrServiceStatus = SMGR_STATUS_NULL;
                     cache_sync();
@@ -5008,26 +5033,26 @@ int main(void)
         get_menu_flash();
     }
 
-	unsigned short maxDL;
-	gResponseMsgStatus = 0;
+    unsigned short maxDL;
+    gResponseMsgStatus = 0;
 
-	*(unsigned short*)rom_hdr = 0xffff;
-	maxDL = (getClockType()) ? 50 : 60;
-	update_sd_display();
-	//force load static map 
-	gChangedPage = 1; update_sd_display(); gChangedPage = 0;
-	gRomDly = maxDL >> 1;
-	gLastEntryIndex = -1;
-	utility_memset(entrySNameBuf,'\0',64);
+    *(unsigned short*)rom_hdr = 0xffff;
+    maxDL = (getClockType()) ? 50 : 60;
+    update_sd_display();
+    //force load static map
+    gChangedPage = 1; update_sd_display(); gChangedPage = 0;
+    gRomDly = maxDL >> 1;
+    gLastEntryIndex = -1;
+    utility_memset(entrySNameBuf,'\0',64);
 
     while(1)
     {
         unsigned short int buttons;
 //      unsigned char now[8];
 
-		delay(1);
+        delay(1);
 
-		gRomDly = (gRomDly > maxDL) ? maxDL : gRomDly;
+        gRomDly = (gRomDly > maxDL) ? maxDL : gRomDly;
 
         if (gRomDly)
         {
@@ -5035,28 +5060,28 @@ int main(void)
             --gRomDly;
 
             if (gRomDly)
-			{
-				if(!gResponseMsgStatus)
-				{
-					gResponseMsgStatus = 1;
-					printToScreen(gEmptyLine,1,20,0x0000);
-					printToScreen(gEmptyLine,1,21,0x0000);
-					printToScreen("Waiting for response...",20 - (utility_strlen("Waiting for response...") >> 1),21,0x2000);
-					printToScreen(gEmptyLine,1,22,0x0000);
-					printToScreen(gEmptyLine,1,23,0x0000);
-				}
+            {
+                if(!gResponseMsgStatus)
+                {
+                    gResponseMsgStatus = 1;
+                    printToScreen(gEmptyLine,1,20,0x0000);
+                    printToScreen(gEmptyLine,1,21,0x0000);
+                    printToScreen("Waiting for response...",20 - (utility_strlen("Waiting for response...") >> 1),21,0x2000);
+                    printToScreen(gEmptyLine,1,22,0x0000);
+                    printToScreen(gEmptyLine,1,23,0x0000);
+                }
                 *(unsigned short*)rom_hdr = 0xffff;//rom_hdr[0] = rom_hdr[1] = 0xFF;
-			}
+            }
             else
-			{
-				gResponseMsgStatus = 1;
-				gRomDly = 0;
-				gUpdate = 1;
-			}
+            {
+                gResponseMsgStatus = 1;
+                gRomDly = 0;
+                gUpdate = 1;
+            }
         }
 
         if (gUpdate)
-			update_display();
+            update_display();
 
 
 //      ints_off();                 /* disable interrupts */
@@ -5083,22 +5108,22 @@ int main(void)
             }
         }
 
-		{
+        {
             if (  (buttons & SEGA_CTRL_UP))
             {
                 // UP pressed, go one entry back
-				gLastEntryIndex = gCurEntry;
+                gLastEntryIndex = gCurEntry;
                 gCurEntry--;
 
                 if (gCurEntry < 0)
                 {
-					gChangedPage = 1;
+                    gChangedPage = 1;
                     gCurEntry = gMaxEntry - 1;
                     gStartEntry = gMaxEntry - (gMaxEntry % PAGE_ENTRIES);
                 }
                 if (gCurEntry < gStartEntry)
                 {
-					gChangedPage = 1;
+                    gChangedPage = 1;
                     gStartEntry -= PAGE_ENTRIES; // previous "page" of entries
 
                     if (gStartEntry < 0)
@@ -5107,25 +5132,25 @@ int main(void)
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 update_sd_display(); // quick hack to remove flickering
                 gRomDly += (gCurMode == MODE_SD) ? 10 : 5;
-				delay( (getClockType()) ? 4 : 6 );
+                delay( (getClockType()) ? 4 : 6 );
                 continue;
             }
             if ( (buttons & SEGA_CTRL_LEFT))
             {
                 // LEFT pressed, go one page back
-				gLastEntryIndex = gCurEntry;
+                gLastEntryIndex = gCurEntry;
                 gCurEntry -= PAGE_ENTRIES;
 
                 if (gCurEntry < 0)
                 {
-					gChangedPage = 1;
+                    gChangedPage = 1;
                     gLastEntryIndex = gCurEntry = gMaxEntry - 1;
                     gStartEntry = gMaxEntry - (gMaxEntry % PAGE_ENTRIES);
                 }
 
                 if (gCurEntry < gStartEntry)
                 {
-					gChangedPage = 1;
+                    gChangedPage = 1;
                     gStartEntry -= PAGE_ENTRIES; // previous "page" of entries
 
                     if (gStartEntry < 0)
@@ -5134,58 +5159,58 @@ int main(void)
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 update_sd_display(); // quick hack to remove flickering
                 gRomDly += (gCurMode == MODE_SD) ? 20 : 10;
-				delay( (getClockType()) ? 4 : 6 );
+                delay( (getClockType()) ? 4 : 6 );
                 continue;
             }
             if (  (buttons & SEGA_CTRL_DOWN))
             {
                 // DOWN pressed, go one entry forward
-				gLastEntryIndex = gCurEntry;
+                gLastEntryIndex = gCurEntry;
                 gCurEntry++;
 
                 if (gCurEntry == gMaxEntry)
-				{
-					gChangedPage = 1;
+                {
+                    gChangedPage = 1;
                     gLastEntryIndex = gCurEntry = gStartEntry = 0;    // wrap around to top
-				}
+                }
 
                 if ((gCurEntry - gStartEntry) == PAGE_ENTRIES)
-				{
-					gChangedPage = 1;
+                {
+                    gChangedPage = 1;
                     gStartEntry += PAGE_ENTRIES; // next "page" of entries
-				}
+                }
 
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 update_sd_display(); // quick hack to remove flickering
                 gRomDly += (gCurMode == MODE_SD) ? 10 : 5;
-				delay( (getClockType()) ? 4 : 6 );
+                delay( (getClockType()) ? 4 : 6 );
                 continue;
             }
             if (  (buttons & SEGA_CTRL_RIGHT))
             {
                 // RIGHT pressed, go one page forward
-				gLastEntryIndex = gCurEntry;
+                gLastEntryIndex = gCurEntry;
                 gCurEntry += PAGE_ENTRIES;
 
                 if (gCurEntry >= gMaxEntry)
-				{
-					gChangedPage = 1;
+                {
+                    gChangedPage = 1;
                     gLastEntryIndex = gCurEntry = gStartEntry = 0;    // wrap around to top
-				}
+                }
 
                 if ((gCurEntry - gStartEntry) >= PAGE_ENTRIES)
-				{
-					gChangedPage = 1;
+                {
+                    gChangedPage = 1;
                     gStartEntry += PAGE_ENTRIES; // next "page" of entries
-				}
+                }
 
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 update_sd_display(); // quick hack to remove flickering
                 gRomDly += (gCurMode == MODE_SD) ? 20 : 10;
-				delay( (getClockType()) ? 4 : 6 );
+                delay( (getClockType()) ? 4 : 6 );
                 continue;
             }
-		}
+        }
 
         // check if buttons changed
         if ((buttons & SEGA_CTRL_BUTTONS) != gButtons)
