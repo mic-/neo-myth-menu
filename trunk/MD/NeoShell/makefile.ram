@@ -5,7 +5,7 @@ OBJC := $(GENDEV)/m68k/bin/objcopy
 ASMZ80 := $(GENDEV)/bin/zasm
 BINTOC := $(GENDEV)/bin/bin2c
 
-OBJS := crt0.o main.o neo2.o font.o myth_io.o sd_io.o u_strings.o
+OBJS := crt0.o main.o neo2.o font.o myth_io.o sd_io.o u_strings.o u_memory.o
 
 OPTION := -DRUN_IN_PSRAM
 INCS := -I$(GENDEV)/m68k/include -I$(GENDEV)/m68k/sdk/include -I.
