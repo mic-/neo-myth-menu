@@ -1079,6 +1079,11 @@ void get_sd_info(int entry)
     gFileType = 0;
     gMythHdr = 0;
 
+	printToScreen(gEmptyLine,1,20,0x0000);
+	printToScreen(gEmptyLine,1,21,0x0000);
+	printToScreen(gEmptyLine,1,22,0x0000);
+	printToScreen(gEmptyLine,1,23,0x0000);
+
     //get_sd_cheat(gSelections[entry].name);
     //get_sd_ips(entry);
 
@@ -1424,8 +1429,14 @@ void update_display(void)
     char temp[48];
 
     if (gUpdate < 0)
+	{
         clear_screen();
 
+		for(ix = 3; ix < PAGE_ENTRIES + 3; ix++)
+			printToScreen(gFEmptyLine,1,ix,0x2000);
+	}
+
+	ix = 0;
     gUpdate = 0;
     gCursorX = 1;
     gCursorY = 1;
@@ -1478,9 +1489,12 @@ void update_display(void)
                 printToScreen("\x7c",1,3 + ix,0x2000);printToScreen("\x7c",38,3 + ix,0x2000);
             }
 
-            //clear anything that's left
-            //for(;lines < PAGE_ENTRIES; lines++,ix++)
-                //printToScreen(gFEmptyLine,1,3 + ix,0x2000);
+            //make sure that list border tiles are visible
+            for(;lines < PAGE_ENTRIES; lines++,ix++)
+            {
+				printToScreen("\x7c",1,3 + ix,0x2000);
+				printToScreen("\x7c",38,3 + ix,0x2000);
+			}
         }
         else
         {
@@ -1545,7 +1559,7 @@ void update_display(void)
         // get info for current entry
         if (gCurMode == MODE_SD)
         {
-            if (gMaxEntry && !gRomDly && (gSelections[gCurEntry].type != 128))
+            if ( (gMaxEntry) && (!gRomDly))
             {
                 printToScreen(gEmptyLine,1,20,0x0000);
                 printToScreen(gEmptyLine,1,21,0x0000);
@@ -1894,6 +1908,8 @@ void update_progress(char *str1, char *str2, int curr, int total)
 {
     int ix;
 
+	ix = utility_strlen(str1);
+
     gCursorX = 1;
     gCursorY = 20;
     // erase line
@@ -1903,10 +1919,10 @@ void update_progress(char *str1, char *str2, int curr, int total)
     gCursorY = 21;
     // erase line
     put_str(gEmptyLine, 0);
-    gCursorX = 20 - (utility_strlen(str1) + utility_strlen(str2)) / 2;
-    put_str(str1, 0x2000);              /* print first string in green */
-    gCursorX += utility_strlen(str1);
-    put_str(str2, 0);                   /* print first string in white */
+    gCursorX = 20 - ((ix + utility_strlen(str2))>>1);
+    put_str(str1, 0x2000);              
+    gCursorX += ix;
+    put_str(str2, 0);                 
 
     gCursorX = 1;
     gCursorY = 22;
@@ -1914,10 +1930,10 @@ void update_progress(char *str1, char *str2, int curr, int total)
     put_str("   ", 0);
     gCursorX = 4;
     for (ix=0; ix<=(32*curr/total); ix++, gCursorX++)
-        put_str("\x87", 0x2000);        /* part completed */
+        put_str("\x87", 0x2000);        
     while (gCursorX < 36)
     {
-        put_str("\x87", 0x4000);        /* part left to go */
+        put_str("\x87", 0x4000);        
         gCursorX++;
     }
     put_str("   ", 0);
@@ -2307,10 +2323,13 @@ int cache_process()
 
     clearStatusMessage();
 
-    if(gSelections[gCurEntry].type == 128) //dir
-        return 0;
-    else if(gSelections[gCurEntry].type == 127) //Uknown
-        return 0;
+	switch(gSelections[gCurEntry].type)
+	{
+		case 4://vgm
+		case 127://unknown
+		case 128://dir
+			return 0;
+	}
 
     if(gSelections[gCurEntry].run == 0x27)
         return 0;
@@ -2323,6 +2342,14 @@ int cache_process()
 
         if((rom_hdr[0] == 0xFF) && (rom_hdr[1] != 0x04)) //bad!
             return 0;
+
+		switch(gSelections[gCurEntry].type)
+		{
+			case 4://vgm
+			case 127://unknown
+			case 128://dir
+				return 0;
+		}
 
         if(gSelections[gCurEntry].run == 0x27)
             return 0;
@@ -2389,10 +2416,18 @@ void cache_loadPA(WCHAR* sss)
     if(gCurMode != MODE_SD)
         return;
 
-    if(*utility_getFileExtW(sss) != '.')
-        return;
+	switch(gSelections[gCurEntry].type)
+	{
+		case 4://vgm
+		case 127://unknown
+		case 128://dir
+			return;
+	}
 
     if(gSelections[gCurEntry].run == 0x27)
+        return;
+
+    if(*utility_getFileExtW(sss) != '.')
         return;
 
     setStatusMessage("Reading cache...");
@@ -2454,10 +2489,13 @@ void cache_loadPA(WCHAR* sss)
 
 void cache_load()
 {
-    if(gSelections[gCurEntry].type == 128) //dir
-        return;
-    else if(gSelections[gCurEntry].type == 127) //Uknown
-        return;
+	switch(gSelections[gCurEntry].type)
+	{
+		case 4://vgm
+		case 127://unknown
+		case 128://dir
+			return;
+	}
 
     if(gSelections[gCurEntry].run == 0x27)
         return;
@@ -2473,10 +2511,18 @@ void cache_sync()
     if(gCurMode != MODE_SD)
         return;
 
-    if(*utility_getFileExtW(gSelections[gCurEntry].name) != '.')
-        return;
+	switch(gSelections[gCurEntry].type)
+	{
+		case 4://vgm
+		case 127://unknown
+		case 128://dir
+			return;
+	}
 
     if(gSelections[gCurEntry].run == 0x27)
+        return;
+
+    if(*utility_getFileExtW(gSelections[gCurEntry].name) != '.')
         return;
 
     ints_on();
@@ -4090,6 +4136,11 @@ void run_rom(int reset_mode)
 
     gResetMode = reset_mode;
 
+	printToScreen(gEmptyLine,1,20,0x0000);
+	printToScreen(gEmptyLine,1,21,0x0000);
+	printToScreen(gEmptyLine,1,22,0x0000);
+	printToScreen(gEmptyLine,1,23,0x0000);
+
     if (gCurMode == MODE_FLASH)
     {
         int fstart, fsize, bbank, bsize;
@@ -4153,6 +4204,8 @@ void run_rom(int reset_mode)
             delay(60);
 
             PlayVGM();
+			gRomDly = 60;
+			gResponseMsgStatus = 1;
             gUpdate = -1;               /* clear screen for major screen update */
             return;
         }
@@ -4303,6 +4356,8 @@ void run_rom(int reset_mode)
             delay(60);
 
             PlayVGM();
+			gRomDly = 60;
+			gResponseMsgStatus = 1;
             gUpdate = -1;               /* clear screen for major screen update */
             return;
         }
@@ -5064,11 +5119,18 @@ int main(void)
                 if(!gResponseMsgStatus)
                 {
                     gResponseMsgStatus = 1;
-                    printToScreen(gEmptyLine,1,20,0x0000);
-                    printToScreen(gEmptyLine,1,21,0x0000);
-                    printToScreen("Waiting for response...",20 - (utility_strlen("Waiting for response...") >> 1),21,0x2000);
-                    printToScreen(gEmptyLine,1,22,0x0000);
-                    printToScreen(gEmptyLine,1,23,0x0000);
+
+					if(gMaxEntry && gCurEntry)
+					{
+						if( (gSelections[gCurEntry].type != 4) && (gSelections[gCurEntry].type != 128) ) 
+						{
+				            printToScreen(gEmptyLine,1,20,0x0000);
+				            printToScreen(gEmptyLine,1,21,0x0000);
+				            printToScreen("Waiting for response...",20 - (utility_strlen("Waiting for response...") >> 1),21,0x2000);
+				            printToScreen(gEmptyLine,1,22,0x0000);
+				            printToScreen(gEmptyLine,1,23,0x0000);
+						}
+					}
                 }
                 *(unsigned short*)rom_hdr = 0xffff;//rom_hdr[0] = rom_hdr[1] = 0xFF;
             }
