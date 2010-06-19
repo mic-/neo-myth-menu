@@ -1097,12 +1097,12 @@ void get_sd_info(int entry)
     if (f_open_zip(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
     {
         // couldn't open file
-        char *temp = (char *)buffer;
+        /*char *temp = (char *)buffer;
         char *temp2 = (char *)&buffer[1024];
         utility_w2cstrcpy(temp2, path);
         temp2[32] = '\0';
         sprintf(temp, "!open %s",temp2);
-        setStatusMessage(temp);
+        setStatusMessage(temp);*/
         path[eos] = 0;
         return;
     }
@@ -1433,7 +1433,12 @@ void update_display(void)
         clear_screen();
 
 		for(ix = 3; ix < PAGE_ENTRIES + 3; ix++)
-			printToScreen(gFEmptyLine,1,ix,0x2000);
+		{
+			//printToScreen(gFEmptyLine,1,ix,0x2000);
+			//better render just the listbox border tiles
+			printToScreen("\x7c",1,ix,0x2000);
+			printToScreen("\x7c",38,ix,0x2000);
+		}
 	}
 
 	ix = 0;
@@ -1804,7 +1809,7 @@ void update_display(void)
                     ix = 37; // max string size to print
                 temp[ix+1] = 0; // null terminate name
                 gCursorY = 22;
-                gCursorX = 20 - utility_strlen(temp)/2; // center name
+                gCursorX = 20 - (utility_strlen(temp)>>1); // center name
                 put_str(temp, 0);
             }
             else if (!utility_memcmp(rom_hdr, "SEGA", 4))
@@ -1827,7 +1832,7 @@ void update_display(void)
                     ix = 37; // max string size to print
                 temp[ix+1] = 0; // null terminate name
                 gCursorY = 22;
-                gCursorX = 20 - utility_strlen(temp)/2; // center name
+                gCursorX = 20 - (utility_strlen(temp)>>1); // center name
                 put_str(temp, 0);
 
                 // print rom size and sram size
@@ -1904,6 +1909,37 @@ void update_display(void)
     }
 }
 
+static char __attribute__((aligned(16))) gProgressBarStaticBuffer[36];
+
+inline void update_progress(char *str1, char *str2, int curr, int total)
+{
+    static int a = 0 , b = 0;
+
+    if(!a)
+    {
+        a = utility_strlen(str1);
+        b = 20 - ((a + utility_strlen(str2))>>1);
+
+        printToScreen(gEmptyLine,1,20,0x0000);
+        printToScreen(gEmptyLine,1,21,0x0000);
+        printToScreen(str1,b,21,0x2000);
+        printToScreen(str2,b + a,21,0x2000);
+        printToScreen(gProgressBarStaticBuffer,4,22,0x4000);
+        a = 0;
+    }
+
+    b = (32*curr/total);
+    b = (b>32) ? 32 : b;
+    a = (!a) ? 0 : ((!(b-a)) ? 32 : (b-a)) ;
+   
+    *(gProgressBarStaticBuffer + b) = '\0';
+    printToScreen(gProgressBarStaticBuffer + a,4 + a,22,0x2000);
+    *(gProgressBarStaticBuffer + b) = 0x87;
+
+    a = (b>=32)? 0 : b;
+}
+
+/*
 void update_progress(char *str1, char *str2, int curr, int total)
 {
     int ix;
@@ -1943,6 +1979,7 @@ void update_progress(char *str1, char *str2, int curr, int total)
     // erase line
     put_str(gEmptyLine, 0);
 }
+*/
 
 void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(unsigned char *buff, int offs, int len), int doffset, int soffset, int length, char *str1, char *str2)
 {
@@ -5099,6 +5136,8 @@ int main(void)
     gRomDly = maxDL >> 1;
     gLastEntryIndex = -1;
     utility_memset(entrySNameBuf,'\0',64);
+	utility_memset(gProgressBarStaticBuffer,0x87,36);
+	*(gProgressBarStaticBuffer + 32) = '\0';
 
     while(1)
     {
@@ -5122,7 +5161,7 @@ int main(void)
 
 					if(gMaxEntry && gCurEntry)
 					{
-						if( (gSelections[gCurEntry].type != 4) && (gSelections[gCurEntry].type != 128) ) 
+						if( (gSelections[gCurEntry].type != 4)) 
 						{
 				            printToScreen(gEmptyLine,1,20,0x0000);
 				            printToScreen(gEmptyLine,1,21,0x0000);
