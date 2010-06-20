@@ -1920,7 +1920,8 @@ inline void update_progress(char *str1, char *str2, int curr, int total)
 	static int ctotal = 0, div, last;
 	int this;
 
-	if ((cstr1 != str1) || (cstr2 != str2) || (ctotal != total) || (curr < last))
+//	if ((cstr1 != str1) || (cstr2 != str2) || (ctotal != total) || (curr < last))
+	if (curr == 0)
 	{
 		// new progress bar, recompute divisor and start
 		cstr1 = str1;
@@ -1951,48 +1952,6 @@ inline void update_progress(char *str1, char *str2, int curr, int total)
 		last = this;
 	}
 }
-
-/*
-void update_progress(char *str1, char *str2, int curr, int total)
-{
-    int ix;
-
-	ix = utility_strlen(str1);
-
-    gCursorX = 1;
-    gCursorY = 20;
-    // erase line
-    put_str(gEmptyLine, 0);
-
-    gCursorX = 1;
-    gCursorY = 21;
-    // erase line
-    put_str(gEmptyLine, 0);
-    gCursorX = 20 - ((ix + utility_strlen(str2))>>1);
-    put_str(str1, 0x2000);
-    gCursorX += ix;
-    put_str(str2, 0);
-
-    gCursorX = 1;
-    gCursorY = 22;
-    // draw progress bar
-    put_str("   ", 0);
-    gCursorX = 4;
-    for (ix=0; ix<=(32*curr/total); ix++, gCursorX++)
-        put_str("\x87", 0x2000);
-    while (gCursorX < 36)
-    {
-        put_str("\x87", 0x4000);
-        gCursorX++;
-    }
-    put_str("   ", 0);
-
-    gCursorX = 1;
-    gCursorY = 23;
-    // erase line
-    put_str(gEmptyLine, 0);
-}
-*/
 
 void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(unsigned char *buff, int offs, int len), int doffset, int soffset, int length, char *str1, char *str2)
 {
