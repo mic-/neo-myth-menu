@@ -1084,6 +1084,9 @@ void get_sd_info(int entry)
 	printToScreen(gEmptyLine,1,22,0x0000);
 	printToScreen(gEmptyLine,1,23,0x0000);
 
+	if (gSelections[entry].type == 128)
+		return;
+
     //get_sd_cheat(gSelections[entry].name);
     //get_sd_ips(entry);
 
@@ -1097,12 +1100,12 @@ void get_sd_info(int entry)
     if (f_open_zip(&gSDFile, path, FA_OPEN_EXISTING | FA_READ))
     {
         // couldn't open file
-        /*char *temp = (char *)buffer;
+        char *temp = (char *)buffer;
         char *temp2 = (char *)&buffer[1024];
         utility_w2cstrcpy(temp2, path);
         temp2[32] = '\0';
         sprintf(temp, "!open %s",temp2);
-        setStatusMessage(temp);*/
+        setStatusMessage(temp);
         path[eos] = 0;
         return;
     }
@@ -1909,34 +1912,44 @@ void update_display(void)
     }
 }
 
-static char __attribute__((aligned(16))) gProgressBarStaticBuffer[36];
+static char gProgressBarStaticBuffer[36];
 
 inline void update_progress(char *str1, char *str2, int curr, int total)
 {
-    static int a = 0 , b = 0;
+	static char *cstr1 = NULL, *cstr2 = NULL;
+	static int ctotal = 0, div, last;
+	int this;
 
-    if(!a)
-    {
-        a = utility_strlen(str1);
-        b = 20 - ((a + utility_strlen(str2))>>1);
+	if ((cstr1 != str1) || (cstr2 != str2) || (ctotal != total))
+	{
+		// new progress bar, recompute divisor and start
+		cstr1 = str1;
+		cstr2= str2;
+		ctotal = total;
+		div = (total + 31) / 32;
+		last = -1;
 
+		// print empty progress bar
         printToScreen(gEmptyLine,1,20,0x0000);
         printToScreen(gEmptyLine,1,21,0x0000);
-        printToScreen(str1,b,21,0x2000);
-        printToScreen(str2,b + a,21,0x2000);
+        printToScreen(gEmptyLine,1,22,0x0000);
+        printToScreen(gEmptyLine,1,23,0x0000);
+        printToScreen(str1,20-((strlen(str1)+strlen(str2))>>1),21,0x0000);
+        printToScreen(str2,20-((strlen(str2)-strlen(str1))>>1),21,0x2000);
+		memset(gProgressBarStaticBuffer, 0x87, 32);
+		gProgressBarStaticBuffer[32] = 0;
         printToScreen(gProgressBarStaticBuffer,4,22,0x4000);
-        a = 0;
-    }
+	}
 
-    b = (32*curr/total);
-    b = (b>32) ? 32 : b;
-    a = (!a) ? 0 : ((!(b-a)) ? 32 : (b-a)) ;
-   
-    *(gProgressBarStaticBuffer + b) = '\0';
-    printToScreen(gProgressBarStaticBuffer + a,4 + a,22,0x2000);
-    *(gProgressBarStaticBuffer + b) = 0x87;
-
-    a = (b>=32)? 0 : b;
+	// now print progress
+	this = curr/div;
+	if (this != last)
+	{
+		memset(gProgressBarStaticBuffer, 0x87, this-last);
+		gProgressBarStaticBuffer[this-last] = 0;
+		printToScreen(gProgressBarStaticBuffer,4+last+1,22,0x2000);
+		last = this;
+	}
 }
 
 /*
@@ -1956,9 +1969,9 @@ void update_progress(char *str1, char *str2, int curr, int total)
     // erase line
     put_str(gEmptyLine, 0);
     gCursorX = 20 - ((ix + utility_strlen(str2))>>1);
-    put_str(str1, 0x2000);              
+    put_str(str1, 0x2000);
     gCursorX += ix;
-    put_str(str2, 0);                 
+    put_str(str2, 0);
 
     gCursorX = 1;
     gCursorY = 22;
@@ -1966,10 +1979,10 @@ void update_progress(char *str1, char *str2, int curr, int total)
     put_str("   ", 0);
     gCursorX = 4;
     for (ix=0; ix<=(32*curr/total); ix++, gCursorX++)
-        put_str("\x87", 0x2000);        
+        put_str("\x87", 0x2000);
     while (gCursorX < 36)
     {
-        put_str("\x87", 0x4000);        
+        put_str("\x87", 0x4000);
         gCursorX++;
     }
     put_str("   ", 0);
@@ -5161,7 +5174,7 @@ int main(void)
 
 					if(gMaxEntry && gCurEntry)
 					{
-						if( (gSelections[gCurEntry].type != 4)) 
+						if( (gSelections[gCurEntry].type != 4))
 						{
 				            printToScreen(gEmptyLine,1,20,0x0000);
 				            printToScreen(gEmptyLine,1,21,0x0000);
