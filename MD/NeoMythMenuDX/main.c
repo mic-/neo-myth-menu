@@ -1920,7 +1920,7 @@ inline void update_progress(char *str1, char *str2, int curr, int total)
 	static int ctotal = 0, div, last;
 	int this;
 
-	if ((cstr1 != str1) || (cstr2 != str2) || (ctotal != total))
+	if ((cstr1 != str1) || (cstr2 != str2) || (ctotal != total) || (curr < last))
 	{
 		// new progress bar, recompute divisor and start
 		cstr1 = str1;
