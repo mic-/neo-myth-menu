@@ -45,6 +45,7 @@
 
 .BANK 0 SLOT 0                  ; Defines the ROM bank and the slot it is inserted in memory.
 .ORG 0                          ; .ORG 0 is really $8000, because the slot starts at $8000
+.IFDEF EMULATOR
 .db $AD, $3F, $21, $29, $10			; lda $213f / and #$10
 .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
 .db $AD, $3F, $21, $89, $10			; lda $213f / bit #$10
@@ -56,6 +57,11 @@
 .db $AF, $3F, $21, $00, $29, $10	
 
 .DSB $8000-44,0
+
+.ELSE
+
+.DSB $8000,0
+.ENDIF
 
 .bank 1 slot 0
 .org 0

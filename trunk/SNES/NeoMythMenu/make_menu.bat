@@ -1,7 +1,7 @@
 REM Convert graphics data
 tools\sixpack -image -target snes -format p4 -planes 4 -o assets\marker.chr assets\marker.bmp
 tools\sixpack -image -target snes -format p1 -bg 6,0 -o assets\font.chr assets\adore.bmp
-tools\sixpack -image -target snes -format p4 -opt -o assets\menu_bg.lzs -pack assets\menu_bg2.bmp
+tools\sixpack -image -target snes -format p4 -opt -codec aplib -o assets\menu_bg.lzs -pack assets\menu_bg2.bmp
 
 
 REM C -> ASM / S
@@ -12,6 +12,9 @@ REM C -> ASM / S
 ..\bin\816-tcc.exe -Wall -I../include -o ppuc.ps -c ppuc.c
 ..\bin\816-tcc.exe -Wall -I../include -o cheat_db.ps -c cheats\cheat_database.c
 
+..\bin\816-tcc.exe -Wall -I../include -o pff.ps -c pff.c
+..\bin\816-tcc.exe -Wall -I../include -o u_strings.ps -c u_strings.c
+..\bin\816-tcc.exe -Wall -I../include -o diskio.ps -c diskio.c
 
 REM Optimize ASM files
 tools\stripcom main.ps main.ps2
@@ -19,6 +22,9 @@ tools\stripcom navigation.ps navigation.ps2
 tools\stripcom game_genie.ps game_genie.ps2
 tools\stripcom action_replay.ps action_replay.ps2
 tools\stripcom ppuc.ps ppuc.ps2
+tools\stripcom diskio.ps diskio.ps2
+tools\stripcom pff.ps pff.ps2
+tools\stripcom u_strings.ps u_strings.ps2
 tools\stripcom cheat_db.ps cheat_db.s
 del *.ps 
 ..\bin\816-opt.py main.ps2 > main.s
@@ -26,6 +32,10 @@ del *.ps
 ..\bin\816-opt.py game_genie.ps2 > game_genie.s
 ..\bin\816-opt.py action_replay.ps2 > action_replay.s
 ..\bin\816-opt.py ppuc.ps2 > ppuc.s
+
+..\bin\816-opt.py diskio.ps2 > diskio.s
+..\bin\816-opt.py pff.ps2 > pff.s
+..\bin\816-opt.py u_strings.ps2 > u_strings.s
 
 tools\optimore-816 main.s mainopt.s
 tools\optimore-816 navigation.s navigopt.s
@@ -41,7 +51,7 @@ REM ASM -> OBJ
 ..\bin\wla-65816.exe -io assets\data.asm data.obj
 ..\bin\wla-65816.exe -io dma.asm dma.obj
 ..\bin\wla-65816.exe -io hw_math.asm hw_math.obj
-..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
+REM ..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
 ..\bin\wla-65816.exe -io neo2.asm neo2.obj
 ..\bin\wla-65816.exe -io neo2_spc.asm neo2_spc.obj
 ..\bin\wla-65816.exe -io ppu.asm ppu.obj
@@ -53,10 +63,15 @@ REM ASM -> OBJ
 ..\bin\wla-65816.exe -io ggopt.s game_genie.obj
 ..\bin\wla-65816.exe -io aropt.s action_replay.obj
 ..\bin\wla-65816.exe -io ppucopt.s ppuc.obj
-REM ..\bin\wla-65816.exe -io font.s font.obj
+
+..\bin\wla-65816.exe -io diskio.s diskio.obj
+..\bin\wla-65816.exe -io pff.s pff.obj
+..\bin\wla-65816.exe -io u_strings.s u_strings.obj
+
+..\bin\wla-65816.exe -io aplib_decrunch.asm aplib_decrunch.obj
 
 REM OBJ -> SMC
-..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj cheat_db.obj dummy_games_list.obj NEOSNES.BIN
+..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj aplib_decrunch.obj neo2.obj neo2_spc.obj ppu.obj cheat_db.obj dummy_games_list.obj diskio.obj pff.obj u_strings.obj NEOSNES.BIN
 
 REM Delete files
 del *.ps2

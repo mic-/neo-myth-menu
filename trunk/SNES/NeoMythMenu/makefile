@@ -8,7 +8,7 @@ STRIPCOM = ./tools/stripcom
 CONSTIFY = ./tools/constify
 SIXPACK = tools/sixpack
 
-OBJS = main.obj navigation.obj ppuc.obj assets/data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.obj neo2_spc.obj ppu.obj cheats/cheat_database.obj dummy_games_list.obj
+OBJS = main.obj navigation.obj ppuc.obj assets/data.obj diskio.obj dma.obj game_genie.obj action_replay.obj hw_math.obj aplib_decrunch.obj neo2.obj neo2_spc.obj pff.obj ppu.obj u_strings.obj cheats/cheat_database.obj dummy_games_list.obj
 
 EMUOBJS = main.eobj navigation.eobj ppuc.eobj assets/data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.eobj neo2_spc.eobj ppu.eobj cheats/cheat_database.obj dummy_games_list.obj
 
@@ -29,7 +29,7 @@ NEOSNESEMU.BIN:
 
 # Convert graphics data
 assets/menu_bg.lzs: assets/menu_bg2.bmp
-	$(SIXPACK) -image -target snes -opt -format p4 -o $@ -pack $<
+	$(SIXPACK) -image -target snes -opt -codec aplib -format p4 -o $@ -pack $<
 assets/font.chr: assets/adore.bmp
 	$(SIXPACK) -image -target snes -format p1 -bg 6,0 -o $@ $<
 assets/marker.chr: assets/marker.bmp

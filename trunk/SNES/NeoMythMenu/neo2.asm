@@ -1619,7 +1619,207 @@ MAP_DSP_DONE:
 RUN_M01:
          JMP     run_3800     ; FOR EXIT RAM
          
-         
+
+;-------------------------------------------------------------------------------
+
+
+; do a Neo Flash ASIC command
+; entry: XY = Neo Flash ASIC command
+_neo_asic_cmd:
+	rep 	#$30
+	phx
+	phy
+	; do unlocking sequence
+	ldx		#$00FF			; address
+	ldy		#$D200			; value
+	jsr		_neo_asic_op
+	ldx		#$0000			; address
+	ldy		#$1500			; value
+	jsr		_neo_asic_op
+	ldx		#$0001
+	ldy		#$D200
+	jsr		_neo_asic_op
+	ldx		#$0002
+	ldy		#$1500
+	jsr		_neo_asic_op
+	ldx		#$00FE
+	ldy		#$1500
+	jsr		_neo_asic_op
+	; do ASIC command
+	ply
+	plx
+	; fall into _neo_asic_op for last operation
+	
+
+
+; do a Neo Flash ASIC operation
+; entry: XY = Neo Flash ASIC operation
+;             X = addr, Y = value
+; exit:  A = result (usually dummy read)
+_neo_asic_op:
+	; TODO: write this function
+	
+	rts
+	
+	
+        
+        
+
+; select Neo Flash Menu Flash ROM
+; allows you to access the menu flash via flash space
+; entry: a1 = hardware base (0xA10000)
+_neo_select_menu:
+	sep		#$20
+	rep		#$10
+	phx
+	phy
+	
+	lda		#0
+	sta.l	MYTH_OPTION_IO				; set mode 0
+	sta.l	MYTH_GBAC_ZIO				; clear bank size reg
+	
+	ldx		#$0037
+	rep		#$20
+	lda.l	$7d0000+neo_mode			; enable/disable SD card interface
+	ora		#$0003
+	tay
+	jsr		_neo_asic_cmd				; set cr = select menu flash
+	ldx		#$00DA
+	ldy		#$0044
+	jsr		_neo_asic_cmd				; set iosr = disable game flash
+	
+	sep		#$20
+	lda		#0
+	sta.l	MYTH_GBAC_LIO				; clear low bank select reg
+	sta.l	MYTH_GBAC_HIO				; clear high bank select reg
+	sta.l	MYTH_PRAM_BIO				; set psram to bank 0
+	lda		#$F8
+	sta.l	MYTH_GBAC_ZIO				; bank size = 1MB
+	lda		#$F0
+	sta.l	MYTH_PRAM_ZIO				; psram bank size = 2MB
+	lda		#6
+	sta.l	MYTH_WE_IO					; map bank 7, write enable myth psram
+	lda		#7
+	sta.l	MYTH_OPTION_IO				; set mode 7 (copy mode)
+ 
+	rep		#$30
+	ply
+	plx
+	rts
+        
+
+; void neo2_enable_sd(void);
+neo2_enable_sd:
+	sei								; disable interrupts
+	lda		#$0480
+	sta.l	$7d0000+neo_mode
+	jsr		_neo_select_menu
+	cli								; enable interrupts
+	rtl
+		
+
+; void neo2_disable_sd(void);
+neo2_disable_sd:
+	sei								; disable interrupts
+	lda		#0
+	sta.l	$7d0000+neo_mode
+	jsr		_neo_select_menu
+	cli								; enable interrupts
+	rtl
+		
+
+; void neo2_pre_sd(void);
+neo2_pre_sd:
+	sei						; disable interrupts
+	sep		#$20
+	lda		#$80
+	sta.l	MYTH_GBAC_LIO
+	rep		#$20
+	rtl
+		
+
+; void neo2_post_sd(void);
+neo2_post_sd:
+	sep		#$20
+	lda		#0
+	sta.l	MYTH_GBAC_LIO
+	rep		#$20
+	cli						; enable interrupts
+	rtl
+        
+
+; void neo2_recv_sd(unsigned char *buf);
+neo2_recv_sd:
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+	
+	lda		10,s						; buf
+	tax
+	sep		#$20
+	lda		#$87
+	sta.l	MYTH_GBAC_LIO
+	lda		12,s						; buf bank
+	pha
+	plb
+	ldy		#512						; counter
+_nrsd_loop:
+	rep		#$20
+	lda.l	$6060
+	sep		#$20
+	asl		a
+	asl		a
+	asl		a
+	asl		a
+	rep		#$20
+	sta		tcc__r0
+	lda.l	$6060
+	and		#$000F
+	ora		tcc__r0						; sector byte
+	sep		#$20
+	sta.w	$0000,x
+	inx
+	dey
+	bne		_nrsd_loop
+
+	ldy		#8	
+_nrsd_crc:
+	rep		#$20
+	lda.l	$6060
+	sep		#$20
+	asl		a
+	asl		a
+	asl		a
+	asl		a
+	rep		#$20
+	sta		tcc__r0
+	lda.l	$6060
+	and		#$000F
+	ora		tcc__r0						; crc byte
+	sep		#$20
+;	sta.w	$0000,x
+;	inx
+	dey
+	bne		_nrsd_crc
+
+	rep		#$20
+	lda.l	$6060						; end bit
+
+	sep		#$20
+	lda		#$80
+	sta.l	MYTH_GBAC_LIO
+	
+	plb
+	ply
+	plx
+	plp
+	rtl
+	
+
+neo_mode:	.dw 0
+
 ram_code_end:
 
 .ends
