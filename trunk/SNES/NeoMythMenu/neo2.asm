@@ -1659,7 +1659,8 @@ _neo_asic_cmd:
 _neo_asic_op:
 	; TODO: write this function
 	
-	rts
+	rts		; RTS is used here instead of RTL since this function only is supposed to be
+			; called from other RAM-resident assembly functions -- i.e. not from C functions.
 	
 	
         
@@ -1711,6 +1712,7 @@ _neo_select_menu:
 ; void neo2_enable_sd(void);
 neo2_enable_sd:
 	sei								; disable interrupts
+	rep		#$30
 	lda		#$0480
 	sta.l	$7d0000+neo_mode
 	jsr		_neo_select_menu
@@ -1721,6 +1723,7 @@ neo2_enable_sd:
 ; void neo2_disable_sd(void);
 neo2_disable_sd:
 	sei								; disable interrupts
+	rep		#$30
 	lda		#0
 	sta.l	$7d0000+neo_mode
 	jsr		_neo_select_menu
