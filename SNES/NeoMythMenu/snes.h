@@ -1,13 +1,10 @@
 #ifndef _SNES_H_
 #define _SNES_H_
 
+#include "basetypes.h"
+
 typedef unsigned char u8;
 typedef unsigned short u16;
-
-typedef char int8_t;
-typedef short int16_t;
-typedef unsigned char uint8_t;
-typedef unsigned short uint16_t;
 
 typedef int8_t int8;
 typedef int16_t int16;

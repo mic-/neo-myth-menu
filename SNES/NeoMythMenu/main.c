@@ -1,12 +1,13 @@
-// SNES Myth Menu
-// C version 0.26
+// SNES Myth Shell
+// C version 0.50
 //
 // Mic, 2010
 
 #include "snes.h"
 #include "ppu.h"
 #include "hw_math.h"
-#include "lzss_decode.h"
+//#include "lzss_decode.h"
+#include "aplib_decrunch.h"
 #include "myth.h"
 #include "neo2.h"
 #include "navigation.h"
@@ -56,12 +57,12 @@ char MS2[] = "\xff\x15\x02\x02 Loading......(  )";
 char MS3[] = "\xff\x0b\x02\x02                        \xff\x09\x02\x07Secondary cart:";
 char MS4[] = "\xff\x15\x02\x02 Game (001)";
 
-// Each of these metastrings are onm the format 0xff,row,column,palette,"actual text". A single metastring can go on
+// Each of these metastrings are on the format 0xff,row,column,palette,"actual text". A single metastring can go on
 // indefinitely until a null-terminator is reached.
 //
 const char * const metaStrings[] =
 {
-    "\xff\x03\x01\x07 Menu v 0.26\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
+    "\xff\x03\x01\x07 Shell v 0.50\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
 	"\xff\x01\xfe\x0f\x0a\x68\x69\x6A\x20\x71\x72\x73\x20\x7a\x7b\x7c\x83\x84\x85\xfe\x10\x0a\x6b\x6c\x6d\x20\x74\x75 \
 	 \x76\x20\x7d\x7e\x7f\x86\x87\x88xfe\x11\x0a\x6e\x6f\x70\x20\x77\x78\x79\x20\x80\x81\x82\x89\x8a\x8b\xfe\x17\x06 \
 	 \x06\xff\x04                             ",
@@ -803,7 +804,10 @@ int main()
 	set_printxy_clip_rect(2, 0, 28, 31);
 
 	// Load the background graphics data
-	lzss_decode_vram(&bg_patterns, 0x4000, (&bg_patterns_end - &bg_patterns));
+	//lzss_decode_vram(&bg_patterns, 0x4000, (&bg_patterns_end - &bg_patterns));
+	aplib_decrunch(&bg_patterns, 0x7f6000);
+	load_vram(0x7f6000, 0x4000, 21152);
+
   	load_cgram(bg_palette, 0, 32);
    	load_vram(&bg_map, 0x3000,(&bg_map_end - &bg_map));
 
