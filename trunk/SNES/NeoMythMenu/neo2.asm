@@ -29,7 +29,7 @@ copy_ram_code:
 	; the order of the sections involved has been changed by the linker.
 	ldy		#(neo2_spc_ram_code_end - ppu_ram_code_begin)
 	ldx		#0
--:	
+-:
 	lda.l	ppu_ram_code_begin,x
 	sta.l	$7e8000,x
 	inx
@@ -37,8 +37,8 @@ copy_ram_code:
 	bne		-
 	plp
 	rtl
-	
-	
+
+
 .ends
 
 
@@ -62,9 +62,9 @@ copy_1mbit_from_gbac_to_psram:
     SEP		#$20
     REP		#$10
     PHB        	   ; Save DBR
-    LDA   	#$40   ; +$07	
-	LDY		#2	   ; Copy 2 * 512 kbit	
-MOV_512K:	
+    LDA   	#$40   ; +$07
+	LDY		#2	   ; Copy 2 * 512 kbit
+MOV_512K:
     PHA
     PLB        	   ; Set DBR
 
@@ -74,26 +74,26 @@ MOV_512K:
     LDA.W   $0000,X   	 	; READ GBA CARD
     STA.L   PSRAM_ADDR,X  	; WRITE PSRAM ;+$18
     LDA.W   $2000,X    		; READ GBA CARD
-    STA.L   PSRAM_ADDR+$2000,X  ; WRITE PSRAM 
+    STA.L   PSRAM_ADDR+$2000,X  ; WRITE PSRAM
     LDA.W   $4000,X    ; ...
-    STA.L   PSRAM_ADDR+$4000,X 
-    LDA.W   $6000,X   
-    STA.L   PSRAM_ADDR+$6000,X 
-    LDA.W   $8000,X   
-    STA.L   PSRAM_ADDR+$8000,X 
-    LDA.W   $A000,X    
-    STA.L   PSRAM_ADDR+$A000,X 
-    LDA.W   $C000,X   
-    STA.L   PSRAM_ADDR+$C000,X  
-    LDA.W   $E000,X   
-    STA.L   PSRAM_ADDR+$E000,X  
+    STA.L   PSRAM_ADDR+$4000,X
+    LDA.W   $6000,X
+    STA.L   PSRAM_ADDR+$6000,X
+    LDA.W   $8000,X
+    STA.L   PSRAM_ADDR+$8000,X
+    LDA.W   $A000,X
+    STA.L   PSRAM_ADDR+$A000,X
+    LDA.W   $C000,X
+    STA.L   PSRAM_ADDR+$C000,X
+    LDA.W   $E000,X
+    STA.L   PSRAM_ADDR+$E000,X
     DEX
     DEX
     BPL     -
 
 	DEY
 	BEQ	+
-;+$51	
+;+$51
 	SEP		#$20
 	LDA		#PSRAM_BANK+1		;+$54
 	STA.L	$7d0000+copy_1mbit_from_gbac_to_psram+$18	; Increase the MSB of all the addresses above on the form $5xxxxx
@@ -104,18 +104,18 @@ MOV_512K:
 	STA.L	$7d0000+copy_1mbit_from_gbac_to_psram+$3B
 	STA.L	$7d0000+copy_1mbit_from_gbac_to_psram+$42
 	STA.L	$7d0000+copy_1mbit_from_gbac_to_psram+$49
-	
+
 	; Increase DBR
 	PHB
 	PLA
 	INA
 	BRA	MOV_512K
-+:	
++:
     PLB        	   ; Restore DBR
     PLP
     RTS
-    	
-    	
+
+
 ; Used for running the secondary cart (plugged in at the back of the Myth)
 run_3800:
 	sep	#$30
@@ -125,14 +125,14 @@ run_3800:
     LDA     #$01                 ;
     STA.L   $C012                ; CPLD RAM ON
     STA.L   $C015                ; CPLD RAM ON
-              
+
     LDA     #$FF                 ; RUN
     STA.L   MYTH_RST_IO          ; RUN
-        
+
     LDA     #$0   ;#$00 0000     ;MYTH
     PHA                          ;
     PLB
-         
+
     LDX     #$00                 ;0  MOVE BOOT CODE TO SRAM
 -:  LDA.L   CPLD_RAM+$7D0000,X  ;0
     STA.L   $3800,X             ;0  CPLD SRAM
@@ -185,14 +185,14 @@ run_3800:
 	tax
 	cpx		#8*14
 	bne		-
-	
+
 
     LDX     #$00                 ;0  MOVE CHEAT CODE TO SRAM
 -:  LDA.L   CHEAT+$7D0000,X     ;0
     STA.L   $3E00,X             ;0  CPLD SRAM
     INX
     BNE     -                   ;0
-        
+
     JMP.L   $003800
 ;===============================================================================
 ; EXIT RAM  $003800~003FFF
@@ -200,10 +200,10 @@ run_3800:
 CPLD_RAM:
     REP	#$30        ; A,8 & X,Y 16 BIT
     LDX     #$0000
-    LDA     #$0000      
+    LDA     #$0000
 	; Clear RAM
 -:
-    STA.L   $7E0000,X  
+    STA.L   $7E0000,X
     INX
     INX
     BNE     -
@@ -232,14 +232,14 @@ CPLD_RAM:
     SEI
     SEC
     XCE             ; SET 65C02 MODE
-    JMP     ($FFFC)	; Branch to emulation mode RESET vector 
+    JMP     ($FFFC)	; Branch to emulation mode RESET vector
 
 
 CHEAT:
 	pha
 	php
 	sep		#$20
-ram_cheat1:		
+ram_cheat1:
 	lda		#0		;#0@+4
 	beq		+
 	lda		#1		;#1@+8
@@ -264,55 +264,55 @@ ram_cheat4:
 	sta.l	$030201	;addr@+40
 +:
 
-ram_cheat5:		
-	lda		#0		
+ram_cheat5:
+	lda		#0
 	beq		+
-	lda		#1		
-	sta.l	$030201	
+	lda		#1
+	sta.l	$030201
 +:
 ram_cheat6:
-	lda		#0		
+	lda		#0
 	beq		+
-	lda		#2		
-	sta.l	$030201	
+	lda		#2
+	sta.l	$030201
 +:
 ram_cheat7:
-	lda		#0		
+	lda		#0
 	beq		+
-	lda		#3		
+	lda		#3
 	sta.l	$030201
 +:
 ram_cheat8:
-	lda		#0		
+	lda		#0
 	beq		+
-	lda		#4		
-	sta.l	$030201	
+	lda		#4
+	sta.l	$030201
 +:
 
 	plp
 	pla
 branch_to_real_nmi:
 	jmp.l	$000000	;addr@+85
-	
-	
-	
-     
-	
-	
+
+
+
+
+
+
 run_secondary_cart:
 	rep		#$30
 	phx
 
 	jsl		mosaic_up + $7D0000
-	
+
 	jsl		clear_screen
-	
+
 	sep		#$20
 	lda		#1
 	sta.l	$00c017
 	lda		#$05
 	sta.l	MYTH_OPTION_IO
-	
+
 	; Fill in the cartridge name
 	ldx		#0
 -:
@@ -321,7 +321,7 @@ run_secondary_cart:
 	inx
 	cpx		#20
 	bne		-
-	
+
 	lda		#MAP_MENU_FLASH_TO_ROM
 	sta.l	MYTH_OPTION_IO
 
@@ -336,7 +336,7 @@ run_secondary_cart:
 	jsl		print_meta_string			; Print instructions
 	pla
 	jsl		print_hw_card_rev
-	
+
 	; Print region and CPU/PPU1/PPU2 versions
 	lda.l	REG_STAT78
 	lsr	a
@@ -358,7 +358,7 @@ run_secondary_cart:
 	pla
 	lda.l	REG_STAT77
 	and		#3
-	clc	
+	clc
 	adc		#65
 	pha
 	jsl		print_meta_string
@@ -370,18 +370,18 @@ run_secondary_cart:
 	pha
 	jsl		print_meta_string
 	pla
-	
+
 	jsl		update_screen
 
 	jsl		mosaic_down + $7D0000
-	
-	; Wait until B or Y is pressed	
+
+	; Wait until B or Y is pressed
 -:
 	jsl		read_joypad
 	lda.b	tcc__r0
 	and		#$c000
 	beq		-
-	
+
 	lda.b	tcc__r0
 	and		#$4000
 	beq		+
@@ -407,7 +407,7 @@ run_secondary_cart:
 	jsl		mosaic_down + $7D0000
 	plx
 	rtl
-	
+
 +:
 	lda.b	tcc__r0
 	and		#$8000
@@ -427,7 +427,7 @@ run_secondary_cart:
 	rep		#$30
 	plx
 	rtl
-	
+
 
 
 ; Apply Game Genie / Action Replay codes to game ROM data that has been copied to PSRAM
@@ -517,12 +517,12 @@ _next_cheat_code:
 	dey
 	beq		_apply_cheat_codes_done
 	jmp.l	$7d0000+_acc_loop
-_apply_cheat_codes_done:	
+_apply_cheat_codes_done:
 	sep		#$10			; 8-bit X/Y
 	ply
 	plx
 	rts
-	
+
 
 
 ; Region-checking patterns found in some NTSC games - and what to replace them with
@@ -580,7 +580,7 @@ suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
 	jmp.l	$7d0000+\6
 ++:
  .endm
- 
+
 
 ; IN:
 ; tcc__r2: first PSRAM bank
@@ -610,11 +610,11 @@ fix_region_checks:
 	plb
 	rts
 
-	
-_fix_region_checks:	
+
+_fix_region_checks:
 	rep		#$10			; 16-bit X/Y
 	sep		#$20			; 8-bit A
-	
+
 	.IFDEF EMULATOR
 	lda		#PSRAM_BANK
 	.ELSE
@@ -622,7 +622,7 @@ _fix_region_checks:
 	.ENDIF
 	pha
 	plb						; DBR = $5x (PSRAM)
-	
+
 	lda.l	REG_STAT78
 	and		#$10
 	beq		_frc_ppu_is_60hz
@@ -650,7 +650,7 @@ _frc_50hz_next:
 	inx
 	bne		-
 	rts
-	
+
 _frc_ppu_is_60hz:
 	rep		#$30
 	ldx		#0
@@ -679,46 +679,46 @@ _frc_60hz_next:
 
 _frc_possible_pal_pattern_odd:
 	rep		#$30
-	inx	
+	inx
 _frc_possible_pal_pattern:
 	jmp.l	$7d0000+_frc_check_for_pal_patterns
-	
+
 _frc_possible_ntsc_pattern_odd:
-	inx	
+	inx
 _frc_possible_ntsc_pattern:
 	rep		#$30
 	phx
 	jsr		_frc_copy_pattern
-	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern0,4,2,$a9,$00,_frc_50hz_next	
-	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern2,4,2,$a9,$00,_frc_50hz_next	
-	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern1,5,4,$a9,$00,_frc_50hz_next	
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern0,4,2,$a9,$00,_frc_50hz_next
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern2,4,2,$a9,$00,_frc_50hz_next
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern1,5,4,$a9,$00,_frc_50hz_next
 	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern3,5,4,$a9,$00,_frc_50hz_next
 	rep		#$30
 	plx
 	jmp.l	$7d0000+_frc_50hz_next
-	
+
 _frc_check_for_pal_patterns
 	rep		#$30
 	phx
 	jsr		_frc_copy_pattern
-	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern0,4,2,$a9,$10,_frc_60hz_next	
-	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern2,4,2,$a9,$10,_frc_60hz_next		
-	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern1,5,4,$a9,$10,_frc_60hz_next		
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern0,4,2,$a9,$10,_frc_60hz_next
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern2,4,2,$a9,$10,_frc_60hz_next
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern1,5,4,$a9,$10,_frc_60hz_next
 	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern3,5,4,$a9,$10,_frc_60hz_next
 	rep		#$30
 	plx
 	jmp.l	$7d0000+_frc_60hz_next
-	
+
 _frc_copy_pattern:
 	rep		#$30
 	txy
-	ldx		#1	
+	ldx		#1
 	tya
 	and		#1
 	beq		+
 	dex
 	dey
-+:	
++:
 -:
 	lda.w	PSRAM_OFFS,y
 	iny
@@ -736,7 +736,7 @@ _frc_copy_pattern:
 
 
 
-; Updates and displays the "LOADING......(nn)" string 
+; Updates and displays the "LOADING......(nn)" string
 show_loading_progress:
 	jsr.w	_wait_nmi
 	rep	#$30
@@ -760,13 +760,13 @@ show_loading_progress:
 	lda.w	load_progress,x
 	beq	+
 	sta.l	REG_VRAM_DATAW1		; Write the character number
-	lda	#8			
+	lda	#8
 	sta.l	REG_VRAM_DATAW2		; Write attributes (palette number)
 	inx
 	bra	-
 +:
 	rts
-	
+
 show_copied_data:
  .DEFINE NEO2_DEBUG 1
  .IFDEF NEO2_DEBUG
@@ -810,16 +810,16 @@ show_copied_data:
 	cpx	#8
 	bne	-
  .ENDIF
- 
+
 	rts
- 
+
 
 
 ; Reads the 64-byte "header" (ROM title, country code, checksum etc) from the currently highlighted ROM and stores it in snesRomInfo.
 get_rom_info:
 	php
 	sep	#$20
-	
+
 	lda.l	romAddressPins
 	sta	tcc__r2h
 
@@ -869,13 +869,13 @@ _gri_hirom:
 +:
 
 	sep	#$20
-	
+
 	LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
 	STA.L   MYTH_OPTION_IO
 
 	LDA     #$00
 	STA.L   MYTH_EXTM_ON   ; A25,A24 ON
-	
+
 	LDA     #$20       	; OFF A21
 	STA.L   MYTH_GBAC_ZIO
 	JSR     SET_NEOCMD	; SET MENU
@@ -884,11 +884,11 @@ _gri_hirom:
 	STA.L   MYTH_GBAC_LIO
 	STA.L   MYTH_GBAC_HIO
 	STA.L   MYTH_GBAC_ZIO
-   
+
    	plp
    	rtl
-   	
-   	
+
+
 
 ; void neo2_myth_psram_read(char *dest, u16 psramBank, u16 psramOffset, u16 length)
 neo2_myth_psram_read:
@@ -897,7 +897,7 @@ neo2_myth_psram_read:
 	phx
 	phy
 	phb
-	
+
 	lda		14,s		; psramBank
 	tax
 	lsr		a
@@ -910,16 +910,16 @@ neo2_myth_psram_read:
     lda     #$01
     sta.l   MYTH_EXTM_ON   	; A25,A24 ON
 
-    lda    #GBAC_TO_PSRAM_COPY_MODE      
+    lda    #GBAC_TO_PSRAM_COPY_MODE
     sta.l  MYTH_OPTION_IO
 
     lda    #$01       		; PSRAM WE ON !
     sta.l  MYTH_WE_IO
-                         
+
     lda    #$F8
     sta.l  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
 
-	pla         
+	pla
     sta.l  MYTH_PRAM_BIO
 
 	lda		12,s			; dest bank
@@ -929,7 +929,7 @@ neo2_myth_psram_read:
 	and		#$0F
 	ora		#$50
 	sta.l	$7d0000+_ncfmp_read+3
-	
+
 	rep		#$20
 	lda		16,s			; psramOffset
 	tax
@@ -947,7 +947,7 @@ _ncfmp_read:
 	iny
 	dec		tcc__r4
 	bne		_ncfmp_read
-	
+
 	sep		#$20
     lda     #$00       ;
     sta.l   MYTH_WE_IO     ; PSRAM WRITE OFF
@@ -957,13 +957,13 @@ _ncfmp_read:
 
 	lda     #$00
 	sta.l   MYTH_EXTM_ON   ; A25,A24 OFF
-	
+
  	plb
  	ply
  	plx
  	plp
 	rtl
-         
+
 
 ; void neo2_myth_psram_write(char *src, u16 psramBank, u16 psramOffset, u16 length)
 neo2_myth_psram_write:
@@ -972,7 +972,7 @@ neo2_myth_psram_write:
 	phx
 	phy
 	phb
-	
+
 	lda		14,s		; psramBank
 	tax
 	lsr		a
@@ -985,16 +985,16 @@ neo2_myth_psram_write:
     lda     #$01
     sta.l   MYTH_EXTM_ON   	; A25,A24 ON
 
-    lda    #GBAC_TO_PSRAM_COPY_MODE      
+    lda    #GBAC_TO_PSRAM_COPY_MODE
     sta.l  MYTH_OPTION_IO
 
     lda    #$01       		; PSRAM WE ON !
     sta.l  MYTH_WE_IO
-                         
+
     lda    #$F8
     sta.l  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
 
-	pla         
+	pla
     sta.l  MYTH_PRAM_BIO
 
 	lda		12,s			; src bank
@@ -1004,7 +1004,7 @@ neo2_myth_psram_write:
 	and		#$0F
 	ora		#$50
 	sta.l	$7d0000+_nctmp_write+3
-	
+
 	rep		#$20
 	lda		16,s			; psramOffset
 	tax
@@ -1023,7 +1023,7 @@ _nctmp_write:
 	iny
 	dec		tcc__r4
 	bne		-
-	
+
 	sep		#$20
     lda     #$00       ;
     sta.l   MYTH_WE_IO     ; PSRAM WRITE OFF
@@ -1033,41 +1033,41 @@ _nctmp_write:
 
 	lda     #$00
 	sta.l   MYTH_EXTM_ON   ; A25,A24 OFF
-	
+
  	plb
  	ply
  	plx
  	plp
 	rtl
-	
 
-         
+
+
 load_progress:
 	.db "Loading......(  )",0
-	
 
- .MACRO MOV_PSRAM_SETUP 
+
+ .MACRO MOV_PSRAM_SETUP
         LDA.L  romSize
         CMP    #\1
         BNE    +
-        LDA    #\2  
+        LDA    #\2
         STA    tcc__r0
-          
-        LDA    #<\3     
+
+        LDA    #<\3
         STA    tcc__r0+1
-        LDA    #>\3     
+        LDA    #>\3
         STA    tcc__r0h
-         
-        LDA    #\4     
+
+        LDA    #\4
         STA    tcc__r0h+1
-         
-        LDA    #\5     
+
+        LDA    #\5
         STA    tcc__r1
         JMP    MOV_PSRAM
 	+:
  .ENDM
 
- 
+
  .MACRO MAP_SRAM_CHECK
  	 CMP     #\1
          BNE     +
@@ -1077,7 +1077,7 @@ load_progress:
          JMP     MAP_SRAM_DONE
 	 +:
  .ENDM
- 
+
 .8bit
 .accu 8
 SET_NEOCM5:
@@ -1157,16 +1157,16 @@ SET_NEOCMD:
 run_game_from_gba_card:
 	jsl	clear_status_window
 	jsl	update_screen
-	
+
 	sep	#$20
-	
+
 	lda	#$7e
 	pha
 	plb
-	
+
 	lda.l	romAddressPins
 	sta	tcc__r2h
-	
+
 	 LDA    #$20      	; OFF A21
 	 STA.L  MYTH_GBAC_ZIO
 	 JSR    SET_NEOCMA  	;
@@ -1206,7 +1206,7 @@ MOV_PSRAM:
 	sta.w	load_progress+15
 	lda	tcc__r0h
 	sta.w	load_progress+14
-	
+
 	 LDA    #$00
 	 STA    tcc__r1+1
 	 sta	tcc__r3
@@ -1251,20 +1251,20 @@ MOV_PSRAM_LOOP:
 	 jsr	show_loading_progress
 
 	 LDA	tcc__r1h
-	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$07		
-	 
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$07
+
          LDA    tcc__r2
 	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$18	; First bank to write to
 	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$1f	; ...
 	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$26
 	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$2d
 	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$34
-	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$3b 
-	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$42 
-	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$49 
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$3b
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$42
+	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$49
 	 ina
 	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$54
-	
+
 	 DEC    tcc__r0+1
 	 LDA    tcc__r0+1        ; L-BYTE
 	 LDA    tcc__r0h        ; H-BYTE
@@ -1280,7 +1280,7 @@ MOV_PSRAM_LOOP:
 	; sta	tcc__r4
 	; jsr	fix_region_checks
 	; +:
-	 
+
 	; Replace the NMI vector with the cheat routine if needed
 	 lda	tcc__r3
 	 bne	+
@@ -1303,11 +1303,11 @@ MOV_PSRAM_LOOP:
 	 sta.l	$507fea		; Native mode vector
 	 sep	#$20
 	 +:
-	
+
 	 jsr	apply_cheat_codes
 	 inc	tcc__r3
 	 inc	tcc__r3
-	 
+
 ;	 jsr	show_copied_data
 
 	 DEC    tcc__r0h+1
@@ -1479,7 +1479,7 @@ MAP_SRAM:
  	MAP_SRAM_CHECK $06, $07
  	MAP_SRAM_CHECK $05, $0F
  	MAP_SRAM_CHECK $04, $0F
- 	
+
 MAP_SRAM_DONE:
 	 LDA     #$01
 	 STA.L   MYTH_SRAM_WE    ; GBA SRAM WE ON !
@@ -1601,7 +1601,7 @@ SET_EXT_DSP:
          LDA     #$06    ;$600000
          STA.L   MYTH_DSP_MAP
          JMP     MAP_DSP_DONE
-         
+
 ;-------------------------------------------------------------------------------
 ;-------------------------------------------------------------------------------
 MAP_DSP_DONE:
@@ -1618,7 +1618,7 @@ MAP_DSP_DONE:
          STA.L   MYTH_RUN_IO
 RUN_M01:
          JMP     run_3800     ; FOR EXIT RAM
-         
+
 
 ;-------------------------------------------------------------------------------
 
@@ -1649,7 +1649,7 @@ _neo_asic_cmd:
 	ply
 	plx
 	; fall into _neo_asic_op for last operation
-	
+
 
 
 ; do a Neo Flash ASIC operation
@@ -1658,13 +1658,13 @@ _neo_asic_cmd:
 ; exit:  A = result (usually dummy read)
 _neo_asic_op:
 	; TODO: write this function
-	
+
 	rts		; RTS is used here instead of RTL since this function only is supposed to be
 			; called from other RAM-resident assembly functions -- i.e. not from C functions.
-	
-	
-        
-        
+
+
+
+
 
 ; select Neo Flash Menu Flash ROM
 ; allows you to access the menu flash via flash space
@@ -1674,11 +1674,12 @@ _neo_select_menu:
 	rep		#$10
 	phx
 	phy
-	
+
 	lda		#0
 	sta.l	MYTH_OPTION_IO				; set mode 0
+	lda		#$20
 	sta.l	MYTH_GBAC_ZIO				; clear bank size reg
-	
+
 	ldx		#$0037
 	rep		#$20
 	lda.l	$7d0000+neo_mode			; enable/disable SD card interface
@@ -1688,26 +1689,17 @@ _neo_select_menu:
 	ldx		#$00DA
 	ldy		#$0044
 	jsr		_neo_asic_cmd				; set iosr = disable game flash
-	
+
 	sep		#$20
 	lda		#0
 	sta.l	MYTH_GBAC_LIO				; clear low bank select reg
 	sta.l	MYTH_GBAC_HIO				; clear high bank select reg
-	sta.l	MYTH_PRAM_BIO				; set psram to bank 0
-	lda		#$F8
-	sta.l	MYTH_GBAC_ZIO				; bank size = 1MB
-	lda		#$F0
-	sta.l	MYTH_PRAM_ZIO				; psram bank size = 2MB
-	lda		#6
-	sta.l	MYTH_WE_IO					; map bank 7, write enable myth psram
-	lda		#7
-	sta.l	MYTH_OPTION_IO				; set mode 7 (copy mode)
- 
+
 	rep		#$30
 	ply
 	plx
 	rts
-        
+
 
 ; void neo2_enable_sd(void);
 neo2_enable_sd:
@@ -1718,7 +1710,7 @@ neo2_enable_sd:
 	jsr		_neo_select_menu
 	cli								; enable interrupts
 	rtl
-		
+
 
 ; void neo2_disable_sd(void);
 neo2_disable_sd:
@@ -1729,7 +1721,7 @@ neo2_disable_sd:
 	jsr		_neo_select_menu
 	cli								; enable interrupts
 	rtl
-		
+
 
 ; void neo2_pre_sd(void);
 neo2_pre_sd:
@@ -1739,7 +1731,7 @@ neo2_pre_sd:
 	sta.l	MYTH_GBAC_LIO
 	rep		#$20
 	rtl
-		
+
 
 ; void neo2_post_sd(void);
 neo2_post_sd:
@@ -1749,7 +1741,7 @@ neo2_post_sd:
 	rep		#$20
 	cli						; enable interrupts
 	rtl
-        
+
 
 ; void neo2_recv_sd(unsigned char *buf);
 neo2_recv_sd:
@@ -1758,7 +1750,7 @@ neo2_recv_sd:
 	phx
 	phy
 	phb
-	
+
 	lda		10,s						; buf
 	tax
 	sep		#$20
@@ -1787,7 +1779,7 @@ _nrsd_loop:
 	dey
 	bne		_nrsd_loop
 
-	ldy		#8	
+	ldy		#8
 _nrsd_crc:
 	rep		#$20
 	lda.l	$6060
@@ -1813,13 +1805,13 @@ _nrsd_crc:
 	sep		#$20
 	lda		#$80
 	sta.l	MYTH_GBAC_LIO
-	
+
 	plb
 	ply
 	plx
 	plp
 	rtl
-	
+
 
 neo_mode:	.dw 0
 
