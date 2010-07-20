@@ -4565,7 +4565,7 @@ void run_rom(int reset_mode)
 							b |= 1;
 
 							psramBuf[0] = (a>>24)&0xff;psramBuf[1] = (a>>16)&0xff;
-							psramBuf[2] = (a>>8)&0xff;psramBuf[3] = (a&&0xff);
+							psramBuf[2] = (a>>8)&0xff;psramBuf[3] = (a&0xff);
 
 							psramBuf[4] = (b>>24)&0xff;psramBuf[5] = (b>>16)&0xff;
 							psramBuf[6] = (b>>8)&0xff;psramBuf[7] = (b&0xff);
