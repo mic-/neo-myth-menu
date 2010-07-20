@@ -29,10 +29,13 @@
 #define max(x,y) (((x)>(y))?(x):(y))
 
 /*tables*/
-#define EEPROM_MAPPERS_COUNT (26)
-static const char* EEPROM_MAPPERS[EEPROM_MAPPERS_COUNT] =  //shared from genplus gx
+static const char* EEPROM_MAPPERS[] =  
 {
     "T-8104B",//new - nba jam 32x
+	"GM G-4025",//new - wonder boy 3
+	"GM G-4060",//new - wonder boy in MW
+
+	//shared from genplus gx
     "T-120106",
     "T-50176",
     "T-50396",
@@ -57,7 +60,9 @@ static const char* EEPROM_MAPPERS[EEPROM_MAPPERS_COUNT] =  //shared from genplus
     "T-081586",
     "T-81576",
     "T-81476",
-    "T-120146-50"
+    "T-120146-50",
+	NULL,
+	NULL
 };
 
 /* hardware definitions */
@@ -139,6 +144,7 @@ static CheatEntry cheatEntries[CHEAT_ENTRIES_COUNT];
 static short registeredCheatEntries = 0;
 static short gResponseMsgStatus = 0;
 
+#define eeprom_inc_path "/.menu/md/eeprom.inc"
 #define dxcore_dir "/.menu/md"
 #define dxconf_cfg "/.menu/md/DXCONF.CFG"
 #define cheats_dir_default ".menu/md/cheats"
@@ -338,9 +344,29 @@ void update_display(void);
 
 static char __attribute__((aligned(16))) entrySNameBuf[64];
 static short int gChangedPage = 0;
+static short int gCacheOutOfSync = 0;
 static int inputboxDelay = 5;
 
 //macros
+inline int is_space(char c)
+{
+    switch(c)
+    {
+        case 0x9:
+        case 0xa:
+        case 0xb:
+        case 0xc:
+        case 0xd:
+        case 0x20:
+            return 1;
+
+        default:
+            return 0;
+    }
+
+    return 0;
+}
+
 //0 = 7.67 MHz, and 1 = 7.60 MHz
 inline int getClockType()
 {
@@ -2005,6 +2031,8 @@ void toggleResetMode(int index)
         gResetMode = 0x00FF;
         gOptions[index].value = "Reset to Game";
     }
+
+	gCacheOutOfSync = 1;
 }
 
 void toggleSRAMType(int index)
@@ -2021,6 +2049,8 @@ void toggleSRAMType(int index)
         gSRAMSize = 0;
         gOptions[index].value = "EEPROM";
     }
+
+	gCacheOutOfSync = 1;
 }
 /*
 int logtwo(int x)
@@ -2049,6 +2079,7 @@ void incSaveRAMSize(int index)
         gSRAMBank = 0; // max of 32 banks since minimum bank size is 8KB sram
 
     sprintf(gSRAMBankStr, "%d", gSRAMBank);
+	gCacheOutOfSync = 1;
 }
 
 void incSaveRAMBank(int index)
@@ -2059,6 +2090,7 @@ void incSaveRAMBank(int index)
         gSRAMBank = 0; // max of 32 banks since minimum bank size is 8KB sram
 
     sprintf(gSRAMBankStr, "%d", gSRAMBank);
+	gCacheOutOfSync = 1;
 }
 
 void toggleYM2413(int index)
@@ -2073,6 +2105,8 @@ void toggleYM2413(int index)
         gYM2413 = 0x0001;
         gOptions[index].value = "On";
     }
+
+	gCacheOutOfSync = 1;
 }
 
 //for the cheat support
@@ -2328,7 +2362,8 @@ void cache_invalidate_pointers()
 int cache_process()
 {
     unsigned int a = 0 , b = 0;
-    short int i;
+    int i = 0;
+	short int found = 0;
 
     clearStatusMessage();
 
@@ -2365,6 +2400,7 @@ int cache_process()
     }
 
     setStatusMessage("One-time detection in progress...");
+	gCacheOutOfSync = 1;
 
     if ((rom_hdr[0xB0] == 'R') && (rom_hdr[0xB1] == 'A'))
     {
@@ -2397,14 +2433,75 @@ int cache_process()
         if(!gSRAMSize)//check for eeprom
         {
             //intense scan
-            for(i = 0; i < EEPROM_MAPPERS_COUNT; i++)
+            for(i = 0; ; i++)
             {
+				if(EEPROM_MAPPERS[i] == NULL)
+					break;
+
                 if(!utility_memcmp(rom_hdr + 0x83,EEPROM_MAPPERS[i],utility_strlen(EEPROM_MAPPERS[i])))
                 {
+					found = 1;
                     gSRAMType = 0x0001;
                     break;
                 }
             }
+
+			if(!found)//XXX TODO XXX.menu/md/eeprom.inc
+			{
+				{
+					unsigned char* token = (unsigned char*)&buffer[((XFER_SIZE << 1) - 256)];
+					unsigned char* code = (unsigned char*)&buffer[0];
+					WCHAR* eepInc = (WCHAR*)&buffer[0];
+					short tokenLen = 0;
+					unsigned int bytesToRead = 0;
+					unsigned int bytesWritten = 0;
+					unsigned int addr = 0;
+					FIL f;
+
+					utility_c2wstrcpy(eepInc,eeprom_inc_path);
+
+					if(f_open(&f,eepInc, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+					{
+						bytesToRead = f.fsize;
+
+						if(bytesToRead > ((XFER_SIZE << 1) - 256))
+							bytesToRead = ((XFER_SIZE << 1) - 256);
+
+						if(f_read(&f,code, bytesToRead, &bytesWritten) == FR_OK)
+						{
+							while((addr < bytesWritten))
+							{
+								while(addr < bytesWritten)
+								{
+									if(!is_space(code[addr]))
+										break;
+		
+									++addr;
+								}
+
+								if( ((code[addr] == '\r') || (code[addr] == '\n')) && (tokenLen) )
+								{
+									tokenLen = 0;
+
+									if(!utility_memcmp(rom_hdr + 0x83,token,tokenLen))
+									{
+										gSRAMType = 0x0001;
+										break;
+									}
+
+									++addr;
+									continue;
+								}
+
+								token[tokenLen++] = code[addr++];
+								tokenLen = (tokenLen > 256) ? 256 : tokenLen;
+							}
+						}
+
+						f_close(&f);
+					}//parser sec
+				}
+			}
         }
     }
 
@@ -2520,6 +2617,11 @@ void cache_sync()
     if(gCurMode != MODE_SD)
         return;
 
+	if(!gCacheOutOfSync)
+		return;
+
+	gCacheOutOfSync = 0;
+
 	switch(gSelections[gCurEntry].type)
 	{
 		case 4://vgm
@@ -2612,14 +2714,14 @@ void sram_mgr_toggleService(int index)
     {
         gOptions[index].value = "Disabled";
         gManageSaves = 0;
-
+		gCacheOutOfSync = 1;
         //config_push("manageSaves","0");//will be replaced if exists
     }
     else
     {
         gOptions[index].value = "Enabled";
         gManageSaves = 1;
-
+		gCacheOutOfSync = 1;
         //config_push("manageSaves","1");//will be replaced if exists
     }
 
@@ -3786,13 +3888,9 @@ void do_options(void)
                 continue;
             }
         }
-        // check if buttons changed
-        if ((buttons & SEGA_CTRL_BUTTONS) != gButtons)
-        {
-            unsigned short int changed = (buttons & SEGA_CTRL_BUTTONS) ^ gButtons;
-            gButtons = buttons & SEGA_CTRL_BUTTONS;
 
-            if ((changed & SEGA_CTRL_UP) && (buttons & SEGA_CTRL_UP))
+        {
+            if ((buttons & SEGA_CTRL_UP))
             {
                 // UP pressed, go one entry back
                 currOption--;
@@ -3808,10 +3906,11 @@ void do_options(void)
                         start = 0;
                 }
                 update = 1;
+				delay( (getClockType()) ? 4 : 6 );
                 continue;
             }
 
-            if ((changed & SEGA_CTRL_LEFT) && (buttons & SEGA_CTRL_LEFT))
+            if ((buttons & SEGA_CTRL_LEFT))
             {
                 // LEFT pressed, go one page back
                 currOption -= PAGE_ENTRIES;
@@ -3827,10 +3926,11 @@ void do_options(void)
                         start = 0;
                 }
                 update = 1;
+				delay( (getClockType()) ? 10 : 14 );
                 continue;
             }
 
-            if ((changed & SEGA_CTRL_DOWN) && (buttons & SEGA_CTRL_DOWN))
+            if ((buttons & SEGA_CTRL_DOWN))
             {
                 // DOWN pressed, go one entry forward
                 currOption++;
@@ -3839,10 +3939,11 @@ void do_options(void)
                 if ((currOption - start) >= PAGE_ENTRIES)
                     start += PAGE_ENTRIES;
                 update = 1;
+				delay( (getClockType()) ? 4 : 6 );
                 continue;
             }
 
-            if ((changed & SEGA_CTRL_RIGHT) && (buttons & SEGA_CTRL_RIGHT))
+            if ((buttons & SEGA_CTRL_RIGHT))
             {
                 // RIGHT pressed, go one page forward
                 currOption += PAGE_ENTRIES;
@@ -3851,8 +3952,16 @@ void do_options(void)
                 if ((currOption - start) >= PAGE_ENTRIES)
                     start += PAGE_ENTRIES; // next "page" of entries
                 update = 1;
+				delay( (getClockType()) ? 10 : 14 );
                 continue;
             }
+
+		}
+
+        if ((buttons & SEGA_CTRL_BUTTONS) != gButtons)
+        {
+            unsigned short int changed = (buttons & SEGA_CTRL_BUTTONS) ^ gButtons;
+            gButtons = buttons & SEGA_CTRL_BUTTONS;
 
             if ((changed & SEGA_CTRL_A) && !(buttons & SEGA_CTRL_A))
             {
@@ -3865,6 +3974,7 @@ void do_options(void)
                 gSelectionSize = 0;
                 ipsPath[0] = 0;
                 cheat_invalidate();
+                delay( (getClockType()) ? 10 : 14 );
                 break;  // A released -> cancel, break out of while loop
             }
 
@@ -4035,6 +4145,7 @@ void do_options(void)
                 if(gOptions[currOption].exclusiveFCall)
                 {
                     clear_screen();
+	                delay( (getClockType()) ? 10 : 14 );
                     goto __options_EntryPoint;
                 }
 
@@ -4431,6 +4542,49 @@ void run_rom(int reset_mode)
             }
             else
                 cache_sync();
+
+			//patch bad headers ( based on genplus emu )
+			{
+				unsigned int a,b;
+				unsigned char* psramBuf = (unsigned char*)&buffer[0];
+				unsigned char* psramRaw = (unsigned char*)0x2001B4;
+
+				setStatusMessage("Checking for bad header...");
+				ints_off();
+
+				if( (*(unsigned char*)0x2001B0 == 'R') && (*(unsigned char*)0x2001B1 == 'A') )
+				{
+					{
+						a = psramRaw[0x00]<<24|psramRaw[0x01]<<16|psramRaw[0x02]<<8|psramRaw[0x03];
+						b = psramRaw[0x04]<<24|psramRaw[0x05]<<16|psramRaw[0x06]<<8|psramRaw[0x07];
+
+						if ((b > a) || ((b - a) >= 0x10000))
+						{
+							b = a + 0xffff;
+				 			a &= 0xfffffffe;
+							b |= 1;
+
+							psramBuf[0] = (a>>24)&0xff;psramBuf[1] = (a>>16)&0xff;
+							psramBuf[2] = (a>>8)&0xff;psramBuf[3] = (a&&0xff);
+
+							psramBuf[4] = (b>>24)&0xff;psramBuf[5] = (b>>16)&0xff;
+							psramBuf[6] = (b>>8)&0xff;psramBuf[7] = (b&0xff);
+
+							ints_off();
+							neo_copyto_myth_psram(psramBuf,0x1B4,8);
+						}
+					}
+				}
+
+				//nba jam 32x te
+				if( (utility_memcmp((void*)0x200180,"GM T-8104B",10) == 0) || (utility_memcmp((void*)0x200180,"GM T-81406",10) == 0) )
+				{
+					*(unsigned short*)&psramBuf[0] = 0x714e;
+
+					ints_off();
+					neo_copyto_myth_psram(psramBuf,0xeec,2);
+				}
+			}
 
             clearStatusMessage();
             ints_on();
@@ -5110,6 +5264,7 @@ int main(void)
     utility_memset(entrySNameBuf,'\0',64);
 	utility_memset(gProgressBarStaticBuffer,0x87,36);
 	*(gProgressBarStaticBuffer + 32) = '\0';
+	gCacheOutOfSync = 0;
 
     while(1)
     {
@@ -5232,7 +5387,7 @@ int main(void)
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 update_sd_display(); // quick hack to remove flickering
                 gRomDly += (gCurMode == MODE_SD) ? 20 : 10;
-                delay( (getClockType()) ? 4 : 6 );
+                delay( (getClockType()) ? 10 : 14 );
                 continue;
             }
             if (  (buttons & SEGA_CTRL_DOWN))
@@ -5280,7 +5435,7 @@ int main(void)
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
                 update_sd_display(); // quick hack to remove flickering
                 gRomDly += (gCurMode == MODE_SD) ? 20 : 10;
-                delay( (getClockType()) ? 4 : 6 );
+                delay( (getClockType()) ? 10 : 14 );
                 continue;
             }
         }
