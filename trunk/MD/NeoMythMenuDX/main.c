@@ -2446,7 +2446,7 @@ int cache_process()
                 }
             }
 
-			if(!found)//XXX TODO XXX.menu/md/eeprom.inc
+			if(!found)
 			{
 				{
 					unsigned char* token = (unsigned char*)&buffer[((XFER_SIZE << 1) - 256)];
@@ -2479,22 +2479,29 @@ int cache_process()
 									++addr;
 								}
 
-								if( ((code[addr] == '\r') || (code[addr] == '\n')) && (tokenLen) )
+								if( ((code[addr] == '\r') || (code[addr] == '\n')) || (addr >= bytesWritten) )
 								{
-									tokenLen = 0;
-
-									if(!utility_memcmp(rom_hdr + 0x83,token,tokenLen))
+									if(tokenLen)
 									{
-										gSRAMType = 0x0001;
-										break;
+										if(!utility_memcmp(rom_hdr + 0x83,token,tokenLen))
+										{
+											gSRAMType = 0x0001;
+											break;
+										}
 									}
 
+									tokenLen = 0;
 									++addr;
 									continue;
 								}
 
-								token[tokenLen++] = code[addr++];
-								tokenLen = (tokenLen > 256) ? 256 : tokenLen;
+								if(tokenLen < 255)
+								{
+									token[tokenLen++] = code[addr++];
+									continue;
+								}
+								
+								++addr;
 							}
 						}
 
