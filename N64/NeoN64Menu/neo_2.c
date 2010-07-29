@@ -1,0 +1,790 @@
+#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#include <libdragon.h>
+
+typedef volatile unsigned short vu16;
+typedef volatile unsigned int vu32;
+typedef volatile uint64_t vu64;
+typedef unsigned char u8;
+typedef unsigned short u16;
+typedef unsigned int u32;
+typedef uint64_t u64;
+
+// Modify 1:  double size of all IO address:
+// Modify 2:  add delay after every IO writ, otherwise, it will skip the options after the second one, only the first one can pass.
+// Modify 3:  change delay() to hw_delay()
+// Modify 4:  add ROM1 Dump and ROM2 Dump
+
+// V1.2-A hardware
+#define MYTH_IO_BASE 0xA8040000
+#define SAVE_IO   *(vu32*)(MYTH_IO_BASE | 0x00*2) // 0x00000000 = ext card save, 0x000F000F = off
+#define CIC_IO    *(vu32*)(MYTH_IO_BASE | 0x04*2) // 0 = ext card CIC, 1 = 6101, 2 = 6102, 3 = 6103, 5 = 6105, 6 = 6106
+#define ROM_BANK  *(vu32*)(MYTH_IO_BASE | 0x0C*2) // b3-0 = gba card A25-22 (8MB granularity)
+#define ROM_SIZE  *(vu32*)(MYTH_IO_BASE | 0x08*2) // b3-0 = gba card A25-22 = masked N64 A25-22
+#define RUN_IO    *(vu32*)(MYTH_IO_BASE | 0x20*2) // 0xFFFFFFFF = lock IO for game
+#define INT_IO    *(vu32*)(MYTH_IO_BASE | 0x24*2) // 0xFFFFFFFF = enable multi-card mode
+#define NEO_IO    *(vu32*)(MYTH_IO_BASE | 0x28*2) // 0xFFFFFFFF = 16 bit mode - read long from 0xB2000000 to 0xB3FFFFFF returns word
+#define ROMC_IO   *(vu32*)(MYTH_IO_BASE | 0x30*2) // 0xFFFFFFFF = run card
+#define ROMSW_IO  *(vu32*)(MYTH_IO_BASE | 0x34*2) // 0x0000 = n64 menu at 0xB0000000 to 0xB1FFFFFF and gba card at 0xB2000000 to 0xB3FFFFFF
+#define SRAM2C_I0 *(vu16*)(MYTH_IO_BASE | 0x36*2) // 0xFFFF = gba sram at 0xA8000000 to 0xA803FFFF (only when SAVE_IO = 0x000F000F)
+#define RST_IO    *(vu32*)(MYTH_IO_BASE | 0x38*2) // 0x00000000 = RESET to game, 0xFFFFFFFF = RESET to menu
+#define CIC_EN    *(vu32*)(MYTH_IO_BASE | 0x3C*2) // 0x00000000 = CIC use default, 0xFFFFFFFF = CIC open
+#define CPID_IO   *(vu32*)(MYTH_IO_BASE | 0x40*2) // 0x00000000 = CPLD ID off, 0xFFFFFFFF = CPLD ID one (0x81 = V1.1, 0x82 = V2.0)
+// V2.0 hardware
+#define SRAM2C_IO *(vu32*)(MYTH_IO_BASE | 0x2C*2) // 0xFFFFFFFF = gba sram at 0xA8000000 to 0xA803FFFF (only when SAVE_IO = 0x000F000F)
+
+
+#define SD_OFF 0x0000
+#define SD_ON  0x0480
+
+static u32 neo_mode = SD_OFF;
+
+extern unsigned int gCardTypeCmd;
+extern unsigned int gPsramCmd;
+extern short int gCardType;
+
+extern int get_cic(unsigned char *buffer);
+
+
+inline void bus_delay(int cnt)
+{
+    for(int ix=0; ix<cnt; ix++)
+        asm("\tnop\n"::);
+}
+
+inline void hw_delay()
+{
+    bus_delay(384);
+}
+
+
+#define _neo_asic_op(cmd) *(vu32 *)(0xB2000000 | (cmd<<1))
+
+// do a Neo Flash ASIC command
+inline unsigned short _neo_asic_cmd(unsigned int cmd, int full)
+{
+    unsigned int data;
+
+    if (full)
+    {
+        // need to switch rom bus for ASIC operations
+        INT_IO = 0xFFFFFFFF;            // enable multi-card mode
+        hw_delay();
+        ROMSW_IO = 0x00000000;          // gba mapped to 0xB2000000 - 0xB3FFFFFF
+        hw_delay();
+        ROM_BANK = 0x00000000;
+        hw_delay();
+        ROM_SIZE = 0x000C000C;          // bank size = 256Mbit
+        hw_delay();
+    }
+
+    // at this point, assumes rom bus in a mode that allows ASIC operations
+
+    NEO_IO = 0xFFFFFFFF;                // 16 bit mode
+    hw_delay();
+
+    /* do unlocking sequence */
+    _neo_asic_op(0x00FFD200);
+    _neo_asic_op(0x00001500);
+    _neo_asic_op(0x0001D200);
+    _neo_asic_op(0x00021500);
+    _neo_asic_op(0x00FE1500);
+    /* do ASIC command */
+    data = _neo_asic_op(cmd);
+
+    NEO_IO = 0x00000000;                // 32 bit mode
+    hw_delay();
+
+    return (unsigned short)(data & 0x0000FFFF);
+}
+
+unsigned int neo_id_card(void)
+{
+    unsigned int result, temp;
+    vu32 *sram = (vu32 *)0xA8000000;
+
+    // enable ID mode
+    _neo_asic_cmd(0x00903500, 1);       // ID enabled
+
+    // map GBA save ram into sram space
+    SAVE_IO = 0x00050005;               // save off
+    hw_delay();
+    SRAM2C_IO = 0xFFFFFFFF;             // enable gba sram
+    hw_delay();
+
+    // read ID from sram space
+    temp = sram[0];
+    result = (temp & 0xFF000000) | ((temp & 0x0000FF00)<<8);
+    temp = sram[1];
+    result |= ((temp & 0xFF000000)>>16) | ((temp & 0x0000FF00)>>8);
+
+    // disable ID mode
+    _neo_asic_cmd(0x00904900, 1);       // ID disabled
+
+    SRAM2C_IO = 0x00000000;             // disable gba sram
+    hw_delay();
+
+    return result;
+}
+
+unsigned int neo_get_cpld(void)
+{
+    unsigned int data;
+
+    INT_IO = 0xFFFFFFFF;                // enable multi-card mode
+    hw_delay();
+
+    CPID_IO = 0xFFFFFFFF;               // enable CPLD ID read
+    hw_delay();
+    data = *(vu32 *)0xB0000000;
+    hw_delay();
+    CPID_IO = 0x00000000;               // disable CPLD ID read
+    hw_delay();
+
+    return data;
+}
+
+void neo_select_menu(void)
+{
+    _neo_asic_cmd(0x00370002, 1);       // menu flash enabled
+    _neo_asic_cmd(0x00DA0044, 0);       // select menu flash
+
+    ROMSW_IO = 0xFFFFFFFF;              // gba mapped to 0xB0000000 - 0xB3FFFFFF
+    hw_delay();
+    ROM_SIZE = 0x00000000;              // bank size = 1Gbit
+    hw_delay();
+}
+
+void neo_select_game(void)
+{
+    _neo_asic_cmd(0x00370202, 1);       // game flash enabled
+    _neo_asic_cmd(gCardTypeCmd, 0);     // select game flash
+    _neo_asic_cmd(0x00EE0630, 0);       // set cr1 = enable extended address bus
+
+    ROMSW_IO = 0xFFFFFFFF;              // gba mapped to 0xB0000000 - 0xB3FFFFFF
+    hw_delay();
+    ROM_SIZE = 0x00000000;              // bank size = 1Gbit
+    hw_delay();
+}
+
+void neo_select_psram(void)
+{
+    _neo_asic_cmd(0x00E21500, 1);       // GBA CARD WE ON !
+    _neo_asic_cmd(0x00372302|neo_mode, 0); // game flash and write enabled, optionally enable SD interface
+    _neo_asic_cmd(gPsramCmd, 0);        // select psram
+    _neo_asic_cmd(0x00EE0630, 0);       // set cr1 = enable extended address bus
+
+    ROMSW_IO = 0xFFFFFFFF;              // gba mapped to 0xB0000000 - 0xB3FFFFFF
+    hw_delay();
+    ROM_SIZE = 0x000C000C;              // bank size = 256Mbit (largest psram available)
+    hw_delay();
+}
+
+void neo_psram_offset(int offs)
+{
+    _neo_asic_cmd(0x00C40000|offs, 1);  // set gba game flash offset
+
+    ROMSW_IO = 0xFFFFFFFF;              // gba mapped to 0xB0000000 - 0xB3FFFFFF
+    hw_delay();
+    ROM_SIZE = 0x000C000C;              // bank size = 256Mbit (largest psram available)
+    hw_delay();
+    NEO_IO = 0xFFFFFFFF;            // 16 bit mode
+    hw_delay();
+}
+
+void neo_copyfrom_game(void *dest, int fstart, int len)
+{
+    neo_select_game();                  // select game flash
+
+    // copy data
+    for (int ix=0; ix<len; ix+=4)
+        *(u32 *)(dest + ix) = *(vu32 *)(0xB0000000 + fstart + ix);
+}
+
+
+
+void neo_copyfrom_menu(void *dest, int fstart, int len)
+{
+    neo_select_menu();                  // select menu flash
+
+    // copy data
+    for (int ix=0; ix<len; ix+=4)
+        *(u32 *)(dest + ix) = *(vu32 *)(0xB0000000 + fstart + ix);
+}
+
+void neo_xferto_psram(void *src, int pstart, int len)
+{
+    // copy data
+    for (int ix=0; ix<len; ix+=4)
+    {
+        *(vu32 *)(0xB0000000+pstart+ix) = *(u32 *)(src+ix);
+        bus_delay(96);
+    }
+}
+
+void neo_copyto_psram(void *src, int pstart, int len)
+{
+    neo_select_psram();                 // psram enabled and write-enabled
+
+    // copy data
+    for (int ix=0; ix<len; ix+=4)
+    {
+        *(vu32 *)(0xB0000000+pstart+ix) = *(u32 *)(src+ix);
+        bus_delay(96);
+    }
+}
+
+void neo_copyfrom_psram(void *dest, int pstart, int len)
+{
+    neo_select_psram();                 // psram enabled and write-enabled
+
+    // copy data
+    for (int ix=0; ix<len; ix+=4)
+        *(u32 *)(dest + ix) = *(vu32 *)(0xB0000000 + pstart + ix);
+}
+
+void neo_copyto_sram(void *src, int sstart, int len)
+{
+}
+
+void neo_copyfrom_sram(void *dst, int sstart, int len)
+{
+}
+
+void neo_get_rtc(unsigned char *rtc)
+{
+}
+
+void neo2_enable_sd(void)
+{
+    neo_mode = SD_ON;
+    neo_select_psram();
+
+    NEO_IO = 0xFFFFFFFF;                // 16 bit mode
+    hw_delay();
+}
+
+void neo2_disable_sd(void)
+{
+    neo_mode = SD_OFF;
+    neo_select_psram();
+
+    NEO_IO = 0x00000000;                // 32 bit mode
+    hw_delay();
+}
+
+void neo2_pre_sd(void)
+{
+}
+
+void neo2_post_sd(void)
+{
+}
+
+int neo2_recv_sd_multi(unsigned char *buf, int count)
+{
+    int res;
+    asm(".set push\n"
+        ".set noreorder\n\t"
+        "lui $15,0xB30E\n\t"            // $15 = 0xB30E0000
+        "ori $14,%1,0\n\t"              // $14 = buf
+        "ori $12,%2,0\n"                // $12 = count
+
+        "oloop:\n\t"
+        "lui $11,0x0001\n"              // $11 = timeout = 64 * 1024
+
+        "tloop:\n\t"
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "andi $2,$2,0x0100\n\t"         // eqv of (data>>8)&0x01
+        "beq $2,$0,getsect\n\t"         // start bit detected
+        "nop\n\t"
+        "addiu $11,$11,-1\n\t"
+        "bne $11,$0,tloop\n\t"          // not timed out
+        "nop\n\t"
+        "beq $11,$0,exit\n\t"           // timeout
+        "ori %0,$0,0\n"                 // res = FALSE
+
+        "getsect:\n\t"
+        "ori $13,$0,128\n"              // $13 = long count
+
+        "gsloop:\n\t"
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4 => -a-- -a--
+        "lui $10,0xF000\n\t"            // $10 = mask = 0xF0000000
+        "sll $2,$2,4\n\t"               // a--- a---
+
+        "lw $3,0x6060($15)\n\t"         // rdMmcDatBit4 => -b-- -b--
+        "and $2,$2,$10\n\t"             // a000 0000
+        "lui $10,0x0F00\n\t"            // $10 = mask = 0x0F000000
+        "and $3,$3,$10\n\t"             // 0b00 0000
+
+        "lw $4,0x6060($15)\n\t"         // rdMmcDatBit4 => -c-- -c--
+        "lui $10,0x00F0\n\t"            // $10 = mask = 0x00F00000
+        "or $11,$3,$2\n\t"              // $11 = ab00 0000
+        "srl $4,$4,4\n\t"               // --c- --c-
+
+        "lw $5,0x6060($15)\n\t"         // rdMmcDatBit4 => -d-- -d--
+        "and $4,$4,$10\n\t"             // 00c0 0000
+        "lui $10,0x000F\n\t"            // $10 = mask = 0x000F0000
+        "srl $5,$5,8\n\t"               // ---d ---d
+        "or $11,$11,$4\n\t"             // $11 = abc0 0000
+
+        "lw $6,0x6060($15)\n\t"         // rdMmcDatBit4 => -e-- -e--
+        "and $5,$5,$10\n\t"             // 000d 0000
+        "ori $10,$0,0xF000\n\t"         // $10 = mask = 0x0000F000
+        "sll $6,$6,4\n\t"               // e--- e---
+        "or $11,$11,$5\n\t"             // $11 = abcd 0000
+
+        "lw $7,0x6060($15)\n\t"         // rdMmcDatBit4 => -f-- -f--
+        "and $6,$6,$10\n\t"             // 0000 e000
+        "ori $10,$0,0x0F00\n\t"         // $10 = mask = 0x00000F00
+        "or $11,$11,$6\n\t"             // $11 = abcd e000
+        "and $7,$7,$10\n\t"             // 0000 0f00
+
+        "lw $8,0x6060($15)\n\t"         // rdMmcDatBit4 => -g-- -g--
+        "ori $10,$0,0x00F0\n\t"         // $10 = mask = 0x000000F0
+        "or $11,$11,$7\n\t"             // $11 = abcd ef00
+        "srl $8,$8,4\n\t"               // --g- --g-
+
+        "lw $9,0x6060($15)\n\t"         // rdMmcDatBit4 => -h-- -h--
+        "and $8,$8,$10\n\t"             // 0000 00g0
+        "ori $10,$0,0x000F\n\t"         // $10 = mask = 0x000000F
+        "or $11,$11,$8\n\t"             // $11 = abcd efg0
+
+        "srl $9,$9,8\n\t"               // ---h ---h
+        "and $9,$9,$10\n\t"             // 0000 000h
+        "or $11,$11,$9\n\t"             // $11 = abcd efgh
+
+        "sw $11,0($14)\n\t"              // save sector data
+        "addiu $13,$13,-1\n\t"
+        "bne $13,$0,gsloop\n\t"
+        "addiu $14,$14,4\n\t"           // inc buffer pointer
+
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4 - just toss checksum bytes
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4
+
+        "lw $2,0x6060($15)\n\t"         // rdMmcDatBit4 - clock out end bit
+
+        "addiu $12,$12,-1\n\t"          // count--
+        "bne $12,$0,oloop\n\t"          // next sector
+        "nop\n\t"
+
+        "ori %0,$0,1\n"                 // res = TRUE
+
+        "exit:\n"
+        ".set pop\n"
+        : "=r" (res)                    // output
+        : "r" (buf), "r" (count)        // inputs
+        : "$0" );                       // clobbered
+    return res;
+}
+
+//----------------------------------------------------------------------
+//
+//----------------------------------------------------------------------
+
+#define CIC_6101 1
+#define CIC_6102 2
+#define CIC_6103 3
+#define CIC_6104 4
+#define CIC_6105 5
+#define CIC_6106 6
+
+// Simulated PIF ROM bootcode adapted from DaedalusX64 emulator
+void simulate_pif_boot(u32 cic_chip)
+{
+    u32 ix;
+    vu32 *src, *dst;
+    u32 country = ((*(vu32 *)0xB000003C) >> 8) & 0xFF;
+    vu64 *gGPR = (vu64 *)0xA0100000;
+
+    // Copy low 0x1000 bytes to DMEM
+    src = (vu32 *)0xB0000000;
+    dst = (vu32 *)0xA4000000;
+    for (ix=0; ix<(0x1000>>2); ix++)
+        dst[ix] = src[ix];
+
+    // Need to copy crap to IMEM for CIC-6105 boot.
+    dst = (vu32 *)0xA4001000;
+
+    // register values due to pif boot for CiC chip and country code, and IMEM crap
+
+    gGPR[0]=0x0000000000000000LL;
+    gGPR[6]=0xFFFFFFFFA4001F0CLL;
+    gGPR[7]=0xFFFFFFFFA4001F08LL;
+    gGPR[8]=0x00000000000000C0LL;
+    gGPR[9]=0x0000000000000000LL;
+    gGPR[10]=0x0000000000000040LL;
+    gGPR[11]=0xFFFFFFFFA4000040LL;
+    gGPR[16]=0x0000000000000000LL;
+    gGPR[17]=0x0000000000000000LL;
+    gGPR[18]=0x0000000000000000LL;
+    gGPR[19]=0x0000000000000000LL;
+    gGPR[21]=0x0000000000000000LL;
+    gGPR[26]=0x0000000000000000LL;
+    gGPR[27]=0x0000000000000000LL;
+    gGPR[28]=0x0000000000000000LL;
+    gGPR[29]=0xFFFFFFFFA4001FF0LL;
+    gGPR[30]=0x0000000000000000LL;
+
+    switch (country) {
+        case 0x44: //Germany
+        case 0x46: //french
+        case 0x49: //Italian
+        case 0x50: //Europe
+        case 0x53: //Spanish
+        case 0x55: //Australia
+        case 0x58: // ????
+        case 0x59: // X (PAL)
+            switch (cic_chip) {
+                case CIC_6102:
+                    gGPR[5]=0xFFFFFFFFC0F1D859LL;
+                    gGPR[14]=0x000000002DE108EALL;
+                    gGPR[24]=0x0000000000000000LL;
+                    break;
+                case CIC_6103:
+                    gGPR[5]=0xFFFFFFFFD4646273LL;
+                    gGPR[14]=0x000000001AF99984LL;
+                    gGPR[24]=0x0000000000000000LL;
+                    break;
+                case CIC_6105:
+                    dst[0x04>>2] = 0xBDA807FC;
+                    gGPR[5]=0xFFFFFFFFDECAAAD1LL;
+                    gGPR[14]=0x000000000CF85C13LL;
+                    gGPR[24]=0x0000000000000002LL;
+                    break;
+                case CIC_6106:
+                    gGPR[5]=0xFFFFFFFFB04DC903LL;
+                    gGPR[14]=0x000000001AF99984LL;
+                    gGPR[24]=0x0000000000000002LL;
+                    break;
+            }
+
+            gGPR[20]=0x0000000000000000LL;
+            gGPR[23]=0x0000000000000006LL;
+            gGPR[31]=0xFFFFFFFFA4001554LL;
+            break;
+        case 0x37: // 7 (Beta)
+        case 0x41: // ????
+        case 0x45: //USA
+        case 0x4A: //Japan
+        default:
+            switch (cic_chip) {
+                case CIC_6102:
+                    gGPR[5]=0xFFFFFFFFC95973D5LL;
+                    gGPR[14]=0x000000002449A366LL;
+                    break;
+                case CIC_6103:
+                    gGPR[5]=0xFFFFFFFF95315A28LL;
+                    gGPR[14]=0x000000005BACA1DFLL;
+                    break;
+                case CIC_6105:
+                    dst[0x04>>2] = 0x8DA807FC;
+                    gGPR[5]=0x000000005493FB9ALL;
+                    gGPR[14]=0xFFFFFFFFC2C20384LL;
+                case CIC_6106:
+                    gGPR[5]=0xFFFFFFFFE067221FLL;
+                    gGPR[14]=0x000000005CD2B70FLL;
+                    break;
+            }
+            gGPR[20]=0x0000000000000001LL;
+            gGPR[23]=0x0000000000000000LL;
+            gGPR[24]=0x0000000000000003LL;
+            gGPR[31]=0xFFFFFFFFA4001550LL;
+    }
+
+    switch (cic_chip) {
+        case CIC_6101:
+            gGPR[22]=0x000000000000003FLL;
+            break;
+        case CIC_6102:
+            gGPR[1]=0x0000000000000001LL;
+            gGPR[2]=0x000000000EBDA536LL;
+            gGPR[3]=0x000000000EBDA536LL;
+            gGPR[4]=0x000000000000A536LL;
+            gGPR[12]=0xFFFFFFFFED10D0B3LL;
+            gGPR[13]=0x000000001402A4CCLL;
+            gGPR[15]=0x000000003103E121LL;
+            gGPR[22]=0x000000000000003FLL;
+            gGPR[25]=0xFFFFFFFF9DEBB54FLL;
+            break;
+        case CIC_6103:
+            gGPR[1]=0x0000000000000001LL;
+            gGPR[2]=0x0000000049A5EE96LL;
+            gGPR[3]=0x0000000049A5EE96LL;
+            gGPR[4]=0x000000000000EE96LL;
+            gGPR[12]=0xFFFFFFFFCE9DFBF7LL;
+            gGPR[13]=0xFFFFFFFFCE9DFBF7LL;
+            gGPR[15]=0x0000000018B63D28LL;
+            gGPR[22]=0x0000000000000078LL;
+            gGPR[25]=0xFFFFFFFF825B21C9LL;
+            break;
+        case CIC_6105:
+            dst[0x00>>2] = 0x3C0DBFC0;
+            dst[0x08>>2] = 0x25AD07C0;
+            dst[0x0C>>2] = 0x31080080;
+            dst[0x10>>2] = 0x5500FFFC;
+            dst[0x14>>2] = 0x3C0DBFC0;
+            dst[0x18>>2] = 0x8DA80024;
+            dst[0x1C>>2] = 0x3C0BB000;
+            gGPR[1]=0x0000000000000000LL;
+            gGPR[2]=0xFFFFFFFFF58B0FBFLL;
+            gGPR[3]=0xFFFFFFFFF58B0FBFLL;
+            gGPR[4]=0x0000000000000FBFLL;
+            gGPR[12]=0xFFFFFFFF9651F81ELL;
+            gGPR[13]=0x000000002D42AAC5LL;
+            gGPR[15]=0x0000000056584D60LL;
+            gGPR[22]=0x0000000000000091LL;
+            gGPR[25]=0xFFFFFFFFCDCE565FLL;
+            break;
+        case CIC_6106:
+            gGPR[1]=0x0000000000000000LL;
+            gGPR[2]=0xFFFFFFFFA95930A4LL;
+            gGPR[3]=0xFFFFFFFFA95930A4LL;
+            gGPR[4]=0x00000000000030A4LL;
+            gGPR[12]=0xFFFFFFFFBCB59510LL;
+            gGPR[13]=0xFFFFFFFFBCB59510LL;
+            gGPR[15]=0x000000007A3C07F4LL;
+            gGPR[22]=0x0000000000000085LL;
+            gGPR[25]=0x00000000465E3F72LL;
+            break;
+    }
+
+    // set HW registers - PI_BSD_DOM1 regs, etc
+
+
+    // now set MIPS registers - set CP0, and then GPRs, then jump thru gpr11 (which is 0xA400040)
+    asm(".set noat\n\t"
+        ".set noreorder\n\t"
+        "li $8,0x34000000\n\t"
+        "mtc0 $8,$12\n\t"
+        "nop\n\t"
+        "li $9,0x0006E463\n\t"
+        "mtc0 $9,$16\n\t"
+        "nop\n\t"
+        "li $8,0x00005000\n\t"
+        "mtc0 $8,$9\n\t"
+        "nop\n\t"
+        "li $9,0x0000005C\n\t"
+        "mtc0 $9,$13\n\t"
+        "nop\n\t"
+        "li $8,0x007FFFF0\n\t"
+        "mtc0 $8,$4\n\t"
+        "nop\n\t"
+        "li $9,0xFFFFFFFF\n\t"
+        "mtc0 $9,$14\n\t"
+        "nop\n\t"
+        "mtc0 $9,$8\n\t"
+        "nop\n\t"
+        "mtc0 $9,$30\n\t"
+        "nop\n\t"
+        "lui $31,0xA010\n\t"
+        "ld $1,0x08($31)\n\t"
+        "ld $2,0x10($31)\n\t"
+        "ld $3,0x18($31)\n\t"
+        "ld $4,0x20($31)\n\t"
+        "ld $5,0x28($31)\n\t"
+        "ld $6,0x30($31)\n\t"
+        "ld $7,0x38($31)\n\t"
+        "ld $8,0x40($31)\n\t"
+        "ld $9,0x48($31)\n\t"
+        "ld $10,0x50($31)\n\t"
+        "ld $11,0x58($31)\n\t"
+        "ld $12,0x60($31)\n\t"
+        "ld $13,0x68($31)\n\t"
+        "ld $14,0x70($31)\n\t"
+        "ld $15,0x78($31)\n\t"
+        "ld $16,0x80($31)\n\t"
+        "ld $17,0x88($31)\n\t"
+        "ld $18,0x90($31)\n\t"
+        "ld $19,0x98($31)\n\t"
+        "ld $20,0xA0($31)\n\t"
+        "ld $21,0xA8($31)\n\t"
+        "ld $22,0xB0($31)\n\t"
+        "ld $23,0xB8($31)\n\t"
+        "ld $24,0xC0($31)\n\t"
+        "ld $25,0xC8($31)\n\t"
+        "ld $26,0xD0($31)\n\t"
+        "ld $27,0xD8($31)\n\t"
+        "ld $28,0xE0($31)\n\t"
+        "ld $29,0xE8($31)\n\t"
+        "ld $30,0xF0($31)\n\t"
+        "ld $31,0xF8($31)\n\t"
+        "jr $11\n\t"
+        "nop"
+        ::: "$8" );
+}
+
+/*
+Address 0x1D0000 arrangement:
+every 64 bytes is a item for one game, inside the 64 bytes:
+[0] : game flag, 0xFF-> game's item,  0x00->end item
+[1] : high byte of rom bank
+[2] : low byte of rom bank
+[3] : high byte of rom size
+[4] : low byte of rom size
+[5] : save value, which range from 0x00~0x06
+[6] : game cic value, which range from 0x00~0x06
+[7] : game mode value, which range from 0x00~0x0F
+[8~63] : game name string
+
+about the word of rombank and romsize:
+  0M ROM_BANK   0 0 0 0  -> 0x0000
+ 64M ROM_BANK   0 0 0 1  -> 0x0001
+128M ROM_BANK   0 0 1 0  -> 0x0002
+256M ROM_BANK   0 1 0 0  -> 0x0004
+512M ROM_BANK   1 0 0 0  -> 0x0008
+  1G ROM_BANK   0 0 0 0  -> 0x0000 // only when ROM SIZE also que to zero
+
+ 64M ROM_SIZE   1 1 1 1  -> 0x000F
+128M ROM_SIZE   1 1 1 0  -> 0x000E
+256M ROM_SIZE   1 1 0 0  -> 0x000C
+512M ROM_SIZE   1 0 0 0  -> 0x0008
+  1G ROM_SIZE   0 0 0 0  -> 0x0000
+*/
+
+
+#define N64_MENU_ENTRY  (0xB0000000 + 0x1D0000)
+
+
+void neo_run_game(u8 *option, int reset)
+{
+    u32 rombank=0;
+    u32 romsize=0;
+    u32 romsave=0;
+    u32 romcic=0;
+    u32 rommode=0;
+    u32 gamelen;
+    u32 runcic;
+
+    rombank = (option[1]<<8) + option[2];
+    rombank += (rombank<<16);
+
+    romsize = (option[3]<<8) + option[4];
+    romsize += (romsize<<16);
+
+    romsave = (option[5]<<16) + option[5];
+    romcic  = (option[6]<<16) + option[6];
+    rommode = (option[7]<<16) + option[7];
+
+    if ((romsize && 0xFFFF) > 0x000F)
+    {
+        // romsize is number of Mbits in rom
+        gamelen = (romsize & 0xFFFF)*128*1024;
+        if (gamelen <= (8*1024*1024))
+            romsize = 0x000F000F;
+        else if (gamelen <= (16*1024*1024))
+            romsize = 0x000E000E;
+        else if (gamelen <= (32*1024*1024))
+            romsize = 0x000C000C;
+        else if (gamelen <= (64*1024*1024))
+            romsize = 0x00080008;
+        else
+            romsize = 0x00000000;
+    }
+
+    neo_select_game();                  // select game flash
+
+    // if set to use card cic, figure out cic for simulated start
+    if (romcic == 0)
+        runcic = get_cic((unsigned char *)0xB0000040);
+    else
+        runcic = romcic & 7;
+
+    // set myth hw for selected rom
+    ROM_BANK = rombank;
+    hw_delay();
+    ROM_SIZE = romsize;
+    hw_delay();
+    SAVE_IO  = romsave;
+    hw_delay();
+    CIC_IO   = reset ? 0x00020002 : romcic;
+    hw_delay();
+    RST_IO = reset ? 0xFFFFFFFF : 0x00000000;
+    hw_delay();
+    RUN_IO  = 0xFFFFFFFF;
+    hw_delay();
+
+    // start cart
+    disable_interrupts();
+    simulate_pif_boot(runcic);          // should never return
+    enable_interrupts();
+}
+
+void neo_run_psram(u8 *option, int reset)
+{
+    u32 romsize=0;
+    u32 romsave=0;
+    u32 romcic=0;
+    u32 rommode=0;
+    u32 gamelen;
+    u32 runcic;
+
+    romsize = (option[3]<<8) + option[4];
+    romsize += (romsize<<16);
+
+    romsave = (option[5]<<16) + option[5];
+    romcic  = (option[6]<<16) + option[6];
+    rommode = (option[7]<<16) + option[7];
+
+    if ((romsize && 0xFFFF) > 0x000F)
+    {
+        // romsize is number of Mbits in rom
+        gamelen = (romsize & 0xFFFF)*128*1024;
+        if (gamelen <= (8*1024*1024))
+            romsize = 0x000F000F;
+        else if (gamelen <= (16*1024*1024))
+            romsize = 0x000E000E;
+        else if (gamelen <= (32*1024*1024))
+            romsize = 0x000C000C;
+        else if (gamelen <= (64*1024*1024))
+            romsize = 0x00080008;
+        else
+            romsize = 0x00000000;
+    }
+
+    neo_mode = SD_OFF;                  // make sure SD card interface is disabled
+    neo_select_psram();                 // select gba psram
+    _neo_asic_cmd(0x00E2D200, 1);       // GBA CARD WE OFF !
+
+    // if set to use card cic, figure out cic for simulated start
+    if (romcic == 0)
+        runcic = get_cic((unsigned char *)0xB0000040);
+    else
+        runcic = romcic & 7;
+
+    // set myth hardware for selected rom
+    ROMSW_IO = 0xFFFFFFFF;              // gba mapped to 0xB0000000 - 0xB3FFFFFF
+    hw_delay();
+    ROM_BANK = 0x00000000;
+    hw_delay();
+    ROM_SIZE = romsize;
+    hw_delay();
+    SAVE_IO  = romsave;
+    hw_delay();
+    CIC_IO   = reset ? 0x00020002 : romcic;
+    hw_delay();
+    RST_IO = reset ? 0xFFFFFFFF : 0x00000000;
+    hw_delay();
+    RUN_IO   = 0xFFFFFFFF;
+    hw_delay();
+
+    // start cart
+    disable_interrupts();
+    simulate_pif_boot(runcic);          // should never return
+    enable_interrupts();
+}
