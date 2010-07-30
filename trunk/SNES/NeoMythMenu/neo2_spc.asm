@@ -23,6 +23,9 @@ play_spc_from_gba_card:
 	pea	73
 	jsl	print_meta_string			; Print instructions
 	pla
+	pea		0
+	jsl		print_meta_string			; Print instructions
+	pla	
 	jsl	print_hw_card_rev
 
 	jsl	update_screen
@@ -64,7 +67,8 @@ play_spc_from_gba_card:
         LDA    #$00
         STA.L  MYTH_PRAM_BIO
 
-	jsr	load_spc
+		jsr	load_spc
+		jsr	neo2_spc_puts_tag
 	
         LDA     #$00       ;
         STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
@@ -102,11 +106,53 @@ play_spc_from_gba_card:
         rtl
         
 
+
+neo2_spc_puts_tag:
+	php
+ 	jsr.w	_wait_nmi
+	rep	#$30
+	lda	#$2163
+	sta.l	REG_VRAM_ADDR_L
+	ldx	#SPC_TAG_TITLE_ADDR
+	jsr	++
+	lda	#$2183
+	sta.l	REG_VRAM_ADDR_L
+	ldx	#SPC_TAG_GAME_ADDR
+	jsr	++
+	lda	#$21A3
+	sta.l	REG_VRAM_ADDR_L
+	ldx	#SPC_TAG_ARTIST_ADDR
+	jsr	++
+	plp
+	rts
+++:	
+	sep	#$20
+	ldy	#0
+-:
+	lda.l	$410000,x
+	beq		+
+	sta.l	REG_VRAM_DATAW1
+	lda		#8
+	sta.l	REG_VRAM_DATAW2
+	inx
+	iny
+	cpy		#28
+	bne		-
++:
+	rep		#$20
+	rts
+	
+	
+	
  ; The initialization code will be written to this address in SPC RAM if no better location is found
  .equ SPC_DEFAULT_INIT_ADDRESS	$ff70
  
- .equ SPC_REG_ADDR		$410000
- .equ SPC_DSP_REG_ADDR		$410008
+ .equ SPC_REG_ADDR		$4100A5 ;00
+ .equ SPC_DSP_REG_ADDR		$410000 ;8
+  
+ .equ SPC_TAG_TITLE_ADDR	$4100AE
+ .equ SPC_TAG_GAME_ADDR		$4100CE
+ .equ SPC_TAG_ARTIST_ADDR	$410131
   
  ; The length of our init routine in bytes
  .equ SPC_INIT_CODE_LENGTH 	$2b 
@@ -393,6 +439,7 @@ play_spc_from_gba_card:
   	sta.l	$7f8000,x
   	dex
   	bpl 	-
+	
   
  	rts
  

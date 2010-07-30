@@ -3,6 +3,7 @@
 #include "basetypes.h"
 #include "u_strings.h"
 //#include <u_memory.h>
+#include <string.h>
 
 // #########################################################################
 

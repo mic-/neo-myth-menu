@@ -5,6 +5,8 @@
 
 extern void copy_ram_code();
 
+extern void neo2_myth_current_rom_read(char *dest, u16 romBank, u16 romOffset, u16 length);
+
 extern void neo2_myth_psram_read(char *dest, u16 psramBank, u16 psramOffset, u16 length);
 extern void neo2_myth_psram_write(char *src, u16 psramBank, u16 psramOffset, u16 length);
 
@@ -19,6 +21,6 @@ extern void run_secondary_cart();
 
 extern void play_spc_from_gba_card();
 
-extern void get_rom_info();
+//extern void get_rom_info();
 
 #endif
