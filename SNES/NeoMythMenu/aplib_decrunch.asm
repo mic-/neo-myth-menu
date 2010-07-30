@@ -20,7 +20,12 @@
 .DEFINE APLIB_OFFS	APLIB_BITCOUNT+1
 .DEFINE APLIB_GAMMA APLIB_OFFS+2
 .DEFINE APLIB_OFFS2 APLIB_GAMMA+2
-
+.DEFINE APLIB_RAMCODE APLIB_OFFS2+3
+.DEFINE APLIB_OLDDEST APLIB_RAMCODE+16
+.DEFINE APLIB_PLANAR APLIB_OLDDEST+2
+.DEFINE APLIB_COUNT APLIB_OFFS
+.DEFINE APLIB_COUNT2 APLIB_OFFS2
+.DEFINE APLIB_NUMBYTES APLIB_GAMMA
 
     
 ; In:
@@ -35,6 +40,16 @@ aplib_decrunch:
 	phx
 	phy
 	phb
+
+	sep		#$20
+	ldx		#0
+-:
+	lda.l	aplib_ramcode_start,x
+	sta		APLIB_RAMCODE,x
+	inx
+	cpx		#(aplib_ramcode_end-aplib_ramcode_start)
+	bne		-
+	rep		#$20
 	
 	lda		10,s			; source address (low 16 bits)
 	tay
@@ -144,9 +159,10 @@ compare_128:
 	inc		APLIB_GAMMA
 	jmp		continue_short_match
 	
+	sep		#$20
+	
 ; get_bit: Get bits from the crunched data and insert the most significant bit in the carry flag.
 get_bit:
-	sep		#$20
 	dec		APLIB_BITCOUNT
 	bne		still_bits_left
 	lda		#8
@@ -160,15 +176,14 @@ still_bits_left:
 
 ; decode_gamma: Decode values from the crunched data using gamma code
 decode_gamma:
-	rep		#$20
+	sep		#$20
 	lda		#1
 	sta		APLIB_GAMMA
+	stz		APLIB_GAMMA+1
 get_more_gamma:
 	jsr		get_bit
-	rep		#$20
-	lda		APLIB_GAMMA
-	adc		APLIB_GAMMA
-	sta		APLIB_GAMMA
+	rol		APLIB_GAMMA
+	rol		APLIB_GAMMA+1
 	jsr		get_bit
 	bcs		get_more_gamma
 	rts
@@ -195,16 +210,21 @@ copy_code_pair:
 	txa
 	sec
 	sbc		APLIB_OFFS			; dest - offs
-	tay
-loop_do_copy:
-	sep		#$20
-	lda.w	$0000,y
-	sta.w	$0000,x
-	inx
-	iny
-	rep		#$20
-	dec		APLIB_GAMMA
-	bne		loop_do_copy
+	txy
+	tax
+	
+	sep 		#$20 
+	phb 	
+	pla	
+	sta 		APLIB_RAMCODE+1	; overwrite source and dest banks for the MVN instruction in RAM
+	sta 		APLIB_RAMCODE+2	; ...
+	rep 		#$20	
+	lda 		APLIB_GAMMA 		
+	dea			   				; MVN copies A+1 bytes
+	jml 		APLIB_RAMCODE 
+	after_copy:
+	tyx	
+	
 	ply
 	lda		#1
 	sta		APLIB_LWM
@@ -217,6 +237,11 @@ end_decrunch:
 	plx
 	plp
 	rtl
+
+aplib_ramcode_start:
+	mvn 0,0
+	jml after_copy
+aplib_ramcode_end:
 
 .ends
 

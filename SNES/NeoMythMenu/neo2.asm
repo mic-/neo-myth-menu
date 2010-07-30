@@ -116,6 +116,13 @@ MOV_512K:
     RTS
 
 
+.EQU cpldJoyData $3900
+.EQU cpldJoyMask $3902
+.EQU cpldArEnabled $3904
+.EQU cpldSlowMo	 $3905
+.EQU cpldSaveTimEn $3906
+
+
 ; Used for running the secondary cart (plugged in at the back of the Myth)
 run_3800:
 	sep	#$30
@@ -186,6 +193,14 @@ run_3800:
 	cpx		#8*14
 	bne		-
 
+	lda		#0
+	sta.l	cpldJoyData
+	sta.l	cpldJoyData+1
+	sta.l	cpldJoyMask
+	sta.l	cpldJoyMask+1
+	sta.l	cpldSlowMo
+	lda		#1
+	sta.l	cpldArEnabled
 
     LDX     #$00                 ;0  MOVE CHEAT CODE TO SRAM
 -:  LDA.L   CHEAT+$7D0000,X     ;0
@@ -195,7 +210,7 @@ run_3800:
 
     JMP.L   $003800
 ;===============================================================================
-; EXIT RAM  $003800~003FFF
+; EXT RAM  $003800~003FFF
 ;===============================================================================
 CPLD_RAM:
     REP	#$30        ; A,8 & X,Y 16 BIT
@@ -236,9 +251,51 @@ CPLD_RAM:
 
 
 CHEAT:
-	pha
 	php
+	rep		#$30
+	pha
+	phx
+	phb
+	
 	sep		#$20
+	lda		#0
+	pha
+	plb
+	
+	sei
+	;lda		REG_NMI_TIMEN
+	sta		cpldSaveTimEn
+	lda		#1
+	;sta		REG_NMI_TIMEN
+	
+	
+	rep		#$20
+;lda $4218
+;sta	cpldJoyData
+	lda		cpldJoyData
+	tax
+	eor		cpldJoyMask
+	stx		cpldJoyMask
+	and		cpldJoyMask
+	sta		cpldJoyData
+	lda		cpldJoyMask
+	and		#$C04 ;D0C			; don't block Select, L, R
+	sta		cpldJoyMask
+
+	lda		cpldJoyData
+	and		#$D04 ;20B			; Select, L, R, A
+	cmp		#$D04 ;20B
+	bne		+
+	sep		#$20
+	lda		cpldArEnabled
+	eor		#1
+	sta		cpldArEnabled
+	;beq		ram_cheats_disabled
++:
+
+	sep		#$20
+	lda		cpldArEnabled
+	beq		ram_cheats_disabled	
 ram_cheat1:
 	lda		#0		;#0@+4
 	beq		+
@@ -288,9 +345,39 @@ ram_cheat8:
 	lda		#4
 	sta.l	$030201
 +:
+ram_cheats_disabled:
 
-	plp
+	rep		#$20
+	lda		cpldJoyData
+	and		#$E04 ;207			; Select, L, R, X
+	cmp		#$E04 ;207
+	bne		+
+	sep		#$20
+	lda		cpldSlowMo
+	eor		#1
+	sta		cpldSlowMo
+	;beq		slowmo_disabled
++:
+	sep		#$20
+	lda		cpldSlowMo
+	beq		slowmo_disabled
+	
+	; Wait one frame
+-:
+	lda.l	REG_RDNMI
+	bmi	-
+-:
+	lda.l	REG_RDNMI
+	bpl	-
+slowmo_disabled:
+	lda		cpldSaveTimEn
+	;sta		REG_NMI_TIMEN	
+	
+	plb
+	rep		#$30
+	plx
 	pla
+	plp
 branch_to_real_nmi:
 	jmp.l	$000000	;addr@+85
 
@@ -816,12 +903,18 @@ show_copied_data:
 
 
 ; Reads the 64-byte "header" (ROM title, country code, checksum etc) from the currently highlighted ROM and stores it in snesRomInfo.
-get_rom_info:
+;get_rom_info:
+; void neo2_myth_current_rom_read(char *dest, u16 romBank, u16 romOffset, u16 length)
+neo2_myth_current_rom_read:
 	php
-	sep	#$20
+	rep		#$30
+	phx
+	phy
+	phb
 
+	sep		#$20
 	lda.l	romAddressPins
-	sta	tcc__r2h
+	sta		tcc__r2h
 
 	LDA    #$20      	; OFF A21
 	STA.L  MYTH_GBAC_ZIO
@@ -844,29 +937,56 @@ get_rom_info:
 	LDA.L  romAddressPins
 	STA.L  MYTH_GBAC_LIO
 
-	lda.l	romRunMode
-	beq	_gri_hirom
-	rep	#$30
-	ldx	#0
+	lda		12,s			; dest bank
+	sta		tcc__r2h
+	stz		tcc__r2h+1
+	lda		14,s			; romBank
+	clc
+	adc		#$40
+	pha
+	plb
+	rep		#$20
+	lda		10,s			; dest offset
+	tay
+	stz		tcc__r2
+	lda		16,s			; romOffset
+	tax
+	lda		18,s			; length
+	lsr		a
+	sta.b	tcc__r1
 -:
-	lda.l	$407fc0,x
-	sta.l	snesRomInfo,x
+	lda.w	$0000,x
+	sta		[tcc__r2],y
 	inx
 	inx
-	cpx	#$40
-	bne	-
-	bra	+
-_gri_hirom:
-	rep	#$30
-	ldx	#0
--:
-	lda.l	$40ffc0,x
-	sta.l	snesRomInfo,x
-	inx
-	inx
-	cpx	#$40
-	bne	-
-+:
+	iny
+	iny
+	dec		tcc__r1
+	bne		-
+	
+;	lda.l	romRunMode
+;	beq	_gri_hirom
+;	rep	#$30
+;	ldx	#0
+;-:
+;	lda.l	$407fc0,x
+;	sta.l	snesRomInfo,x
+;	inx
+;	inx
+;	cpx	#$40
+;	bne	-
+;	bra	+
+;_gri_hirom:
+;	rep	#$30
+;	ldx	#0
+;-:
+;	lda.l	$40ffc0,x
+;	sta.l	snesRomInfo,x
+;	inx
+;	inx
+;	cpx	#$40
+;	bne	-
+;+:
 
 	sep	#$20
 
@@ -885,8 +1005,11 @@ _gri_hirom:
 	STA.L   MYTH_GBAC_HIO
 	STA.L   MYTH_GBAC_ZIO
 
-   	plp
-   	rtl
+	plb
+ 	ply
+ 	plx
+ 	plp
+	rtl
 
 
 

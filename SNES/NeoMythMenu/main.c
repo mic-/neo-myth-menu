@@ -1,12 +1,11 @@
 // SNES Myth Shell
-// C version 0.50
+// C version 0.30
 //
 // Mic, 2010
 
 #include "snes.h"
 #include "ppu.h"
 #include "hw_math.h"
-//#include "lzss_decode.h"
 #include "aplib_decrunch.h"
 #include "myth.h"
 #include "neo2.h"
@@ -62,7 +61,7 @@ char MS4[] = "\xff\x15\x02\x02 Game (001)";
 //
 const char * const metaStrings[] =
 {
-    "\xff\x03\x01\x07 Shell v 0.50\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
+    "\xff\x03\x01\x07 Shell v 0.30\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
 	"\xff\x01\xfe\x0f\x0a\x68\x69\x6A\x20\x71\x72\x73\x20\x7a\x7b\x7c\x83\x84\x85\xfe\x10\x0a\x6b\x6c\x6d\x20\x74\x75 \
 	 \x76\x20\x7d\x7e\x7f\x86\x87\x88xfe\x11\x0a\x6e\x6f\x70\x20\x77\x78\x79\x20\x80\x81\x82\x89\x8a\x8b\xfe\x17\x06 \
 	 \x06\xff\x04                             ",
@@ -145,7 +144,7 @@ const char * const metaStrings[] =
     "\xff\x12\x01\x02 S-PPU2 V2",
     "\xff\x12\x01\x02 S-PPU2 V3",
     // 73
-	"\xff\x06\x02\x07Games\xff\x17\x03\x03Y\xff\x17\x04\x07: Go back\xff\x09\x01\x07 SPC LOAD TEST",
+	"\xff\x06\x02\x07Music\xff\x17\x03\x03RESET\xff\x17\x08\x07: Go back\xff\x09\x01\x07 SPC Playback",
     "\xff\x06\x02\x07Option\xff\x17\x03\x03Start\xff\x17\x08\x07: Run, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Go back\xff\x16\x03\x03\x42\xff\x16\x04\x07: Edit  ",
     "\xff\x06\x02\x07Games\xff\x17\x03\x03\x42/X\xff\x17\x06\x07: Run, \xff\x17\x0e\x03Y\xff\x17\x0f\x07: Run 2nd cart",
     "\xff\x06\x02\x07\x43odes\xff\x17\x03\x03Start\xff\x17\x08\x07: Run, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Go back\xff\x16\x03\x03X\xff\x16\x04\x07: Delete, \xff\x16\x0f\x03\x42\xff\x16\x10\x07: Edit  ",
@@ -218,6 +217,7 @@ void wait_nmi()
 	while (REG_RDNMI & 0x80);
 	while (!(REG_RDNMI & 0x80));
 }
+
 
 
 
@@ -704,12 +704,24 @@ void run_game_from_gba_card_c()
 {
 	int i;
 	void (*run_game)(void);
+	void (*read_rom)(char *, u16, u16, u16);
 
 	//DEBUG
 	/*print_hex(gameMode, 2, 5, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	print_hex(romRunMode, 5, 5, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	print_hex(anyRamCheats, 8, 5, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	update_screen();*/
+
+	// Read 32 bytes from offset 0x10080 in the highlighted ROM
+	read_rom = neo2_myth_current_rom_read & 0x7fff;
+	add_full_pointer((void**)&read_rom, 0x7d, 0x8000);
+	read_rom(tempString, 1, 0x0080, 32);
+	tempString[31] = 0;
+
+	if (strcmp(tempString, "SNES-SPC700 Sound File Data v0.") == 0)
+	{
+		gameMode = 32;
+	}
 
 	if (gameMode == 4)
 	{

@@ -555,7 +555,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 	int i;
 	u8 y;
 	cheat_t const *cheats;
-	void (*get_info)(void);
+	void (*get_info)(char *, u16, u16, u16);
 
 	if (!reusePrevScreen)
 	{
@@ -650,9 +650,18 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			highlightedOption[MID_CHEAT_DB_MENU] = 0;
 
 			// Get ROM info
-			get_info = get_rom_info & 0x7fff;
+			get_info = neo2_myth_current_rom_read & 0x7fff;
 			add_full_pointer((void**)&get_info, 0x7d, 0x8000);
-			get_info();
+			if (romRunMode)
+			{
+				// LoROM
+				get_info(snesRomInfo, 0, 0x7fc0, 0x40);
+			}
+			else
+			{
+				// HiROM
+				get_info(snesRomInfo, 0, 0xffc0, 0x40);
+			}
 
 			gameFoundInDb = 0;
 			for (cheatGameIdx = 0; ; cheatGameIdx++)
@@ -722,9 +731,18 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			print_meta_string(MS_ROM_INFO_MENU_INSTRUCTIONS);
 
 			// Get ROM info
-			get_info = get_rom_info & 0x7fff;
+			get_info = neo2_myth_current_rom_read & 0x7fff;
 			add_full_pointer((void**)&get_info, 0x7d, 0x8000);
-			get_info();
+			if (romRunMode)
+			{
+				// LoROM
+				get_info(snesRomInfo, 0, 0x7fc0, 0x40);
+			}
+			else
+			{
+				// HiROM
+				get_info(snesRomInfo, 0, 0xffc0, 0x40);
+			}
 
 			printxy(snesRomInfo, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);	// ROM title
 
