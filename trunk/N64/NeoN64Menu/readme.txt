@@ -1,5 +1,5 @@
 ========================================================================
-              Neo N64 Myth Menu v1.0 by Chilly Willy
+              Neo N64 Myth Menu v1.1 by Chilly Willy
 ========================================================================
 The Neo N64 Myth Menu uses libdragon, by Shaun Taylor. Many thanks for
 his work on this fine SDK for the N64.
@@ -7,16 +7,28 @@ his work on this fine SDK for the N64.
 My thanks, also, to Dr.neo, SivenYu, Conle, madmonkey, and mic.
 ========================================================================
 
-Installation: Copy NEON64.v64 to where your N64 rom images are. In the
-Neo2 Pro client on your PC, set the boot type to "TypeA-1: GBA Menu",
-set the BIOS Path A-1 to the aforementioned NEON64.v64, then click "Burn"
-to set the menu in the flash cart.
+Installation: Copy NEON64.v64 and NEON64MF.v64 to where your N64 rom
+images are. In the Neo2 Pro Manager on your PC, set the boot type to
+"TypeA-2: N64 U2", set the BIOS Path A-2 to the NEON64.v64 image, then
+click "Burn" to set the menu in the N64 Myth menu flash.
 
-You could also write this menu into the N64 U2 flash by setting the boot
-type to "TypeA-2: N64 Menu" and setting the BIOS Path A-2 to the menu
-image. You want to avoid using the N64 menu as much as possible since
-it cannot be replaced - once it goes bad, you cannot fix it short of
-getting another N64 Myth.
+That menu needs to be written to the N64 menu flash in order for some of
+the extra features of v1.1 to work. You can burn the NEON64MF.v64 rom
+image to the GBA flash cart menu flash, setting the path to the image in
+the BIOS Path A-1. If you leave the boot type on TypeA-1, the menu in the
+N64 menu flash will detect the menu in the GBA menu flash and run it.
+This allows you to do updates to the GBA menu flash, leaving the N64 menu
+flash alone unless there is a major update. You could also boot only the
+GBA menu flash directly, but you will lose some features of the menu if
+you do so.
+
+Similarly, you can put the NEON64SD.v64 on your SD card. Copy it to
+"/.menu/n64/NEON64SD.v64" - create the directories if they don't already
+exist. Spelling and capitalization matter, so get it right! When the menu
+in either the N64 menu flash or the GBA menu flash find that file, they
+will boot it, assuming it to be the most up to date version. This is the
+easiest way to handle minor updates - put v1.1 in the N64 menu flash and
+then any new updates on the SD card.
 
 ========================================================================
 
@@ -78,6 +90,27 @@ swap the data as needed to allow it to run. If you are on a regular flash
 cart, they haven't any psram, so you cannot play games where the game info
 is not white. The proper files to burn to flash to be directly playable
 are of the .v64 variety.
+
+One new feature of the v1.1 menu if you have a Neo2-SD or Neo2-Pro has to
+do with games that won't reset to the game because their CIC type doesn't
+match the boot CIC type. If you run them from the SD card, I have code in
+the N64 menu flash menu that will rerun the game, allowing you to run with
+reset to game. I'm still thinking of how to do this with games in the game
+flash. I can do this on the Neo2-SD and Neo2-Pro, but not on plain flash
+only carts.
+
+Another new feature is the ability to boot Myth-aware homebrew. This is
+tied to the ability to boot menus from anywhere as described above. What
+the homebrew author does is set the first eight characters of the rom
+header name to "N64 Myth" - the rest of the name doesn't matter. When
+those characters are found, the program is run with the hardware unlocked
+so that the N64 Myth hardware (particularly the SD card interface) may be
+used.
+
+Another new feature has to do with the game options. No longer is a number
+displayed - instead, you see what the option stands for. The only two you
+can change are the save type, and the CIC type. It is now obvious to what
+each option value is set.
 
 ========================================================================
                             Controls

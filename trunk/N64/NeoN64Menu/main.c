@@ -97,8 +97,13 @@ extern void neo_select_game(void);
 extern void neo_select_psram(void);
 extern void neo_psram_offset(int offset);
 
+#ifdef RUN_FROM_U2
+extern neo_check_reset_to_game(void);
+#endif
+
 extern unsigned int neo_id_card(void);
 extern unsigned int neo_get_cpld(void);
+extern void neo_run_menu(void);
 extern void neo_run_game(u8 *options, int reset);
 extern void neo_run_psram(u8 *options, int reset);
 extern void neo_copyfrom_game(void *dest, int fstart, int len);
@@ -108,7 +113,11 @@ extern void neo_copyto_psram(void *src, int pstart, int len);
 extern void neo_copyfrom_psram(void *dst, int pstart, int len);
 extern void neo_copyto_sram(void *src, int sstart, int len);
 extern void neo_copyfrom_sram(void *dst, int sstart, int len);
+extern void neo_copyto_cache(void *src, int cstart, int len);
+extern void neo_copyfrom_cache(void *dst, int cstart, int len);
 extern void neo_get_rtc(unsigned char *rtc);
+extern void neo_copyto_nsram(void *src, int sstart, int len);
+extern void neo_copyfrom_nsram(void *dst, int sstart, int len);
 
 extern int get_cic(unsigned char *buffer);
 extern int get_swap(unsigned char *buffer);
@@ -349,10 +358,6 @@ int getGFInfo(void)
             if (gTable[max].name[ix] != ' ')
                 break;
         gTable[max].name[ix+1] = 0;
-
-        // check for auto-boot extended menu
-//        if (!memcmp(&options[8], "N64EBIOS", 8))
-//            neo_run_game(options, 1);   // never returns
 
         // copy rom info - both hdr and rom arrays at once
         neo_copyfrom_game(gTable[max].hdr, ((options[1]<<8)|options[2])*8*1024*1024, 0x40);
@@ -712,6 +717,10 @@ void copySD2Psram(int bselect, int bfill)
     XCHAR fpath[1280];
     char temp[256];
 
+    // load rom info if not already loaded
+    if (gTable[bselect].type == 127)
+        get_sd_info(bselect);
+
     romsize = (gTable[bselect].options[3]<<8) | gTable[bselect].options[4];
     // for SD card file, romsize is number of Mbits in rom
     gamelen = romsize*128*1024;
@@ -870,7 +879,13 @@ int main(void)
     u16 previous = 0, buttons;
     int bfill = 0, brwsr = 0, bselect = 0, bstart = 0, bmax = 0, btout = 60, bopt = 0, osel = 0;
     char temp[128];
-    char *menu_title = "Neo N64 Myth Menu v1.0";
+#if defined RUN_FROM_U2
+    char *menu_title = "Neo N64 Myth Menu v1.1 (U2)";
+#elif defined RUN_FROM_SD
+    char *menu_title = "Neo N64 Myth Menu v1.1 (SD)";
+#else
+    char *menu_title = "Neo N64 Myth Menu v1.1 (MF)";
+#endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";
     char *menu_help3[4] = { "Z=Show Options      START=SD browser",
@@ -878,6 +893,18 @@ int main(void)
                             "Z=Show Options   START=Flash browser",
                             "Z=Show ROM Info  START=Flash browser" };
     char cards[3] = { 'C', 'B', 'A' };
+    int onext[2][16] = {
+        { 1, 2, 3, 4, 5, 6, 8, 0, 15, 0, 0, 0, 0, 0, 0, 0 },
+        { 1, 2, 3, 4, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+    };
+    int oprev[2][16] = {
+        { 15, 0, 1, 2, 3, 4, 5, 0, 6, 0, 0, 0, 0, 0, 0, 8 },
+        { 6, 0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
+    };
+    char *ostr[2][16] = {
+        { "EXT CARD", "SRAM 32KB", "SRAM 64KB", "SRAM 128KB", "FRAM 128KB", "EEPROM 4Kb", "EEPROM 16Kb", "", "SRAM 256KB", "", "", "", "", "", "", "SAVE OFF" },
+        { "EXT CARD", "6101", "6102/7101", "6103/7103", "6104", "6105/7105", "6106/7106", "", "", "", "", "", "", "", "", "" }
+    };
 
     init_n64();
 
@@ -895,7 +922,7 @@ int main(void)
         case 1:
         gCardTypeCmd = 0x00DA8E44;      // set iosr = enable game flash for new cards
         gPsramCmd = 0x00DA674E;         // set iosr for Neo2-Pro psram
-       break;
+        break;
         case 2:
         gCardTypeCmd = 0x00DA0E44;      // set iosr = enable game flash for old cards
         gPsramCmd = 0x00DA0F44;         // set iosr for psram
@@ -905,6 +932,46 @@ int main(void)
         gPsramCmd = 0x00DAAF44;         // set iosr for psram
         break;
     }
+
+#ifdef RUN_FROM_U2
+    // check for boot rom in menu
+    if (!memcmp((void *)0xB0000020, "N64 Myth", 8))
+        neo_run_menu();
+
+    neo_check_reset_to_game();
+#endif
+
+#ifndef RUN_FROM_SD
+    // check for boot rom on SD card
+    neo2_enable_sd();
+    bmax = getSDInfo(-1);               // get root directory of sd card
+    if (bmax)
+    {
+        XCHAR fpath[32];
+
+        strcpy(path, "/.menu/n64/");
+        strcpy(gTable[0].name, "NEON64SD.v64");
+        c2wstrcpy(fpath, path);
+        c2wstrcat(fpath, gTable[0].name);
+        if (f_open(&gSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+        {
+            gTable[0].valid = 1;
+            gTable[0].type = 127;
+            gTable[0].options[0] = 0xFF;
+            gTable[0].options[1] = 0;
+            gTable[0].options[2] = 0;
+            gTable[0].options[3] = 0;
+            gTable[0].options[4] = 16;      // 16 Mbits
+            gTable[0].options[5] = 5;
+            gTable[0].options[6] = 2;
+            gTable[0].options[7] = 0;
+            get_sd_info(0);
+            copySD2Psram(0, 0);
+            neo_run_psram(gTable[0].options, 1);
+        }
+        neo2_disable_sd();
+    }
+#endif
 
     bmax = getGFInfo();                 // preload flash menu entries
 
@@ -995,20 +1062,14 @@ int main(void)
                     graphics_set_color(graphics_make_color(0xFF, 0x3F, 0x3F, 0xFF), 0);
                 else
                     graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
-                sprintf(temp, "Save: %d", gTable[bselect].options[5]);
+                sprintf(temp, "Save: %s", ostr[0][gTable[bselect].options[5]]);
                 printText(dcon, temp, 4, 15);
                 if (osel == 1)
                     graphics_set_color(graphics_make_color(0xFF, 0x3F, 0x3F, 0xFF), 0);
                 else
                     graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
-                sprintf(temp, "CIC: %d", gTable[bselect].options[6]);
-                printText(dcon, temp, 14, 15);
-                if (osel == 2)
-                    graphics_set_color(graphics_make_color(0xFF, 0x3F, 0x3F, 0xFF), 0);
-                else
-                    graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
-                sprintf(temp, "Run Mode: %2d", gTable[bselect].options[7]);
-                printText(dcon, temp, 24, 15);
+                sprintf(temp, "CIC: %s", ostr[1][gTable[bselect].options[6]]);
+                printText(dcon, temp, 36-strlen(temp), 15);
             }
 
             graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
@@ -1141,12 +1202,12 @@ int main(void)
             }
         }
 
-        if (A_BUTTON(buttons ^ previous))
+        if (A_BUTTON(buttons ^ previous) && bmax)
         {
             // A changed
             if (!A_BUTTON(buttons))
             {
-                // A just released
+                // A just released - run with reset to menu
                 if (brwsr)
                 {
                     if (gTable[bselect].type == 128)
@@ -1157,7 +1218,9 @@ int main(void)
                     }
                     else
                     {
+                        u8 blk[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55 };
                         copySD2Psram(bselect, bfill);
+                        neo_copyto_nsram(blk, 0x3FFF0, 16);
                         neo_run_psram(gTable[bselect].options, 1);
                     }
                 }
@@ -1169,18 +1232,20 @@ int main(void)
                     }
                     else
                     {
+                        u8 blk[16] = { 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55 };
                         copyGF2Psram(bselect, bfill);
+                        neo_copyto_nsram(blk, 0x3FFF0, 16);
                         neo_run_psram(gTable[bselect].options, 1);
                     }
                 }
             }
         }
-        if (B_BUTTON(buttons ^ previous))
+        if (B_BUTTON(buttons ^ previous) && bmax)
         {
             // B changed
             if (!B_BUTTON(buttons))
             {
-                // B just released
+                // B just released - run with reset to game
                 if (brwsr)
                 {
                     if (gTable[bselect].type == 128)
@@ -1191,7 +1256,11 @@ int main(void)
                     }
                     else
                     {
+                        u8 blk[16];
                         copySD2Psram(bselect, bfill);
+                        memcpy(blk, gTable[bselect].options, 8);
+                        neo_copyfrom_psram(&blk[8], 0x10, 8); // CRCs
+                        neo_copyto_nsram(blk, 0x3FFF0, 16);
                         neo_run_psram(gTable[bselect].options, 0);
                     }
                 }
@@ -1203,7 +1272,11 @@ int main(void)
                     }
                     else
                     {
+                        u8 blk[16];
                         copyGF2Psram(bselect, bfill);
+                        memcpy(blk, gTable[bselect].options, 8);
+                        neo_copyfrom_psram(&blk[8], 0x10, 8); // CRCs
+                        neo_copyto_nsram(blk, 0x3FFF0, 16);
                         neo_run_psram(gTable[bselect].options, 0);
                     }
                 }
@@ -1212,46 +1285,30 @@ int main(void)
 
         if (bopt == 1)
         {
-        if (CU_BUTTON(buttons ^ previous))
-        {
-            // CU changed
-            if (!CU_BUTTON(buttons))
+            if (CU_BUTTON(buttons ^ previous))
             {
-                gTable[bselect].options[5+osel]++;
-                if (gTable[bselect].options[5+osel] > 15)
-                    gTable[bselect].options[5+osel] = 0;
+                // CU changed
+                if (!CU_BUTTON(buttons))
+                    gTable[bselect].options[5+osel] = onext[osel][gTable[bselect].options[5+osel]];
             }
-        }
-        if (CD_BUTTON(buttons ^ previous))
-        {
-            // CD changed
-            if (!CD_BUTTON(buttons))
+            if (CD_BUTTON(buttons ^ previous))
             {
-                gTable[bselect].options[5+osel]--;
-                if (gTable[bselect].options[5+osel] > 15)
-                    gTable[bselect].options[5+osel] = 15;
+                // CD changed
+                if (!CD_BUTTON(buttons))
+                    gTable[bselect].options[5+osel] = oprev[osel][gTable[bselect].options[5+osel]];
             }
-        }
-        if (CR_BUTTON(buttons ^ previous))
-        {
-            // CR changed
-            if (!CR_BUTTON(buttons))
+            if (CR_BUTTON(buttons ^ previous))
             {
-                osel++;
-                if (osel > 2)
-                    osel = 0;
+                // CR changed
+                if (!CR_BUTTON(buttons))
+                    osel ^=1;
             }
-        }
-        if (CL_BUTTON(buttons ^ previous))
-        {
-            // CL changed
-            if (!CL_BUTTON(buttons))
+            if (CL_BUTTON(buttons ^ previous))
             {
-                osel--;
-                if (osel < 0)
-                    osel = 2;
+                // CL changed
+                if (!CL_BUTTON(buttons))
+                    osel ^=1;
             }
-        }
         }
 
         if (TL_BUTTON(buttons ^ previous))
@@ -1260,20 +1317,17 @@ int main(void)
             if (!TL_BUTTON(buttons))
             {
                 // TL just released
-                bfill--;
-                if (bfill < 0)
-                    bfill = 3;
+                bfill = (bfill-1)&3;
             }
         }
+
         if (TR_BUTTON(buttons ^ previous))
         {
             // TR changed
             if (!TR_BUTTON(buttons))
             {
                 // TR just released
-                bfill++;
-                if (bfill > 3)
-                    bfill = 0;
+                bfill = (bfill+1)&3;
             }
         }
 
