@@ -216,10 +216,30 @@ void neo_gsram_offset(int offs)
 void neo_copyfrom_game(void *dest, int fstart, int len)
 {
     neo_select_game();                  // select game flash
-
+#if 0
     // copy data
     for (int ix=0; ix<len; ix+=4)
         *(u32 *)(dest + ix) = *(vu32 *)(0xB0000000 + fstart + ix);
+#else
+    if ((u32)dest & 7)
+    {
+        // not properly aligned - DMA sram space to buffer, then copy it
+        data_cache_writeback_invalidate(dmaBuf, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 3;
+        dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xB0000000 + fstart, len);
+        // copy DMA buffer to dst
+        memcpy(dest, dmaBuf, len);
+    }
+    else
+    {
+        // destination is aligned - DMA sram space directly to dst
+        data_cache_writeback_invalidate(dest, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 3;
+        dma_read((void *)((u32)dest & 0x1FFFFFFF), 0xB0000000 + fstart, len);
+    }
+#endif
 }
 
 
@@ -227,10 +247,30 @@ void neo_copyfrom_game(void *dest, int fstart, int len)
 void neo_copyfrom_menu(void *dest, int fstart, int len)
 {
     neo_select_menu();                  // select menu flash
-
+#if 0
     // copy data
     for (int ix=0; ix<len; ix+=4)
         *(u32 *)(dest + ix) = *(vu32 *)(0xB0000000 + fstart + ix);
+#else
+    if ((u32)dest & 7)
+    {
+        // not properly aligned - DMA sram space to buffer, then copy it
+        data_cache_writeback_invalidate(dmaBuf, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 3;
+        dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xB0000000 + fstart, len);
+        // copy DMA buffer to dst
+        memcpy(dest, dmaBuf, len);
+    }
+    else
+    {
+        // destination is aligned - DMA sram space directly to dst
+        data_cache_writeback_invalidate(dest, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 3;
+        dma_read((void *)((u32)dest & 0x1FFFFFFF), 0xB0000000 + fstart, len);
+    }
+#endif
 }
 
 void neo_xferto_psram(void *src, int pstart, int len)
@@ -562,13 +602,24 @@ void neo_copyto_nsram(void *src, int sstart, int len)
     PI_BSD_DOM2_PGS_REG = 0x0000000D;
     PI_BSD_DOM2_RLS_REG = 0x00000002;
 
-    // copy src to DMA buffer
-    memcpy(dmaBuf, src, len);
-    // DMA buffer to sram space
-    data_cache_writeback_invalidate(dmaBuf, len);
-    while (dma_busy()) ;
-    PI_STATUS_REG = 2;
-    dma_write((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart, len);
+    if ((u32)src & 7)
+    {
+        // source not properly aligned, copy src to DMA buffer, then DMA it
+        memcpy(dmaBuf, src, len);
+        // DMA buffer to sram space
+        data_cache_writeback_invalidate(dmaBuf, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 2;
+        dma_write((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart, len);
+    }
+    else
+    {
+        // source is aligned, DMA src directly to sram space
+        data_cache_writeback_invalidate(src, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 2;
+        dma_write((void *)((u32)src & 0x1FFFFFFF), 0xA8000000 + sstart, len);
+    }
 
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
@@ -587,13 +638,24 @@ void neo_copyfrom_nsram(void *dst, int sstart, int len)
     PI_BSD_DOM2_PGS_REG = 0x0000000D;
     PI_BSD_DOM2_RLS_REG = 0x00000002;
 
-    // DMA sram space to buffer
-    data_cache_writeback_invalidate(dmaBuf, len);
-    while (dma_busy()) ;
-    PI_STATUS_REG = 3;
-    dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart, len);
-    // copy DMA buffer to dst
-    memcpy(dst, dmaBuf, len);
+    if ((u32)dst & 7)
+    {
+        // not properly aligned - DMA sram space to buffer, then copy it
+        data_cache_writeback_invalidate(dmaBuf, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 3;
+        dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart, len);
+        // copy DMA buffer to dst
+        memcpy(dst, dmaBuf, len);
+    }
+    else
+    {
+        // destination is aligned - DMA sram space directly to dst
+        data_cache_writeback_invalidate(dst, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 3;
+        dma_read((void *)((u32)dst & 0x1FFFFFFF), 0xA8000000 + sstart, len);
+    }
 
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
