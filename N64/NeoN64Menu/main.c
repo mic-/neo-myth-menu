@@ -98,7 +98,7 @@ extern void neo_select_psram(void);
 extern void neo_psram_offset(int offset);
 
 #ifdef RUN_FROM_U2
-extern neo_check_reset_to_game(void);
+extern void neo_check_reset_to_game(void);
 #endif
 
 extern unsigned int neo_id_card(void);
@@ -121,7 +121,7 @@ extern void neo_copyfrom_nsram(void *dst, int sstart, int len);
 
 extern int get_cic(unsigned char *buffer);
 extern int get_swap(unsigned char *buffer);
-
+extern int get_cic_save(char *cartid, int *cic, int *save);
 
 void w2cstrcpy(void *dst, void *src)
 {
@@ -341,13 +341,14 @@ int getGFInfo(void)
 {
     int max = 0;
     u8 options[64];
+    char cartid[4];
 
     neo_copyfrom_menu(options, 0x1D0000, 64);
 
     // go through entries present in menu flash
     while (options[0] == 0xFF)
     {
-        int ix;
+        int cic, save, ix;
         // set entry in gTable
         gTable[max].valid = 1;
         gTable[max].type = options[0];
@@ -392,6 +393,15 @@ int getGFInfo(void)
             break;
         }
 
+        // get cartid
+        sprintf(cartid, "%c%c", gTable[max].rom[0x1C], gTable[max].rom[0x1D]);
+        if (get_cic_save(cartid, &cic, &save))
+        {
+            // cart was found, use CIC and SaveRAM type
+            gTable[max].options[5] = save;
+            gTable[max].options[6] = cic;
+        }
+
         // next entry
         max++;
         if (max == 1024)
@@ -413,6 +423,8 @@ void get_sd_info(int entry)
     UINT ts;
     u8 buffer[0x440];
     XCHAR fpath[1280];
+    char cartid[4];
+    int cic, save;
 
     c2wstrcpy(fpath, path);
     if (path[strlen(path)-1] != '/')
@@ -467,6 +479,15 @@ void get_sd_info(int entry)
 
     gTable[entry].options[6] = get_cic(&buffer[0x40]);
     gTable[entry].type = 255;
+
+    // get cartid
+    sprintf(cartid, "%c%c", gTable[entry].rom[0x1C], gTable[entry].rom[0x1D]);
+    if (get_cic_save(cartid, &cic, &save))
+    {
+        // cart was found, use CIC and SaveRAM type
+        gTable[entry].options[5] = save;
+        gTable[entry].options[6] = cic;
+    }
 }
 
 int getSDInfo(int entry)
@@ -877,14 +898,20 @@ int main(void)
 {
     display_context_t dcon;
     u16 previous = 0, buttons;
-    int bfill = 0, brwsr = 0, bselect = 0, bstart = 0, bmax = 0, btout = 60, bopt = 0, osel = 0;
+    int bfill = 0, bselect = 0, bstart = 0, bmax = 0, btout = 60, bopt = 0, osel = 0;
+#ifdef RUN_FROM_SD
+    int brwsr = 1;                      // start in SD browser
+#else
+    int brwsr = 0;                      // start in game flash browser
+#endif
+
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v1.1 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v1.2 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v1.1 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v1.2 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v1.1 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v1.2 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";
@@ -934,14 +961,14 @@ int main(void)
     }
 
 #ifdef RUN_FROM_U2
-    // check for boot rom in menu
-    if (!memcmp((void *)0xB0000020, "N64 Myth", 8))
-        neo_run_menu();
-
     neo_check_reset_to_game();
+    // check for boot rom in menu
+    if (!memcmp((void *)0xB0000020, "N64 Myth Menu (MF)", 18))
+        neo_run_menu();
 #endif
 
 #ifndef RUN_FROM_SD
+#ifndef NO_SD_FACE
     // check for boot rom on SD card
     neo2_enable_sd();
     bmax = getSDInfo(-1);               // get root directory of sd card
@@ -961,7 +988,7 @@ int main(void)
             gTable[0].options[1] = 0;
             gTable[0].options[2] = 0;
             gTable[0].options[3] = 0;
-            gTable[0].options[4] = 16;      // 16 Mbits
+            gTable[0].options[4] = 16;  // 16 Mbits
             gTable[0].options[5] = 5;
             gTable[0].options[6] = 2;
             gTable[0].options[7] = 0;
@@ -972,8 +999,16 @@ int main(void)
         neo2_disable_sd();
     }
 #endif
+#endif
 
-    bmax = getGFInfo();                 // preload flash menu entries
+    if (brwsr)
+    {
+        neo2_enable_sd();
+        bmax = getSDInfo(-1);           // preload SD root dir
+        btout = 60;
+    }
+    else
+        bmax = getGFInfo();             // preload flash menu entries
 
     while (1)
     {

@@ -1,10 +1,10 @@
 ========================================================================
-              Neo N64 Myth Menu v1.1 by Chilly Willy
+              Neo N64 Myth Menu v1.2 by Chilly Willy
 ========================================================================
 The Neo N64 Myth Menu uses libdragon, by Shaun Taylor. Many thanks for
 his work on this fine SDK for the N64.
 
-My thanks, also, to Dr.neo, SivenYu, Conle, madmonkey, and mic.
+My thanks, also, to Dr.neo, SivenYu, Conle, madmonkey, mic, and sanni.
 ========================================================================
 
 Installation: Copy NEON64.v64 and NEON64MF.v64 to where your N64 rom
@@ -13,7 +13,7 @@ images are. In the Neo2 Pro Manager on your PC, set the boot type to
 click "Burn" to set the menu in the N64 Myth menu flash.
 
 That menu needs to be written to the N64 menu flash in order for some of
-the extra features of v1.1 to work. You can burn the NEON64MF.v64 rom
+the extra features of v1.2 to work. You can burn the NEON64MF.v64 rom
 image to the GBA flash cart menu flash, setting the path to the image in
 the BIOS Path A-1. If you leave the boot type on TypeA-1, the menu in the
 N64 menu flash will detect the menu in the GBA menu flash and run it.
@@ -27,7 +27,7 @@ Similarly, you can put the NEON64SD.v64 on your SD card. Copy it to
 exist. Spelling and capitalization matter, so get it right! When the menu
 in either the N64 menu flash or the GBA menu flash find that file, they
 will boot it, assuming it to be the most up to date version. This is the
-easiest way to handle minor updates - put v1.1 in the N64 menu flash and
+easiest way to handle minor updates - put v1.2 in the N64 menu flash and
 then any new updates on the SD card.
 
 ========================================================================
@@ -91,7 +91,7 @@ cart, they haven't any psram, so you cannot play games where the game info
 is not white. The proper files to burn to flash to be directly playable
 are of the .v64 variety.
 
-One new feature of the v1.1 menu if you have a Neo2-SD or Neo2-Pro has to
+One new feature of the v1.2 menu if you have a Neo2-SD or Neo2-Pro has to
 do with games that won't reset to the game because their CIC type doesn't
 match the boot CIC type. If you run them from the SD card, I have code in
 the N64 menu flash menu that will rerun the game, allowing you to run with

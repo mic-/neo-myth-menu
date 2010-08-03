@@ -15,7 +15,7 @@ AS = $(GCCN64PREFIX)as
 LD = $(GCCN64PREFIX)ld
 OBJCOPY = $(GCCN64PREFIX)objcopy
 
-OBJS = main.o neo_2.o utility.o disk_io.o rom_io.o
+OBJS = main.o neo_2.o utility.o disk_io.o ram_io.o
 
 $(PROG_NAME).v64: $(PROG_NAME).dfs $(PROG_NAME).elf
 	$(OBJCOPY) $(PROG_NAME).elf $(PROG_NAME).bin -O binary

@@ -43,7 +43,7 @@ unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads *
 
 unsigned char sd_csd[R2_LEN];
 
-#define INIT_RETRIES (40)
+#define INIT_RETRIES (64)
 
 /*-----------------------------------------------------------------------*/
 /*                             support code                              */
@@ -327,7 +327,7 @@ BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
     unsigned int i, j;
     unsigned char *r = resp;
 
-    for (i=0; i<1024; i++)
+    for (i=0; i<(1024/2); i++)
     {
         // wait on start bit
         if(rdMmcCmdBit()==0)
