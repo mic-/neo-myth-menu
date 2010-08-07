@@ -1055,6 +1055,7 @@ int main(void)
                         // directory entry
                         strcpy(temp, "[");
                         strncat(temp, gTable[bstart+ix].name, 34);
+						temp[35] = 0;
                         strcat(temp, "]");
                     }
                     else
