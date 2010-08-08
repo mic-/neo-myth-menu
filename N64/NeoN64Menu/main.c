@@ -1057,7 +1057,7 @@ int main(void)
             gTable[0].options[1] = 0;
             gTable[0].options[2] = 0;
             gTable[0].options[3] = 0;
-            gTable[0].options[4] = 16;  // 16 Mbits
+            gTable[0].options[4] = (gSDFile.fsize > 2097152) ? gSDFile.fsize/131072 : 16;
             gTable[0].options[5] = 5;
             gTable[0].options[6] = 2;
             gTable[0].options[7] = 0;
