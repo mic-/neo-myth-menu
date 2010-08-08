@@ -45,6 +45,11 @@ unsigned char sd_csd[R2_LEN];
 
 #define INIT_RETRIES (64)
 
+#define RESP_TIME_R (1024/2)
+#define RESP_TIME_W (1024*4)
+
+static int respTime = RESP_TIME_R;
+
 /*-----------------------------------------------------------------------*/
 /*                             support code                              */
 /*-----------------------------------------------------------------------*/
@@ -327,7 +332,7 @@ BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
     unsigned int i, j;
     unsigned char *r = resp;
 
-    for (i=0; i<(1024/2); i++)
+    for (i=0; i<respTime; i++)
     {
         // wait on start bit
         if(rdMmcCmdBit()==0)
@@ -340,11 +345,13 @@ BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
             if (cflag)
                 wrMmcCmdByte(0xFF);     // 8 cycles to complete the operation so clock can halt
 
+			respTime = RESP_TIME_R;
             debugMmcResp(pkt[0]&0x3F, resp);
             return TRUE;
         }
     }
 
+	respTime = RESP_TIME_R;
     //debugPrint("recvMmcCmdResp() failed");
     debugMmcResp(pkt[0]&0x3F, resp);
     return FALSE;
@@ -580,6 +587,7 @@ BOOL sdWriteSingleBlock( unsigned char *buf, unsigned int addr )
     sdCrc16(crcbuf, buf, 512);          // Calculate CRC16
 
     sendMmcCmd( 24, addr );
+	respTime = RESP_TIME_W;
     if (recvMmcCmdResp(resp, R1_LEN, 0) && (resp[0] == 24))
         return sendSdWriteBlock4(buf, crcbuf);
 
@@ -592,6 +600,8 @@ BOOL sdInit(void)
     int i;
     unsigned short rca;
     unsigned char resp[R2_LEN];         // R2 is largest response
+
+	respTime = RESP_TIME_R;
 
     for (i=0; i<128; i++)
         wrMmcCmdBit(1);
