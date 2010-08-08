@@ -118,6 +118,8 @@ extern void neo_copyfrom_cache(void *dst, int cstart, int len);
 extern void neo_get_rtc(unsigned char *rtc);
 extern void neo_copyto_nsram(void *src, int sstart, int len);
 extern void neo_copyfrom_nsram(void *dst, int sstart, int len);
+extern void neo_copyto_eeprom(void *src, int sstart, int len, int mode);
+extern void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode);
 
 extern int get_cic(unsigned char *buffer);
 extern int get_swap(unsigned char *buffer);
@@ -881,13 +883,19 @@ void loadSaveState(int bselect)
     {
 		UINT ts;
 		f_read(&gSDFile, tmpBuf, ssize[gTable[bselect].options[5]], &ts);
-		neo_copyto_nsram(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
+		if ((gTable[bselect].options[5] == 5) || (gTable[bselect].options[5] == 6))
+			neo_copyto_eeprom(tmpBuf, 0, ssize[gTable[bselect].options[5]], gTable[bselect].options[5]);
+		else
+			neo_copyto_nsram(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
 		f_close(&gSDFile);
 	}
 	else
 	{
 		memset(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
-		neo_copyto_nsram(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
+		if ((gTable[bselect].options[5] == 5) || (gTable[bselect].options[5] == 6))
+			neo_copyto_eeprom(tmpBuf, 0, ssize[gTable[bselect].options[5]], gTable[bselect].options[5]);
+		else
+			neo_copyto_nsram(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
 	}
 	flags = 0xAA550100LL | gTable[bselect].options[5];
 
@@ -917,7 +925,10 @@ void saveSaveState(void)
 
 	f_close(&gSDFile);
 	f_open(&gSDFile, wname, FA_OPEN_ALWAYS | FA_WRITE);
-	neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15]);
+	if (((flags & 15) == 5) || ((flags & 15) == 6))
+		neo_copyfrom_eeprom(tmpBuf, 0, ssize[flags & 15], flags & 15);
+	else
+		neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15]);
 	f_write(&gSDFile, tmpBuf, ssize[flags & 15], &ts);
 	f_close(&gSDFile);
 
@@ -927,7 +938,6 @@ void saveSaveState(void)
 	flags = 0;
 	neo_copyto_nsram(&flags, 0x3FF00, 8);
 }
-
 
 /* initialize console hardware */
 void init_n64(void)
@@ -976,11 +986,11 @@ int main(void)
 
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v1.3 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v1.4 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v1.3 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v1.4 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v1.3 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v1.4 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";

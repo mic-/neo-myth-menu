@@ -661,6 +661,42 @@ void neo_copyfrom_nsram(void *dst, int sstart, int len)
     hw_delay();
 }
 
+void neo_copyto_eeprom(void *src, int sstart, int len, int mode)
+{
+    SAVE_IO = (mode<<16) | mode;        // set EEPROM mode
+    hw_delay();
+    SRAM2C_IO = 0x00000000;             // disable gba sram
+    hw_delay();
+
+	for (int ix=0; ix<len; ix+=8)
+	{
+		unsigned long long data;
+		memcpy((void*)&data, (void*)((u32)src + ix), 8);
+		eeprom_write((sstart + ix)>>3, data);
+	}
+
+    SAVE_IO = 0x00050005;               // save off
+    hw_delay();
+}
+
+void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode)
+{
+    SAVE_IO = (mode<<16) | mode;        // set EEPROM mode
+    hw_delay();
+    SRAM2C_IO = 0x00000000;             // disable gba sram
+    hw_delay();
+
+	for (int ix=0; ix<len; ix+=8)
+	{
+		unsigned long long data;
+		data = eeprom_read((sstart + ix)>>3);
+		memcpy((void*)((u32)dst + ix), (void*)&data, 8);
+	}
+
+    SAVE_IO = 0x00050005;               // save off
+    hw_delay();
+}
+
 //----------------------------------------------------------------------
 //
 //----------------------------------------------------------------------
