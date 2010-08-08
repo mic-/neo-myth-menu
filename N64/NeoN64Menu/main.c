@@ -860,6 +860,75 @@ void copySD2Psram(int bselect, int bfill)
     delay(30);
 }
 
+void loadSaveState(int bselect)
+{
+	int ix, ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144-512, 0, 0, 0, 0, 0, 0, 0 };
+	char temp[256];
+	XCHAR wname[280];
+	long flags = 0;
+
+	if ((gTable[bselect].options[5] == 0) || (gTable[bselect].options[5] == 7) || (gTable[bselect].options[5] > 8))
+		return; // ext cart, invalid, or off
+
+	strcpy(temp, gTable[bselect].name);
+	for (ix=strlen(temp)-1; temp[ix] != '.'; ix--) ;
+	strcpy(&temp[ix], ".sav");
+	c2wstrcpy(wname, "/.menu/n64/save/");
+	c2wstrcat(wname, temp);
+
+	f_close(&gSDFile);
+    if (f_open(&gSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+    {
+		UINT ts;
+		f_read(&gSDFile, tmpBuf, ssize[gTable[bselect].options[5]], &ts);
+		neo_copyto_nsram(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
+		f_close(&gSDFile);
+	}
+	else
+	{
+		memset(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
+		neo_copyto_nsram(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
+	}
+	flags = 0xAA550100LL | gTable[bselect].options[5];
+
+	neo_copyto_nsram(temp, 0x3FE00, 256);
+	neo_copyto_nsram(&flags, 0x3FF00, 8);
+}
+
+void saveSaveState(void)
+{
+	int ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144-512, 0, 0, 0, 0, 0, 0, 0 };
+	char temp[256];
+	XCHAR wname[280];
+	long flags;
+	UINT ts;
+
+	neo_copyfrom_nsram(temp, 0x3FE00, 256);
+	neo_copyfrom_nsram(&flags, 0x3FF00, 4);
+
+	if ((flags & 0xFFFFFF00) != 0xAA550100)
+		return; // auto-save sram not needed
+
+	c2wstrcpy(wname, "/.menu/n64/save/");
+	c2wstrcat(wname, temp);
+
+    neo2_enable_sd();
+    getSDInfo(-1);                      // get root directory of sd card
+
+	f_close(&gSDFile);
+	f_open(&gSDFile, wname, FA_OPEN_ALWAYS | FA_WRITE);
+	neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15]);
+	f_write(&gSDFile, tmpBuf, ssize[flags & 15], &ts);
+	f_close(&gSDFile);
+
+	neo2_disable_sd();
+
+	// turn off auto-save
+	flags = 0;
+	neo_copyto_nsram(&flags, 0x3FF00, 8);
+}
+
+
 /* initialize console hardware */
 void init_n64(void)
 {
@@ -907,11 +976,11 @@ int main(void)
 
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v1.2 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v1.3 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v1.2 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v1.3 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v1.2 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v1.3 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";
@@ -1000,6 +1069,9 @@ int main(void)
     }
 #endif
 #endif
+
+    // save save state if needed
+	saveSaveState();
 
     if (brwsr)
     {
@@ -1257,6 +1329,7 @@ int main(void)
                         u8 blk[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55 };
                         copySD2Psram(bselect, bfill);
                         neo_copyto_nsram(blk, 0x3FFF0, 16);
+						loadSaveState(bselect);
                         neo_run_psram(gTable[bselect].options, 1);
                     }
                 }
@@ -1297,6 +1370,7 @@ int main(void)
                         memcpy(blk, gTable[bselect].options, 8);
                         neo_copyfrom_psram(&blk[8], 0x10, 8); // CRCs
                         neo_copyto_nsram(blk, 0x3FFF0, 16);
+						loadSaveState(bselect);
                         neo_run_psram(gTable[bselect].options, 0);
                     }
                 }
