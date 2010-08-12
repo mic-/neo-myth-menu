@@ -56,6 +56,12 @@ volatile unsigned int gTicks;           /* incremented every vblank */
 
 sprite_t *pattern[3] = { NULL, NULL, NULL };
 
+sprite_t *splash;
+int splash_w, splash_h;
+sprite_t *browser;
+int browser_w, browser_h;
+sprite_t *loading;
+int loading_w, loading_h;
 
 struct selEntry {
     u32 valid;                          /* 0 = invalid, ~0 = valid */
@@ -87,6 +93,9 @@ char path[1024];
 #define ONCE_SIZE (256*1024)
 static u8 __attribute__((aligned(16))) tmpBuf[ONCE_SIZE];
 
+extern sprite_t *loadImageDFS(char *fname, int *w, int *h);
+extern sprite_t *loadImageSD(char *fname, int *w, int *h);
+extern void drawImage(display_context_t dcon, sprite_t *sprites, int w, int h);
 
 extern void neo2_enable_sd(void);
 extern void neo2_disable_sd(void);
@@ -96,10 +105,6 @@ extern void neo_select_menu(void);
 extern void neo_select_game(void);
 extern void neo_select_psram(void);
 extern void neo_psram_offset(int offset);
-
-#ifdef RUN_FROM_U2
-extern void neo_check_reset_to_game(void);
-#endif
 
 extern unsigned int neo_id_card(void);
 extern unsigned int neo_get_cpld(void);
@@ -113,13 +118,11 @@ extern void neo_copyto_psram(void *src, int pstart, int len);
 extern void neo_copyfrom_psram(void *dst, int pstart, int len);
 extern void neo_copyto_sram(void *src, int sstart, int len);
 extern void neo_copyfrom_sram(void *dst, int sstart, int len);
-extern void neo_copyto_cache(void *src, int cstart, int len);
-extern void neo_copyfrom_cache(void *dst, int cstart, int len);
-extern void neo_get_rtc(unsigned char *rtc);
 extern void neo_copyto_nsram(void *src, int sstart, int len);
 extern void neo_copyfrom_nsram(void *dst, int sstart, int len);
 extern void neo_copyto_eeprom(void *src, int sstart, int len, int mode);
 extern void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode);
+extern void neo_get_rtc(unsigned char *rtc);
 
 extern int get_cic(unsigned char *buffer);
 extern int get_swap(unsigned char *buffer);
@@ -282,7 +285,11 @@ void progress_screen(char *str1, char *str2, int frac, int total, int bfill)
     dcon = lockVideo(1);
     graphics_fill_screen(dcon, 0);
 
-    if ((bfill < 3) && (pattern[bfill] != NULL))
+    if (loading)
+    {
+        drawImage(dcon, loading, loading_w, loading_h);
+    }
+    else if ((bfill < 3) && (pattern[bfill] != NULL))
     {
         rdp_sync(SYNC_PIPE);
         rdp_set_default_clipping();
@@ -351,6 +358,8 @@ int getGFInfo(void)
     while (options[0] == 0xFF)
     {
         int cic, save, ix;
+        u32 rombank;
+
         // set entry in gTable
         gTable[max].valid = 1;
         gTable[max].type = options[0];
@@ -362,8 +371,12 @@ int getGFInfo(void)
                 break;
         gTable[max].name[ix+1] = 0;
 
+        rombank = (gTable[max].options[1]<<8) | gTable[max].options[2];
+        if (rombank > 16)
+            rombank = rombank / 64;
+        rombank *= (8*1024*1024);
         // copy rom info - both hdr and rom arrays at once
-        neo_copyfrom_game(gTable[max].hdr, ((options[1]<<8)|options[2])*8*1024*1024, 0x40);
+        neo_copyfrom_game(gTable[max].hdr, rombank, 0x40);
 
         // now check if it needs to be byte-swapped
         gTable[max].swap = get_swap(gTable[max].hdr);
@@ -622,7 +635,7 @@ int getSDInfo(int entry)
             gTable[max].options[2] = 0;
             gTable[max].options[3] = (fno.fsize / (128*1024)) >> 8;
             gTable[max].options[4] = (fno.fsize / (128*1024)) & 0xFF;
-            gTable[max].options[5] = 5;
+            gTable[max].options[5] = 0;
             gTable[max].options[6] = 2;
             gTable[max].options[7] = 0;
             if (fno.lfname[0])
@@ -658,6 +671,8 @@ void copyGF2Psram(int bselect, int bfill)
     char temp[256];
 
     rombank = (gTable[bselect].options[1]<<8) | gTable[bselect].options[2];
+    if (rombank > 16)
+        rombank = rombank / 64;
     rombank *= (8*1024*1024);
 
     romsize = (gTable[bselect].options[3]<<8) | gTable[bselect].options[4];
@@ -862,81 +877,401 @@ void copySD2Psram(int bselect, int bfill)
     delay(30);
 }
 
-void loadSaveState(int bselect)
+int selectGBASlot(int sel, u8 *blk, int stype, int bfill)
 {
-	int ix, ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144-512, 0, 0, 0, 0, 0, 0, 0 };
-	char temp[256];
-	XCHAR wname[280];
-	long flags = 0;
+    display_context_t dcon;
+    char temp[40];
+    char names[20*256];
+    u16 buttons, previous = 0;
+    int i, ix = sel;
+    int ssel, sfirst, slast;
+    char str1[] = "Overwriting slot in GBA SRAM";
+    char str2[] = "Select GBA SRAM slot for Save State";
+    char str3[] = "A/B = Select slot   Z = Erase slot";
 
-	if ((gTable[bselect].options[5] == 0) || (gTable[bselect].options[5] == 7) || (gTable[bselect].options[5] > 8))
-		return; // ext cart, invalid, or off
+    neo_copyfrom_sram(names, 0x3E000, 20*256);
 
-	strcpy(temp, gTable[bselect].name);
-	for (ix=strlen(temp)-1; temp[ix] != '.'; ix--) ;
-	strcpy(&temp[ix], ".sav");
-	c2wstrcpy(wname, "/.menu/n64/save/");
-	c2wstrcat(wname, temp);
-
-	f_close(&gSDFile);
-    if (f_open(&gSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+    if (stype == 4)
     {
-		UINT ts;
-		f_read(&gSDFile, tmpBuf, ssize[gTable[bselect].options[5]], &ts);
-		if ((gTable[bselect].options[5] == 5) || (gTable[bselect].options[5] == 6))
-			neo_copyto_eeprom(tmpBuf, 0, ssize[gTable[bselect].options[5]], gTable[bselect].options[5]);
-		else
-			neo_copyto_nsram(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
-		f_close(&gSDFile);
-	}
-	else
-	{
-		memset(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
-		if ((gTable[bselect].options[5] == 5) || (gTable[bselect].options[5] == 6))
-			neo_copyto_eeprom(tmpBuf, 0, ssize[gTable[bselect].options[5]], gTable[bselect].options[5]);
-		else
-			neo_copyto_nsram(tmpBuf, 0, ssize[gTable[bselect].options[5]]);
-	}
-	flags = 0xAA550100LL | gTable[bselect].options[5];
+        // FRAM - only one slot
+        sfirst = 0;
+        slast = 0;
+    }
+    else if (stype == 5)
+    {
+        // 4Kb EEPROM - eight slots
+        sfirst = 12;
+        slast = 19;
+    }
+    else if (stype == 6)
+    {
+        // 16Kb EEPROM - eight slots
+        sfirst = 4;
+        slast = 11;
+    }
+    else
+    {
+        // 32KB SRAM - three slots
+        sfirst = 1;
+        slast = 3;
+    }
 
-	neo_copyto_nsram(temp, 0x3FE00, 256);
-	neo_copyto_nsram(&flags, 0x3FF00, 8);
+    if (sel == 20)
+        ssel = sfirst;
+    else
+        ssel = -1;
+
+    while (1)
+    {
+        // get next buffer to draw in
+        dcon = lockVideo(1);
+        graphics_fill_screen(dcon, 0);
+
+        if (browser)
+        {
+            drawImage(dcon, browser, browser_w, browser_h);
+        }
+        else if ((bfill < 3) && (pattern[bfill] != NULL))
+        {
+            rdp_sync(SYNC_PIPE);
+            rdp_set_default_clipping();
+            rdp_enable_texture_copy();
+            rdp_attach_display(dcon);
+            // Draw pattern
+            rdp_sync(SYNC_PIPE);
+            rdp_load_texture(0, 0, MIRROR_DISABLED, pattern[bfill]);
+            for (int j=0; j<240; j+=pattern[bfill]->height)
+                for (int i=0; i<320; i+=pattern[bfill]->width)
+                    rdp_draw_sprite(0, i, j);
+            rdp_detach_display();
+        }
+
+        graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
+        if (ssel == -1)
+            printText(dcon, str1, 20 - strlen(str1)/2, 3);
+        else
+            printText(dcon, str2, 20 - strlen(str2)/2, 3);
+
+        for (int iy=0; iy<(slast - sfirst + 1); iy++)
+        {
+            if ((sfirst + iy) == sel)
+                graphics_set_color(graphics_make_color(0xEF, 0xEF, 0xEF, 0xFF), 0);
+            else
+                graphics_set_color((sfirst + iy) == ssel ? graphics_make_color(0xEF, 0xEF, 0xEF, 0xFF) : graphics_make_color(0x7F, 0xFF, 0x3F, 0xFF), 0);
+            if (blk[sfirst + iy] == 0xAA)
+            {
+                strncpy(temp, &names[(sfirst + iy)*256], 36);
+                temp[36] = 0;
+                printText(dcon, temp, 20 - strlen(temp)/2, 5 + iy);
+            }
+            else
+                printText(dcon, "empty", 19, 5 + iy);
+        }
+        graphics_set_color(graphics_make_color(0x7F, 0xFF, 0x3F, 0xFF), 0);
+        printText(dcon, str3, 20 - strlen(str3)/2, 25);
+
+        // show display
+        unlockVideo(dcon);
+
+        if (ssel == -1)
+        {
+            // just showing matching slot
+            for (i=0; i<180; i++)
+            {
+                buttons = getButtons(0);
+                if (Z_BUTTON(buttons))
+                    break;
+                previous = buttons;
+                delay(1);
+            }
+            if (i == 180)
+                break;
+            ssel = sel;
+            sel = 20;
+        }
+
+        // get buttons
+        buttons = getButtons(0);
+
+        if (DU_BUTTON(buttons))
+        {
+            // UP pressed, go one entry back
+            ssel--;
+            if (ssel < sfirst)
+                ssel = slast;
+            delay(7);
+        }
+        if (DD_BUTTON(buttons))
+        {
+            // DOWN pressed, go one entry forward
+            ssel++;
+            if (ssel > slast)
+                ssel = sfirst;
+            delay(7);
+        }
+
+        if (A_BUTTON(buttons ^ previous))
+        {
+            // A changed
+            if (!A_BUTTON(buttons))
+            {
+                // A just released
+                ix = ssel;
+                break;
+            }
+        }
+        if (B_BUTTON(buttons ^ previous))
+        {
+            // B changed
+            if (!B_BUTTON(buttons))
+            {
+                // B just released
+                ix = ssel;
+                break;
+            }
+        }
+
+        if (Z_BUTTON(buttons ^ previous))
+        {
+            // Z changed
+            if (!Z_BUTTON(buttons))
+            {
+                // Z just released
+                blk[ssel] = 0;
+            }
+        }
+
+        previous = buttons;
+        delay(1);
+    }
+
+    return ix;
+}
+
+#define SWAPLONG(i) (((uint32_t)((i) & 0xFF000000) >> 24) | ((uint32_t)((i) & 0x00FF0000) >>  8) | ((uint32_t)((i) & 0x0000FF00) <<  8) | ((uint32_t)((i) & 0x000000FF) << 24))
+
+void byte_swap_buf(u8 *buf, int size)
+{
+    u32 *ptr = (u32*)buf;
+    for (int ix=0; ix<(size/4); ix++)
+        ptr[ix] = SWAPLONG(ptr[ix]);
+}
+
+void loadSaveState(int bsel, int bfill)
+{
+    int ix, ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144, 0, 0, 0, 0, 0, 0, 0 };
+    char *sext[16] = { 0, ".sra",  ".sra",  ".sra", ".fla", ".eep", ".eep", 0, ".sra", 0, 0, 0, 0, 0, 0, 0 };
+    char temp[260];
+    XCHAR wname[280];
+    u64 flags;
+    UINT ts;
+    selEntry_t entry;
+
+    if (ssize[gTable[bsel].options[5] & 15] == 0)
+        return; // ext cart, invalid, or off
+
+    memcpy(&entry, &gTable[bsel], sizeof(selEntry_t)); // backup the entry
+
+    strcpy(temp, entry.name);
+    ix = strlen(temp)-1;
+    while (ix && (temp[ix] != '.')) ix--;
+    if (ix == 0)
+        ix = strlen(temp);              // no extension - just add to end of name
+    strcpy(&temp[ix], sext[entry.options[5]]);
+
+    // check for SD card
+    neo2_enable_sd();
+    ix = getSDInfo(-1);             // try to get root
+    if (!ix)
+    {
+        // no SD card, use GBA SRAM
+        u8 blk[32];
+        int ix;
+        int soffs[20] = { 0x00000, // one slot for 128KB FPRAM games
+                          0x20000, 0x28000, 0x30000, // three slots for 32KB SRAM games
+                          0x38000, 0x38800, 0x39000, 0x39800, 0x3A000, 0x3A800, 0x3B000, 0x3B800, // 8 slots for 16Kb EEPROM games
+                          0x3C000, 0x3C200, 0x3C400, 0x3C600, 0x3C800, 0x3CA00, 0x3CC00, 0x3CE00 }; // 8 slots for 4Kb EEPROM games
+
+        neo_copyfrom_sram(blk, 0x3FF20, 32);
+        for (ix=0; ix<20; ix++)
+        {
+            char temp2[256];
+            neo_copyfrom_sram(temp2, 0x3E000 | (ix<<8), 256);
+            if ((blk[ix] == 0xAA) && !strcmp(temp, temp2))
+                break;                  // found match in gba sram directory
+        }
+        ix = selectGBASlot(ix, blk, entry.options[5], bfill); // have user select a slot
+
+        // copy from slot in GBA SRAM
+        if (entry.options[5] == 4)
+        {
+            // copy FRAM in two segments
+            neo_copyfrom_sram(tmpBuf, soffs[ix], 65536);
+            neo_copyfrom_sram(&tmpBuf[65536], soffs[ix]+65536, 65536);
+            // "fix" for sram quirk
+            neo_copyfrom_sram(tmpBuf, 0x3FFF0, 16);
+        }
+        else
+            neo_copyfrom_sram(tmpBuf, soffs[ix], ssize[entry.options[5]]);
+
+        blk[ix] = 0xAA;
+        neo_copyto_sram(blk, 0x3FF20, 32);
+        neo_copyto_sram(temp, 0x3E000 | (ix<<8), 256);
+
+        neo2_disable_sd();
+        neo2_enable_sd();
+        getSDInfo(-1);
+    }
+    else
+    {
+        // load save state from SD card
+        c2wstrcpy(wname, "/.menu/n64/save/");
+        c2wstrcat(wname, temp);
+        f_close(&gSDFile);
+        if (f_open(&gSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+        {
+            f_read(&gSDFile, tmpBuf, ssize[entry.options[5]], &ts);
+            f_close(&gSDFile);
+        }
+        else
+        {
+            // no save state file - init save ram to all 0xFFs
+            memset(tmpBuf, 0xFF, ssize[entry.options[5]]);
+        }
+    }
+    neo2_disable_sd();
+
+    switch(entry.options[5])
+    {
+        case 1:
+        case 2:
+        case 3:
+            byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
+            neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]]);
+            break;
+        case 4:
+            byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
+            neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]]);
+            break;
+        case 5:
+        case 6:
+            neo_copyto_eeprom(tmpBuf, 0, ssize[entry.options[5]], entry.options[5]);
+            break;
+        case 8:
+            byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
+            neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]]);
+            break;
+    }
+    flags = 0xAA550100LL | entry.options[5];
+
+    neo_copyto_sram(temp, 0x3FE00, 256);
+    neo_copyto_sram(&flags, 0x3FF00, 8);
+
+    memcpy(&gTable[bsel], &entry, sizeof(selEntry_t)); // restore the entry
 }
 
 void saveSaveState(void)
 {
-	int ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144-512, 0, 0, 0, 0, 0, 0, 0 };
-	char temp[256];
-	XCHAR wname[280];
-	long flags;
-	UINT ts;
+    int ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144, 0, 0, 0, 0, 0, 0, 0 };
+    char temp[256];
+    XCHAR wname[280];
+    u64 flags;
+    UINT ts;
+    int bmax;
 
-	neo_copyfrom_nsram(temp, 0x3FE00, 256);
-	neo_copyfrom_nsram(&flags, 0x3FF00, 4);
+    neo_copyfrom_sram(temp, 0x3FE00, 256);
+    neo_copyfrom_sram(&flags, 0x3FF00, 8);
 
-	if ((flags & 0xFFFFFF00) != 0xAA550100)
-		return; // auto-save sram not needed
+    if ((flags & 0xFFFFFF00) != 0xAA550100)
+    {
+        neo2_enable_sd();
+        getSDInfo(-1);
+        neo2_disable_sd();
+        return; // auto-save sram not needed
+    }
 
-	c2wstrcpy(wname, "/.menu/n64/save/");
-	c2wstrcat(wname, temp);
+    switch(flags & 15)
+    {
+        case 1:
+        case 2:
+        case 3:
+            neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15]);
+            byte_swap_buf(tmpBuf, ssize[flags & 15]);
+            break;
+        case 4:
+            neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15]);
+            byte_swap_buf(tmpBuf, ssize[flags & 15]);
+            break;
+        case 5:
+        case 6:
+            neo_copyfrom_eeprom(tmpBuf, 0, ssize[flags & 15], flags & 15);
+            break;
+        case 8:
+            neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15]);
+            byte_swap_buf(tmpBuf, ssize[flags & 15]);
+            break;
+    }
 
+    // check for SD card
     neo2_enable_sd();
-    getSDInfo(-1);                      // get root directory of sd card
+    bmax = getSDInfo(-1);               // try to get root
+    if (!bmax)
+    {
+        // no SD card, use GBA SRAM
+        u8 blk[32];
+        int ix;
+        int soffs[20] = { 0x00000, // one slot for 128KB FPRAM games
+                          0x20000, 0x28000, 0x30000, // three slots for 32KB SRAM games
+                          0x38000, 0x38800, 0x39000, 0x39800, 0x3A000, 0x3A800, 0x3B000, 0x3B800, // 8 slots for 16Kb EEPROM games
+                          0x3C000, 0x3C200, 0x3C400, 0x3C600, 0x3C800, 0x3CA00, 0x3CC00, 0x3CE00 }; // 8 slots for 4Kb EEPROM games
 
-	f_close(&gSDFile);
-	f_open(&gSDFile, wname, FA_OPEN_ALWAYS | FA_WRITE);
-	if (((flags & 15) == 5) || ((flags & 15) == 6))
-		neo_copyfrom_eeprom(tmpBuf, 0, ssize[flags & 15], flags & 15);
-	else
-		neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15]);
-	f_write(&gSDFile, tmpBuf, ssize[flags & 15], &ts);
-	f_close(&gSDFile);
+        neo_copyfrom_sram(blk, 0x3FF20, 32);
+        for (ix=0; ix<20; ix++)
+        {
+            char temp2[256];
+            neo_copyfrom_sram(temp2, 0x3E000 | (ix<<8), 256);
+            if ((blk[ix] == 0xAA) && !strcmp(temp, temp2))
+                break;                  // found match in gba sram directory
+        }
+        if (ix == 20)
+        {
+            // turn off auto-save
+            flags = 0;
+            neo_copyto_sram(&flags, 0x3FF00, 8);
+            return;                     // no matching entry
+        }
 
-	neo2_disable_sd();
+        // copy to slot in GBA SRAM
+        if ((flags & 15) == 4)
+        {
+            // copy FRAM in two segments
+            neo_copyto_sram(tmpBuf, soffs[ix], 65536);
+            neo_copyto_sram(&tmpBuf[65536], soffs[ix]+65536, 65536);
+            // "fix" for sram quirk
+            neo_copyto_sram(tmpBuf, 0x3FFF0, 16);
+        }
+        else
+            neo_copyto_sram(tmpBuf, soffs[ix], ssize[flags & 15]);
 
-	// turn off auto-save
-	flags = 0;
-	neo_copyto_nsram(&flags, 0x3FF00, 8);
+        neo2_disable_sd();
+        neo2_enable_sd();
+        getSDInfo(-1);
+    }
+    else
+    {
+        c2wstrcpy(wname, "/.menu/n64/save/");
+        c2wstrcat(wname, temp);
+        f_close(&gSDFile);
+        f_open(&gSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
+        f_write(&gSDFile, tmpBuf, ssize[flags & 15], &ts);
+        f_close(&gSDFile);
+
+    }
+    neo2_disable_sd();
+
+    // turn off auto-save
+    flags = 0;
+    neo_copyto_sram(&flags, 0x3FF00, 8);
 }
 
 /* initialize console hardware */
@@ -956,7 +1291,7 @@ void init_n64(void)
     // Initialize rom filesystem
     if (dfs_init(0xB0101000) == DFS_ESUCCESS)
     {
-        // load sprites
+        // load pattern sprites
         int fp = dfs_open("/pattern0.sprite");
         pattern[0] = malloc(dfs_size(fp));
         dfs_read(pattern[0], 1, dfs_size(fp), fp);
@@ -969,6 +1304,10 @@ void init_n64(void)
         pattern[2] = malloc(dfs_size(fp));
         dfs_read(pattern[2], 1, dfs_size(fp), fp);
         dfs_close(fp);
+        // load backdrop images
+        splash = loadImageDFS("/splash.jpg", &splash_w, &splash_h);
+        browser = loadImageDFS("/browser.jpg", &browser_w, &browser_h);
+        loading = loadImageDFS("/loading.jpg", &loading_w, &loading_h);
     }
 }
 
@@ -986,11 +1325,11 @@ int main(void)
 
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v1.4 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v1.6 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v1.4 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v1.6 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v1.4 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v1.6 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";
@@ -1012,10 +1351,13 @@ int main(void)
         { "EXT CARD", "6101", "6102/7101", "6103/7103", "6104", "6105/7105", "6106/7106", "", "", "", "", "", "", "", "", "" }
     };
 
+    int stemp_w, stemp_h;
+    sprite_t *stemp;
+
     init_n64();
 
-    gCardID = neo_id_card();            // check for Neo Flash card
     gCpldVers = neo_get_cpld();         // get Myth CPLD ID
+    gCardID = neo_id_card();            // check for Neo Flash card
 
     neo_select_menu();                  // enable menu flash in cart space
     gCardType = *(vu32 *)(0xB01FFFF0) >> 16;
@@ -1040,14 +1382,12 @@ int main(void)
     }
 
 #ifdef RUN_FROM_U2
-    neo_check_reset_to_game();
     // check for boot rom in menu
     if (!memcmp((void *)0xB0000020, "N64 Myth Menu (MF)", 18))
         neo_run_menu();
 #endif
 
 #ifndef RUN_FROM_SD
-#ifndef NO_SD_FACE
     // check for boot rom on SD card
     neo2_enable_sd();
     bmax = getSDInfo(-1);               // get root directory of sd card
@@ -1061,6 +1401,16 @@ int main(void)
         c2wstrcat(fpath, gTable[0].name);
         if (f_open(&gSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
         {
+            stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
+            if (stemp)
+            {
+                if (loading)
+                    free(loading);
+                loading = stemp;
+                loading_w = stemp_w;
+                loading_h = stemp_h;
+            }
+
             gTable[0].valid = 1;
             gTable[0].type = 127;
             gTable[0].options[0] = 0xFF;
@@ -1072,16 +1422,61 @@ int main(void)
             gTable[0].options[6] = 2;
             gTable[0].options[7] = 0;
             get_sd_info(0);
+
             copySD2Psram(0, 0);
             neo_run_psram(gTable[0].options, 1);
         }
         neo2_disable_sd();
     }
 #endif
-#endif
+
+    neo2_enable_sd();
+    bmax = getSDInfo(-1);
+    if (bmax)
+    {
+        // try for images on the SD card
+        stemp = loadImageSD("/.menu/n64/images/splash.jpg", &stemp_w, &stemp_h);
+        if (stemp)
+        {
+            if (splash)
+                free(splash);
+            splash = stemp;
+            splash_w = stemp_w;
+            splash_h = stemp_h;
+        }
+        stemp = loadImageSD("/.menu/n64/images/browser.jpg", &stemp_w, &stemp_h);
+        if (stemp)
+        {
+            if (browser)
+                free(browser);
+            browser = stemp;
+            browser_w = stemp_w;
+            browser_h = stemp_h;
+        }
+        stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
+        if (stemp)
+        {
+            if (loading)
+                free(loading);
+            loading = stemp;
+            loading_w = stemp_w;
+            loading_h = stemp_h;
+        }
+    }
+    neo2_disable_sd();
+
+    if (splash)
+    {
+        display_context_t dcon;
+        dcon = lockVideo(1);
+        graphics_fill_screen(dcon, 0);
+        drawImage(dcon, splash, splash_w, splash_h);
+        unlockVideo(dcon);
+        delay(120);
+    }
 
     // save save state if needed
-	saveSaveState();
+    saveSaveState();
 
     if (brwsr)
     {
@@ -1104,7 +1499,11 @@ int main(void)
         dcon = lockVideo(1);
         graphics_fill_screen(dcon, 0);
 
-        if ((bfill < 3) && (pattern[bfill] != NULL))
+        if (browser)
+        {
+            drawImage(dcon, browser, browser_w, browser_h);
+        }
+        else if ((bfill < 3) && (pattern[bfill] != NULL))
         {
             rdp_sync(SYNC_PIPE);
             rdp_set_default_clipping();
@@ -1120,7 +1519,10 @@ int main(void)
         }
 
         // show title
-        graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
+        if (browser)
+            graphics_set_color(graphics_make_color(0x3F, 0x3F, 0x7F, 0xFF), 0);
+        else
+            graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
         printText(dcon, menu_title, 20 - strlen(menu_title)/2, 1);
 
         // print browser list (lines 3 to 12)
@@ -1137,7 +1539,7 @@ int main(void)
                         // directory entry
                         strcpy(temp, "[");
                         strncat(temp, gTable[bstart+ix].name, 34);
-						temp[35] = 0;
+                        temp[35] = 0;
                         strcat(temp, "]");
                     }
                     else
@@ -1205,7 +1607,10 @@ int main(void)
         }
 
         // show cart info help messages
-        graphics_set_color(graphics_make_color(0xFF, 0x4F, 0x4F, 0xFF), 0);
+        if (browser)
+            graphics_set_color(graphics_make_color(0x5F, 0x1F, 0x1F, 0xFF), 0);
+        else
+            graphics_set_color(graphics_make_color(0xFF, 0x4F, 0x4F, 0xFF), 0);
         sprintf(temp, "CPLD:V%d CART:0x%08X FLASH:%c", gCpldVers & 7, gCardID, cards[gCardType & 3]);
         printText(dcon, temp, 20 - strlen(temp)/2, 24);
         graphics_set_color(graphics_make_color(0x7F, 0xFF, 0x3F, 0xFF), 0);
@@ -1336,10 +1741,13 @@ int main(void)
                     }
                     else
                     {
-                        u8 blk[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55 };
+                        if (gTable[bselect].type == 127)
+                        {
+                            // load rom info if not already loaded
+                            get_sd_info(bselect);
+                        }
                         copySD2Psram(bselect, bfill);
-                        neo_copyto_nsram(blk, 0x3FFF0, 16);
-						loadSaveState(bselect);
+                        loadSaveState(bselect, bfill);
                         neo_run_psram(gTable[bselect].options, 1);
                     }
                 }
@@ -1347,13 +1755,13 @@ int main(void)
                 {
                     if (!gTable[bselect].swap)
                     {
+                        loadSaveState(bselect, bfill);
                         neo_run_game(gTable[bselect].options, 1);
                     }
                     else
                     {
-                        u8 blk[16] = { 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55, 0xAA, 0x55 };
                         copyGF2Psram(bselect, bfill);
-                        neo_copyto_nsram(blk, 0x3FFF0, 16);
+                        loadSaveState(bselect, bfill);
                         neo_run_psram(gTable[bselect].options, 1);
                     }
                 }
@@ -1375,12 +1783,13 @@ int main(void)
                     }
                     else
                     {
-                        u8 blk[16];
+                        if (gTable[bselect].type == 127)
+                        {
+                            // load rom info if not already loaded
+                            get_sd_info(bselect);
+                        }
                         copySD2Psram(bselect, bfill);
-                        memcpy(blk, gTable[bselect].options, 8);
-                        neo_copyfrom_psram(&blk[8], 0x10, 8); // CRCs
-                        neo_copyto_nsram(blk, 0x3FFF0, 16);
-						loadSaveState(bselect);
+                        loadSaveState(bselect, bfill);
                         neo_run_psram(gTable[bselect].options, 0);
                     }
                 }
@@ -1388,15 +1797,13 @@ int main(void)
                 {
                     if (!gTable[bselect].swap)
                     {
+                        loadSaveState(bselect, bfill);
                         neo_run_game(gTable[bselect].options, 0);
                     }
                     else
                     {
-                        u8 blk[16];
                         copyGF2Psram(bselect, bfill);
-                        memcpy(blk, gTable[bselect].options, 8);
-                        neo_copyfrom_psram(&blk[8], 0x10, 8); // CRCs
-                        neo_copyto_nsram(blk, 0x3FFF0, 16);
+                        loadSaveState(bselect, bfill);
                         neo_run_psram(gTable[bselect].options, 0);
                     }
                 }
