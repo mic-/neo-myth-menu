@@ -1,5 +1,5 @@
 ========================================================================
-              Neo N64 Myth Menu v1.4 by Chilly Willy
+              Neo N64 Myth Menu v1.6 by Chilly Willy
 ========================================================================
 The Neo N64 Myth Menu uses libdragon, by Shaun Taylor. Many thanks for
 his work on this fine SDK for the N64.
@@ -13,22 +13,30 @@ images are. In the Neo2 Pro Manager on your PC, set the boot type to
 click "Burn" to set the menu in the N64 Myth menu flash.
 
 That menu needs to be written to the N64 menu flash in order for some of
-the extra features of v1.4 to work. You can burn the NEON64MF.v64 rom
-image to the GBA flash cart menu flash, setting the path to the image in
-the BIOS Path A-1. If you leave the boot type on TypeA-1, the menu in the
-N64 menu flash will detect the menu in the GBA menu flash and run it.
-This allows you to do updates to the GBA menu flash, leaving the N64 menu
-flash alone unless there is a major update. You could also boot only the
-GBA menu flash directly, but you will lose some features of the menu if
-you do so.
+the extra features to work. You can burn the NEON64MF.v64 rom image to
+the GBA flash cart menu flash, setting the path to the image in the BIOS
+Path A-1. If you leave the boot type on TypeA-1, the menu in the N64 menu
+flash will detect the menu in the GBA menu flash and run it. This allows
+you to do updates to the GBA menu flash, leaving the N64 menu flash alone
+unless there is a major update. You could also boot only the GBA menu
+flash directly.
 
 Similarly, you can put the NEON64SD.v64 on your SD card. Copy it to
 "/.menu/n64/NEON64SD.v64" - create the directories if they don't already
-exist. Spelling and capitalization matter, so get it right! When the menu
-in either the N64 menu flash or the GBA menu flash find that file, they
-will boot it, assuming it to be the most up to date version. This is the
-easiest way to handle minor updates - put v1.4 in the N64 menu flash and
-then any new updates on the SD card.
+exist. Spelling and capitalization matter, so get it right! While you are
+at it, make a "/.menu/n64/save" directory. It is needed for the autosave
+manager.
+
+When the menu in either the N64 menu flash or the GBA menu flash find that
+file, they will boot it, assuming it to be the most up to date version.
+This is the easiest way to handle minor updates - put v1.6 in the N64 menu
+flash and then any new updates on the SD card.
+
+You can replace the splash, browser, and loading images by placing your
+own images in the "/.menu/n64/images" directory. The images should be
+named "splash.jpg", "browser.jpg", and "loading.jpg", and they should be
+jpeg images 320 pixels wide by 240 lines tall. You can have any or all of
+them. Images not included in the directory will use the default image.
 
 ========================================================================
 
@@ -91,34 +99,43 @@ cart, they haven't any psram, so you cannot play games where the game info
 is not white. The proper files to burn to flash to be directly playable
 are of the .v64 variety.
 
-One new feature of the menu if you have a Neo2-SD or Neo2-Pro has to do
-with games that won't reset to the game because their CIC type doesn't
-match the boot CIC type. If you run them from the SD card, I have code in
-the N64 menu flash menu that will rerun the game, allowing you to run with
-reset to game. I'm still thinking of how to do this with games in the game
-flash. I can do this on the Neo2-SD and Neo2-Pro, but not on plain flash
-only carts.
+The menu has the ability to boot Myth-aware homebrew. This is tied to the
+ability to boot menus from anywhere as described above. What the homebrew
+author does is set the first eight characters of the rom header name to
+"N64 Myth" - the rest of the name doesn't matter. When those characters
+are found, the program is run with the hardware unlocked so that the N64
+Myth hardware (particularly the SD card interface) may be used.
 
-Another new feature is the ability to boot Myth-aware homebrew. This is
-tied to the ability to boot menus from anywhere as described above. What
-the homebrew author does is set the first eight characters of the rom
-header name to "N64 Myth" - the rest of the name doesn't matter. When
-those characters are found, the program is run with the hardware unlocked
-so that the N64 Myth hardware (particularly the SD card interface) may be
-used.
+The latest feature is auto load/save of save ram. When you run a game and
+it uses save ram of any kind (except ext cart), the save ram will be
+automatically loaded from "/.menu/n64/save/<game_name>.<save extension>"
+when you have an SD card. If the file doesn't exist, the save ram is
+cleared. When you restart the menu the next time, the save ram will be
+automatically saved to the file. If the directory mentioned doesn't exist
+on your SD card, create it or this will not work.
 
-Another new feature has to do with the game options. No longer is a number
-displayed - instead, you see what the option stands for. The only two you
-can change are the save type, and the CIC type. It is now obvious to what
-each option value is set.
+The extension for the file depends on the type of save ram used. For SRAM,
+the extension is ".sra"; for EEPROM, it is ".eep"; and for FRAM, it is
+".fla". These files are compatible with N64 emulator save ram files.
 
-The latest feature is auto load/save of save ram. When you run a game from
-the SD card, and it uses save ram of any kind (except ext cart), the save
-state will be automatically loaded from "/.menu/n64/save/<game_name>.sav".
-If the file doesn't exist, the save ram is cleared. When you restart the
-menu the next time, the save ram will be automatically saved to the file.
-If the directory mentioned doesn't exist on your SD card, create it or this
-will not work.
+When you don't have an SD card plugged in, or are using a cart without the
+SD interface, the save ram is saved in the SRAM on the GBA cart. In that
+case, when you run the game, a save slot selector screen will be shown.
+If the game already has a slot in the SRAM, the selector screen will just
+show which slot will be written to. If the game doesn't have a slot in the
+SRAM, you will be asked to select one. Press A or B to select a slot, or
+press Z to erase the currently high-lighted slot.
+
+The number of slots available depends on the type of save ram the game uses.
+
+4Kbit EEPROM:  8 slots
+16Kbit EEPROM: 8 slots
+32KByte SRAM:  3 slots
+128KByte FRAM: 1 slot
+
+You are allowed multiple slots (except for FRAM) so that if/when you write
+another game to the flash card, the save state will remain in case you
+rewrite the previous game at a later time.
 
 ========================================================================
                             Controls

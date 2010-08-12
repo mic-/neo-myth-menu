@@ -28,11 +28,11 @@ typedef uint64_t u64;
 #define INT_IO    *(vu32*)(MYTH_IO_BASE | 0x24*2) // 0xFFFFFFFF = enable multi-card mode
 #define NEO_IO    *(vu32*)(MYTH_IO_BASE | 0x28*2) // 0xFFFFFFFF = 16 bit mode - read long from 0xB2000000 to 0xB3FFFFFF returns word
 #define ROMC_IO   *(vu32*)(MYTH_IO_BASE | 0x30*2) // 0xFFFFFFFF = run card
-#define ROMSW_IO  *(vu32*)(MYTH_IO_BASE | 0x34*2) // 0x0000 = n64 menu at 0xB0000000 to 0xB1FFFFFF and gba card at 0xB2000000 to 0xB3FFFFFF
-#define SRAM2C_I0 *(vu16*)(MYTH_IO_BASE | 0x36*2) // 0xFFFF = gba sram at 0xA8000000 to 0xA803FFFF (only when SAVE_IO = 5 or 6)
+#define ROMSW_IO  *(vu32*)(MYTH_IO_BASE | 0x34*2) // 0x00000000 = n64 menu at 0xB0000000 to 0xB1FFFFFF and gba card at 0xB2000000 to 0xB3FFFFFF
+#define SRAM2C_I0 *(vu32*)(MYTH_IO_BASE | 0x36*2) // 0xFFFFFFFF = gba sram at 0xA8000000 to 0xA803FFFF (only when SAVE_IO = 5 or 6)
 #define RST_IO    *(vu32*)(MYTH_IO_BASE | 0x38*2) // 0x00000000 = RESET to game, 0xFFFFFFFF = RESET to menu
 #define CIC_EN    *(vu32*)(MYTH_IO_BASE | 0x3C*2) // 0x00000000 = CIC use default, 0xFFFFFFFF = CIC open
-#define CPID_IO   *(vu32*)(MYTH_IO_BASE | 0x40*2) // 0x00000000 = CPLD ID off, 0xFFFFFFFF = CPLD ID one (0x81 = V1.1, 0x82 = V2.0)
+#define CPID_IO   *(vu32*)(MYTH_IO_BASE | 0x40*2) // 0x00000000 = CPLD ID off, 0xFFFFFFFF = CPLD ID one (0x81 = V1.2, 0x82 = V2.0, 0x83 = V3.0)
 // V2.0 hardware
 #define SRAM2C_IO *(vu32*)(MYTH_IO_BASE | 0x2C*2) // 0xFFFFFFFF = gba sram at 0xA8000000 to 0xA803FFFF (only when SAVE_IO = 5 or 6)
 
@@ -45,12 +45,12 @@ typedef uint64_t u64;
 
 static u32 neo_mode = SD_OFF;
 
-#define MAX_DMA_SIZE 8192
-static u8 __attribute__((aligned(16))) dmaBuf[MAX_DMA_SIZE*2];
+static u8 __attribute__((aligned(16))) dmaBuf[128*1024];
 
 extern unsigned int gCardTypeCmd;
 extern unsigned int gPsramCmd;
 extern short int gCardType;
+extern unsigned int gCpldVers;          /* 0x81 = V1.2 hardware, 0x82 = V2.0 hardware, 0x83 = V3.0 hardware */
 
 extern int get_cic(unsigned char *buffer);
 
@@ -118,7 +118,10 @@ unsigned int neo_id_card(void)
     // map GBA save ram into sram space
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
-    SRAM2C_IO = 0xFFFFFFFF;             // enable gba sram
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0xFFFFFFFF;         // enable gba sram
+    else
+        SRAM2C_IO = 0xFFFFFFFF;         // enable gba sram
     hw_delay();
 
     // read ID from sram space
@@ -130,7 +133,10 @@ unsigned int neo_id_card(void)
     // disable ID mode
     _neo_asic_cmd(0x00904900, 1);       // ID disabled
 
-    SRAM2C_IO = 0x00000000;             // disable gba sram
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0x00000000;         // disable gba sram
+    else
+        SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
 
     return result;
@@ -201,18 +207,6 @@ void neo_psram_offset(int offs)
     hw_delay();
 }
 
-void neo_gsram_offset(int offs)
-{
-    _neo_asic_cmd(0x00E00000|offs, 1);  // set gba sram offset
-
-    ROMSW_IO = 0xFFFFFFFF;              // gba mapped to 0xB0000000 - 0xB3FFFFFF
-    hw_delay();
-    ROM_SIZE = 0x000C000C;              // bank size = 256Mbit (largest psram available)
-    hw_delay();
-    NEO_IO = 0xFFFFFFFF;                // 16 bit mode
-    hw_delay();
-}
-
 void neo_copyfrom_game(void *dest, int fstart, int len)
 {
     neo_select_game();                  // select game flash
@@ -228,6 +222,7 @@ void neo_copyfrom_game(void *dest, int fstart, int len)
         while (dma_busy()) ;
         PI_STATUS_REG = 3;
         dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xB0000000 + fstart, len);
+        data_cache_writeback_invalidate(dmaBuf, len);
         // copy DMA buffer to dst
         memcpy(dest, dmaBuf, len);
     }
@@ -238,6 +233,7 @@ void neo_copyfrom_game(void *dest, int fstart, int len)
         while (dma_busy()) ;
         PI_STATUS_REG = 3;
         dma_read((void *)((u32)dest & 0x1FFFFFFF), 0xB0000000 + fstart, len);
+        data_cache_writeback_invalidate(dest, len);
     }
 #endif
 }
@@ -259,6 +255,7 @@ void neo_copyfrom_menu(void *dest, int fstart, int len)
         while (dma_busy()) ;
         PI_STATUS_REG = 3;
         dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xB0000000 + fstart, len);
+        data_cache_writeback_invalidate(dmaBuf, len);
         // copy DMA buffer to dst
         memcpy(dest, dmaBuf, len);
     }
@@ -269,6 +266,7 @@ void neo_copyfrom_menu(void *dest, int fstart, int len)
         while (dma_busy()) ;
         PI_STATUS_REG = 3;
         dma_read((void *)((u32)dest & 0x1FFFFFFF), 0xB0000000 + fstart, len);
+        data_cache_writeback_invalidate(dest, len);
     }
 #endif
 }
@@ -307,18 +305,20 @@ void neo_copyfrom_psram(void *dest, int pstart, int len)
 void neo_copyto_sram(void *src, int sstart, int len)
 {
     u32 temp;
-    vu32 *sram = (vu32*)0xA8000000;
 
     temp = (sstart & 0x00030000) >> 13;
-//  neo_gsram_offset(temp);             // set sram offset
+    _neo_asic_cmd(0x00E00000|temp, 1);  // set gba sram offset
 
     // map GBA save ram into sram space
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
-    SRAM2C_IO = 0xFFFFFFFF;             // enable gba sram
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0xFFFFFFFF;         // enable gba sram
+    else
+        SRAM2C_IO = 0xFFFFFFFF;         // enable gba sram
+    hw_delay();
     hw_delay();
 
-#if 0
     // Init the PI for sram
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
@@ -327,42 +327,39 @@ void neo_copyto_sram(void *src, int sstart, int len)
 
     // copy src to DMA buffer
     for (int ix=0; ix<len; ix++)
-        dmaBuf[ix*2] = *(u8*)(src + ix);
+        dmaBuf[ix*2 + 1] = *(u8*)(src + ix);
     // DMA buffer to sram space
     data_cache_writeback_invalidate(dmaBuf, len*2);
     while (dma_busy()) ;
     PI_STATUS_REG = 2;
     dma_write((void *)((u32)dmaBuf & 0x1FFFFFF8), 0xA8000000 + (sstart & 0xFFFF)*2, len*2);
-#else
-    // copy src to DMA buffer
-    for (int ix=0; ix<len; ix++)
-        dmaBuf[ix*2] = *(u8*)(src + ix);
-    // copy buffer to sram space
-    for (int ix=0; ix<len/2; ix++)
-        sram[(sstart & 0xFFFF)/2 + ix] = *(u32*)((u32)dmaBuf + ix*4);
-#endif
 
-//  neo_gsram_offset(0);                // clear sram offset
+    _neo_asic_cmd(0x00E00000, 1);       // clear gba sram offset
 
-    SRAM2C_IO = 0x00000000;             // disable gba sram
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0x00000000;         // disable gba sram
+    else
+        SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
 }
 
 void neo_copyfrom_sram(void *dst, int sstart, int len)
 {
     u32 temp;
-    vu32 *sram = (vu32*)0xA8000000;
 
     temp = (sstart & 0x00030000) >> 13;
-//  neo_gsram_offset(temp);             // set sram offset
+    _neo_asic_cmd(0x00E00000|temp, 1);  // set gba sram offset
 
     // map GBA save ram into sram space
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
-    SRAM2C_IO = 0xFFFFFFFF;             // enable gba sram
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0xFFFFFFFF;         // enable gba sram
+    else
+        SRAM2C_IO = 0xFFFFFFFF;         // enable gba sram
+    hw_delay();
     hw_delay();
 
-#if 0
     // Init the PI for sram
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
@@ -374,77 +371,137 @@ void neo_copyfrom_sram(void *dst, int sstart, int len)
     while (dma_busy()) ;
     PI_STATUS_REG = 3;
     dma_read((void *)((u32)dmaBuf & 0x1FFFFFF8), 0xA8000000 + (sstart & 0xFFFF)*2, len*2);
-#else
-    // copy sram space to buffer
-    for (int ix=0; ix<len/2; ix++)
-        *(u32*)((u32)dmaBuf + ix*4) = sram[(sstart & 0xFFFF)/2 + ix];
-#endif
+    data_cache_writeback_invalidate(dmaBuf, len*2);
     // copy DMA buffer to dst
     for (int ix=0; ix<len; ix++)
-        *(u8*)(dst + ix) = dmaBuf[ix*2];
+        *(u8*)(dst + ix) = dmaBuf[ix*2 + 1];
 
-//  neo_gsram_offset(0);                // clear sram offset
+    _neo_asic_cmd(0x00E00000, 1);       // clear gba sram offset
 
-    SRAM2C_IO = 0x00000000;             // disable gba sram
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0x00000000;         // disable gba sram
+    else
+        SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
 }
 
-void neo_copyto_cache(void *src, int cstart, int len)
+void neo_copyto_nsram(void *src, int sstart, int len)
 {
-    u32 temp;
-    vu32 *sram = (vu32 *)0xA8000000;
-
-    // enable ID mode
-    _neo_asic_cmd(0x00903500, 1);       // ID enabled
-
-    // map GBA save ram into sram space
-    SAVE_IO = 0x00050005;               // save off
+    SAVE_IO = 0x00080008;               // SRAM 256KB
     hw_delay();
-    SRAM2C_IO = 0xFFFFFFFF;             // enable gba sram
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0x00000000;         // disable gba sram
+    else
+        SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
 
-    // write cache in sram space
-    for (int ix=0; ix<len; ix+=2)
+    // Init the PI for sram
+    PI_BSD_DOM2_LAT_REG = 0x00000005;
+    PI_BSD_DOM2_PWD_REG = 0x0000000C;
+    PI_BSD_DOM2_PGS_REG = 0x0000000D;
+    PI_BSD_DOM2_RLS_REG = 0x00000002;
+
+    if ((u32)src & 7)
     {
-        temp = *(u8 *)(src + ix) << 24;
-        temp |= *(u8 *)(src + ix + 1) << 8;
-        sram[(NEO2_CACHE_OFFS + cstart + ix) >> 1] = temp;
-        bus_delay(384);
+        // source not properly aligned, copy src to DMA buffer, then DMA it
+        memcpy(dmaBuf, src, len);
+        // DMA buffer to sram space
+        data_cache_writeback_invalidate(dmaBuf, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 2;
+        dma_write((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart, len);
+    }
+    else
+    {
+        // source is aligned, DMA src directly to sram space
+        data_cache_writeback_invalidate(src, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 2;
+        dma_write((void *)((u32)src & 0x1FFFFFFF), 0xA8000000 + sstart, len);
     }
 
-    // disable ID mode
-    _neo_asic_cmd(0x00904900, 1);       // ID disabled
-
-    SRAM2C_IO = 0x00000000;             // disable gba sram
+    SAVE_IO = 0x00050005;               // save off
     hw_delay();
 }
 
-void neo_copyfrom_cache(void *dst, int cstart, int len)
+void neo_copyfrom_nsram(void *dst, int sstart, int len)
 {
-    u32 temp;
-    vu32 *sram = (vu32 *)0xA8000000;
-
-    // enable ID mode
-    _neo_asic_cmd(0x00903500, 1);       // ID enabled
-
-    // map GBA save ram into sram space
-    SAVE_IO = 0x00050005;               // save off
+    SAVE_IO = 0x00080008;               // SRAM 256KB
     hw_delay();
-    SRAM2C_IO = 0xFFFFFFFF;             // enable gba sram
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0x00000000;         // disable gba sram
+    else
+        SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
 
-    // read cache in sram space
-    for (int ix=0; ix<len; ix+=2)
+    // Init the PI for sram
+    PI_BSD_DOM2_LAT_REG = 0x00000005;
+    PI_BSD_DOM2_PWD_REG = 0x0000000C;
+    PI_BSD_DOM2_PGS_REG = 0x0000000D;
+    PI_BSD_DOM2_RLS_REG = 0x00000002;
+
+    if ((u32)dst & 7)
     {
-        temp = sram[(NEO2_CACHE_OFFS + cstart + ix) >> 1];
-        *(u8 *)(dst + ix) = (temp & 0xFF000000) >> 24;
-        *(u8 *)(dst + ix + 1) = (temp & 0x0000FF00) >> 8;
+        // not properly aligned - DMA sram space to buffer, then copy it
+        data_cache_writeback_invalidate(dmaBuf, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 3;
+        dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart, len);
+        // copy DMA buffer to dst
+        memcpy(dst, dmaBuf, len);
+    }
+    else
+    {
+        // destination is aligned - DMA sram space directly to dst
+        data_cache_writeback_invalidate(dst, len);
+        while (dma_busy()) ;
+        PI_STATUS_REG = 3;
+        dma_read((void *)((u32)dst & 0x1FFFFFFF), 0xA8000000 + sstart, len);
     }
 
-    // disable ID mode
-    _neo_asic_cmd(0x00904900, 1);       // ID disabled
+    SAVE_IO = 0x00050005;               // save off
+    hw_delay();
+}
 
-    SRAM2C_IO = 0x00000000;             // disable gba sram
+void neo_copyto_eeprom(void *src, int sstart, int len, int mode)
+{
+    SAVE_IO = (mode<<16) | mode;        // set EEPROM mode
+    hw_delay();
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0x00000000;         // disable gba sram
+    else
+        SRAM2C_IO = 0x00000000;         // disable gba sram
+    hw_delay();
+
+    for (int ix=0; ix<len; ix+=8)
+    {
+        unsigned long long data;
+        memcpy((void*)&data, (void*)((u32)src + ix), 8);
+        eeprom_write((sstart + ix)>>3, data);
+    }
+
+    SAVE_IO = 0x00050005;               // save off
+    hw_delay();
+}
+
+void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode)
+{
+    SAVE_IO = (mode<<16) | mode;        // set EEPROM mode
+    hw_delay();
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0x00000000;         // disable gba sram
+    else
+        SRAM2C_IO = 0x00000000;         // disable gba sram
+    hw_delay();
+
+    for (int ix=0; ix<len; ix+=8)
+    {
+        unsigned long long data;
+        data = eeprom_read((sstart + ix)>>3);
+        memcpy((void*)((u32)dst + ix), (void*)&data, 8);
+    }
+
+    SAVE_IO = 0x00050005;               // save off
     hw_delay();
 }
 
@@ -587,114 +644,6 @@ int neo2_recv_sd_multi(unsigned char *buf, int count)
         : "r" (buf), "r" (count)        // inputs
         : "$0" );                       // clobbered
     return res;
-}
-
-void neo_copyto_nsram(void *src, int sstart, int len)
-{
-    SAVE_IO = 0x00080008;               // SRAM 256KB
-    hw_delay();
-    SRAM2C_IO = 0x00000000;             // disable gba sram
-    hw_delay();
-
-    // Init the PI for sram
-    PI_BSD_DOM2_LAT_REG = 0x00000005;
-    PI_BSD_DOM2_PWD_REG = 0x0000000C;
-    PI_BSD_DOM2_PGS_REG = 0x0000000D;
-    PI_BSD_DOM2_RLS_REG = 0x00000002;
-
-    if ((u32)src & 7)
-    {
-        // source not properly aligned, copy src to DMA buffer, then DMA it
-        memcpy(dmaBuf, src, len);
-        // DMA buffer to sram space
-        data_cache_writeback_invalidate(dmaBuf, len);
-        while (dma_busy()) ;
-        PI_STATUS_REG = 2;
-        dma_write((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart, len);
-    }
-    else
-    {
-        // source is aligned, DMA src directly to sram space
-        data_cache_writeback_invalidate(src, len);
-        while (dma_busy()) ;
-        PI_STATUS_REG = 2;
-        dma_write((void *)((u32)src & 0x1FFFFFFF), 0xA8000000 + sstart, len);
-    }
-
-    SAVE_IO = 0x00050005;               // save off
-    hw_delay();
-}
-
-void neo_copyfrom_nsram(void *dst, int sstart, int len)
-{
-    SAVE_IO = 0x00080008;               // SRAM 256KB
-    hw_delay();
-    SRAM2C_IO = 0x00000000;             // disable gba sram
-    hw_delay();
-
-    // Init the PI for sram
-    PI_BSD_DOM2_LAT_REG = 0x00000005;
-    PI_BSD_DOM2_PWD_REG = 0x0000000C;
-    PI_BSD_DOM2_PGS_REG = 0x0000000D;
-    PI_BSD_DOM2_RLS_REG = 0x00000002;
-
-    if ((u32)dst & 7)
-    {
-        // not properly aligned - DMA sram space to buffer, then copy it
-        data_cache_writeback_invalidate(dmaBuf, len);
-        while (dma_busy()) ;
-        PI_STATUS_REG = 3;
-        dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart, len);
-        // copy DMA buffer to dst
-        memcpy(dst, dmaBuf, len);
-    }
-    else
-    {
-        // destination is aligned - DMA sram space directly to dst
-        data_cache_writeback_invalidate(dst, len);
-        while (dma_busy()) ;
-        PI_STATUS_REG = 3;
-        dma_read((void *)((u32)dst & 0x1FFFFFFF), 0xA8000000 + sstart, len);
-    }
-
-    SAVE_IO = 0x00050005;               // save off
-    hw_delay();
-}
-
-void neo_copyto_eeprom(void *src, int sstart, int len, int mode)
-{
-    SAVE_IO = (mode<<16) | mode;        // set EEPROM mode
-    hw_delay();
-    SRAM2C_IO = 0x00000000;             // disable gba sram
-    hw_delay();
-
-	for (int ix=0; ix<len; ix+=8)
-	{
-		unsigned long long data;
-		memcpy((void*)&data, (void*)((u32)src + ix), 8);
-		eeprom_write((sstart + ix)>>3, data);
-	}
-
-    SAVE_IO = 0x00050005;               // save off
-    hw_delay();
-}
-
-void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode)
-{
-    SAVE_IO = (mode<<16) | mode;        // set EEPROM mode
-    hw_delay();
-    SRAM2C_IO = 0x00000000;             // disable gba sram
-    hw_delay();
-
-	for (int ix=0; ix<len; ix+=8)
-	{
-		unsigned long long data;
-		data = eeprom_read((sstart + ix)>>3);
-		memcpy((void*)((u32)dst + ix), (void*)&data, 8);
-	}
-
-    SAVE_IO = 0x00050005;               // save off
-    hw_delay();
 }
 
 //----------------------------------------------------------------------
@@ -1004,6 +953,8 @@ void neo_run_game(u8 *option, int reset)
     u32 mythaware;
 
     rombank = (option[1]<<8) + option[2];
+    if (rombank > 16)
+        rombank = rombank / 64;
     rombank += (rombank<<16);
 
     romsize = (option[3]<<8) + option[4];
@@ -1031,12 +982,6 @@ void neo_run_game(u8 *option, int reset)
 
     neo_select_game();                  // select game flash
 
-    // if set to use card cic, figure out cic for simulated start
-    if (romcic == 0)
-        runcic = get_cic((unsigned char *)0xB0000040);
-    else
-        runcic = romcic & 7;
-
     // set myth hw for selected rom
     ROM_BANK = rombank;
     hw_delay();
@@ -1044,6 +989,13 @@ void neo_run_game(u8 *option, int reset)
     hw_delay();
     SAVE_IO  = romsave;
     hw_delay();
+    // if set to use card cic, figure out cic for simulated start
+    if (romcic == 0)
+        runcic = get_cic((unsigned char *)0xB0000040);
+    else
+        runcic = romcic & 7;
+    if (!reset && (runcic != 2))
+        reset = 1;                      // reset back to menu since cannot reset to game in hardware
     CIC_IO   = romcic; //reset ? 0x00020002 : romcic;
     hw_delay();
     RST_IO = reset ? 0xFFFFFFFF : 0x00000000;
@@ -1095,15 +1047,6 @@ void neo_run_psram(u8 *option, int reset)
     neo_select_psram();                 // select gba psram
     _neo_asic_cmd(0x00E2D200, 1);       // GBA CARD WE OFF !
 
-    // if set to use card cic, figure out cic for simulated start
-    if (romcic == 0)
-        runcic = get_cic((unsigned char *)0xB0000040);
-    else
-        runcic = romcic & 7;
-
-    if (!reset && (runcic != 2))
-        reset = 1;                      // reset back to menu since cannot reset to game in hardware
-
     // set myth hardware for selected rom
     ROMSW_IO = 0xFFFFFFFF;              // gba mapped to 0xB0000000 - 0xB3FFFFFF
     hw_delay();
@@ -1113,6 +1056,13 @@ void neo_run_psram(u8 *option, int reset)
     hw_delay();
     SAVE_IO  = romsave;
     hw_delay();
+    // if set to use card cic, figure out cic for simulated start
+    if (romcic == 0)
+        runcic = get_cic((unsigned char *)0xB0000040);
+    else
+        runcic = romcic & 7;
+    if (!reset && (runcic != 2))
+        reset = 1;                      // reset back to menu since cannot reset to game in hardware
     CIC_IO   = romcic; //reset ? 0x00020002 : romcic;
     hw_delay();
     RST_IO = reset ? 0xFFFFFFFF : 0x00000000;
@@ -1126,21 +1076,3 @@ void neo_run_psram(u8 *option, int reset)
     simulate_pif_boot(runcic);          // should never return
     enable_interrupts();
 }
-
-#ifdef RUN_FROM_U2
-void neo_check_reset_to_game(void)
-{
-    u8 blk1[16];
-    u8 blk2[8];
-
-    // if CRCs match between n64 sram and psram, reset to game in psram
-    neo_copyfrom_nsram(blk1, 0x3FFF0, 16);
-    if ((blk1[0] == 0xFF) && (blk1[7] == 0))
-    {
-        // validated... a little
-        neo_copyfrom_psram(blk2, 0x10, 8);
-        if (!memcmp(&blk1[8], blk2, 8))
-            neo_run_psram(blk1, 0);     // reset to game
-    }
-}
-#endif

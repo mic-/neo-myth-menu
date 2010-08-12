@@ -6,16 +6,17 @@ MKSPRITEPATH = $(ROOTDIR)/bin/mksprite
 HEADERPATH = $(ROOTDIR)/lib
 N64TOOL = $(ROOTDIR)/bin/n64tool
 HEADERNAME = header
-LINK_FLAGS = -G0 -L$(ROOTDIR)/lib -L$(ROOTDIR)/mips64-elf/lib -lff -ldragon -lc -lm -ldragonsys -Tn64ld.x
+LINK_FLAGS = -G0 -L$(ROOTDIR)/lib -L$(ROOTDIR)/mips64-elf/lib -lff -ldragon -lc -lm -ldragonsys -lnosys -Tn64ld.x
 PROG_NAME = NEON64MF
 CFLAGS = -std=gnu99 -march=vr4300 -mtune=vr4300 -O1 -G0 -Wall -I$(ROOTDIR)/include -I$(ROOTDIR)/mips64-elf/include -DRUN_FROM_MF
+CFLAGS += -DSTBI_NO_STDIO -DSTBI_NO_HDR
 ASFLAGS = -mtune=vr4300 -march=vr4300
 CC = $(GCCN64PREFIX)gcc
 AS = $(GCCN64PREFIX)as
 LD = $(GCCN64PREFIX)ld
 OBJCOPY = $(GCCN64PREFIX)objcopy
 
-OBJS = main.o neo_2.o utility.o disk_io.o ram_io.o
+OBJS = main.o neo_2.o utility.o disk_io.o ram_io.o stb_image.o
 
 $(PROG_NAME).v64: $(PROG_NAME).dfs $(PROG_NAME).elf
 	$(OBJCOPY) $(PROG_NAME).elf $(PROG_NAME).bin -O binary
