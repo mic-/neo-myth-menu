@@ -63,6 +63,8 @@ int browser_w, browser_h;
 sprite_t *loading;
 int loading_w, loading_h;
 
+u64 back_flags;                         /* 0xAA550mno - m = brwsr, n = bopt, o = bfill */
+
 struct selEntry {
     u32 valid;                          /* 0 = invalid, ~0 = valid */
     u32 type;                           /* 128 = directory, 0xFF = N64 game */
@@ -285,7 +287,7 @@ void progress_screen(char *str1, char *str2, int frac, int total, int bfill)
     dcon = lockVideo(1);
     graphics_fill_screen(dcon, 0);
 
-    if (loading)
+    if (loading && (bfill == 4))
     {
         drawImage(dcon, loading, loading_w, loading_h);
     }
@@ -927,7 +929,7 @@ int selectGBASlot(int sel, u8 *blk, int stype, int bfill)
         dcon = lockVideo(1);
         graphics_fill_screen(dcon, 0);
 
-        if (browser)
+        if (browser && (bfill == 4))
         {
             drawImage(dcon, browser, browser_w, browser_h);
         }
@@ -1181,6 +1183,7 @@ void saveSaveState(void)
 
     neo_copyfrom_sram(temp, 0x3FE00, 256);
     neo_copyfrom_sram(&flags, 0x3FF00, 8);
+    neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
 
     if ((flags & 0xFFFFFF00) != 0xAA550100)
     {
@@ -1274,6 +1277,15 @@ void saveSaveState(void)
     neo_copyto_sram(&flags, 0x3FF00, 8);
 }
 
+void saveBrowserFlags(int brwsr, int bopt, int bfill)
+{
+    back_flags = 0xAA550000LL | (brwsr<<8) | (bopt<<4) | bfill;
+    neo_copyto_sram(&back_flags, 0x3FF08, 8);
+
+    if (brwsr)
+        neo2_enable_sd();               // make sure still in proper mode for SD
+}
+
 /* initialize console hardware */
 void init_n64(void)
 {
@@ -1316,7 +1328,7 @@ int main(void)
 {
     display_context_t dcon;
     u16 previous = 0, buttons;
-    int bfill = 0, bselect = 0, bstart = 0, bmax = 0, btout = 60, bopt = 0, osel = 0;
+    int bfill = 4, bselect = 0, bstart = 0, bmax = 0, btout = 60, bopt = 0, osel = 0;
 #ifdef RUN_FROM_SD
     int brwsr = 1;                      // start in SD browser
 #else
@@ -1325,11 +1337,11 @@ int main(void)
 
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v1.6 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v1.7 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v1.6 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v1.7 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v1.6 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v1.7 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";
@@ -1478,6 +1490,13 @@ int main(void)
     // save save state if needed
     saveSaveState();
 
+    if ((back_flags & 0xFFFFF000) == 0xAA550000)
+    {
+        brwsr = (back_flags >> 8) & 1;
+        bopt = (back_flags >> 4) & 1;
+        bfill = back_flags & 7;
+    }
+
     if (brwsr)
     {
         neo2_enable_sd();
@@ -1499,7 +1518,7 @@ int main(void)
         dcon = lockVideo(1);
         graphics_fill_screen(dcon, 0);
 
-        if (browser)
+        if (browser && (bfill == 4))
         {
             drawImage(dcon, browser, browser_w, browser_h);
         }
@@ -1519,7 +1538,7 @@ int main(void)
         }
 
         // show title
-        if (browser)
+        if (browser && (bfill == 4))
             graphics_set_color(graphics_make_color(0x3F, 0x3F, 0x7F, 0xFF), 0);
         else
             graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
@@ -1607,7 +1626,7 @@ int main(void)
         }
 
         // show cart info help messages
-        if (browser)
+        if (browser && (bfill == 4))
             graphics_set_color(graphics_make_color(0x5F, 0x1F, 0x1F, 0xFF), 0);
         else
             graphics_set_color(graphics_make_color(0xFF, 0x4F, 0x4F, 0xFF), 0);
@@ -1711,6 +1730,7 @@ int main(void)
                     neo2_disable_sd();
                     bmax = getGFInfo();
                 }
+                saveBrowserFlags(brwsr, bopt, bfill);
             }
             btout = 60;
         }
@@ -1722,6 +1742,7 @@ int main(void)
             {
                 // START just released
                 bopt ^= 1;              // toggle options display
+                saveBrowserFlags(brwsr, bopt, bfill);
             }
         }
 
@@ -1844,7 +1865,8 @@ int main(void)
             if (!TL_BUTTON(buttons))
             {
                 // TL just released
-                bfill = (bfill-1)&3;
+                bfill = bfill ? bfill-1 : 4;
+                saveBrowserFlags(brwsr, bopt, bfill);
             }
         }
 
@@ -1854,7 +1876,8 @@ int main(void)
             if (!TR_BUTTON(buttons))
             {
                 // TR just released
-                bfill = (bfill+1)&3;
+                bfill = (bfill == 4) ? 0 : bfill+1;
+                saveBrowserFlags(brwsr, bopt, bfill);
             }
         }
 
