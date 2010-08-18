@@ -345,13 +345,13 @@ BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
             if (cflag)
                 wrMmcCmdByte(0xFF);     // 8 cycles to complete the operation so clock can halt
 
-			respTime = RESP_TIME_R;
+            respTime = RESP_TIME_R;
             debugMmcResp(pkt[0]&0x3F, resp);
             return TRUE;
         }
     }
 
-	respTime = RESP_TIME_R;
+    respTime = RESP_TIME_R;
     //debugPrint("recvMmcCmdResp() failed");
     debugMmcResp(pkt[0]&0x3F, resp);
     return FALSE;
@@ -587,7 +587,7 @@ BOOL sdWriteSingleBlock( unsigned char *buf, unsigned int addr )
     sdCrc16(crcbuf, buf, 512);          // Calculate CRC16
 
     sendMmcCmd( 24, addr );
-	respTime = RESP_TIME_W;
+    respTime = RESP_TIME_W;
     if (recvMmcCmdResp(resp, R1_LEN, 0) && (resp[0] == 24))
         return sendSdWriteBlock4(buf, crcbuf);
 
@@ -601,7 +601,7 @@ BOOL sdInit(void)
     unsigned short rca;
     unsigned char resp[R2_LEN];         // R2 is largest response
 
-	respTime = RESP_TIME_R;
+    respTime = RESP_TIME_R;
 
     for (i=0; i<128; i++)
         wrMmcCmdBit(1);
@@ -889,6 +889,7 @@ DRESULT MMC_disk_write (
 {
     unsigned int ix, iy;
 
+    sd_speed = 1;                       // no fast access on writes
     for (ix=0; ix<count; ix++)
     {
         iy = (sector + ix) & (CACHE_SIZE - 1);    // really simple hash
@@ -902,12 +903,14 @@ DRESULT MMC_disk_write (
             if (!sdWriteSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
             {
                 neo2_post_sd();
+                sd_speed = 0;           // allow fast access on reads
                 return RES_ERROR;
             }
         }
         neo2_post_sd();
     }
 
+    sd_speed = 0;                       // allow fast access on reads
     return RES_OK;
 }
 

@@ -13,6 +13,10 @@ typedef uint64_t u64;
 
 // N64 hardware defines
 #define PI_STATUS_REG       *(vu32*)0xA4600010
+#define PI_BSD_DOM1_LAT_REG *(vu32*)0xA4600014
+#define PI_BSD_DOM1_PWD_REG *(vu32*)0xA4600018
+#define PI_BSD_DOM1_PGS_REG *(vu32*)0xA460001C
+#define PI_BSD_DOM1_RLS_REG *(vu32*)0xA4600020
 #define PI_BSD_DOM2_LAT_REG *(vu32*)0xA4600024
 #define PI_BSD_DOM2_PWD_REG *(vu32*)0xA4600028
 #define PI_BSD_DOM2_PGS_REG *(vu32*)0xA460002C
@@ -51,6 +55,8 @@ extern unsigned int gCardTypeCmd;
 extern unsigned int gPsramCmd;
 extern short int gCardType;
 extern unsigned int gCpldVers;          /* 0x81 = V1.2 hardware, 0x82 = V2.0 hardware, 0x83 = V3.0 hardware */
+
+extern unsigned int sd_speed;
 
 extern int get_cic(unsigned char *buffer);
 
@@ -529,15 +535,32 @@ void neo2_disable_sd(void)
 
 void neo2_pre_sd(void)
 {
+    if (!sd_speed)
+    {
+        // set the PI for myth sd
+        PI_BSD_DOM1_LAT_REG = 0x00000003; //4
+        PI_BSD_DOM1_RLS_REG = 0x00000002;
+        PI_BSD_DOM1_PWD_REG = 0x00000003; //4
+        PI_BSD_DOM1_PGS_REG = 0x00000007;
+    }
 }
 
 void neo2_post_sd(void)
 {
+    if (!sd_speed)
+    {
+        // restore the PI for rom
+        PI_BSD_DOM1_LAT_REG = 0x00000040;
+        PI_BSD_DOM1_RLS_REG = 0x00000003;
+        PI_BSD_DOM1_PWD_REG = 0x00000012;
+        PI_BSD_DOM1_PGS_REG = 0x00000007;
+    }
 }
 
 int neo2_recv_sd_multi(unsigned char *buf, int count)
 {
     int res;
+
     asm(".set push\n"
         ".set noreorder\n\t"
         "lui $15,0xB30E\n\t"            // $15 = 0xB30E0000
@@ -643,6 +666,7 @@ int neo2_recv_sd_multi(unsigned char *buf, int count)
         : "=r" (res)                    // output
         : "r" (buf), "r" (count)        // inputs
         : "$0" );                       // clobbered
+
     return res;
 }
 
@@ -664,6 +688,10 @@ void simulate_pif_boot(u32 cic_chip)
     vu32 *src, *dst;
     u32 country = ((*(vu32 *)0xB000003C) >> 8) & 0xFF;
     vu64 *gGPR = (vu64 *)0xA0300000;
+
+    // clear some OS globals for cleaner boot
+    *(vu32*)0xA000030C = 0;             // cold boot
+    memset((void*)0xA000031C, 0, 64);   // clear app nmi buffer
 
     // Copy low 0x1000 bytes to DMEM
     src = (vu32 *)0xB0000000;
