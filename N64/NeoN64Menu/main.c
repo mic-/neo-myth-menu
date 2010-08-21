@@ -39,6 +39,7 @@ typedef uint64_t u64;
 #define CL_BUTTON(a)    ((a) & 0x0002)
 #define CR_BUTTON(a)    ((a) & 0x0001)
 
+unsigned int gBootCic;
 unsigned int gCpldVers;                 /* 0x81 = V1.2 hardware, 0x82 = V2.0 hardware, 0x83 = V3.0 hardware */
 unsigned int gCardTypeCmd;
 unsigned int gPsramCmd;
@@ -1337,11 +1338,11 @@ int main(void)
 
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v1.7 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v1.8 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v1.7 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v1.8 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v1.7 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v1.8 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";
@@ -1360,13 +1361,15 @@ int main(void)
     };
     char *ostr[2][16] = {
         { "EXT CARD", "SRAM 32KB", "SRAM 64KB", "SRAM 128KB", "FRAM 128KB", "EEPROM 4Kb", "EEPROM 16Kb", "", "SRAM 256KB", "", "", "", "", "", "", "SAVE OFF" },
-        { "EXT CARD", "6101", "6102/7101", "6103/7103", "6104", "6105/7105", "6106/7106", "", "", "", "", "", "", "", "", "" }
+        { "EXT CARD", "6101/7102", "6102/7101", "6103/7103", "6104/7104", "6105/7105", "6106/7106", "", "", "", "", "", "", "", "", "" }
     };
 
     int stemp_w, stemp_h;
     sprite_t *stemp;
 
     init_n64();
+
+    gBootCic = get_cic((unsigned char *)0xB0000040);
 
     gCpldVers = neo_get_cpld();         // get Myth CPLD ID
     gCardID = neo_id_card();            // check for Neo Flash card
@@ -1542,7 +1545,25 @@ int main(void)
             graphics_set_color(graphics_make_color(0x3F, 0x3F, 0x7F, 0xFF), 0);
         else
             graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
-        printText(dcon, menu_title, 20 - strlen(menu_title)/2, 1);
+        strcpy(temp, menu_title);
+        if (*(vu32*)0x80000300 == 0)
+        {
+			// PAL
+            strcpy(&temp[strlen(temp)-1], "/7101)");
+            if (gBootCic == 1)
+                temp[30] = '2';
+            else if (gBootCic == 2)
+                temp[30] = '1';
+            else
+                temp[30] = 0x30 + gBootCic;
+        }
+        else
+        {
+			// NTSC or MPAL
+            strcpy(&temp[strlen(temp)-1], "/6102)");
+            temp[30] = 0x30 + gBootCic;
+        }
+        printText(dcon, temp, 20 - strlen(temp)/2, 1);
 
         // print browser list (lines 3 to 12)
         if (bmax)

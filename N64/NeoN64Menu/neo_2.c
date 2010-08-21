@@ -51,6 +51,7 @@ static u32 neo_mode = SD_OFF;
 
 static u8 __attribute__((aligned(16))) dmaBuf[128*1024];
 
+extern unsigned int gBootCic;
 extern unsigned int gCardTypeCmd;
 extern unsigned int gPsramCmd;
 extern short int gCardType;
@@ -692,6 +693,12 @@ void simulate_pif_boot(u32 cic_chip)
     // clear some OS globals for cleaner boot
     *(vu32*)0xA000030C = 0;             // cold boot
     memset((void*)0xA000031C, 0, 64);   // clear app nmi buffer
+
+    // copy the memsize for different boot loaders
+    if ((cic_chip == CIC_6105) && (gBootCic != CIC_6105))
+        *(vu32 *)0xA00003F0 = *(vu32 *)0xA0000318;
+    else if ((cic_chip != CIC_6105) && (gBootCic == CIC_6105))
+        *(vu32 *)0xA0000318 = *(vu32 *)0xA00003F0;
 
     // Copy low 0x1000 bytes to DMEM
     src = (vu32 *)0xB0000000;
