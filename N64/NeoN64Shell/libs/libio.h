@@ -1,23 +1,50 @@
 #ifndef _libio_h_
 #define _libio_h_
 
-//A nice , portable , and optimized wrapper for libff
+//LIBIO 0.2
+
 #include <ff.h>
 #include <stdint.h>
-#undef IO_MD32X_BUILD
+
+#undef IO_TARGET_PLATFORM_SNES
+#undef IO_TARGET_PLATFORM_MD32X
+#undef SNES_LOVELY_POINTERS
+#define IO_TARGET_PLATFORM_N64
+
 #define IO_Handle FIL
 #define IO_HandleInfo FILINFO
 #define IO_HandleResult FRESULT
 #define IO_DirHandle DIR
 #undef IO_FULL_OPT
 
-#ifdef IO_MD32X_BUILD
-	extern void ints_on();
-	extern void ints_off();
-	#define DISABLE_INTERRUPTS ints_off
-	#define ENABLE_INTERRUPTS ints_on
-#else
+/*MD / 32X*/
+#if (IO_TARGET_PLATFORM_MD32X)
+	#define MAX_FILE_HANDLES (16)
+	#define MAX_DIR_HANDLES (8)
+	#define DISABLE_INTERRUPTS asm("move.w 0x2700,sr")
+	#define ENABLE_INTERRUPTS asm("move.w 0x2000,sr")
+#endif
+	
+/*SNES*/
+#if defined(IO_TARGET_PLATFORM_SNES)
+	#define MAX_FILE_HANDLES (8)
+	#define MAX_DIR_HANDLES (4)
+	#define SNES_LOVELY_POINTERS
+	#define DISABLE_INTERRUPTS asm("sei")
+	#define ENABLE_INTERRUPTS asm("cli")
+#endif
+
+/*N64*/
+#if defined(IO_TARGET_PLATFORM_N64)
+	#define DISABLE_INTERRUPTS asm("\tmfc0 $8,$12\n\tla $9,~1\n\tand $8,$9\n\tmtc0 $8,$12\n\tnop":::"$8","$9")
+	#define ENABLE_INTERRUPTS asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8")
+#endif
+
+#ifndef DISABLE_INTERRUPTS
 	#define DISABLE_INTERRUPTS
+#endif
+
+#ifndef ENABLE_INTERRUPTS
 	#define ENABLE_INTERRUPTS
 #endif
 
