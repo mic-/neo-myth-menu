@@ -3,47 +3,206 @@
 #include <stdarg.h>
 #include <malloc.h>
 #include <string.h>
-//A nice , portable , and optimized wrapper for libff
 
-//XXX for MD/32X remember to also handle io_open/close
-
-#ifndef IO_MD32X_BUILD
-	static uint8_t* ioGenericBuf = ((void*)0);
-	static uint32_t ioGenericBufSize = 0;
-#else
+#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
 	static uint8_t ioGenericBuf[1024];
 	static uint32_t ioGenericBufSize = 1024;
+	static int16_t ioDirPtr = 0;
+	static int16_t ioFilePtr = 0;
+
+	typedef struct File File;
+	typedef struct Directory Directory;
+
+	struct File
+	{
+		IO_Handle handle;
+		#ifndef SNES_LOVELY_POINTERS
+			uint32_t addr;
+		#else
+			uint8_t bank;
+			uint8_t _pad;
+			uint16_t addr;
+		#endif
+		int16_t alive;
+	};
+
+	struct Directory
+	{
+		IO_DirHandle handle;
+		#ifndef SNES_LOVELY_POINTERS
+			uint32_t addr;
+		#else
+			uint8_t bank;
+			uint8_t _pad;
+			uint16_t addr;
+		#endif
+		int16_t alive;
+	};
+
+	static File ioFile[MAX_FILE_HANDLES];
+	static Directory ioDir[MAX_DIR_HANDLES];
+
+	static int16_t _____io_internal_get_next_file_handle()
+	{
+		int16_t addr = 0;
+
+		while(addr < MAX_FILE_HANDLES)
+		{
+			if(ioFile[addr].alive)
+			{
+				#ifndef SNES_LOVELY_POINTERS
+					ioFile[addr].addr = ((uint32_t)&ioFile[addr].handle);
+				#else
+					ioFile[addr].bank = (uint8_t)((uint32_t)&ioFile[addr].handle & 0xff000000);
+					ioFile[addr].addr = (uint16_t)((uint32_t)&ioFile[addr].handle & 0x0000ffff);
+				#endif
+				ioFile[addr].alive = 0x0;
+
+				return addr;
+			}
+
+			++addr;
+		}
+
+		return 0xFFFE;
+	}
+
+	static int16_t _____io_internal_get_next_dir_handle()
+	{
+		int16_t addr = 0;
+
+		while(addr < MAX_DIR_HANDLES)
+		{
+			if(ioDir[addr].alive)
+			{
+				#ifndef SNES_LOVELY_POINTERS
+					ioDir[addr].addr = ((uint32_t)&ioDir[addr].handle);
+				#else
+					ioDir[addr].bank = (uint8_t)((uint32_t)&ioDir[addr].handle & 0xff000000);
+					ioDir[addr].addr = (uint16_t)((uint32_t)&ioDir[addr].handle & 0x0000ffff);
+				#endif
+				ioDir[addr].alive = 0x0;
+
+				return addr;
+			}
+
+			++addr;
+		}
+
+		return 0xFFFE;
+	}
+
+	static void _____io_internal_mark_free(uint16_t isFile,uint32_t addr)
+	{
+		int16_t ptr = 0;
+		#ifdef SNES_LOVELY_POINTERS
+			uint8_t bbank = (uint8_t)(addr & 0xff000000);
+			uint16_t boffs = (uint16_t)(addr & 0x0000ffff);
+		#endif
+
+		if(isFile != 0x00)
+		{
+			while(ptr < MAX_FILE_HANDLES)
+			{
+				#ifndef SNES_LOVELY_POINTERS
+					if(ioFile[ptr].addr == addr)
+					{
+						ioFile[ptr].alive = 0x1;
+						return;
+					}
+				#else
+					if(ioFile[ptr].bank == bbank && ioFile[ptr].addr == boffs)
+					{
+						ioFile[ptr].alive = 0x1;
+						return;
+					}
+				#endif
+
+				++ptr;
+			}
+
+			return;
+		}
+		else
+		{
+			while(ptr < MAX_DIR_HANDLES)
+			{
+				#ifndef SNES_LOVELY_POINTERS
+					if(ioDir[ptr].addr == addr)
+					{
+						ioDir[ptr].alive = 0x1;
+						return;
+					}
+				#else
+					if(ioDir[ptr].bank == bbank && ioDir[ptr].addr == boffs)
+					{
+						ioDir[ptr].alive = 0x1;
+						return;
+					}
+				#endif
+
+				++ptr;
+			}
+		}
+	}
+#else
+	static uint8_t* ioGenericBuf = ((void*)0);
+	static uint32_t ioGenericBufSize = 0;
 #endif
 
 static void _____io_internal_c2wstrcpy(XCHAR* dst,const int8_t* src)
 {
-    int32_t ix = 0;
+	#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
+		register int16_t ix = 0;
+		register XCHAR* a;
+		register const int8_t* b;
+		do
+		{
+			a = dst + (ix << 1);
+			b = (src + (ix++));
+		}while( (( *a = ((*b) & 0x00FF) )!= (XCHAR)0x0000) );
+	#else
+		int32_t ix = 0;
 
-    while (1)
-    {
-        if( (*(XCHAR *)(dst + (ix << 1) ) = *(int8_t*)(src + ix) & 0x00FF) == (XCHAR)0)
-			break;
+		while(1)
+		{
+		    if( (*(XCHAR *)(dst + (ix << 1) ) = *(int8_t*)(src + ix) & 0x00FF) == (XCHAR)0)
+				break;
 
-		++ix;
-    }
+			++ix;
+		}
+	#endif
 }
 
 void io_init(uint32_t genericBufSize)
 {
-	#ifndef IO_MD32X_BUILD
-	ioGenericBuf = (uint8_t*)malloc(genericBufSize);
-	ioGenericBufSize = (ioGenericBuf) ? genericBufSize : 0;
+	#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
+		ioFilePtr = MAX_FILE_HANDLES - 1;
+		ioDirPtr = MAX_DIR_HANDLES - 1;
+
+		while(ioFilePtr)
+			ioFile[ioFilePtr--].alive = 0x1;
+
+		while(ioDirPtr)
+			ioFile[ioDirPtr--].alive = 0x1;
+
+		ioDirPtr = ioFilePtr = 0;
+	#else
+		ioGenericBuf = (uint8_t*)malloc(genericBufSize);
+		ioGenericBufSize = (ioGenericBuf) ? genericBufSize : 0;
 	#endif
 }
 
 void io_shutdown()
 {
-	#ifndef IO_MD32X_BUILD
-	if(ioGenericBuf != ((void*)0))
-		free(ioGenericBuf);
+	#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
+		io_init(0);
+	#else
+		if(ioGenericBuf != ((void*)0))
+			free(ioGenericBuf);
 
-	ioGenericBufSize = 0;
-	ioGenericBuf = ((void*)0);
+		ioGenericBufSize = 0;
+		ioGenericBuf = ((void*)0);
 	#endif
 }
 
@@ -70,8 +229,7 @@ uint32_t io_seek(IO_Handle* f,uint32_t addr,uint32_t mode)
 
 		case IO_SEEK_CUR:
 			ENABLE_INTERRUPTS;
-			addr = ((f->fptr + addr) > f->fsize) ? f->fsize : f->fptr + addr;
-			f_lseek(f,addr);
+			f_lseek(f,(((f->fptr + addr) > f->fsize) ? f->fsize : f->fptr + addr));
 			DISABLE_INTERRUPTS;
 		return f->fptr;
 	}
@@ -153,27 +311,26 @@ uint32_t io_puts(const int8_t* str,IO_Handle* f)
 
 uint32_t io_printf(IO_Handle* f,const int8_t* fmt,...)
 {
-	char* buf = (char*)&ioGenericBuf[0];
+	int8_t* buf = (int8_t*)&ioGenericBuf[0];
 	UINT r = 0;
-
-	ENABLE_INTERRUPTS;
 
 	#ifndef IO_FULL_OPT
 	if(f)
 	{
 	#endif
-		*(uint32_t*)&ioGenericBuf = 0x00000000;
+		buf[0] = 0;
 		va_list	ap;
 		va_start(ap,(const char*)fmt);
-		vsprintf(buf,(const char*)fmt,ap);
+		vsprintf((char*)buf,(const char*)fmt,ap);
 		va_end(ap);
 
-		f_write(f,(const void*)buf,strlen(buf),&r);
+		ENABLE_INTERRUPTS;
+		f_write(f,(const void*)buf,strlen((char*)buf),&r);
+		DISABLE_INTERRUPTS;
 	#ifndef IO_FULL_OPT
 	}
 	#endif
 
-	DISABLE_INTERRUPTS;
 	return r;
 }
 
@@ -250,7 +407,12 @@ void io_close(IO_Handle* f)
 		return;
 
 	f_close(f);
-	free(f);
+
+	#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
+		_____io_internal_mark_free(0,(uint32_t)(f) & 0x7fffffff);
+	#else
+		free(f);
+	#endif
 }
 
 void io_remove(const int8_t* filename)
@@ -264,12 +426,23 @@ void io_remove(const int8_t* filename)
 IO_Handle* io_open(const int8_t* filename,const int8_t* mode)
 {
 	XCHAR* buf = (XCHAR*)&ioGenericBuf[0];
-	IO_Handle* f = (IO_Handle*)malloc(sizeof(IO_Handle));
+	IO_Handle* f = (void*)0;
 	uint32_t flags = 0;
 	uint32_t eof = 0 , fnew = 0;
 
-	if(!f)
-		return (void*)0;
+	#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
+		int16_t h =  _____io_internal_get_next_file_handle();
+
+		if(h == 0xFFFE)
+			return ((void*)0);
+
+		f = &ioFile[h].handle;
+	#else
+		f = (IO_Handle*)malloc(sizeof(IO_Handle));
+
+		if(!f)
+			return (void*)0;
+	#endif
 
 	_____io_internal_c2wstrcpy(buf,filename);
 
@@ -328,7 +501,10 @@ IO_Handle* io_open(const int8_t* filename,const int8_t* mode)
 
 	if(f_open(f,buf,flags) != FR_OK)
 	{
-		free(f);
+		#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
+			free(f);
+		#endif
+
 		return (void*)0;
 	}
 
@@ -342,16 +518,30 @@ IO_Handle* io_open(const int8_t* filename,const int8_t* mode)
 IO_DirHandle* io_open_dir(const int8_t* dirpath)
 {
 	XCHAR* buf = (XCHAR*)&ioGenericBuf[0];
-	IO_DirHandle* dp = (IO_DirHandle*)malloc(sizeof(IO_DirHandle));
+	IO_DirHandle* dp = (void*)0;
 
-	if(!dp)
-		return (void*)0;
+	#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
+		int16_t h =  _____io_internal_get_next_dir_handle();
+
+		if(h == 0xFFFE)
+			return ((void*)0);
+
+		dp = &ioDir[h].handle;
+	#else
+		dp = (IO_DirHandle*)malloc(sizeof(IO_DirHandle));
+
+		if(!dp)
+			return (void*)0;
+	#endif
 
 	_____io_internal_c2wstrcpy(buf,dirpath);
 
 	if(f_opendir(dp,buf) != FR_OK)
 	{
-		free(dp);
+		#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
+			free(dp);
+		#endif
+
 		return (void*)0;
 	}
 
@@ -360,8 +550,14 @@ IO_DirHandle* io_open_dir(const int8_t* dirpath)
 
 void io_close_dir(IO_DirHandle* dp)
 {
-	if(dp)
+	if(!dp)
+		return;
+
+	#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
+		_____io_internal_mark_free(0,(uint32_t)(dp) & 0x7fffffff);
+	#else
 		free(dp);
+	#endif
 }
 
 void io_remove_dir(const int8_t* dirpath)
