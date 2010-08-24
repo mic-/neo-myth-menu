@@ -409,7 +409,7 @@ void io_close(IO_Handle* f)
 	f_close(f);
 
 	#if ( defined(IO_TARGET_PLATFORM_MD32X) || defined(IO_TARGET_PLATFORM_SNES))
-		_____io_internal_mark_free(0,(uint32_t)(f) & 0x7fffffff);
+		_____io_internal_mark_free(1,(uint32_t)(f) & 0x7fffffff);
 	#else
 		free(f);
 	#endif
