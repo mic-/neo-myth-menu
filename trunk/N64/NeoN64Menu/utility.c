@@ -204,7 +204,7 @@ sprite_t *loadImageDFS(char *fname, int *w, int *h)
  */
 sprite_t *loadImageSD(char *fname, int *w, int *h)
 {
-    XCHAR wname[1280];
+    TCHAR wname[1280];
     UINT ts;
     int size, x, y, n;
     u8 *tbuf;
