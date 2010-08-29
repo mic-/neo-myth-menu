@@ -136,7 +136,7 @@ void w2cstrcpy(void *dst, void *src)
     int ix = 0;
     while (1)
     {
-        *(char *)(dst + ix) = *(XCHAR *)(src + ix*2) & 0x00FF;
+        *(char *)(dst + ix) = *(TCHAR *)(src + ix*2) & 0x00FF;
         if (*(char *)(dst + ix) == 0)
             break;
         ix++;
@@ -155,7 +155,7 @@ void w2cstrcat(void *dst, void *src)
     }
     while (1)
     {
-        *(char *)(dst + ix) = *(XCHAR *)(src + iy*2) & 0x00FF;
+        *(char *)(dst + ix) = *(TCHAR *)(src + iy*2) & 0x00FF;
         if (*(char *)(dst + ix) == 0)
             break;
         ix++;
@@ -168,8 +168,8 @@ void c2wstrcpy(void *dst, void *src)
     int ix = 0;
     while (1)
     {
-        *(XCHAR *)(dst + ix*2) = *(char *)(src + ix) & 0x00FF;
-        if (*(XCHAR *)(dst + ix*2) == (XCHAR)0)
+        *(TCHAR *)(dst + ix*2) = *(char *)(src + ix) & 0x00FF;
+        if (*(TCHAR *)(dst + ix*2) == (TCHAR)0)
             break;
         ix++;
     }
@@ -181,14 +181,14 @@ void c2wstrcat(void *dst, void *src)
     // find end of str in dst
     while (1)
     {
-        if (*(XCHAR *)(dst + ix*2) == (XCHAR)0)
+        if (*(TCHAR *)(dst + ix*2) == (TCHAR)0)
             break;
         ix++;
     }
     while (1)
     {
-        *(XCHAR *)(dst + ix*2) = *(char *)(src + iy) & 0x00FF;
-        if (*(XCHAR *)(dst + ix*2) == (XCHAR)0)
+        *(TCHAR *)(dst + ix*2) = *(char *)(src + iy) & 0x00FF;
+        if (*(TCHAR *)(dst + ix*2) == (TCHAR)0)
             break;
         ix++;
         iy++;
@@ -440,7 +440,7 @@ void get_sd_info(int entry)
 {
     UINT ts;
     u8 buffer[0x440];
-    XCHAR fpath[1280];
+    TCHAR fpath[1280];
     char cartid[4];
     int cic, save;
 
@@ -514,7 +514,7 @@ int getSDInfo(int entry)
     FILINFO fno;
     int ix, max = 0;
     WCHAR lfnbuf[256];
-    XCHAR fpath[1280];
+    TCHAR fpath[1280];
 
     gSdDetected = 0;
 
@@ -627,7 +627,7 @@ int getSDInfo(int entry)
             if (fno.lfname[0])
                 w2cstrcpy(gTable[max].name, fno.lfname);
             else
-                strcpy(gTable[max].name, fno.fname);
+                w2cstrcpy(gTable[max].name, fno.fname);
         }
         else
         {
@@ -644,7 +644,7 @@ int getSDInfo(int entry)
             if (fno.lfname[0])
                 w2cstrcpy(gTable[max].name, fno.lfname);
             else
-                strcpy(gTable[max].name, fno.fname);
+                w2cstrcpy(gTable[max].name, fno.fname);
             memset(gTable[max].rom, 0, 0x20);
 
             //get_sd_info(max); // slows directory load
@@ -755,7 +755,7 @@ void copyGF2Psram(int bselect, int bfill)
 void copySD2Psram(int bselect, int bfill)
 {
     u32 romsize, gamelen, copylen;
-    XCHAR fpath[1280];
+    TCHAR fpath[1280];
     char temp[256];
 
     // load rom info if not already loaded
@@ -1065,7 +1065,7 @@ void loadSaveState(int bsel, int bfill)
     int ix, ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144, 0, 0, 0, 0, 0, 0, 0 };
     char *sext[16] = { 0, ".sra",  ".sra",  ".sra", ".fla", ".eep", ".eep", 0, ".sra", 0, 0, 0, 0, 0, 0, 0 };
     char temp[260];
-    XCHAR wname[280];
+    TCHAR wname[280];
     u64 flags;
     UINT ts;
     selEntry_t entry;
@@ -1105,8 +1105,10 @@ void loadSaveState(int bsel, int bfill)
         }
         ix = selectGBASlot(ix, blk, entry.options[5], bfill); // have user select a slot
 
-        // copy from slot in GBA SRAM
-        if (entry.options[5] == 4)
+        // init save ram to 0x00 or 0xFF in case there's no save file, or only a partial file
+        memset(tmpBuf, (entry.options[5] == 4) ? 0xFF : 0x00, ssize[entry.options[5]]);
+        // copy from valid slot in GBA SRAM
+        if ((entry.options[5] == 4) && (blk[ix] == 0xAA))
         {
             // copy FRAM in two segments
             neo_copyfrom_sram(tmpBuf, soffs[ix], 65536);
@@ -1114,7 +1116,7 @@ void loadSaveState(int bsel, int bfill)
             // "fix" for sram quirk
             neo_copyfrom_sram(tmpBuf, 0x3FFF0, 16);
         }
-        else
+        else if (blk[ix] == 0xAA)
             neo_copyfrom_sram(tmpBuf, soffs[ix], ssize[entry.options[5]]);
 
         blk[ix] = 0xAA;
@@ -1127,6 +1129,8 @@ void loadSaveState(int bsel, int bfill)
     }
     else
     {
+        // init save ram to 0x00 or 0xFF in case there's no save file, or only a partial file
+        memset(tmpBuf, (entry.options[5] == 4) ? 0xFF : 0x00, ssize[entry.options[5]]);
         // load save state from SD card
         c2wstrcpy(wname, "/.menu/n64/save/");
         c2wstrcat(wname, temp);
@@ -1135,11 +1139,6 @@ void loadSaveState(int bsel, int bfill)
         {
             f_read(&gSDFile, tmpBuf, ssize[entry.options[5]], &ts);
             f_close(&gSDFile);
-        }
-        else
-        {
-            // no save state file - init save ram to all 0xFFs
-            memset(tmpBuf, 0xFF, ssize[entry.options[5]]);
         }
     }
     neo2_disable_sd();
@@ -1177,7 +1176,7 @@ void saveSaveState(void)
 {
     int ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144, 0, 0, 0, 0, 0, 0, 0 };
     char temp[256];
-    XCHAR wname[280];
+    TCHAR wname[280];
     u64 flags;
     UINT ts;
     int bmax;
@@ -1408,7 +1407,7 @@ int main(void)
     bmax = getSDInfo(-1);               // get root directory of sd card
     if (bmax)
     {
-        XCHAR fpath[32];
+        TCHAR fpath[32];
 
         strcpy(path, "/.menu/n64/");
         strcpy(gTable[0].name, "NEON64SD.v64");
@@ -1548,7 +1547,7 @@ int main(void)
         strcpy(temp, menu_title);
         if (*(vu32*)0x80000300 == 0)
         {
-			// PAL
+            // PAL
             strcpy(&temp[strlen(temp)-1], "/7101)");
             if (gBootCic == 1)
                 temp[30] = '2';
@@ -1559,7 +1558,7 @@ int main(void)
         }
         else
         {
-			// NTSC or MPAL
+            // NTSC or MPAL
             strcpy(&temp[strlen(temp)-1], "/6102)");
             temp[30] = 0x30 + gBootCic;
         }

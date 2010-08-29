@@ -1,5 +1,5 @@
 ========================================================================
-              Neo N64 Myth Menu v1.7 by Chilly Willy
+              Neo N64 Myth Menu v1.8 by Chilly Willy
 ========================================================================
 The Neo N64 Myth Menu uses libdragon, by Shaun Taylor. Many thanks for
 his work on this fine SDK for the N64.
@@ -29,7 +29,7 @@ manager.
 
 When the menu in either the N64 menu flash or the GBA menu flash find that
 file, they will boot it, assuming it to be the most up to date version.
-This is the easiest way to handle minor updates - put v1.7 in the N64 menu
+This is the easiest way to handle minor updates - put v1.8 in the N64 menu
 flash and then any new updates on the SD card.
 
 You can replace the splash, browser, and loading images by placing your
@@ -41,7 +41,10 @@ them. Images not included in the directory will use the default image.
 ========================================================================
 
 Usage: The menu boots into the Game Flash browser. At the top of the
-display is the title - this shows the version of the menu.
+display is the title - this shows the version of the menu. The characters
+inside the parentheses show where the menu was booted from (U2 is the N64
+menu flash, MF is the GBA menu flash, and SD is from the SD card), as well
+as the boot CIC.
 
 Below that is a list of (up to) ten titles. This is the game list. It
 can handle 1024 games - scroll using the dpad to see all the games. Only

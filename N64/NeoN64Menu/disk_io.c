@@ -327,7 +327,7 @@ void sendMmcCmd( unsigned char cmd, unsigned int arg )
     wrMmcCmdByte( pkt[5] );
 }
 
-BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
+int recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
 {
     unsigned int i, j;
     unsigned char *r = resp;
@@ -347,17 +347,17 @@ BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
 
             respTime = RESP_TIME_R;
             debugMmcResp(pkt[0]&0x3F, resp);
-            return TRUE;
+            return 1;
         }
     }
 
     respTime = RESP_TIME_R;
     //debugPrint("recvMmcCmdResp() failed");
     debugMmcResp(pkt[0]&0x3F, resp);
-    return FALSE;
+    return 0;
 }
 
-BOOL sdReadSingleBlock( unsigned char *buf, unsigned int addr )
+int sdReadSingleBlock( unsigned char *buf, unsigned int addr )
 {
     int i = 8*1024;
     unsigned char resp[R1_LEN];
@@ -367,13 +367,13 @@ BOOL sdReadSingleBlock( unsigned char *buf, unsigned int addr )
     sendMmcCmd(17, addr);               // READ_SINGLE_BLOCK
     if (!(cardType & 0x8000))
         if (!recvMmcCmdResp(resp, R1_LEN, 0) || (resp[0] != 17))
-            return FALSE;
+            return 0;
 
     while ((rdMmcDatBit4()&1) != 0)
         if (i-- <= 0)
         {
             debugMmcPrint("Timeout");
-            return FALSE;               // timeout on start bit
+            return 0;               // timeout on start bit
         }
 #if 1
     for (i=0; i<512; i++)
@@ -391,10 +391,10 @@ BOOL sdReadSingleBlock( unsigned char *buf, unsigned int addr )
     wrMmcCmdByte(0xFF);                 // 8 cycles to complete the operation so clock can halt
 
     debugMmcPrint("Read SD block");
-    return TRUE;
+    return 1;
 }
 
-BOOL sdReadStartMulti( unsigned int addr )
+int sdReadStartMulti( unsigned int addr )
 {
     unsigned char resp[R1_LEN];
 
@@ -403,12 +403,12 @@ BOOL sdReadStartMulti( unsigned int addr )
     sendMmcCmd(18, addr);               // READ_MULTIPLE_BLOCK
     if (!(cardType & 0x8000))
         if (!recvMmcCmdResp(resp, R1_LEN, 0) || (resp[0] != 18))
-            return FALSE;
+            return 0;
 
-    return TRUE;
+    return 1;
 }
 
-BOOL sdReadMultiBlocks( BYTE *buff, BYTE count )
+int sdReadMultiBlocks( BYTE *buff, BYTE count )
 {
 #if 0
     int i, j, k;
@@ -419,7 +419,7 @@ BOOL sdReadMultiBlocks( BYTE *buff, BYTE count )
             if (i-- <= 0)
             {
                 debugMmcPrint("Timeout");
-                return FALSE;           // timeout on start bit
+                return 0;           // timeout on start bit
             }
 
         for (i=0; i<512; i+=4)
@@ -438,13 +438,13 @@ BOOL sdReadMultiBlocks( BYTE *buff, BYTE count )
         // Clock out end bit
         rdMmcDatBit4();
     }
-    return TRUE;
+    return 1;
 #else
     return neo2_recv_sd_multi(buff, count);
 #endif
 }
 
-BOOL sdReadStopMulti( void )
+int sdReadStopMulti( void )
 {
     unsigned char resp[R1_LEN];
 
@@ -452,9 +452,9 @@ BOOL sdReadStopMulti( void )
 
     sendMmcCmd(12, 0);                  // STOP_TRANSMISSION
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || (resp[0] != 12))
-        return FALSE;
+        return 0;
 
-    return TRUE;
+    return 1;
 }
 
 void sdCrc16(unsigned char *p_crc, unsigned char *data, int len)
@@ -496,7 +496,7 @@ void sdCrc16(unsigned char *p_crc, unsigned char *data, int len)
     }
 }
 
-BOOL sendSdWriteBlock4( unsigned char *buf, unsigned char *crcbuf )
+int sendSdWriteBlock4( unsigned char *buf, unsigned char *crcbuf )
 {
     int i;
 
@@ -524,7 +524,7 @@ BOOL sendSdWriteBlock4( unsigned char *buf, unsigned char *crcbuf )
     if( rdMmcDatBit4() & 1 )
     {
         debugPrint("No start bit after write data block.");
-        return FALSE;
+        return 0;
     }
     else
     {
@@ -541,7 +541,7 @@ BOOL sendSdWriteBlock4( unsigned char *buf, unsigned char *crcbuf )
         if(crc_stat!=2)
         {
             debugPrint("CRC error on write data block.");
-            return FALSE;
+            return 0;
         }
 
         // at this point the card is definetly cooperating so wait for the start bit
@@ -557,7 +557,7 @@ BOOL sendSdWriteBlock4( unsigned char *buf, unsigned char *crcbuf )
         if(i==0)
         {
             debugPrint("Write data block busy timeout.");
-            return FALSE;
+            return 0;
         }
     }
 #else
@@ -573,10 +573,10 @@ BOOL sendSdWriteBlock4( unsigned char *buf, unsigned char *crcbuf )
 
     wrMmcCmdByte(0xFF);                 // 8 cycles to complete the operation so clock can halt
     debugMmcPrint("Write done");
-    return TRUE;
+    return 1;
 }
 
-BOOL sdWriteSingleBlock( unsigned char *buf, unsigned int addr )
+int sdWriteSingleBlock( unsigned char *buf, unsigned int addr )
 {
     unsigned char resp[R1_LEN];
     unsigned char crcbuf[8];
@@ -592,10 +592,10 @@ BOOL sdWriteSingleBlock( unsigned char *buf, unsigned int addr )
         return sendSdWriteBlock4(buf, crcbuf);
 
     debugMmcResp(24, resp);
-    return FALSE;
+    return 0;
 }
 
-BOOL sdInit(void)
+int sdInit(void)
 {
     int i;
     unsigned short rca;
@@ -615,7 +615,7 @@ BOOL sdInit(void)
         if ((resp[0] == 8) && (resp[3] == 1) && (resp[4] == 0xAA))
             cardType |= 2;              // V2 and/or HC card
         else
-            return FALSE;               // unusable
+            return 0;               // unusable
     }
 
     for (i=0; i<INIT_RETRIES; i++)
@@ -629,7 +629,7 @@ BOOL sdInit(void)
                 if (resp[1] & 0x40)
                     cardType |= 1;      // HC card
                 if (!(resp[2] & 0x30))
-                    return FALSE;       // unusable
+                    return 0;       // unusable
                 break;
             }
         }
@@ -637,16 +637,16 @@ BOOL sdInit(void)
     if (i == INIT_RETRIES)
     {
         // timed out
-        return FALSE;                   // unusable
+        return 0;                   // unusable
     }
 
     sendMmcCmd(2, 0xFFFFFFFF);          // ALL_SEND_CID
     if (!recvMmcCmdResp(resp, R2_LEN, 1) || (resp[0] != 0x3F))
-        return FALSE;                   // unusable
+        return 0;                   // unusable
 
     sendMmcCmd(3, 1);                   // SEND_RELATIVE_ADDR
     if (!recvMmcCmdResp(resp, R6_LEN, 1) || (resp[0] != 3))
-        return FALSE;                   // unusable
+        return 0;                   // unusable
     rca = (resp[1]<<8) | resp[2];
 
 #if 1
@@ -656,17 +656,17 @@ BOOL sdInit(void)
 
     sendMmcCmd(7, (((rca>>8)&0xFF)<<24) | ((rca&0xFF)<<16) | 0xFFFF); // SELECT_DESELECT_CARD
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || (resp[0] != 7))
-        return FALSE;                   // unusable
+        return 0;                   // unusable
 
     sendMmcCmd(55, (((rca>>8)&0xFF)<<24) | ((rca&0xFF)<<16) | 0xFFFF); // APP_CMD
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || !(resp[4] & 0x20))
-        return FALSE;                   // unusable
+        return 0;                   // unusable
     sendMmcCmd(6, 2);                   // SET_BUS_WIDTH (to 4 bits)
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || (resp[0] != 6))
-        return FALSE;                   // unusable
+        return 0;                   // unusable
 
     sd_speed = 0;                       // data rate after init
-    return TRUE;
+    return 1;
 }
 
 /*-----------------------------------------------------------------------*/
@@ -676,7 +676,7 @@ BOOL sdInit(void)
 DSTATUS MMC_disk_initialize (void)
 {
     int i;
-    BOOL result;
+    int result;
 
     for (i=0; i<CACHE_SIZE; i++)
         sec_tags[i] = 0xFFFFFFFF;       // invalidate cache entry
