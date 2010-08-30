@@ -57,6 +57,10 @@ volatile unsigned int gTicks;           /* incremented every vblank */
 
 sprite_t *pattern[3] = { NULL, NULL, NULL };
 
+unsigned short boxes[16];
+char boxart[14980*16];
+char unknown[14980];
+
 sprite_t *splash;
 int splash_w, splash_h;
 sprite_t *browser;
@@ -328,6 +332,30 @@ void progress_screen(char *str1, char *str2, int frac, int total, int bfill)
 
     // show display
     unlockVideo(dcon);
+}
+
+void get_boxart(int brwsr, int entry)
+{
+    char boxpath[32];
+    TCHAR fpath[32];
+    UINT ts;
+    unsigned short cart = *(unsigned short *)&gTable[entry].rom[0x1C];
+    int ix = (gTable[entry].rom[0x1C] ^ gTable[entry].rom[0x1D]) & 15;
+
+    sprintf(boxpath, "/.menu/n64/boxart/%c%c.sprite", gTable[entry].rom[0x1C], gTable[entry].rom[0x1D]);
+
+    // default to unknown
+    memcpy(&boxart[ix*14980], unknown, 14980);
+    boxes[ix] = cart;
+    if (brwsr)
+    {
+        c2wstrcpy(fpath, boxpath);
+        f_close(&gSDFile);
+        if (f_open(&gSDFile, fpath, FA_OPEN_EXISTING | FA_READ))
+            return;                     // couldn't open file
+        // read boxart sprite
+        f_read(&gSDFile, &boxart[ix*14980], 14980, &ts);
+    }
 }
 
 void sort_entries(int max)
@@ -1316,6 +1344,10 @@ void init_n64(void)
         pattern[2] = malloc(dfs_size(fp));
         dfs_read(pattern[2], 1, dfs_size(fp), fp);
         dfs_close(fp);
+        // load unknown boxart sprite
+        fp = dfs_open("/unknown.sprite");
+        dfs_read(unknown, 1, 14980, fp);
+        dfs_close(fp);
         // load backdrop images
         splash = loadImageDFS("/splash.jpg", &splash_w, &splash_h);
         browser = loadImageDFS("/browser.jpg", &browser_w, &browser_h);
@@ -1337,11 +1369,11 @@ int main(void)
 
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v1.8 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v1.9 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v1.8 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v1.9 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v1.8 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v1.9 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";
@@ -1499,6 +1531,7 @@ int main(void)
         bfill = back_flags & 7;
     }
 
+    memset(boxes, 0xFF, 16 * sizeof(unsigned short)); // clear boxart cache
     if (brwsr)
     {
         neo2_enable_sd();
@@ -1608,40 +1641,48 @@ int main(void)
                 printText(dcon, temp, 2, 15);
                 sprintf(temp, "Cart ID: %04X (%c%c)", gTable[bselect].rom[0x1C]<<8 | gTable[bselect].rom[0x1D], gTable[bselect].rom[0x1C], gTable[bselect].rom[0x1D]);
                 printText(dcon, temp, 20, 15);
+
+                graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
+
+                // print full selection name (lines 16 - 22)
+                strncpy(temp, gTable[bselect].name, 36);
+                temp[36] = 0;
+                printText(dcon, temp, 20-strlen(temp)/2, 16);
+                for (int ix=36, iy=17; ix<strlen(gTable[bselect].name); ix+=36, iy++)
+                {
+                    strncpy(temp, &gTable[bselect].name[ix], 36);
+                    temp[36] = 0;
+                    printText(dcon, temp, 20-strlen(temp)/2, iy);
+                }
             }
 
             if ((gTable[bselect].type == 255) && (bopt == 1))
             {
+                unsigned short cart = *(unsigned short *)&gTable[bselect].rom[0x1C];
+                int ix = (gTable[bselect].rom[0x1C] ^ gTable[bselect].rom[0x1D]) & 15;
+
                 // print selection options
                 sprintf(temp, "Bank: %3d", (gTable[bselect].options[1]<<8) | gTable[bselect].options[2]);
                 printText(dcon, temp, 4, 14);
                 sprintf(temp, "Size: %3d", (gTable[bselect].options[3]<<8) | gTable[bselect].options[4]);
-                printText(dcon, temp, 27, 14);
+                printText(dcon, temp, 4, 15);
                 if (osel == 0)
                     graphics_set_color(graphics_make_color(0xFF, 0x3F, 0x3F, 0xFF), 0);
                 else
                     graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
                 sprintf(temp, "Save: %s", ostr[0][gTable[bselect].options[5]]);
-                printText(dcon, temp, 4, 15);
+                printText(dcon, temp, 4, 16);
                 if (osel == 1)
                     graphics_set_color(graphics_make_color(0xFF, 0x3F, 0x3F, 0xFF), 0);
                 else
                     graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
                 sprintf(temp, "CIC: %s", ostr[1][gTable[bselect].options[6]]);
-                printText(dcon, temp, 36-strlen(temp), 15);
-            }
+                printText(dcon, temp, 4, 17);
 
-            graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
-
-            // print full selection name (lines 16 - 22)
-            strncpy(temp, gTable[bselect].name, 36);
-            temp[36] = 0;
-            printText(dcon, temp, 20-strlen(temp)/2, 16);
-            for (int ix=36, iy=17; ix<strlen(gTable[bselect].name); ix+=36, iy++)
-            {
-                strncpy(temp, &gTable[bselect].name[ix], 36);
-                temp[36] = 0;
-                printText(dcon, temp, 20-strlen(temp)/2, iy);
+                // do boxart
+                if (boxes[ix] != cart)
+                    get_boxart(brwsr, bselect);
+                graphics_draw_sprite(dcon, 184, 112, (sprite_t*)&boxart[ix*14980]);
             }
         }
 
@@ -1736,6 +1777,7 @@ int main(void)
             if (!START_BUTTON(buttons))
             {
                 // START just released
+                memset(boxes, 0xFF, 16 * sizeof(unsigned short)); // clear boxart cache
                 bselect = bstart = 0;
                 brwsr ^= 1;             // toggle browser mode
                 if (brwsr)
@@ -1853,28 +1895,28 @@ int main(void)
 
         if (bopt == 1)
         {
-            if (CU_BUTTON(buttons ^ previous))
-            {
-                // CU changed
-                if (!CU_BUTTON(buttons))
-                    gTable[bselect].options[5+osel] = onext[osel][gTable[bselect].options[5+osel]];
-            }
-            if (CD_BUTTON(buttons ^ previous))
-            {
-                // CD changed
-                if (!CD_BUTTON(buttons))
-                    gTable[bselect].options[5+osel] = oprev[osel][gTable[bselect].options[5+osel]];
-            }
             if (CR_BUTTON(buttons ^ previous))
             {
                 // CR changed
                 if (!CR_BUTTON(buttons))
-                    osel ^=1;
+                    gTable[bselect].options[5+osel] = onext[osel][gTable[bselect].options[5+osel]];
             }
             if (CL_BUTTON(buttons ^ previous))
             {
                 // CL changed
                 if (!CL_BUTTON(buttons))
+                    gTable[bselect].options[5+osel] = oprev[osel][gTable[bselect].options[5+osel]];
+            }
+            if (CU_BUTTON(buttons ^ previous))
+            {
+                // CU changed
+                if (!CU_BUTTON(buttons))
+                    osel ^=1;
+            }
+            if (CD_BUTTON(buttons ^ previous))
+            {
+                // CD changed
+                if (!CD_BUTTON(buttons))
                     osel ^=1;
             }
         }
