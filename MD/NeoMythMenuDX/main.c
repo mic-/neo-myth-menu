@@ -29,7 +29,7 @@
 #define max(x,y) (((x)>(y))?(x):(y))
 
 /*tables*/
-static const char* EEPROM_MAPPERS[] =  
+static const char* EEPROM_MAPPERS[] =
 {
     "T-8104B",//new - nba jam 32x
 	"GM G-4025",//new - wonder boy 3
@@ -1099,6 +1099,7 @@ void get_sd_cheat(WCHAR* sss)
 void get_sd_info(int entry)
 {
     unsigned char jump[4];
+	char extension[6];
     int eos = utility_wstrlen(path);
     UINT ts;
 
@@ -1140,9 +1141,10 @@ void get_sd_info(int entry)
 
     f_lseek_zip(&gSDFile, 0x7FF0);
     f_read_zip(&gSDFile, rom_hdr, 16, &ts);
-    if (!utility_memcmp(rom_hdr, "TMR SEGA", 8))
+    utility_w2cstrcpy(extension, &gSelections[entry].name[utility_wstrlen(gSelections[entry].name) - 4]);
+    if (!utility_memcmp(rom_hdr, "TMR SEGA", 8) || !utility_memcmp(extension, ".sms", 4))
     {
-        // SMS ROM header
+        // SMS ROM header or file extension
         gSelections[entry].type = 2; // SMS
         gSelections[entry].run = 0x13; // run mode = SMS + FM
         return;
@@ -2475,7 +2477,7 @@ int cache_process()
 								{
 									if(!is_space(code[addr]))
 										break;
-		
+
 									++addr;
 								}
 
@@ -2500,7 +2502,7 @@ int cache_process()
 									token[tokenLen++] = code[addr++];
 									continue;
 								}
-								
+
 								++addr;
 							}
 						}
