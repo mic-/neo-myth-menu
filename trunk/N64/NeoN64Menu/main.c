@@ -1349,9 +1349,15 @@ void init_n64(void)
         dfs_read(unknown, 1, 14980, fp);
         dfs_close(fp);
         // load backdrop images
-        splash = loadImageDFS("/splash.jpg", &splash_w, &splash_h);
-        browser = loadImageDFS("/browser.jpg", &browser_w, &browser_h);
-        loading = loadImageDFS("/loading.jpg", &loading_w, &loading_h);
+        splash = loadImageDFS("/splash.png", &splash_w, &splash_h);
+        if (!splash)
+            splash = loadImageDFS("/splash.jpg", &splash_w, &splash_h);
+        browser = loadImageDFS("/browser.png", &browser_w, &browser_h);
+        if (!browser)
+            browser = loadImageDFS("/browser.jpg", &browser_w, &browser_h);
+        loading = loadImageDFS("/loading.png", &loading_w, &loading_h);
+        if (!loading)
+            loading = loadImageDFS("/loading.jpg", &loading_w, &loading_h);
     }
 }
 
@@ -1447,7 +1453,9 @@ int main(void)
         c2wstrcat(fpath, gTable[0].name);
         if (f_open(&gSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
         {
-            stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
+            stemp = loadImageSD("/.menu/n64/images/loading.png", &stemp_w, &stemp_h);
+            if (!stemp)
+                stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
             if (stemp)
             {
                 if (loading)
@@ -1469,7 +1477,7 @@ int main(void)
             gTable[0].options[7] = 0;
             get_sd_info(0);
 
-            copySD2Psram(0, 0);
+            copySD2Psram(0, (loading) ? 4 : 0);
             neo_run_psram(gTable[0].options, 1);
         }
         neo2_disable_sd();
@@ -1481,7 +1489,9 @@ int main(void)
     if (bmax)
     {
         // try for images on the SD card
-        stemp = loadImageSD("/.menu/n64/images/splash.jpg", &stemp_w, &stemp_h);
+        stemp = loadImageSD("/.menu/n64/images/splash.png", &stemp_w, &stemp_h);
+        if (!stemp)
+            stemp = loadImageSD("/.menu/n64/images/splash.jpg", &stemp_w, &stemp_h);
         if (stemp)
         {
             if (splash)
@@ -1490,7 +1500,9 @@ int main(void)
             splash_w = stemp_w;
             splash_h = stemp_h;
         }
-        stemp = loadImageSD("/.menu/n64/images/browser.jpg", &stemp_w, &stemp_h);
+        stemp = loadImageSD("/.menu/n64/images/browser.png", &stemp_w, &stemp_h);
+        if (!stemp)
+            stemp = loadImageSD("/.menu/n64/images/browser.jpg", &stemp_w, &stemp_h);
         if (stemp)
         {
             if (browser)
@@ -1499,7 +1511,9 @@ int main(void)
             browser_w = stemp_w;
             browser_h = stemp_h;
         }
-        stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
+        stemp = loadImageSD("/.menu/n64/images/loading.png", &stemp_w, &stemp_h);
+        if (!stemp)
+            stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
         if (stemp)
         {
             if (loading)
