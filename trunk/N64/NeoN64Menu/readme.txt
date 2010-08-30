@@ -1,5 +1,5 @@
 ========================================================================
-              Neo N64 Myth Menu v1.8 by Chilly Willy
+              Neo N64 Myth Menu v1.9 by Chilly Willy
 ========================================================================
 The Neo N64 Myth Menu uses libdragon, by Shaun Taylor. Many thanks for
 his work on this fine SDK for the N64.
@@ -29,14 +29,20 @@ manager.
 
 When the menu in either the N64 menu flash or the GBA menu flash find that
 file, they will boot it, assuming it to be the most up to date version.
-This is the easiest way to handle minor updates - put v1.8 in the N64 menu
+This is the easiest way to handle minor updates - put v1.9 in the N64 menu
 flash and then any new updates on the SD card.
 
 You can replace the splash, browser, and loading images by placing your
 own images in the "/.menu/n64/images" directory. The images should be
-named "splash.jpg", "browser.jpg", and "loading.jpg", and they should be
-jpeg images 320 pixels wide by 240 lines tall. You can have any or all of
-them. Images not included in the directory will use the default image.
+named "splash.jpg" or "splash.png", "browser.jpg" or "browser.png", and
+"loading.jpg" or "loading.png", and they should be jpeg/png images 320
+pixels wide by 240 lines tall. You can have any or all of them. Images
+not included in the directory will use the default image. If you have both
+png and jpg images, the png image will be used.
+
+Starting with v1.9, boxart is supported in the menu. You must place the
+sprites from the boxart archive into "/.menu/n64/boxart" or you will only
+get the default boxart image.
 
 ========================================================================
 
@@ -49,7 +55,7 @@ as the boot CIC.
 Below that is a list of (up to) ten titles. This is the game list. It
 can handle 1024 games - scroll using the dpad to see all the games. Only
 ten are shown at any one time. The currently selected game is shown in
-light gray, while all the rest are shown in green.
+white, while all the rest are shown in green.
 
 Below the game list is the game info display. This shows the name in the
 header, the country code, the manufacturer's ID, and the cart ID. If you
@@ -79,8 +85,8 @@ combined is 1279 characters. The game info for SD card files is not shown
 initially to speed things up. Pause over a file for a second and it will
 read and display the game info. Note that while flash games start instantly,
 SD card games must be read into memory, and can take a while. Currently,
-it take about 50 seconds to load an 8 MByte game, about 1:50 to load a
-16 MByte game, and about 3:35 to load a 32 MByte game. Larger games cannot
+it take about 27 seconds to load an 8 MByte game, about 0:53 to load a
+16 MByte game, and about 1:46 to load a 32 MByte game. Larger games cannot
 be loaded at this time as the Neo2-Pro has only 32 MBytes of memory for
 loading games into. If you have a Neo2-SD, the maximum is 16 MBytes.
 
@@ -89,17 +95,17 @@ of N64 rom images: .v64, which has the bytes in a word swapped; .z64,
 which does not (this type may also sometimes have a .rom or .bin suffix);
 and finally, .n64, which has the bytes in a long swapped. The color of
 the game info will tell you if the game data is in the proper byte order
-or not. If it is white, the byte order is fine. If it is lavender, it is
-not. This doesn't matter when loading from the SD card - the loader will
+or not. If it is green, the byte order is fine. If it is blue, it is not.
+This doesn't matter when loading from the SD card - the loader will
 automatically swap the data as it loads. The only thing it does is slow
 the loading down just slightly. It's more of a matter for games in the
 game flash. You can only play the game directly from flash when the byte
-order is correct (the game info is white). When the game info is lavender,
+order is correct (the game info is green). When the game info is blue,
 the game cannot be directly run from the flash. If you are using a Neo2-SD
 or Neo2-Pro, the menu will copy the game from the flash to psram. It will
 swap the data as needed to allow it to run. If you are on a regular flash
 cart, they haven't any psram, so you cannot play games where the game info
-is not white. The proper files to burn to flash to be directly playable
+is not green. The proper files to burn to flash to be directly playable
 are of the .v64 variety.
 
 The menu has the ability to boot Myth-aware homebrew. This is tied to the
