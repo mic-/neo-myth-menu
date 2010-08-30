@@ -32,10 +32,10 @@
 static const char* EEPROM_MAPPERS[] =
 {
     "T-8104B",//new - nba jam 32x
-	"GM G-4025",//new - wonder boy 3
-	"GM G-4060",//new - wonder boy in MW
+    "GM G-4025",//new - wonder boy 3
+    "GM G-4060",//new - wonder boy in MW
 
-	//shared from genplus gx
+    //shared from genplus gx
     "T-120106",
     "T-50176",
     "T-50396",
@@ -61,8 +61,8 @@ static const char* EEPROM_MAPPERS[] =
     "T-81576",
     "T-81476",
     "T-120146-50",
-	NULL,
-	NULL
+    NULL,
+    NULL
 };
 
 /* hardware definitions */
@@ -826,6 +826,7 @@ void sort_entries()
 void get_menu_flash(void)
 {
     menuEntry_t *p = NULL;
+    char extension[6];
 
     gMaxEntry = 0;
     rom_hdr[0] = rom_hdr[1] = 0xFF;
@@ -847,6 +848,15 @@ void get_menu_flash(void)
         {
             gCurEntry = gMaxEntry;
             run_rom(0x0000); // never returns
+        }
+
+        // check for SMS override
+        utility_strcpy(extension, &p->meName[utility_strlen(p->meName) - 4]);
+        if (!utility_memcmp(extension, ".SMS", 4) || !utility_memcmp(extension, ".sms", 4))
+        {
+            // SMS ROM extension
+            gSelections[gMaxEntry].type = 2; // SMS
+            gSelections[gMaxEntry].run = 0x13; // run mode = SMS + FM
         }
 
         // next entry
@@ -1099,20 +1109,20 @@ void get_sd_cheat(WCHAR* sss)
 void get_sd_info(int entry)
 {
     unsigned char jump[4];
-	char extension[6];
+    char extension[6];
     int eos = utility_wstrlen(path);
     UINT ts;
 
     gFileType = 0;
     gMythHdr = 0;
 
-	printToScreen(gEmptyLine,1,20,0x0000);
-	printToScreen(gEmptyLine,1,21,0x0000);
-	printToScreen(gEmptyLine,1,22,0x0000);
-	printToScreen(gEmptyLine,1,23,0x0000);
+    printToScreen(gEmptyLine,1,20,0x0000);
+    printToScreen(gEmptyLine,1,21,0x0000);
+    printToScreen(gEmptyLine,1,22,0x0000);
+    printToScreen(gEmptyLine,1,23,0x0000);
 
-	if (gSelections[entry].type == 128)
-		return;
+    if (gSelections[entry].type == 128)
+        return;
 
     //get_sd_cheat(gSelections[entry].name);
     //get_sd_ips(entry);
@@ -1142,7 +1152,7 @@ void get_sd_info(int entry)
     f_lseek_zip(&gSDFile, 0x7FF0);
     f_read_zip(&gSDFile, rom_hdr, 16, &ts);
     utility_w2cstrcpy(extension, &gSelections[entry].name[utility_wstrlen(gSelections[entry].name) - 4]);
-    if (!utility_memcmp(rom_hdr, "TMR SEGA", 8) || !utility_memcmp(extension, ".sms", 4))
+    if (!utility_memcmp(rom_hdr, "TMR SEGA", 8) || !utility_memcmp(extension, ".sms", 4) || !utility_memcmp(extension, ".SMS", 4))
     {
         // SMS ROM header or file extension
         gSelections[entry].type = 2; // SMS
@@ -1460,19 +1470,19 @@ void update_display(void)
     char temp[48];
 
     if (gUpdate < 0)
-	{
+    {
         clear_screen();
 
-		for(ix = 3; ix < PAGE_ENTRIES + 3; ix++)
-		{
-			//printToScreen(gFEmptyLine,1,ix,0x2000);
-			//better render just the listbox border tiles
-			printToScreen("\x7c",1,ix,0x2000);
-			printToScreen("\x7c",38,ix,0x2000);
-		}
-	}
+        for(ix = 3; ix < PAGE_ENTRIES + 3; ix++)
+        {
+            //printToScreen(gFEmptyLine,1,ix,0x2000);
+            //better render just the listbox border tiles
+            printToScreen("\x7c",1,ix,0x2000);
+            printToScreen("\x7c",38,ix,0x2000);
+        }
+    }
 
-	ix = 0;
+    ix = 0;
     gUpdate = 0;
     gCursorX = 1;
     gCursorY = 1;
@@ -1528,9 +1538,9 @@ void update_display(void)
             //make sure that list border tiles are visible
             for(;lines < PAGE_ENTRIES; lines++,ix++)
             {
-				printToScreen("\x7c",1,3 + ix,0x2000);
-				printToScreen("\x7c",38,3 + ix,0x2000);
-			}
+                printToScreen("\x7c",1,3 + ix,0x2000);
+                printToScreen("\x7c",38,3 + ix,0x2000);
+            }
         }
         else
         {
@@ -1944,41 +1954,41 @@ static char gProgressBarStaticBuffer[36];
 
 inline void update_progress(char *str1, char *str2, int curr, int total)
 {
-	static char *cstr1 = NULL, *cstr2 = NULL;
-	static int ctotal = 0, div, last;
-	int this;
+    static char *cstr1 = NULL, *cstr2 = NULL;
+    static int ctotal = 0, div, last;
+    int this;
 
-//	if ((cstr1 != str1) || (cstr2 != str2) || (ctotal != total) || (curr < last))
-	if (curr == 0)
-	{
-		// new progress bar, recompute divisor and start
-		cstr1 = str1;
-		cstr2= str2;
-		ctotal = total;
-		div = (total + 31) / 32;
-		last = -1;
+//  if ((cstr1 != str1) || (cstr2 != str2) || (ctotal != total) || (curr < last))
+    if (curr == 0)
+    {
+        // new progress bar, recompute divisor and start
+        cstr1 = str1;
+        cstr2= str2;
+        ctotal = total;
+        div = (total + 31) / 32;
+        last = -1;
 
-		// print empty progress bar
+        // print empty progress bar
         printToScreen(gEmptyLine,1,20,0x0000);
         printToScreen(gEmptyLine,1,21,0x0000);
         printToScreen(gEmptyLine,1,22,0x0000);
         printToScreen(gEmptyLine,1,23,0x0000);
         printToScreen(str1,20-((strlen(str1)+strlen(str2))>>1),21,0x0000);
         printToScreen(str2,20-((strlen(str2)-strlen(str1))>>1),21,0x2000);
-		memset(gProgressBarStaticBuffer, 0x87, 32);
-		gProgressBarStaticBuffer[32] = 0;
+        memset(gProgressBarStaticBuffer, 0x87, 32);
+        gProgressBarStaticBuffer[32] = 0;
         printToScreen(gProgressBarStaticBuffer,4,22,0x4000);
-	}
+    }
 
-	// now print progress
-	this = curr/div;
-	if (this != last)
-	{
-		memset(gProgressBarStaticBuffer, 0x87, this-last);
-		gProgressBarStaticBuffer[this-last] = 0;
-		printToScreen(gProgressBarStaticBuffer,4+last+1,22,0x2000);
-		last = this;
-	}
+    // now print progress
+    this = curr/div;
+    if (this != last)
+    {
+        memset(gProgressBarStaticBuffer, 0x87, this-last);
+        gProgressBarStaticBuffer[this-last] = 0;
+        printToScreen(gProgressBarStaticBuffer,4+last+1,22,0x2000);
+        last = this;
+    }
 }
 
 void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(unsigned char *buff, int offs, int len), int doffset, int soffset, int length, char *str1, char *str2)
@@ -2034,7 +2044,7 @@ void toggleResetMode(int index)
         gOptions[index].value = "Reset to Game";
     }
 
-	gCacheOutOfSync = 1;
+    gCacheOutOfSync = 1;
 }
 
 void toggleSRAMType(int index)
@@ -2052,7 +2062,7 @@ void toggleSRAMType(int index)
         gOptions[index].value = "EEPROM";
     }
 
-	gCacheOutOfSync = 1;
+    gCacheOutOfSync = 1;
 }
 /*
 int logtwo(int x)
@@ -2081,7 +2091,7 @@ void incSaveRAMSize(int index)
         gSRAMBank = 0; // max of 32 banks since minimum bank size is 8KB sram
 
     sprintf(gSRAMBankStr, "%d", gSRAMBank);
-	gCacheOutOfSync = 1;
+    gCacheOutOfSync = 1;
 }
 
 void incSaveRAMBank(int index)
@@ -2092,7 +2102,7 @@ void incSaveRAMBank(int index)
         gSRAMBank = 0; // max of 32 banks since minimum bank size is 8KB sram
 
     sprintf(gSRAMBankStr, "%d", gSRAMBank);
-	gCacheOutOfSync = 1;
+    gCacheOutOfSync = 1;
 }
 
 void toggleYM2413(int index)
@@ -2108,7 +2118,7 @@ void toggleYM2413(int index)
         gOptions[index].value = "On";
     }
 
-	gCacheOutOfSync = 1;
+    gCacheOutOfSync = 1;
 }
 
 //for the cheat support
@@ -2365,17 +2375,17 @@ int cache_process()
 {
     unsigned int a = 0 , b = 0;
     int i = 0;
-	short int found = 0;
+    short int found = 0;
 
     clearStatusMessage();
 
-	switch(gSelections[gCurEntry].type)
-	{
-		case 4://vgm
-		case 127://unknown
-		case 128://dir
-			return 0;
-	}
+    switch(gSelections[gCurEntry].type)
+    {
+        case 4://vgm
+        case 127://unknown
+        case 128://dir
+            return 0;
+    }
 
     if(gSelections[gCurEntry].run == 0x27)
         return 0;
@@ -2389,20 +2399,20 @@ int cache_process()
         if((rom_hdr[0] == 0xFF) && (rom_hdr[1] != 0x04)) //bad!
             return 0;
 
-		switch(gSelections[gCurEntry].type)
-		{
-			case 4://vgm
-			case 127://unknown
-			case 128://dir
-				return 0;
-		}
+        switch(gSelections[gCurEntry].type)
+        {
+            case 4://vgm
+            case 127://unknown
+            case 128://dir
+                return 0;
+        }
 
         if(gSelections[gCurEntry].run == 0x27)
             return 0;
     }
 
     setStatusMessage("One-time detection in progress...");
-	gCacheOutOfSync = 1;
+    gCacheOutOfSync = 1;
 
     if ((rom_hdr[0xB0] == 'R') && (rom_hdr[0xB1] == 'A'))
     {
@@ -2437,80 +2447,80 @@ int cache_process()
             //intense scan
             for(i = 0; ; i++)
             {
-				if(EEPROM_MAPPERS[i] == NULL)
-					break;
+                if(EEPROM_MAPPERS[i] == NULL)
+                    break;
 
                 if(!utility_memcmp(rom_hdr + 0x83,EEPROM_MAPPERS[i],utility_strlen(EEPROM_MAPPERS[i])))
                 {
-					found = 1;
+                    found = 1;
                     gSRAMType = 0x0001;
                     break;
                 }
             }
 
-			if(!found)
-			{
-				{
-					unsigned char* token = (unsigned char*)&buffer[((XFER_SIZE << 1) - 256)];
-					unsigned char* code = (unsigned char*)&buffer[0];
-					WCHAR* eepInc = (WCHAR*)&buffer[0];
-					short tokenLen = 0;
-					unsigned int bytesToRead = 0;
-					unsigned int bytesWritten = 0;
-					unsigned int addr = 0;
-					FIL f;
+            if(!found)
+            {
+                {
+                    unsigned char* token = (unsigned char*)&buffer[((XFER_SIZE << 1) - 256)];
+                    unsigned char* code = (unsigned char*)&buffer[0];
+                    WCHAR* eepInc = (WCHAR*)&buffer[0];
+                    short tokenLen = 0;
+                    unsigned int bytesToRead = 0;
+                    unsigned int bytesWritten = 0;
+                    unsigned int addr = 0;
+                    FIL f;
 
-					utility_c2wstrcpy(eepInc,eeprom_inc_path);
+                    utility_c2wstrcpy(eepInc,eeprom_inc_path);
 
-					if(f_open(&f,eepInc, FA_OPEN_EXISTING | FA_READ) == FR_OK)
-					{
-						bytesToRead = f.fsize;
+                    if(f_open(&f,eepInc, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+                    {
+                        bytesToRead = f.fsize;
 
-						if(bytesToRead > ((XFER_SIZE << 1) - 256))
-							bytesToRead = ((XFER_SIZE << 1) - 256);
+                        if(bytesToRead > ((XFER_SIZE << 1) - 256))
+                            bytesToRead = ((XFER_SIZE << 1) - 256);
 
-						if(f_read(&f,code, bytesToRead, &bytesWritten) == FR_OK)
-						{
-							while((addr < bytesWritten))
-							{
-								while(addr < bytesWritten)
-								{
-									if(!is_space(code[addr]))
-										break;
+                        if(f_read(&f,code, bytesToRead, &bytesWritten) == FR_OK)
+                        {
+                            while((addr < bytesWritten))
+                            {
+                                while(addr < bytesWritten)
+                                {
+                                    if(!is_space(code[addr]))
+                                        break;
 
-									++addr;
-								}
+                                    ++addr;
+                                }
 
-								if( ((code[addr] == '\r') || (code[addr] == '\n')) || (addr >= bytesWritten) )
-								{
-									if(tokenLen)
-									{
-										if(!utility_memcmp(rom_hdr + 0x83,token,tokenLen))
-										{
-											gSRAMType = 0x0001;
-											break;
-										}
-									}
+                                if( ((code[addr] == '\r') || (code[addr] == '\n')) || (addr >= bytesWritten) )
+                                {
+                                    if(tokenLen)
+                                    {
+                                        if(!utility_memcmp(rom_hdr + 0x83,token,tokenLen))
+                                        {
+                                            gSRAMType = 0x0001;
+                                            break;
+                                        }
+                                    }
 
-									tokenLen = 0;
-									++addr;
-									continue;
-								}
+                                    tokenLen = 0;
+                                    ++addr;
+                                    continue;
+                                }
 
-								if(tokenLen < 255)
-								{
-									token[tokenLen++] = code[addr++];
-									continue;
-								}
+                                if(tokenLen < 255)
+                                {
+                                    token[tokenLen++] = code[addr++];
+                                    continue;
+                                }
 
-								++addr;
-							}
-						}
+                                ++addr;
+                            }
+                        }
 
-						f_close(&f);
-					}//parser sec
-				}
-			}
+                        f_close(&f);
+                    }//parser sec
+                }
+            }
         }
     }
 
@@ -2531,13 +2541,13 @@ void cache_loadPA(WCHAR* sss)
     if(gCurMode != MODE_SD)
         return;
 
-	switch(gSelections[gCurEntry].type)
-	{
-		case 4://vgm
-		case 127://unknown
-		case 128://dir
-			return;
-	}
+    switch(gSelections[gCurEntry].type)
+    {
+        case 4://vgm
+        case 127://unknown
+        case 128://dir
+            return;
+    }
 
     if(gSelections[gCurEntry].run == 0x27)
         return;
@@ -2604,13 +2614,13 @@ void cache_loadPA(WCHAR* sss)
 
 void cache_load()
 {
-	switch(gSelections[gCurEntry].type)
-	{
-		case 4://vgm
-		case 127://unknown
-		case 128://dir
-			return;
-	}
+    switch(gSelections[gCurEntry].type)
+    {
+        case 4://vgm
+        case 127://unknown
+        case 128://dir
+            return;
+    }
 
     if(gSelections[gCurEntry].run == 0x27)
         return;
@@ -2626,18 +2636,18 @@ void cache_sync()
     if(gCurMode != MODE_SD)
         return;
 
-	if(!gCacheOutOfSync)
-		return;
+    if(!gCacheOutOfSync)
+        return;
 
-	gCacheOutOfSync = 0;
+    gCacheOutOfSync = 0;
 
-	switch(gSelections[gCurEntry].type)
-	{
-		case 4://vgm
-		case 127://unknown
-		case 128://dir
-			return;
-	}
+    switch(gSelections[gCurEntry].type)
+    {
+        case 4://vgm
+        case 127://unknown
+        case 128://dir
+            return;
+    }
 
     if(gSelections[gCurEntry].run == 0x27)
         return;
@@ -2723,14 +2733,14 @@ void sram_mgr_toggleService(int index)
     {
         gOptions[index].value = "Disabled";
         gManageSaves = 0;
-		gCacheOutOfSync = 1;
+        gCacheOutOfSync = 1;
         //config_push("manageSaves","0");//will be replaced if exists
     }
     else
     {
         gOptions[index].value = "Enabled";
         gManageSaves = 1;
-		gCacheOutOfSync = 1;
+        gCacheOutOfSync = 1;
         //config_push("manageSaves","1");//will be replaced if exists
     }
 
@@ -3915,7 +3925,7 @@ void do_options(void)
                         start = 0;
                 }
                 update = 1;
-				delay( (getClockType()) ? 4 : 6 );
+                delay( (getClockType()) ? 4 : 6 );
                 continue;
             }
 
@@ -3935,7 +3945,7 @@ void do_options(void)
                         start = 0;
                 }
                 update = 1;
-				delay( (getClockType()) ? 10 : 14 );
+                delay( (getClockType()) ? 10 : 14 );
                 continue;
             }
 
@@ -3948,7 +3958,7 @@ void do_options(void)
                 if ((currOption - start) >= PAGE_ENTRIES)
                     start += PAGE_ENTRIES;
                 update = 1;
-				delay( (getClockType()) ? 4 : 6 );
+                delay( (getClockType()) ? 4 : 6 );
                 continue;
             }
 
@@ -3961,11 +3971,11 @@ void do_options(void)
                 if ((currOption - start) >= PAGE_ENTRIES)
                     start += PAGE_ENTRIES; // next "page" of entries
                 update = 1;
-				delay( (getClockType()) ? 10 : 14 );
+                delay( (getClockType()) ? 10 : 14 );
                 continue;
             }
 
-		}
+        }
 
         if ((buttons & SEGA_CTRL_BUTTONS) != gButtons)
         {
@@ -4154,7 +4164,7 @@ void do_options(void)
                 if(gOptions[currOption].exclusiveFCall)
                 {
                     clear_screen();
-	                delay( (getClockType()) ? 10 : 14 );
+                    delay( (getClockType()) ? 10 : 14 );
                     goto __options_EntryPoint;
                 }
 
@@ -4265,10 +4275,10 @@ void run_rom(int reset_mode)
 
     gResetMode = reset_mode;
 
-	printToScreen(gEmptyLine,1,20,0x0000);
-	printToScreen(gEmptyLine,1,21,0x0000);
-	printToScreen(gEmptyLine,1,22,0x0000);
-	printToScreen(gEmptyLine,1,23,0x0000);
+    printToScreen(gEmptyLine,1,20,0x0000);
+    printToScreen(gEmptyLine,1,21,0x0000);
+    printToScreen(gEmptyLine,1,22,0x0000);
+    printToScreen(gEmptyLine,1,23,0x0000);
 
     if (gCurMode == MODE_FLASH)
     {
@@ -4333,8 +4343,8 @@ void run_rom(int reset_mode)
             delay(60);
 
             PlayVGM();
-			gRomDly = 60;
-			gResponseMsgStatus = 1;
+            gRomDly = 60;
+            gResponseMsgStatus = 1;
             gUpdate = -1;               /* clear screen for major screen update */
             return;
         }
@@ -4485,8 +4495,8 @@ void run_rom(int reset_mode)
             delay(60);
 
             PlayVGM();
-			gRomDly = 60;
-			gResponseMsgStatus = 1;
+            gRomDly = 60;
+            gResponseMsgStatus = 1;
             gUpdate = -1;               /* clear screen for major screen update */
             return;
         }
@@ -4552,48 +4562,48 @@ void run_rom(int reset_mode)
             else
                 cache_sync();
 
-			//patch bad headers ( based on genplus emu )
-			{
-				unsigned int a,b;
-				unsigned char* psramBuf = (unsigned char*)&buffer[0];
-				unsigned char* psramRaw = (unsigned char*)0x2001B4;
+            //patch bad headers ( based on genplus emu )
+            {
+                unsigned int a,b;
+                unsigned char* psramBuf = (unsigned char*)&buffer[0];
+                unsigned char* psramRaw = (unsigned char*)0x2001B4;
 
-				setStatusMessage("Checking for bad header...");
-				ints_off();
+                setStatusMessage("Checking for bad header...");
+                ints_off();
 
-				if( (*(unsigned char*)0x2001B0 == 'R') && (*(unsigned char*)0x2001B1 == 'A') )
-				{
-					{
-						a = psramRaw[0x00]<<24|psramRaw[0x01]<<16|psramRaw[0x02]<<8|psramRaw[0x03];
-						b = psramRaw[0x04]<<24|psramRaw[0x05]<<16|psramRaw[0x06]<<8|psramRaw[0x07];
+                if( (*(unsigned char*)0x2001B0 == 'R') && (*(unsigned char*)0x2001B1 == 'A') )
+                {
+                    {
+                        a = psramRaw[0x00]<<24|psramRaw[0x01]<<16|psramRaw[0x02]<<8|psramRaw[0x03];
+                        b = psramRaw[0x04]<<24|psramRaw[0x05]<<16|psramRaw[0x06]<<8|psramRaw[0x07];
 
-						if ((b > a) || ((b - a) >= 0x10000))
-						{
-							b = a + 0xffff;
-				 			a &= 0xfffffffe;
-							b |= 1;
+                        if ((b > a) || ((b - a) >= 0x10000))
+                        {
+                            b = a + 0xffff;
+                            a &= 0xfffffffe;
+                            b |= 1;
 
-							psramBuf[0] = (a>>24)&0xff;psramBuf[1] = (a>>16)&0xff;
-							psramBuf[2] = (a>>8)&0xff;psramBuf[3] = (a&0xff);
+                            psramBuf[0] = (a>>24)&0xff;psramBuf[1] = (a>>16)&0xff;
+                            psramBuf[2] = (a>>8)&0xff;psramBuf[3] = (a&0xff);
 
-							psramBuf[4] = (b>>24)&0xff;psramBuf[5] = (b>>16)&0xff;
-							psramBuf[6] = (b>>8)&0xff;psramBuf[7] = (b&0xff);
+                            psramBuf[4] = (b>>24)&0xff;psramBuf[5] = (b>>16)&0xff;
+                            psramBuf[6] = (b>>8)&0xff;psramBuf[7] = (b&0xff);
 
-							ints_off();
-							neo_copyto_myth_psram(psramBuf,0x1B4,8);
-						}
-					}
-				}
+                            ints_off();
+                            neo_copyto_myth_psram(psramBuf,0x1B4,8);
+                        }
+                    }
+                }
 
-				//nba jam 32x te
-				if( (utility_memcmp((void*)0x200180,"GM T-8104B",10) == 0) || (utility_memcmp((void*)0x200180,"GM T-81406",10) == 0) )
-				{
-					*(unsigned short*)&psramBuf[0] = 0x714e;
+                //nba jam 32x te
+                if( (utility_memcmp((void*)0x200180,"GM T-8104B",10) == 0) || (utility_memcmp((void*)0x200180,"GM T-81406",10) == 0) )
+                {
+                    *(unsigned short*)&psramBuf[0] = 0x714e;
 
-					ints_off();
-					neo_copyto_myth_psram(psramBuf,0xeec,2);
-				}
-			}
+                    ints_off();
+                    neo_copyto_myth_psram(psramBuf,0xeec,2);
+                }
+            }
 
             clearStatusMessage();
             ints_on();
@@ -5271,9 +5281,9 @@ int main(void)
     gRomDly = maxDL >> 1;
     gLastEntryIndex = -1;
     utility_memset(entrySNameBuf,'\0',64);
-	utility_memset(gProgressBarStaticBuffer,0x87,36);
-	*(gProgressBarStaticBuffer + 32) = '\0';
-	gCacheOutOfSync = 0;
+    utility_memset(gProgressBarStaticBuffer,0x87,36);
+    *(gProgressBarStaticBuffer + 32) = '\0';
+    gCacheOutOfSync = 0;
 
     while(1)
     {
@@ -5295,17 +5305,17 @@ int main(void)
                 {
                     gResponseMsgStatus = 1;
 
-					if(gMaxEntry && gCurEntry)
-					{
-						if( (gSelections[gCurEntry].type != 4))
-						{
-				            printToScreen(gEmptyLine,1,20,0x0000);
-				            printToScreen(gEmptyLine,1,21,0x0000);
-				            printToScreen("Waiting for response...",20 - (utility_strlen("Waiting for response...") >> 1),21,0x2000);
-				            printToScreen(gEmptyLine,1,22,0x0000);
-				            printToScreen(gEmptyLine,1,23,0x0000);
-						}
-					}
+                    if(gMaxEntry && gCurEntry)
+                    {
+                        if( (gSelections[gCurEntry].type != 4))
+                        {
+                            printToScreen(gEmptyLine,1,20,0x0000);
+                            printToScreen(gEmptyLine,1,21,0x0000);
+                            printToScreen("Waiting for response...",20 - (utility_strlen("Waiting for response...") >> 1),21,0x2000);
+                            printToScreen(gEmptyLine,1,22,0x0000);
+                            printToScreen(gEmptyLine,1,23,0x0000);
+                        }
+                    }
                 }
                 *(unsigned short*)rom_hdr = 0xffff;//rom_hdr[0] = rom_hdr[1] = 0xFF;
             }
