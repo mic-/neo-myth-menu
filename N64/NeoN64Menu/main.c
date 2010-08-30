@@ -326,10 +326,10 @@ void progress_screen(char *str1, char *str2, int frac, int total, int bfill)
         rdp_detach_display();
     }
 
-    graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
+    graphics_set_color(gTextColors.sel_game, 0);
     printText(dcon, str1, 20 - strlen(str1)/2, 3);
 
-    graphics_set_color(graphics_make_color(0x7F, 0xFF, 0x7F, 0xFF), 0);
+    graphics_set_color(gTextColors.usel_game, 0);
     strncpy(temp, str2, 34);
     temp[34] = 0;
     printText(dcon, temp, 20-strlen(temp)/2, 5);
@@ -1484,6 +1484,8 @@ int main(void)
         neo_run_menu();
 #endif
 
+	delay(10);
+
 #ifndef RUN_FROM_SD
     // check for boot rom on SD card
     neo2_enable_sd();
@@ -1522,6 +1524,7 @@ int main(void)
             gTable[0].options[7] = 0;
             get_sd_info(0);
 
+			setTextColors((loading) ? 4 : 0);
             copySD2Psram(0, (loading) ? 4 : 0);
             neo_run_psram(gTable[0].options, 1);
         }
