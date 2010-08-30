@@ -27,7 +27,7 @@ $(PROG_NAME).v64: $(PROG_NAME).dfs $(PROG_NAME).elf
 $(PROG_NAME).elf : $(OBJS)
 	$(LD) -o $(PROG_NAME).elf $(OBJS) $(LINK_FLAGS)
 
-$(PROG_NAME).dfs : ./filesystem/pattern0.sprite ./filesystem/pattern1.sprite ./filesystem/pattern2.sprite
+$(PROG_NAME).dfs : ./filesystem/pattern0.sprite ./filesystem/pattern1.sprite ./filesystem/pattern2.sprite ./filesystem/unknown.sprite
 	$(MKDFSPATH) $(PROG_NAME).dfs ./filesystem/
 
 ./filesystem/pattern0.sprite:
@@ -38,6 +38,9 @@ $(PROG_NAME).dfs : ./filesystem/pattern0.sprite ./filesystem/pattern1.sprite ./f
 
 ./filesystem/pattern2.sprite:
 	$(MKSPRITEPATH) 16 pattern_2.png ./filesystem/pattern2.sprite
+
+./filesystem/unknown.sprite:
+	$(MKSPRITEPATH) 16 unknown.png ./filesystem/unknown.sprite
 
 all: $(PROG_NAME).v64
 
