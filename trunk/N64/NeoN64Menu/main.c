@@ -68,6 +68,21 @@ int browser_w, browser_h;
 sprite_t *loading;
 int loading_w, loading_h;
 
+struct textColors {
+    u32 title;
+    u32 usel_game;
+    u32 sel_game;
+    u32 uswp_info;
+    u32 swp_info;
+    u32 usel_option;
+    u32 sel_option;
+    u32 hw_info;
+    u32 help_info;
+};
+typedef struct textColors textColors_t;
+
+textColors_t gTextColors;
+
 u64 back_flags;                         /* 0xAA550mno - m = brwsr, n = bopt, o = bfill */
 
 struct selEntry {
@@ -314,7 +329,7 @@ void progress_screen(char *str1, char *str2, int frac, int total, int bfill)
     graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
     printText(dcon, str1, 20 - strlen(str1)/2, 3);
 
-    graphics_set_color(graphics_make_color(0x7F, 0xFF, 0x3F, 0xFF), 0);
+    graphics_set_color(graphics_make_color(0x7F, 0xFF, 0x7F, 0xFF), 0);
     strncpy(temp, str2, 34);
     temp[34] = 0;
     printText(dcon, temp, 20-strlen(temp)/2, 5);
@@ -1314,6 +1329,36 @@ void saveBrowserFlags(int brwsr, int bopt, int bfill)
         neo2_enable_sd();               // make sure still in proper mode for SD
 }
 
+void setTextColors(int bfill)
+{
+    if (bfill < 4)
+    {
+        // patterns
+        gTextColors.title = graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF);
+        gTextColors.usel_game = graphics_make_color(0x3F, 0x8F, 0x3F, 0xFF);
+        gTextColors.sel_game = graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF);
+        gTextColors.uswp_info = graphics_make_color(0x3F, 0xFF, 0x3F, 0xFF);
+        gTextColors.swp_info = graphics_make_color(0x5F, 0x5F, 0xFF, 0xFF);
+        gTextColors.usel_option = graphics_make_color(0x3F, 0xFF, 0x3F, 0xFF);
+        gTextColors.sel_option = graphics_make_color(0xBF, 0x3F, 0x3F, 0xFF);
+        gTextColors.hw_info = graphics_make_color(0xFF, 0x3F, 0x3F, 0xFF);
+        gTextColors.help_info = graphics_make_color(0x3F, 0xFF, 0x3F, 0xFF);
+    }
+    else
+    {
+        // images
+        gTextColors.title = graphics_make_color(0x3F, 0x3F, 0x9F, 0xFF);
+        gTextColors.usel_game = graphics_make_color(0x3F, 0x8F, 0x3F, 0xFF);
+        gTextColors.sel_game = graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF);
+        gTextColors.uswp_info = graphics_make_color(0x3F, 0xBF, 0x3F, 0xFF);
+        gTextColors.swp_info = graphics_make_color(0x3F, 0x3F, 0xBF, 0xFF);
+        gTextColors.usel_option = graphics_make_color(0x3F, 0xBF, 0x3F, 0xFF);
+        gTextColors.sel_option = graphics_make_color(0xBF, 0x3F, 0x3F, 0xFF);
+        gTextColors.hw_info = graphics_make_color(0x5F, 0x1F, 0x1F, 0xFF);
+        gTextColors.help_info = graphics_make_color(0x1F, 0x7F, 0x1F, 0xFF);
+    }
+}
+
 /* initialize console hardware */
 void init_n64(void)
 {
@@ -1545,6 +1590,8 @@ int main(void)
         bfill = back_flags & 7;
     }
 
+    setTextColors(bfill);
+
     memset(boxes, 0xFF, 16 * sizeof(unsigned short)); // clear boxart cache
     if (brwsr)
     {
@@ -1587,10 +1634,7 @@ int main(void)
         }
 
         // show title
-        if (browser && (bfill == 4))
-            graphics_set_color(graphics_make_color(0x3F, 0x3F, 0x7F, 0xFF), 0);
-        else
-            graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
+        graphics_set_color(gTextColors.title, 0);
         strcpy(temp, menu_title);
         if (*(vu32*)0x80000300 == 0)
         {
@@ -1631,7 +1675,7 @@ int main(void)
                     else
                         strncpy(temp, gTable[bstart+ix].name, 36);
                     temp[36] = 0;
-                    graphics_set_color((bstart+ix) == bselect ? graphics_make_color(0xEF, 0xEF, 0xEF, 0xFF) : graphics_make_color(0x7F, 0xFF, 0x3F, 0xFF), 0);
+                    graphics_set_color((bstart+ix) == bselect ? gTextColors.sel_game : gTextColors.usel_game, 0);
                     printText(dcon, temp, 20 - strlen(temp)/2, 3 + ix);
                 }
                 else
@@ -1639,14 +1683,11 @@ int main(void)
             }
         }
 
-        graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
-
         if (bmax && gTable[bselect].valid)
         {
             if ((gTable[bselect].type == 255) && (bopt == 0))
             {
-                if (gTable[bselect].swap)
-                    graphics_set_color(graphics_make_color(0xFF, 0x3F, 0xBF, 0xFF), 0);
+                graphics_set_color(gTable[bselect].swap ? gTextColors.swp_info : gTextColors.uswp_info, 0);
                 // print selection info
                 printText(dcon, (char *)gTable[bselect].rom, 2, 14);
                 sprintf(temp, "Country: %02X (%c)", gTable[bselect].rom[0x1E], gTable[bselect].rom[0x1E]);
@@ -1656,8 +1697,7 @@ int main(void)
                 sprintf(temp, "Cart ID: %04X (%c%c)", gTable[bselect].rom[0x1C]<<8 | gTable[bselect].rom[0x1D], gTable[bselect].rom[0x1C], gTable[bselect].rom[0x1D]);
                 printText(dcon, temp, 20, 15);
 
-                graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
-
+                graphics_set_color(gTextColors.title, 0);
                 // print full selection name (lines 16 - 22)
                 strncpy(temp, gTable[bselect].name, 36);
                 temp[36] = 0;
@@ -1675,21 +1715,16 @@ int main(void)
                 unsigned short cart = *(unsigned short *)&gTable[bselect].rom[0x1C];
                 int ix = (gTable[bselect].rom[0x1C] ^ gTable[bselect].rom[0x1D]) & 15;
 
+                graphics_set_color(gTable[bselect].swap ? gTextColors.swp_info : gTextColors.uswp_info, 0);
                 // print selection options
                 sprintf(temp, "Bank: %3d", (gTable[bselect].options[1]<<8) | gTable[bselect].options[2]);
                 printText(dcon, temp, 4, 14);
                 sprintf(temp, "Size: %3d", (gTable[bselect].options[3]<<8) | gTable[bselect].options[4]);
                 printText(dcon, temp, 4, 15);
-                if (osel == 0)
-                    graphics_set_color(graphics_make_color(0xFF, 0x3F, 0x3F, 0xFF), 0);
-                else
-                    graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
+                graphics_set_color(osel ? gTextColors.usel_option : gTextColors.sel_option, 0);
                 sprintf(temp, "Save: %s", ostr[0][gTable[bselect].options[5]]);
                 printText(dcon, temp, 4, 16);
-                if (osel == 1)
-                    graphics_set_color(graphics_make_color(0xFF, 0x3F, 0x3F, 0xFF), 0);
-                else
-                    graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
+                graphics_set_color(osel ? gTextColors.sel_option : gTextColors.usel_option, 0);
                 sprintf(temp, "CIC: %s", ostr[1][gTable[bselect].options[6]]);
                 printText(dcon, temp, 4, 17);
 
@@ -1701,13 +1736,10 @@ int main(void)
         }
 
         // show cart info help messages
-        if (browser && (bfill == 4))
-            graphics_set_color(graphics_make_color(0x5F, 0x1F, 0x1F, 0xFF), 0);
-        else
-            graphics_set_color(graphics_make_color(0xFF, 0x4F, 0x4F, 0xFF), 0);
+        graphics_set_color(gTextColors.hw_info, 0);
         sprintf(temp, "CPLD:V%d CART:0x%08X FLASH:%c", gCpldVers & 7, gCardID, cards[gCardType & 3]);
         printText(dcon, temp, 20 - strlen(temp)/2, 24);
-        graphics_set_color(graphics_make_color(0x7F, 0xFF, 0x3F, 0xFF), 0);
+        graphics_set_color(gTextColors.help_info, 0);
         printText(dcon, menu_help1, 20 - strlen(menu_help1)/2, 25);
         printText(dcon, menu_help2, 20 - strlen(menu_help2)/2, 26);
         printText(dcon, menu_help3[brwsr*2+bopt], 20 - strlen(menu_help3[brwsr*2+bopt])/2, 27);
@@ -1943,6 +1975,7 @@ int main(void)
                 // TL just released
                 bfill = bfill ? bfill-1 : 4;
                 saveBrowserFlags(brwsr, bopt, bfill);
+                setTextColors(bfill);
             }
         }
 
@@ -1954,6 +1987,7 @@ int main(void)
                 // TR just released
                 bfill = (bfill == 4) ? 0 : bfill+1;
                 saveBrowserFlags(brwsr, bopt, bfill);
+                setTextColors(bfill);
             }
         }
 
