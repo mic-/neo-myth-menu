@@ -1477,11 +1477,11 @@ int main(void)
         gPsramCmd = 0x00DAAF44;         // set iosr for psram
         break;
     }
-//    neo_select_game();
+    neo_select_game();
 
 #ifdef RUN_FROM_U2
     // check for boot rom in menu
- //   neo_select_menu();                  // enable menu flash in cart space
+   neo_select_menu();                  // enable menu flash in cart space
 
     if (!memcmp((void *)0xB0000020, "N64 Myth Menu (MF)", 18))
         neo_run_menu();
