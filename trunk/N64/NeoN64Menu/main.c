@@ -1477,14 +1477,14 @@ int main(void)
         gPsramCmd = 0x00DAAF44;         // set iosr for psram
         break;
     }
+    neo_select_game();
 
 #ifdef RUN_FROM_U2
     // check for boot rom in menu
+    neo_select_menu();                  // enable menu flash in cart space
     if (!memcmp((void *)0xB0000020, "N64 Myth Menu (MF)", 18))
         neo_run_menu();
 #endif
-
-	delay(10);
 
 #ifndef RUN_FROM_SD
     // check for boot rom on SD card
@@ -1500,18 +1500,6 @@ int main(void)
         c2wstrcat(fpath, gTable[0].name);
         if (f_open(&gSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
         {
-            stemp = loadImageSD("/.menu/n64/images/loading.png", &stemp_w, &stemp_h);
-            if (!stemp)
-                stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
-            if (stemp)
-            {
-                if (loading)
-                    free(loading);
-                loading = stemp;
-                loading_w = stemp_w;
-                loading_h = stemp_h;
-            }
-
             gTable[0].valid = 1;
             gTable[0].type = 127;
             gTable[0].options[0] = 0xFF;
@@ -1523,8 +1511,20 @@ int main(void)
             gTable[0].options[6] = 2;
             gTable[0].options[7] = 0;
             get_sd_info(0);
-
-			setTextColors((loading) ? 4 : 0);
+#if 0
+            stemp = loadImageSD("/.menu/n64/images/loading.png", &stemp_w, &stemp_h);
+            if (!stemp)
+                stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
+            if (stemp)
+            {
+                if (loading)
+                    free(loading);
+                loading = stemp;
+                loading_w = stemp_w;
+                loading_h = stemp_h;
+            }
+#endif
+            setTextColors((loading) ? 4 : 0);
             copySD2Psram(0, (loading) ? 4 : 0);
             neo_run_psram(gTable[0].options, 1);
         }
