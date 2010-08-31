@@ -170,7 +170,6 @@ void config_remove(const int8_t* variable)
     //a nice trick to avoid making a linked list
     ConfigEntry* e = entry;
     ConfigEntry* prev = NULL;
-    ConfigEntry* zombie;
 
     while(e)
     {
