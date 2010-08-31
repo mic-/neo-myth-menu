@@ -539,9 +539,9 @@ void neo2_pre_sd(void)
     if (!sd_speed)
     {
         // set the PI for myth sd
-        PI_BSD_DOM1_LAT_REG = 0x00000003; //4
+        PI_BSD_DOM1_LAT_REG = 0x00000003; // fasest safe speed = 3/2/3/7
         PI_BSD_DOM1_RLS_REG = 0x00000002;
-        PI_BSD_DOM1_PWD_REG = 0x00000003; //4
+        PI_BSD_DOM1_PWD_REG = 0x00000003;
         PI_BSD_DOM1_PGS_REG = 0x00000007;
     }
 }
@@ -632,7 +632,7 @@ int neo2_recv_sd_multi(unsigned char *buf, int count)
         "and $9,$9,$10\n\t"             // 0000 000h
         "or $11,$11,$9\n\t"             // $11 = abcd efgh
 
-        "sw $11,0($14)\n\t"              // save sector data
+        "sw $11,0($14)\n\t"             // save sector data
         "addiu $13,$13,-1\n\t"
         "bne $13,$0,gsloop\n\t"
         "addiu $14,$14,4\n\t"           // inc buffer pointer
