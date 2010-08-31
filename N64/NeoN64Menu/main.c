@@ -1512,7 +1512,7 @@ int main(void)
             gTable[0].options[6] = 2;
             gTable[0].options[7] = 0;
             get_sd_info(0);
-#if 0
+
             stemp = loadImageSD("/.menu/n64/images/loading.png", &stemp_w, &stemp_h);
             if (!stemp)
                 stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
@@ -1524,7 +1524,7 @@ int main(void)
                 loading_w = stemp_w;
                 loading_h = stemp_h;
             }
-#endif
+
             setTextColors((loading) ? 4 : 0);
             copySD2Psram(0, (loading) ? 4 : 0);
             neo_run_psram(gTable[0].options, 1);

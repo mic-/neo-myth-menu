@@ -210,23 +210,22 @@ sprite_t *loadImageSD(char *fname, int *w, int *h)
     u8 *tbuf;
     u8 *ibuf;
     sprite_t *sbuf;
-    FIL gSDFile;
+    FIL lSDFile;
 
     c2wstrcpy(wname, fname);
-    f_close(&gSDFile);
-    if (f_open(&gSDFile, wname, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    if (f_open(&lSDFile, wname, FA_OPEN_EXISTING | FA_READ) != FR_OK)
         return 0;                       // couldn't open image
 
-    size = gSDFile.fsize;
+    size = lSDFile.fsize;
     tbuf = malloc(size);
     if (!tbuf)
     {
-        f_close(&gSDFile);
+        f_close(&lSDFile);
         return 0;                       // out of memory
     }
 
-    f_read(&gSDFile, tbuf, size, &ts);
-    f_close(&gSDFile);
+    f_read(&lSDFile, tbuf, size, &ts);
+    f_close(&lSDFile);
 
     ibuf = stbi_load_from_memory(tbuf, size, &x, &y, &n, 4);
     free(tbuf);
