@@ -615,7 +615,7 @@ int sdInit(void)
         if ((resp[0] == 8) && (resp[3] == 1) && (resp[4] == 0xAA))
             cardType |= 2;              // V2 and/or HC card
         else
-            return 0;               // unusable
+            return 0;                   // unusable
     }
 
     for (i=0; i<INIT_RETRIES; i++)
@@ -629,7 +629,7 @@ int sdInit(void)
                 if (resp[1] & 0x40)
                     cardType |= 1;      // HC card
                 if (!(resp[2] & 0x30))
-                    return 0;       // unusable
+                    return 0;           // unusable
                 break;
             }
         }
@@ -637,16 +637,16 @@ int sdInit(void)
     if (i == INIT_RETRIES)
     {
         // timed out
-        return 0;                   // unusable
+        return 0;                       // unusable
     }
 
     sendMmcCmd(2, 0xFFFFFFFF);          // ALL_SEND_CID
     if (!recvMmcCmdResp(resp, R2_LEN, 1) || (resp[0] != 0x3F))
-        return 0;                   // unusable
+        return 0;                       // unusable
 
     sendMmcCmd(3, 1);                   // SEND_RELATIVE_ADDR
     if (!recvMmcCmdResp(resp, R6_LEN, 1) || (resp[0] != 3))
-        return 0;                   // unusable
+        return 0;                       // unusable
     rca = (resp[1]<<8) | resp[2];
 
 #if 1
@@ -656,14 +656,14 @@ int sdInit(void)
 
     sendMmcCmd(7, (((rca>>8)&0xFF)<<24) | ((rca&0xFF)<<16) | 0xFFFF); // SELECT_DESELECT_CARD
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || (resp[0] != 7))
-        return 0;                   // unusable
+        return 0;                       // unusable
 
     sendMmcCmd(55, (((rca>>8)&0xFF)<<24) | ((rca&0xFF)<<16) | 0xFFFF); // APP_CMD
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || !(resp[4] & 0x20))
-        return 0;                   // unusable
+        return 0;                       // unusable
     sendMmcCmd(6, 2);                   // SET_BUS_WIDTH (to 4 bits)
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || (resp[0] != 6))
-        return 0;                   // unusable
+        return 0;                       // unusable
 
     sd_speed = 0;                       // data rate after init
     return 1;

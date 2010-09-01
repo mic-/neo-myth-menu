@@ -58,6 +58,7 @@ extern short int gCardType;
 extern unsigned int gCpldVers;          /* 0x81 = V1.2 hardware, 0x82 = V2.0 hardware, 0x83 = V3.0 hardware */
 
 extern unsigned int sd_speed;
+extern unsigned int fast_flag;
 
 extern int get_cic(unsigned char *buffer);
 
@@ -536,7 +537,7 @@ void neo2_disable_sd(void)
 
 void neo2_pre_sd(void)
 {
-    if (!sd_speed)
+    if (!sd_speed && fast_flag)
     {
         // set the PI for myth sd
         PI_BSD_DOM1_LAT_REG = 0x00000003; // fasest safe speed = 3/2/3/7
@@ -548,7 +549,7 @@ void neo2_pre_sd(void)
 
 void neo2_post_sd(void)
 {
-    if (!sd_speed)
+    if (!sd_speed && fast_flag)
     {
         // restore the PI for rom
         PI_BSD_DOM1_LAT_REG = 0x00000040;
