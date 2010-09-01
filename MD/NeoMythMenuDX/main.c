@@ -168,9 +168,9 @@ static short int gSRAMgrServiceStatus = SMGR_STATUS_NULL;
 static short int gSRAMgrServiceMode = 0x0000;
 
 #ifndef RUN_IN_PSRAM
-static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.3";
+static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.4";
 #else
-static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.3";
+static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.4";
 #endif
 
 #define MB (0x20000)
@@ -827,6 +827,7 @@ void get_menu_flash(void)
 {
     menuEntry_t *p = NULL;
     char extension[6];
+    int ix;
 
     gMaxEntry = 0;
     rom_hdr[0] = rom_hdr[1] = 0xFF;
@@ -843,11 +844,26 @@ void get_menu_flash(void)
         gSelections[gMaxEntry].length = fsz_tbl[(p->meROMHi & 0xF0)>>4] * 131072;
         utility_c2wstrcpy(gSelections[gMaxEntry].name, p->meName);
 
+        for (ix=min(24, strlen(p->meName)); ix>1; ix--)
+            if (gSelections[gMaxEntry].name[ix-1] != (WCHAR)' ')
+                break;
+        gSelections[gMaxEntry].name[ix] = 0;
+
         // check for auto-boot extended menu
         if ((gSelections[gMaxEntry].run == 7) && !utility_memcmp(p->meName, "MDEBIOS", 7))
         {
             gCurEntry = gMaxEntry;
             run_rom(0x0000); // never returns
+        }
+
+        // check if SCD BRAM should be enabled
+        if ((gSelections[gMaxEntry].run == 9) || (gSelections[gMaxEntry].run == 10))
+        {
+            if (gSelections[gMaxEntry].bsize != 16)
+            {
+                gSelections[gMaxEntry].bsize = 16; // 1Mbit
+                gSelections[gMaxEntry].bbank = 3; // default to bank 3 to keep it out of the way of other saves
+            }
         }
 
         // check for SMS override
@@ -1950,6 +1966,15 @@ void update_display(void)
     }
 }
 
+void gen_bram(unsigned char *dest, int fstart, int len)
+{
+    int ix;
+    for (ix=0; ix<len; ix+=2)
+    {
+        dest[ix] = 0xFF;
+        dest[ix+1] = 0x03;
+    }
+}
 static char gProgressBarStaticBuffer[36];
 
 inline void update_progress(char *str1, char *str2, int curr, int total)
@@ -3744,6 +3769,10 @@ void do_options(void)
         gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
         maxOptions++;
 
+        gSRAMSize = gSelections[gCurEntry].bsize;
+        if(!gSRAMBank)
+            gSRAMBank = gSelections[gCurEntry].bbank;
+
         gOptions[maxOptions].exclusiveFCall = 0;
         sprintf(gSRAMBankStr, "%d", gSRAMBank);
         gOptions[maxOptions].name = "Save RAM Bank";
@@ -4026,7 +4055,13 @@ void do_options(void)
                     else
                     {
                         int pstart = (runmode == 0x27) ? 0x600000 : 0;
-                        //int ix;
+
+                        if (runmode == 9)
+                        {
+                            // generate bram pattern to myth psram
+                            copyGame(&neo_copyto_myth_psram, &gen_bram, 0, 0, fsize, "Generating ", temp);
+                            neo_run_myth_psram(fsize, bbank, bsize, runmode); // never returns
+                        }
                         // copy flash to myth psram
                         copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
 
@@ -4108,9 +4143,17 @@ void do_options(void)
                     else
                     {
                         int pstart = (runmode == 0x27) ? 0x600000 : 0;
-                        //int ix;
-                        // copy file to myth psram
-                        copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
+
+                        if (runmode == 9)
+                        {
+                            // generate bram pattern to myth psram
+                            copyGame(&neo_copyto_myth_psram, &gen_bram, 0, 0, fsize, "Generating ", temp);
+                        }
+                        else
+                        {
+                            // copy file to myth psram
+                            copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
+                        }
 
                         // check for raw S&K
                         if (!utility_memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
@@ -4358,6 +4401,13 @@ void run_rom(int reset_mode)
         else
         {
             int pstart = (gSelections[gCurEntry].run == 0x27) ? 0x600000 : 0;
+
+            if (gSelections[gCurEntry].run == 9)
+            {
+                // generate bram pattern to myth psram
+                copyGame(&neo_copyto_myth_psram, &gen_bram, 0, 0, fsize, "Generating ", temp);
+                neo_run_myth_psram(fsize, bbank, bsize, gSelections[gCurEntry].run); // never returns
+            }
             // copy flash to myth psram
             copyGame(&neo_copyto_myth_psram, &neo_copy_game, pstart, fstart, fsize, "Loading ", temp);
 
@@ -4534,10 +4584,18 @@ void run_rom(int reset_mode)
         }
         else
         {
-            int pstart = (gSelections[gCurEntry].run == 0x27) ? 0x600000 : 0;
+            int pstart = (runmode == 0x27) ? 0x600000 : 0;
 
-            // copy file to myth psram
-            copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
+            if (runmode == 9)
+            {
+                // generate bram pattern to myth psram
+                copyGame(&neo_copyto_myth_psram, &gen_bram, 0, 0, fsize, "Generating ", temp);
+            }
+            else
+            {
+                // copy file to myth psram
+                copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
+            }
 
             // check for raw S&K
             if (!utility_memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
