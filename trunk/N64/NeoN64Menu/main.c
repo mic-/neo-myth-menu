@@ -105,9 +105,10 @@ extern unsigned int num_sectors;        /* number of sectors on SD card (or 0) *
 extern unsigned char *sd_csd;           /* card specific data */
 
 FATFS gSDFatFs;                         /* global FatFs structure for FF */
-FIL gSDFile;                            /* global file structure for FF */
 
 short int gSdDetected = 0;              /* 0 - not detected, 1 - detected */
+
+unsigned int fast_flag = 0;             /* 0 - use normal cart timing for SD read, 1 - use fast timing */
 
 char path[1024];
 
@@ -298,6 +299,38 @@ void debugText(char *msg, int x, int y, int d)
     delay(d);
 }
 
+int wait_confirm(void)
+{
+    unsigned short buttons, previous = 0;
+
+    while (1)
+    {
+        // get buttons
+        buttons = getButtons(0);
+
+        if (A_BUTTON(buttons ^ previous))
+        {
+            // A changed
+            if (!A_BUTTON(buttons))
+            {
+                // A just released
+                return 1;
+            }
+        }
+        if (B_BUTTON(buttons ^ previous))
+        {
+            // B changed
+            if (!B_BUTTON(buttons))
+            {
+                // B just released
+                return 0;
+            }
+        }
+        previous = buttons;
+        delay(1);
+    }
+}
+
 void progress_screen(char *str1, char *str2, int frac, int total, int bfill)
 {
     display_context_t dcon;
@@ -353,6 +386,7 @@ void get_boxart(int brwsr, int entry)
 {
     char boxpath[32];
     TCHAR fpath[32];
+    FIL lSDFile;
     UINT ts;
     unsigned short cart = *(unsigned short *)&gTable[entry].rom[0x1C];
     int ix = (gTable[entry].rom[0x1C] ^ gTable[entry].rom[0x1D]) & 15;
@@ -365,11 +399,11 @@ void get_boxart(int brwsr, int entry)
     if (brwsr)
     {
         c2wstrcpy(fpath, boxpath);
-        f_close(&gSDFile);
-        if (f_open(&gSDFile, fpath, FA_OPEN_EXISTING | FA_READ))
+        if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
             return;                     // couldn't open file
         // read boxart sprite
-        f_read(&gSDFile, &boxart[ix*14980], 14980, &ts);
+        f_read(&lSDFile, &boxart[ix*14980], 14980, &ts);
+        f_close(&lSDFile);
     }
 }
 
@@ -479,8 +513,174 @@ int getGFInfo(void)
     return max;
 }
 
+void check_fast(void)
+{
+    FIL lSDFile;
+    TCHAR fpath[24];
+
+    fast_flag = 0;
+    c2wstrcpy(fpath, "/.menu/n64/.fast");
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+    {
+        fast_flag = 1;
+        f_close(&lSDFile);
+    }
+}
+
+void check_dir(char *dname)
+{
+    DIR dir;
+    TCHAR dpath[24];
+
+    c2wstrcpy(dpath, dname);
+    if (f_opendir(&dir, dpath) != FR_OK)
+        f_mkdir(dpath);
+}
+
+int check_sd(void)
+{
+    DIR dir;
+    TCHAR dpath[24];
+    FIL lSDFile;
+    TCHAR fpath[24];
+
+    c2wstrcpy(dpath, "/.menu");
+    if (f_opendir(&dir, dpath) != FR_OK)
+        return -1;
+    c2wstrcpy(dpath, "/.menu/n64");
+    if (f_opendir(&dir, dpath) != FR_OK)
+        return -1;
+    c2wstrcpy(dpath, "/.menu/n64/save");
+    if (f_opendir(&dir, dpath) != FR_OK)
+        return -1;
+    c2wstrcpy(dpath, "/.menu/n64/images");
+    if (f_opendir(&dir, dpath) != FR_OK)
+        return -1;
+    c2wstrcpy(dpath, "/.menu/n64/boxart");
+    if (f_opendir(&dir, dpath) != FR_OK)
+        return -1;
+
+    c2wstrcpy(fpath, "/.menu/n64/.fast");
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+    {
+        f_close(&lSDFile);
+        return 0;
+    }
+    c2wstrcpy(fpath, "/.menu/n64/.slow");
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+    {
+        f_close(&lSDFile);
+        return 0;
+    }
+
+    return -1;
+}
+
+int do_sd_mgr(int state)
+{
+    char temp1[40];
+    char temp2[40];
+    TCHAR wname[24];
+    FIL lSDFile;
+    UINT ts;
+
+    fast_flag = 0;
+
+    if (!state)
+    {
+        // SD card not formatted
+        sprintf(temp1, "Card has %d blocks (%d MB)", num_sectors, (num_sectors / 2048));
+        strcpy(temp2, "Press A to format, or B to exit");
+        progress_screen(temp1, temp2, 0, 100, (loading) ? 4 : 0);
+        if (wait_confirm())
+            f_mkfs(1, 0, 0);
+        else
+            return -1;
+
+        strcpy(temp2, "Formatting complete");
+        progress_screen(temp1, temp2, 100, 100, (loading) ? 4 : 0);
+        delay(60);
+    }
+
+    strcpy(temp1, "Checking directory structure");
+    strcpy(temp2, "checking /.menu");
+    progress_screen(temp1, temp2, 0, 100, (loading) ? 4 : 0);
+    check_dir("/.menu");
+    delay(60);
+    strcpy(temp2, "checking /.menu/n64");
+    progress_screen(temp1, temp2, 20, 100, (loading) ? 4 : 0);
+    check_dir("/.menu/n64");
+    delay(60);
+    strcpy(temp2, "checking /.menu/n64/save");
+    progress_screen(temp1, temp2, 40, 100, (loading) ? 4 : 0);
+    check_dir("/.menu/n64/save");
+    delay(60);
+    strcpy(temp2, "checking /.menu/n64/images");
+    progress_screen(temp1, temp2, 60, 100, (loading) ? 4 : 0);
+    check_dir("/.menu/n64/images");
+    delay(60);
+    strcpy(temp2, "checking /.menu/n64/boxart");
+    progress_screen(temp1, temp2, 80, 100, (loading) ? 4 : 0);
+    check_dir("/.menu/n64/boxart");
+    delay(60);
+    strcpy(temp2, "complete");
+    progress_screen(temp1, temp2, 100, 100, (loading) ? 4 : 0);
+    delay(60);
+
+    strcpy(temp1, "Checking SD card read speed");
+    strcpy(temp2, "opening test file");
+    progress_screen(temp1, temp2, 0, 100, (loading) ? 4 : 0);
+    c2wstrcpy(wname, "/.test");
+    if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+    {
+        strcpy(temp2, "writing test file");
+        for (int i=0; i<ONCE_SIZE; i+=8192)
+        {
+            progress_screen(temp1, temp2, i*100/ONCE_SIZE, 100, (loading) ? 4 : 0);
+            for (int j=0; j<8192; j+=4)
+                *(int*)&tmpBuf[j] = (i+j);
+            f_write(&lSDFile, tmpBuf, 8192, &ts);
+        }
+        f_close(&lSDFile);
+        strcpy(temp2, "reading test file");
+        progress_screen(temp1, temp2, 0, 100, (loading) ? 4 : 0);
+        if (f_open(&lSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+        {
+            fast_flag = 1;
+            for (int i=0; i<ONCE_SIZE; i+=8192)
+            {
+                progress_screen(temp1, temp2, i*100/ONCE_SIZE, 100, (loading) ? 4 : 0);
+                f_read(&lSDFile, tmpBuf, 8192, &ts);
+                for (int j=0; j<8192; j+=4)
+                    if (*(int*)&tmpBuf[j] != (i+j))
+                        fast_flag = 0;
+            }
+            f_close(&lSDFile);
+            f_unlink(wname); // delete test file
+        }
+        sprintf(temp2, "SD card speed %s", fast_flag ? "FAST" : "SLOW");
+        progress_screen(temp1, temp2, 100, 100, (loading) ? 4 : 0);
+        delay(120);
+        if (fast_flag)
+        {
+            // the existence of this file implies fast read mode allowed
+            c2wstrcpy(wname, "/.menu/n64/.fast");
+            if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+                f_close(&lSDFile);
+        }
+        else
+        {
+            c2wstrcpy(wname, "/.menu/n64/.slow");
+            if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+                f_close(&lSDFile);
+        }
+    }
+    return 0;
+}
+
 void get_sd_info(int entry)
 {
+    FIL lSDFile;
     UINT ts;
     u8 buffer[0x440];
     TCHAR fpath[1280];
@@ -492,8 +692,7 @@ void get_sd_info(int entry)
         c2wstrcat(fpath, "/");
 
     c2wstrcat(fpath, gTable[entry].name);
-    f_close(&gSDFile);
-    if (f_open(&gSDFile, fpath, FA_OPEN_EXISTING | FA_READ))
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
     {
         //char temp[1536];
         // couldn't open file
@@ -503,7 +702,8 @@ void get_sd_info(int entry)
         return;
     }
     // read rom header
-    f_read(&gSDFile, buffer, 0x440, &ts);
+    f_read(&lSDFile, buffer, 0x440, &ts);
+    f_close(&lSDFile);
 
     // copy rom info - both hdr and rom arrays at once
     memcpy(gTable[entry].hdr, buffer, 0x40);
@@ -623,14 +823,20 @@ int getSDInfo(int entry)
     if (f_opendir(&dir, fpath))
     {
         gSdDetected = 0;
-//        if (do_SDMgr())                 /* we know there's a card, but can't read it */
-//            return;                     /* user opted not to try to format the SD card */
+        if (do_sd_mgr(0))               /* we know there's a card, but can't read it */
+            return 0;                   /* user opted not to try to format the SD card */
         if (f_opendir(&dir, fpath))
             return 0;                   /* failed again... give up */
         gSdDetected = 1;
     }
 
+    // if root, check directory structure
+    if (entry == -1)
+        if (check_sd())
+            do_sd_mgr(1);
+
     // add parent directory entry if not root
+    f_opendir(&dir, fpath);
     if (path[1] != 0)
     {
         gTable[max].valid = 1;
@@ -640,6 +846,7 @@ int getSDInfo(int entry)
     }
 
     // scan dirctory entries
+    f_opendir(&dir, fpath);
     for(;;)
     {
         FRESULT fres;
@@ -797,6 +1004,8 @@ void copyGF2Psram(int bselect, int bfill)
 /* Copy data from file to gba psram */
 void copySD2Psram(int bselect, int bfill)
 {
+    FIL lSDFile;
+    UINT ts;
     u32 romsize, gamelen, copylen;
     TCHAR fpath[1280];
     char temp[256];
@@ -816,8 +1025,7 @@ void copySD2Psram(int bselect, int bfill)
         c2wstrcat(fpath, "/");
 
     c2wstrcat(fpath, gTable[bselect].name);
-    f_close(&gSDFile);
-    if (f_open(&gSDFile, fpath, FA_OPEN_EXISTING | FA_READ))
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
     {
         char temp[1536];
         // couldn't open file
@@ -835,10 +1043,9 @@ void copySD2Psram(int bselect, int bfill)
     // copy the rom from file to ram, then ram to psram
     for(int ic=0; ic<copylen; ic+=ONCE_SIZE)
     {
-        UINT ts;
         progress_screen("Loading", temp, 100*ic/gamelen, 100, bfill);
         // read file to buffer
-        f_read(&gSDFile, tmpBuf, ONCE_SIZE, &ts);
+        f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
         // now check if it needs to be byte-swapped
         switch (gTable[bselect].swap)
         {
@@ -873,6 +1080,7 @@ void copySD2Psram(int bselect, int bfill)
 
     if (gamelen <= (16*1024*1024))
     {
+        f_close(&lSDFile);
         progress_screen("Loading", temp, 100, 100, bfill);
         delay(30);
         return;
@@ -882,10 +1090,9 @@ void copySD2Psram(int bselect, int bfill)
     neo_psram_offset(copylen/(32*1024));
     for(int ic=0; ic<(gamelen-copylen); ic+=ONCE_SIZE)
     {
-        UINT ts;
         progress_screen("Loading", temp, 100*(copylen+ic)/gamelen, 100, bfill);
         // read file to buffer
-        f_read(&gSDFile, tmpBuf, ONCE_SIZE, &ts);
+        f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
         // now check if it needs to be byte-swapped
         switch (gTable[bselect].swap)
         {
@@ -919,6 +1126,7 @@ void copySD2Psram(int bselect, int bfill)
     }
     neo_psram_offset(0);
 
+    f_close(&lSDFile);
     progress_screen("Loading", temp, 100, 100, bfill);
     delay(30);
 }
@@ -992,7 +1200,7 @@ int selectGBASlot(int sel, u8 *blk, int stype, int bfill)
             rdp_detach_display();
         }
 
-        graphics_set_color(graphics_make_color(0xFF, 0xFF, 0xFF, 0xFF), 0);
+        graphics_set_color(gTextColors.title, 0);
         if (ssel == -1)
             printText(dcon, str1, 20 - strlen(str1)/2, 3);
         else
@@ -1001,9 +1209,9 @@ int selectGBASlot(int sel, u8 *blk, int stype, int bfill)
         for (int iy=0; iy<(slast - sfirst + 1); iy++)
         {
             if ((sfirst + iy) == sel)
-                graphics_set_color(graphics_make_color(0xEF, 0xEF, 0xEF, 0xFF), 0);
+                graphics_set_color(gTextColors.sel_game, 0);
             else
-                graphics_set_color((sfirst + iy) == ssel ? graphics_make_color(0xEF, 0xEF, 0xEF, 0xFF) : graphics_make_color(0x7F, 0xFF, 0x3F, 0xFF), 0);
+                graphics_set_color((sfirst + iy) == ssel ? gTextColors.sel_game : gTextColors.usel_game, 0);
             if (blk[sfirst + iy] == 0xAA)
             {
                 strncpy(temp, &names[(sfirst + iy)*256], 36);
@@ -1013,7 +1221,7 @@ int selectGBASlot(int sel, u8 *blk, int stype, int bfill)
             else
                 printText(dcon, "empty", 19, 5 + iy);
         }
-        graphics_set_color(graphics_make_color(0x7F, 0xFF, 0x3F, 0xFF), 0);
+        graphics_set_color(gTextColors.usel_game, 0);
         printText(dcon, str3, 20 - strlen(str3)/2, 25);
 
         // show display
@@ -1110,6 +1318,7 @@ void loadSaveState(int bsel, int bfill)
     char temp[260];
     TCHAR wname[280];
     u64 flags;
+    FIL lSDFile;
     UINT ts;
     selEntry_t entry;
 
@@ -1177,11 +1386,10 @@ void loadSaveState(int bsel, int bfill)
         // load save state from SD card
         c2wstrcpy(wname, "/.menu/n64/save/");
         c2wstrcat(wname, temp);
-        f_close(&gSDFile);
-        if (f_open(&gSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+        if (f_open(&lSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
         {
-            f_read(&gSDFile, tmpBuf, ssize[entry.options[5]], &ts);
-            f_close(&gSDFile);
+            f_read(&lSDFile, tmpBuf, ssize[entry.options[5]], &ts);
+            f_close(&lSDFile);
         }
     }
     neo2_disable_sd();
@@ -1221,6 +1429,7 @@ void saveSaveState(void)
     char temp[256];
     TCHAR wname[280];
     u64 flags;
+    FIL lSDFile;
     UINT ts;
     int bmax;
 
@@ -1307,10 +1516,9 @@ void saveSaveState(void)
     {
         c2wstrcpy(wname, "/.menu/n64/save/");
         c2wstrcat(wname, temp);
-        f_close(&gSDFile);
-        f_open(&gSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
-        f_write(&gSDFile, tmpBuf, ssize[flags & 15], &ts);
-        f_close(&gSDFile);
+        f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
+        f_write(&lSDFile, tmpBuf, ssize[flags & 15], &ts);
+        f_close(&lSDFile);
 
     }
     neo2_disable_sd();
@@ -1417,14 +1625,13 @@ int main(void)
 #else
     int brwsr = 0;                      // start in game flash browser
 #endif
-
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v1.9 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v2.0 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v1.9 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v2.0 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v1.9 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v2.0 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";
@@ -1493,13 +1700,16 @@ int main(void)
     bmax = getSDInfo(-1);               // get root directory of sd card
     if (bmax)
     {
+        FIL lSDFile;
         TCHAR fpath[32];
+
+        check_fast();                   // let SD read at full speed if allowed
 
         strcpy(path, "/.menu/n64/");
         strcpy(gTable[0].name, "NEON64SD.v64");
         c2wstrcpy(fpath, path);
         c2wstrcat(fpath, gTable[0].name);
-        if (f_open(&gSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+        if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
         {
             gTable[0].valid = 1;
             gTable[0].type = 127;
@@ -1507,10 +1717,11 @@ int main(void)
             gTable[0].options[1] = 0;
             gTable[0].options[2] = 0;
             gTable[0].options[3] = 0;
-            gTable[0].options[4] = (gSDFile.fsize > 2097152) ? gSDFile.fsize/131072 : 16;
+            gTable[0].options[4] = (lSDFile.fsize > 2097152) ? lSDFile.fsize/131072 : 16;
             gTable[0].options[5] = 5;
             gTable[0].options[6] = 2;
             gTable[0].options[7] = 0;
+            f_close(&lSDFile);
             get_sd_info(0);
 
             stemp = loadImageSD("/.menu/n64/images/loading.png", &stemp_w, &stemp_h);
@@ -1537,6 +1748,8 @@ int main(void)
     bmax = getSDInfo(-1);
     if (bmax)
     {
+        check_fast();                   // let SD read at full speed if allowed
+
         // try for images on the SD card
         stemp = loadImageSD("/.menu/n64/images/splash.png", &stemp_w, &stemp_h);
         if (!stemp)
