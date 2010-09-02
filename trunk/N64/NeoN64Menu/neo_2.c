@@ -61,7 +61,7 @@ extern unsigned int sd_speed;
 extern unsigned int fast_flag;
 
 extern int get_cic(unsigned char *buffer);
-
+void neo2_cycle_sd(void);
 
 inline void bus_delay(int cnt)
 {
@@ -246,8 +246,6 @@ void neo_copyfrom_game(void *dest, int fstart, int len)
 #endif
 }
 
-
-
 void neo_copyfrom_menu(void *dest, int fstart, int len)
 {
     neo_select_menu();                  // select menu flash
@@ -314,6 +312,11 @@ void neo_copyto_sram(void *src, int sstart, int len)
 {
     u32 temp;
 
+    neo2_cycle_sd();
+    //neo_select_menu();
+    neo_select_game();
+    hw_delay();
+
     temp = (sstart & 0x00030000) >> 13;
     _neo_asic_cmd(0x00E00000|temp, 1);  // set gba sram offset
 
@@ -349,17 +352,25 @@ void neo_copyto_sram(void *src, int sstart, int len)
     else
         SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
+
+    //neo_select_menu();
 }
 
 void neo_copyfrom_sram(void *dst, int sstart, int len)
 {
     u32 temp;
 
+    neo2_cycle_sd();
+    //neo_select_menu();
+    neo_select_game();
+    hw_delay();
+
     temp = (sstart & 0x00030000) >> 13;
     _neo_asic_cmd(0x00E00000|temp, 1);  // set gba sram offset
 
     // map GBA save ram into sram space
     SAVE_IO = 0x00050005;               // save off
+    hw_delay();
     hw_delay();
     if ((gCpldVers & 0x0F) == 1)
         SRAM2C_I0 = 0xFFFFFFFF;         // enable gba sram
@@ -391,16 +402,26 @@ void neo_copyfrom_sram(void *dst, int sstart, int len)
     else
         SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
+    hw_delay();
+
+    //neo_select_menu();
 }
 
 void neo_copyto_nsram(void *src, int sstart, int len)
 {
+    neo2_cycle_sd();
+    //neo_select_menu();
+    neo_select_game();
+    hw_delay();
+
     SAVE_IO = 0x00080008;               // SRAM 256KB
+    hw_delay();
     hw_delay();
     if ((gCpldVers & 0x0F) == 1)
         SRAM2C_I0 = 0x00000000;         // disable gba sram
     else
         SRAM2C_IO = 0x00000000;         // disable gba sram
+    hw_delay();
     hw_delay();
 
     // Init the PI for sram
@@ -430,10 +451,18 @@ void neo_copyto_nsram(void *src, int sstart, int len)
 
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
+    hw_delay();
+
+    //neo_select_menu();
 }
 
 void neo_copyfrom_nsram(void *dst, int sstart, int len)
 {
+    neo2_cycle_sd();
+    //neo_select_menu();
+    neo_select_game();
+    hw_delay();
+
     SAVE_IO = 0x00080008;               // SRAM 256KB
     hw_delay();
     if ((gCpldVers & 0x0F) == 1)
@@ -469,10 +498,17 @@ void neo_copyfrom_nsram(void *dst, int sstart, int len)
 
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
+
+    //neo_select_menu();
 }
 
 void neo_copyto_eeprom(void *src, int sstart, int len, int mode)
 {
+    neo2_cycle_sd();
+    //neo_select_menu();
+    neo_select_game();
+    hw_delay();
+
     SAVE_IO = (mode<<16) | mode;        // set EEPROM mode
     hw_delay();
     if ((gCpldVers & 0x0F) == 1)
@@ -490,10 +526,17 @@ void neo_copyto_eeprom(void *src, int sstart, int len, int mode)
 
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
+
+    //neo_select_menu();
 }
 
 void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode)
 {
+    neo2_cycle_sd();
+    //neo_select_menu();
+    neo_select_game();
+    hw_delay();
+
     SAVE_IO = (mode<<16) | mode;        // set EEPROM mode
     hw_delay();
     if ((gCpldVers & 0x0F) == 1)
@@ -511,6 +554,8 @@ void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode)
 
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
+
+    //neo_select_menu();
 }
 
 void neo_get_rtc(unsigned char *rtc)
@@ -557,6 +602,28 @@ void neo2_post_sd(void)
         PI_BSD_DOM1_PWD_REG = 0x00000012;
         PI_BSD_DOM1_PGS_REG = 0x00000007;
     }
+}
+
+void neo2_cycle_sd(void)
+{
+    hw_delay();
+
+    if(neo_mode == SD_OFF)
+    {
+        neo2_enable_sd();
+        hw_delay();
+        hw_delay();
+        neo2_disable_sd();
+    }
+    else
+    {
+        neo2_disable_sd();
+        hw_delay();
+        hw_delay();
+        neo2_enable_sd();
+    }
+
+    hw_delay();
 }
 
 int neo2_recv_sd_multi(unsigned char *buf, int count)
@@ -1112,3 +1179,4 @@ void neo_run_psram(u8 *option, int reset)
     simulate_pif_boot(runcic);          // should never return
     enable_interrupts();
 }
+
