@@ -146,6 +146,7 @@ extern void neo_copyfrom_nsram(void *dst, int sstart, int len);
 extern void neo_copyto_eeprom(void *src, int sstart, int len, int mode);
 extern void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode);
 extern void neo_get_rtc(unsigned char *rtc);
+extern void neo2_cycle_sd(void);
 
 extern int get_cic(unsigned char *buffer);
 extern int get_swap(unsigned char *buffer);
@@ -156,7 +157,7 @@ void w2cstrcpy(void *dst, void *src)
     int ix = 0;
     while (1)
     {
-        *(char *)(dst + ix) = *(TCHAR *)(src + ix*2) & 0x00FF;
+        *(char *)(dst + ix) = *(XCHAR *)(src + ix*2) & 0x00FF;
         if (*(char *)(dst + ix) == 0)
             break;
         ix++;
@@ -175,7 +176,7 @@ void w2cstrcat(void *dst, void *src)
     }
     while (1)
     {
-        *(char *)(dst + ix) = *(TCHAR *)(src + iy*2) & 0x00FF;
+        *(char *)(dst + ix) = *(XCHAR *)(src + iy*2) & 0x00FF;
         if (*(char *)(dst + ix) == 0)
             break;
         ix++;
@@ -188,8 +189,8 @@ void c2wstrcpy(void *dst, void *src)
     int ix = 0;
     while (1)
     {
-        *(TCHAR *)(dst + ix*2) = *(char *)(src + ix) & 0x00FF;
-        if (*(TCHAR *)(dst + ix*2) == (TCHAR)0)
+        *(XCHAR *)(dst + ix*2) = *(char *)(src + ix) & 0x00FF;
+        if (*(XCHAR *)(dst + ix*2) == (XCHAR)0)
             break;
         ix++;
     }
@@ -201,18 +202,29 @@ void c2wstrcat(void *dst, void *src)
     // find end of str in dst
     while (1)
     {
-        if (*(TCHAR *)(dst + ix*2) == (TCHAR)0)
+        if (*(XCHAR *)(dst + ix*2) == (XCHAR)0)
             break;
         ix++;
     }
     while (1)
     {
-        *(TCHAR *)(dst + ix*2) = *(char *)(src + iy) & 0x00FF;
-        if (*(TCHAR *)(dst + ix*2) == (TCHAR)0)
+        *(XCHAR *)(dst + ix*2) = *(char *)(src + iy) & 0x00FF;
+        if (*(XCHAR *)(dst + ix*2) == (XCHAR)0)
             break;
         ix++;
         iy++;
     }
+}
+
+int wstrcmp(WCHAR *ws1, WCHAR *ws2)
+{
+    int ix = 0;
+    while (ws1[ix] && ws2[ix] && (ws1[ix] == ws2[ix])) ix++;
+    if (!ws1[ix] && ws2[ix])
+        return -1; // ws1 < ws2
+    if (ws1[ix] && !ws2[ix])
+        return 1; // ws1 > ws2
+    return (int)ws1[ix] - (int)ws2[ix];
 }
 
 /* input - do getButtons() first, then getAnalogX() and/or getAnalogY() */
@@ -385,13 +397,13 @@ void progress_screen(char *str1, char *str2, int frac, int total, int bfill)
 void get_boxart(int brwsr, int entry)
 {
     char boxpath[32];
-    TCHAR fpath[32];
+    XCHAR fpath[32];
     FIL lSDFile;
     UINT ts;
     unsigned short cart = *(unsigned short *)&gTable[entry].rom[0x1C];
     int ix = (gTable[entry].rom[0x1C] ^ gTable[entry].rom[0x1D]) & 15;
 
-    sprintf(boxpath, "/.menu/n64/boxart/%c%c.sprite", gTable[entry].rom[0x1C], gTable[entry].rom[0x1D]);
+    sprintf(boxpath, "/menu/n64/boxart/%c%c.sprite", gTable[entry].rom[0x1C], gTable[entry].rom[0x1D]);
 
     // default to unknown
     memcpy(&boxart[ix*14980], unknown, 14980);
@@ -516,10 +528,10 @@ int getGFInfo(void)
 void check_fast(void)
 {
     FIL lSDFile;
-    TCHAR fpath[24];
+    XCHAR fpath[24];
 
     fast_flag = 0;
-    c2wstrcpy(fpath, "/.menu/n64/.fast");
+    c2wstrcpy(fpath, "/menu/n64/.fast");
     if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
     {
         fast_flag = 1;
@@ -530,7 +542,7 @@ void check_fast(void)
 void check_dir(char *dname)
 {
     DIR dir;
-    TCHAR dpath[24];
+    XCHAR dpath[24];
 
     c2wstrcpy(dpath, dname);
     if (f_opendir(&dir, dpath) != FR_OK)
@@ -540,33 +552,33 @@ void check_dir(char *dname)
 int check_sd(void)
 {
     DIR dir;
-    TCHAR dpath[24];
+    XCHAR dpath[24];
     FIL lSDFile;
-    TCHAR fpath[24];
+    XCHAR fpath[24];
 
-    c2wstrcpy(dpath, "/.menu");
+    c2wstrcpy(dpath, "/menu");
     if (f_opendir(&dir, dpath) != FR_OK)
         return -1;
-    c2wstrcpy(dpath, "/.menu/n64");
+    c2wstrcpy(dpath, "/menu/n64");
     if (f_opendir(&dir, dpath) != FR_OK)
         return -1;
-    c2wstrcpy(dpath, "/.menu/n64/save");
+    c2wstrcpy(dpath, "/menu/n64/save");
     if (f_opendir(&dir, dpath) != FR_OK)
         return -1;
-    c2wstrcpy(dpath, "/.menu/n64/images");
+    c2wstrcpy(dpath, "/menu/n64/images");
     if (f_opendir(&dir, dpath) != FR_OK)
         return -1;
-    c2wstrcpy(dpath, "/.menu/n64/boxart");
+    c2wstrcpy(dpath, "/menu/n64/boxart");
     if (f_opendir(&dir, dpath) != FR_OK)
         return -1;
 
-    c2wstrcpy(fpath, "/.menu/n64/.fast");
+    c2wstrcpy(fpath, "/menu/n64/.fast");
     if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
     {
         f_close(&lSDFile);
         return 0;
     }
-    c2wstrcpy(fpath, "/.menu/n64/.slow");
+    c2wstrcpy(fpath, "/menu/n64/.slow");
     if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
     {
         f_close(&lSDFile);
@@ -580,7 +592,7 @@ int do_sd_mgr(int state)
 {
     char temp1[40];
     char temp2[40];
-    TCHAR wname[24];
+    XCHAR wname[24];
     FIL lSDFile;
     UINT ts;
 
@@ -603,25 +615,25 @@ int do_sd_mgr(int state)
     }
 
     strcpy(temp1, "Checking directory structure");
-    strcpy(temp2, "checking /.menu");
+    strcpy(temp2, "checking /menu");
     progress_screen(temp1, temp2, 0, 100, (loading) ? 4 : 0);
-    check_dir("/.menu");
+    check_dir("/menu");
     delay(60);
-    strcpy(temp2, "checking /.menu/n64");
+    strcpy(temp2, "checking /menu/n64");
     progress_screen(temp1, temp2, 20, 100, (loading) ? 4 : 0);
-    check_dir("/.menu/n64");
+    check_dir("/menu/n64");
     delay(60);
-    strcpy(temp2, "checking /.menu/n64/save");
+    strcpy(temp2, "checking /menu/n64/save");
     progress_screen(temp1, temp2, 40, 100, (loading) ? 4 : 0);
-    check_dir("/.menu/n64/save");
+    check_dir("/menu/n64/save");
     delay(60);
-    strcpy(temp2, "checking /.menu/n64/images");
+    strcpy(temp2, "checking /menu/n64/images");
     progress_screen(temp1, temp2, 60, 100, (loading) ? 4 : 0);
-    check_dir("/.menu/n64/images");
+    check_dir("/menu/n64/images");
     delay(60);
-    strcpy(temp2, "checking /.menu/n64/boxart");
+    strcpy(temp2, "checking /menu/n64/boxart");
     progress_screen(temp1, temp2, 80, 100, (loading) ? 4 : 0);
-    check_dir("/.menu/n64/boxart");
+    check_dir("/menu/n64/boxart");
     delay(60);
     strcpy(temp2, "complete");
     progress_screen(temp1, temp2, 100, 100, (loading) ? 4 : 0);
@@ -664,13 +676,13 @@ int do_sd_mgr(int state)
         if (fast_flag)
         {
             // the existence of this file implies fast read mode allowed
-            c2wstrcpy(wname, "/.menu/n64/.fast");
+            c2wstrcpy(wname, "/menu/n64/.fast");
             if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
                 f_close(&lSDFile);
         }
         else
         {
-            c2wstrcpy(wname, "/.menu/n64/.slow");
+            c2wstrcpy(wname, "/menu/n64/.slow");
             if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
                 f_close(&lSDFile);
         }
@@ -683,7 +695,7 @@ void get_sd_info(int entry)
     FIL lSDFile;
     UINT ts;
     u8 buffer[0x440];
-    TCHAR fpath[1280];
+    XCHAR fpath[1280];
     char cartid[4];
     int cic, save;
 
@@ -757,7 +769,10 @@ int getSDInfo(int entry)
     FILINFO fno;
     int ix, max = 0;
     WCHAR lfnbuf[256];
-    TCHAR fpath[1280];
+    XCHAR fpath[1280];
+    static WCHAR privateName[64];
+
+    c2wstrcpy(privateName,"menu");
 
     gSdDetected = 0;
 
@@ -831,8 +846,7 @@ int getSDInfo(int entry)
     }
 
     // if root, check directory structure
-    if (entry == -1)
-        if (check_sd())
+    if( (entry == -1) && (check_sd() == -1) )
             do_sd_mgr(1);
 
     // add parent directory entry if not root
@@ -865,13 +879,18 @@ int getSDInfo(int entry)
             //debugText("No more entries in directory", 6, 2, 180);
             break;                      /* no more entries in directory (or some other error) */
         }
+
         if (fno.fname[0] == '.')
             continue;                   /* skip links */
+
         if (fno.lfname[0] == (WCHAR)'.')
             continue;                   /* skip "hidden" files and directories */
 
         if (fno.fattrib & AM_DIR)
         {
+            if(!wstrcmp(privateName,fno.lfname)) /*skip "menu" */
+                continue;
+
             gTable[max].valid = 1;
             gTable[max].type = 128;     // directory entry
             if (fno.lfname[0])
@@ -1007,7 +1026,7 @@ void copySD2Psram(int bselect, int bfill)
     FIL lSDFile;
     UINT ts;
     u32 romsize, gamelen, copylen;
-    TCHAR fpath[1280];
+    XCHAR fpath[1280];
     char temp[256];
 
     // load rom info if not already loaded
@@ -1316,7 +1335,7 @@ void loadSaveState(int bsel, int bfill)
     int ix, ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144, 0, 0, 0, 0, 0, 0, 0 };
     char *sext[16] = { 0, ".sra",  ".sra",  ".sra", ".fla", ".eep", ".eep", 0, ".sra", 0, 0, 0, 0, 0, 0, 0 };
     char temp[260];
-    TCHAR wname[280];
+    XCHAR wname[280];
     u64 flags;
     FIL lSDFile;
     UINT ts;
@@ -1326,6 +1345,8 @@ void loadSaveState(int bsel, int bfill)
         return; // ext cart, invalid, or off
 
     memcpy(&entry, &gTable[bsel], sizeof(selEntry_t)); // backup the entry
+
+    memset(temp,'\0',260);
 
     strcpy(temp, entry.name);
     ix = strlen(temp)-1;
@@ -1337,6 +1358,13 @@ void loadSaveState(int bsel, int bfill)
     // check for SD card
     neo2_enable_sd();
     ix = getSDInfo(-1);             // try to get root
+
+    /*c2wstrcpy(wname,"name.bin");
+    f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
+    f_write(&lSDFile,(void*)temp,strlen(temp),&ts);
+    f_close(&lSDFile);
+    */
+
     if (!ix)
     {
         // no SD card, use GBA SRAM
@@ -1359,6 +1387,7 @@ void loadSaveState(int bsel, int bfill)
 
         // init save ram to 0x00 or 0xFF in case there's no save file, or only a partial file
         memset(tmpBuf, (entry.options[5] == 4) ? 0xFF : 0x00, ssize[entry.options[5]]);
+
         // copy from valid slot in GBA SRAM
         if ((entry.options[5] == 4) && (blk[ix] == 0xAA))
         {
@@ -1384,7 +1413,7 @@ void loadSaveState(int bsel, int bfill)
         // init save ram to 0x00 or 0xFF in case there's no save file, or only a partial file
         memset(tmpBuf, (entry.options[5] == 4) ? 0xFF : 0x00, ssize[entry.options[5]]);
         // load save state from SD card
-        c2wstrcpy(wname, "/.menu/n64/save/");
+        c2wstrcpy(wname, "/menu/n64/save/");
         c2wstrcat(wname, temp);
         if (f_open(&lSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
         {
@@ -1427,11 +1456,16 @@ void saveSaveState(void)
 {
     int ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144, 0, 0, 0, 0, 0, 0, 0 };
     char temp[256];
-    TCHAR wname[280];
+    XCHAR wname[280];
     u64 flags;
     FIL lSDFile;
     UINT ts;
     int bmax;
+
+    flags = 0;
+
+    /*dummy write to unlock sram*/
+    neo_copyto_psram((void*)&flags,0,8);
 
     neo_copyfrom_sram(temp, 0x3FE00, 256);
     neo_copyfrom_sram(&flags, 0x3FF00, 8);
@@ -1514,7 +1548,7 @@ void saveSaveState(void)
     }
     else
     {
-        c2wstrcpy(wname, "/.menu/n64/save/");
+        c2wstrcpy(wname, "/menu/n64/save/");
         c2wstrcat(wname, temp);
         f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
         f_write(&lSDFile, tmpBuf, ssize[flags & 15], &ts);
@@ -1525,6 +1559,7 @@ void saveSaveState(void)
 
     // turn off auto-save
     flags = 0;
+
     neo_copyto_sram(&flags, 0x3FF00, 8);
 }
 
@@ -1701,11 +1736,11 @@ int main(void)
     if (bmax)
     {
         FIL lSDFile;
-        TCHAR fpath[32];
+        XCHAR fpath[32];
 
         check_fast();                   // let SD read at full speed if allowed
 
-        strcpy(path, "/.menu/n64/");
+        strcpy(path, "/menu/n64/");
         strcpy(gTable[0].name, "NEON64SD.v64");
         c2wstrcpy(fpath, path);
         c2wstrcat(fpath, gTable[0].name);
@@ -1724,9 +1759,9 @@ int main(void)
             f_close(&lSDFile);
             get_sd_info(0);
 
-            stemp = loadImageSD("/.menu/n64/images/loading.png", &stemp_w, &stemp_h);
+            stemp = loadImageSD("/menu/n64/images/loading.png", &stemp_w, &stemp_h);
             if (!stemp)
-                stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
+                stemp = loadImageSD("/menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
             if (stemp)
             {
                 if (loading)
@@ -1751,9 +1786,9 @@ int main(void)
         check_fast();                   // let SD read at full speed if allowed
 
         // try for images on the SD card
-        stemp = loadImageSD("/.menu/n64/images/splash.png", &stemp_w, &stemp_h);
+        stemp = loadImageSD("/menu/n64/images/splash.png", &stemp_w, &stemp_h);
         if (!stemp)
-            stemp = loadImageSD("/.menu/n64/images/splash.jpg", &stemp_w, &stemp_h);
+            stemp = loadImageSD("/menu/n64/images/splash.jpg", &stemp_w, &stemp_h);
         if (stemp)
         {
             if (splash)
@@ -1762,9 +1797,9 @@ int main(void)
             splash_w = stemp_w;
             splash_h = stemp_h;
         }
-        stemp = loadImageSD("/.menu/n64/images/browser.png", &stemp_w, &stemp_h);
+        stemp = loadImageSD("/menu/n64/images/browser.png", &stemp_w, &stemp_h);
         if (!stemp)
-            stemp = loadImageSD("/.menu/n64/images/browser.jpg", &stemp_w, &stemp_h);
+            stemp = loadImageSD("/menu/n64/images/browser.jpg", &stemp_w, &stemp_h);
         if (stemp)
         {
             if (browser)
@@ -1773,9 +1808,9 @@ int main(void)
             browser_w = stemp_w;
             browser_h = stemp_h;
         }
-        stemp = loadImageSD("/.menu/n64/images/loading.png", &stemp_w, &stemp_h);
+        stemp = loadImageSD("/menu/n64/images/loading.png", &stemp_w, &stemp_h);
         if (!stemp)
-            stemp = loadImageSD("/.menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
+            stemp = loadImageSD("/menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
         if (stemp)
         {
             if (loading)
@@ -1796,6 +1831,8 @@ int main(void)
         unlockVideo(dcon);
         delay(120);
     }
+
+    neo_select_game();
 
     // save save state if needed
     saveSaveState();
