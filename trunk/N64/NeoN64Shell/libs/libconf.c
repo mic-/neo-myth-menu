@@ -3,8 +3,8 @@
 #include <malloc.h>
 #include <string.h>
 
-static ConfigEntry* entry = (void*)0;
-static ConfigEntry* entries = (void*)0;
+static ConfigEntry* entry = NULL;
+static ConfigEntry* entries = NULL;
 
 /*********************************************** PRIVATE BEGIN *********************************************************/
 static int32_t string_length(register const int8_t* src)
@@ -30,47 +30,28 @@ static int8_t* clone_string(const int8_t* src,int32_t* saveLength)
 
     memcpy(res,src,len);
     res[len] = '\0';
-
     return res;
 }
 
 static ConfigEntry* push_obj()
 {
-    ConfigEntry* next = ((void*)0);
-
     if(!entry)
     {
         entry = (ConfigEntry*)malloc(sizeof(ConfigEntry));
-        entry->next = ((void*)0);
         entries = entry;
+        entry->next = NULL;
+
         return entry;
     }
 
-    next = entries->next;
-    next = (ConfigEntry*)malloc(sizeof(ConfigEntry));
-    next->next = ((void*)0);
-    entries = next;
+    entries->next = (ConfigEntry*)malloc(sizeof(ConfigEntry));
+    entries = entries->next;
+    entries->next = NULL;
 
     return entries;
 }
 
-static ConfigEntry* __config_push(const int8_t* variable,const int8_t* value,const int32_t varLen,const int32_t valLen)
-{
-    ConfigEntry* e = push_obj();
-
-    if(!e)
-        return NULL;
-
-    e->variable = clone_string(variable,NULL);
-    e->variableLength = varLen;
-
-    e->value = clone_string(value,NULL);
-    e->valueLength = valLen;
-
-    return e;
-}
-
-inline int32_t isSpace(int32_t c)
+inline int32_t is_space(int32_t c)
 {
     switch(c)
     {
@@ -92,7 +73,57 @@ inline int32_t isSpace(int32_t c)
 inline int32_t isNumerical(int32_t c)
 {
     c = c - '0';
-    return ((c >= 0) && (c <= 9));
+    return ((c  >= 0) && (c <= 9));
+}
+
+static int32_t skip_whitespace(const int8_t* src)
+{
+    const int8_t* sp = src;
+
+    while(is_space(*src))
+        ++src;
+
+    return src - sp;
+}
+
+static int32_t get_token(int8_t* dst,const int8_t* src,const int32_t srcSize,const int32_t allow_sp,int32_t* len,int32_t* eof)
+{
+    const int8_t* sp = src;
+
+    *eof = *len = 0;
+
+    src += skip_whitespace(src);
+
+    while(*src)
+    {
+        if(*src == '=')
+            break;
+        else if(src >= src + srcSize)
+        {
+            *eof = 1;
+            break;
+        }
+
+        if(!allow_sp)
+        {
+            if( is_space(*src) && (!isdigit(*src)) )
+                break;
+        }
+        else
+        {
+            if(*src == '\r' || *src == '\n')
+                break;
+        }
+
+        *(dst++) = *(src++);
+    }
+
+    src += skip_whitespace(src);
+
+    *dst = '\0';
+    *len = (int32_t)(src - sp);
+
+    return *len;
 }
 
 /*********************************************** PRIVATE END *********************************************************/
@@ -100,7 +131,7 @@ inline int32_t isNumerical(int32_t c)
 /*********************************************** PUBLIC BEGIN *********************************************************/
 void config_init()
 {
-    config_shutdown();
+    entry = entries = NULL;
 }
 
 void config_shutdown()
@@ -123,9 +154,6 @@ ConfigEntry* config_push(const int8_t* variable,const int8_t* value)
 {
     ConfigEntry* e;
 
-    if(variable[0] == '\0')
-        return NULL;
-
     e = config_find(variable);
 
     if(!e)
@@ -146,7 +174,6 @@ ConfigEntry* config_push(const int8_t* variable,const int8_t* value)
 
         e->value = clone_string(value,&e->valueLength);
     }
-
     return e;
 }
 
@@ -199,7 +226,7 @@ void config_remove(const int8_t* variable)
         e = e->next;
     }
 
-    return NULL;
+    return;
 }
 
 ConfigEntry* config_replaceS(const int8_t* variable,const int8_t* newValue)
@@ -258,7 +285,7 @@ int32_t config_getI(const int8_t* variable)
 
     while(*str)
     {
-        if(!isSpace(*str))
+        if(!is_space(*str))
             break;
 
         ++str;
@@ -292,7 +319,9 @@ int32_t config_getI(const int8_t* variable)
 int32_t config_loadFromBuffer(const int8_t* buf,const int32_t size)
 {
     const int8_t* pa = buf;
-    int32_t ind = 0;
+    int32_t eof = 0;
+    int32_t len = 0;
+    int8_t token[1024];
     ConfigEntry* obj = (ConfigEntry*)malloc(sizeof(ConfigEntry));
 
     if(!obj)
@@ -305,121 +334,38 @@ int32_t config_loadFromBuffer(const int8_t* buf,const int32_t size)
     if(!obj->variable || !obj->value)
         return 1;
 
-    config_init();
+   //config_init();
 
-    while(*pa)
+    while(*buf)
     {
+        if(eof)
+            break;
+
+        buf += get_token(token,buf,size,0,&len,&eof);
+
+        if(len)
         {
-            //reset pointer
-            ind = 0;
+            memcpy(obj->variable,token,len);obj->variable[len] = '\0';
 
-            obj->variable[0] = obj->value[0] = '\0';
-            obj->variableLength = obj->valueLength = 0;
-
-            //skip head WS
-            while(*pa){ if(isSpace(*pa))pa++;else break;}
-
-            //load variable
-            while(*pa)
+            if(*buf != '=')
             {
-                if(*pa == '=')
-                    break;
-                else if(*pa == ' ')
-                    break;
-                else
-                {
-                    {
-                        if(! (*pa) )
-                            break;
-
-                        if(*pa == '\r')
-                        {
-                            ++pa;
-
-                            if(*pa == '\n')
-                                ++pa;
-
-                            break;
-                        }
-                        else if(*pa == '\n')
-                        {
-                            ++pa;
-                            break;
-                        }
-                    }
-
-                    obj->variable[ind++] = *pa;
-                }
-
-                ++pa;
+                //config_shutdown();
+                break;
             }
 
-            obj->variable[ind] = '\0';
-            obj->variableLength = ind;
-            ind = 0;
+            ++buf;
 
-            if( (*pa == '='))
+            buf += get_token(token,buf,size,1,&len,&eof);
+
+            if(!len)
             {
-                ++pa;
-
-                //skip WS after assignment --if exists
-                while(*pa){ if(isSpace(*pa))pa++;else break;}
-
-                //load value
-                while(*pa)
-                {
-                    if(*pa == '\r') 
-                    {
-                        ++pa;
-
-                        if(*pa == '\n')
-                        {
-                            ++pa;
-                            break;
-                        }
-                    }
-                    else if(*pa == '\n')
-                    {
-                        ++pa;
-                        break;
-                    }
-                    else
-                    {
-                        {
-                            if(! (*pa) )
-                                break;
-
-                            if(*pa == '\r')
-                            {
-                                ++pa;
-
-                                if(*pa == '\n')
-                                    ++pa;
-
-                                break;
-                            }
-                            else if(*pa == '\n')
-                            {
-                                ++pa;
-                                break;
-                            }
-                        }
-
-                        obj->value[ind++] = *pa;
-                    }
-
-                    ++pa;
-                }
-
-                obj->value[ind] = '\0';
-                obj->valueLength = ind;
-
-                if(obj->variableLength)
-                {
-                    //printf("Adding [%s] with data [%s]\n",obj->variable,obj->value);
-                    __config_push(obj->variable,obj->value,obj->variableLength,obj->valueLength);
-                }
+                //config_shutdown();
+                break;
             }
+
+            memcpy(obj->value,token,len);obj->value[len] = '\0';
+
+            config_push(obj->variable,obj->value);
         }
     }
 
