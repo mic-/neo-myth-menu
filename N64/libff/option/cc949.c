@@ -1,14 +1,14 @@
 /*------------------------------------------------------------------------*/
 /* Unicode - OEM code bidirectional converter  (C)ChaN, 2009              */
 /*                                                                        */
-/* CP949 (Korean EUC-KR)                                                  */
+/* CP949 (Korean)                                                         */
 /*------------------------------------------------------------------------*/
 
 #include "../ff.h"
 
 
 #if !_USE_LFN || _CODE_PAGE != 949
-#error This file is not needed in current configuration. Remove from the project.
+#error This file is not needed in current configuration.
 #endif
 
 
