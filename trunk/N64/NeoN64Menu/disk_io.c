@@ -252,6 +252,9 @@ inline unsigned char rdMmcDatByte()
  * Used in MMC commands and responses.
  */
 
+//extern unsigned char crc7 (unsigned char *buf);
+ 
+ 
 unsigned char crc7 (unsigned char *buf)
 {
     int i;
@@ -266,12 +269,14 @@ unsigned char crc7 (unsigned char *buf)
 
         if (crc & 0x80) crc ^= 9;
         if (c & (r4>>24)) crc ^= 9;
+
         r4 = (r4 >> 1) | (r4 << 31);
+
     } while (--i > 0);
 
     return crc;
-}
-
+} 
+ 
 #ifdef DEBUG_RESP
 void debugMmcResp( unsigned char cmd, unsigned char *resp )
 {

@@ -4,9 +4,10 @@
 #include <string.h>
 #include <stdint.h>
 #include <libdragon.h>
-
 #include <diskio.h>
 #include <ff.h>
+#include "neo_2_asm.h"
+#include "../NeoN64Shell/libs/libconf.h"
 
 typedef volatile unsigned short vu16;
 typedef volatile unsigned int vu32;
@@ -1107,6 +1108,7 @@ void copySD2Psram(int bselect, int bfill)
 
     // change the psram offset and copy the rest
     neo_psram_offset(copylen/(32*1024));
+
     for(int ic=0; ic<(gamelen-copylen); ic+=ONCE_SIZE)
     {
         progress_screen("Loading", temp, 100*(copylen+ic)/gamelen, 100, bfill);
