@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <libdragon.h>
+#include "neo_2_asm.h"
 
 typedef volatile unsigned short vu16;
 typedef volatile unsigned int vu32;
@@ -213,6 +214,8 @@ void neo_psram_offset(int offs)
     hw_delay();
     NEO_IO = 0xFFFFFFFF;                // 16 bit mode
     hw_delay();
+   
+    hw_delay();
 }
 
 void neo_copyfrom_game(void *dest, int fstart, int len)
@@ -277,26 +280,11 @@ void neo_copyfrom_menu(void *dest, int fstart, int len)
 #endif
 }
 
-void neo_xferto_psram(void *src, int pstart, int len)
-{
-    // copy data
-    for (int ix=0; ix<len; ix+=4)
-    {
-        *(vu32 *)(0xB0000000+pstart+ix) = *(u32 *)(src+ix);
-        bus_delay(96);
-    }
-}
-
 void neo_copyto_psram(void *src, int pstart, int len)
 {
     neo_select_psram();                 // psram enabled and write-enabled
 
-    // copy data
-    for (int ix=0; ix<len; ix+=4)
-    {
-        *(vu32 *)(0xB0000000+pstart+ix) = *(u32 *)(src+ix);
-        bus_delay(96);
-    }
+	neo_xferto_psram(src,pstart,len);
 }
 
 void neo_copyfrom_psram(void *dest, int pstart, int len)
@@ -626,6 +614,7 @@ void neo2_cycle_sd(void)
     hw_delay();
 }
 
+/*
 int neo2_recv_sd_multi(unsigned char *buf, int count)
 {
     int res;
@@ -635,7 +624,7 @@ int neo2_recv_sd_multi(unsigned char *buf, int count)
         "lui $15,0xB30E\n\t"            // $15 = 0xB30E0000
         "ori $14,%1,0\n\t"              // $14 = buf
         "ori $12,%2,0\n"                // $12 = count
-
+		
         "oloop:\n\t"
         "lui $11,0x0001\n"              // $11 = timeout = 64 * 1024
 
@@ -737,7 +726,7 @@ int neo2_recv_sd_multi(unsigned char *buf, int count)
         : "$0" );                       // clobbered
 
     return res;
-}
+}*/
 
 //----------------------------------------------------------------------
 //
