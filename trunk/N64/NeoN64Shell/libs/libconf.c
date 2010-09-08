@@ -2,16 +2,19 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
+#include <stdlib.h>
+#include <math.h>
 
 static ConfigEntry* entry = NULL;
 static ConfigEntry* entries = NULL;
+static int8_t* confConvBuf = NULL;
 
 /*********************************************** PRIVATE BEGIN *********************************************************/
 static int32_t string_length(register const int8_t* src)
 {
     register const int8_t* pa = src;
 
-    while(*pa != '\0'){++pa;}
+    while(*(pa++) != '\0');
 
     return (int32_t)(pa - src);
 }
@@ -70,7 +73,7 @@ inline int32_t is_space(int32_t c)
     return 0;
 }
 
-inline int32_t isNumerical(int32_t c)
+inline int32_t is_num(int32_t c)
 {
     c = c - '0';
     return ((c  >= 0) && (c <= 9));
@@ -106,7 +109,7 @@ static int32_t get_token(int8_t* dst,const int8_t* src,const int32_t srcSize,con
 
         if(!allow_sp)
         {
-            if( is_space(*src) && (!isdigit(*src)) )
+            if( is_space(*src) && (!is_num(*src)) )
                 break;
         }
         else
@@ -132,6 +135,16 @@ static int32_t get_token(int8_t* dst,const int8_t* src,const int32_t srcSize,con
 void config_init()
 {
     entry = entries = NULL;
+
+	if(!confConvBuf)
+		confConvBuf = (int8_t*)malloc(256);
+
+	//pointless? :)
+	if(!confConvBuf)
+		confConvBuf = (int8_t*)malloc(128);
+
+	if(!confConvBuf)
+		confConvBuf = (int8_t*)malloc(64);
 }
 
 void config_shutdown()
@@ -147,6 +160,10 @@ void config_shutdown()
         entry = entry->next;
     }
 
+	if(confConvBuf)
+		free(confConvBuf);
+
+	confConvBuf = NULL;
     entry = entries = NULL;
 }
 
@@ -175,6 +192,34 @@ ConfigEntry* config_push(const int8_t* variable,const int8_t* value)
         e->value = clone_string(value,&e->valueLength);
     }
     return e;
+}
+
+ConfigEntry* config_pushI(const int8_t* variable,const int32_t value)
+{
+	confConvBuf[0] = '\0';
+	sprintf((char*)confConvBuf,"%d",(int)value);
+	return config_push(variable,confConvBuf);
+}
+
+ConfigEntry* config_pushF(const int8_t* variable,const float value)
+{
+	confConvBuf[0] = '\0';
+	sprintf((char*)confConvBuf,"%f",value);
+	return config_push(variable,confConvBuf);
+}
+
+ConfigEntry* config_pushD(const int8_t* variable,const double value)
+{
+	confConvBuf[0] = '\0';
+	sprintf((char*)confConvBuf,"%f",value);
+	return config_push(variable,confConvBuf);
+}
+
+ConfigEntry* config_pushHex(const int8_t* variable,const uint32_t value)
+{
+	confConvBuf[0] = '\0';
+	sprintf((char*)confConvBuf,"%x",(unsigned int)value);
+	return config_push(variable,confConvBuf);
 }
 
 ConfigEntry* config_find(const int8_t* variable)
@@ -268,9 +313,21 @@ int8_t* config_getS(const int8_t* variable)
     return e->value;
 }
 
+int8_t* config_getHex(const int8_t* variable)
+{
+    ConfigEntry* e;
+
+    e = config_find(variable);
+
+    if(!e)
+        return NULL;
+
+    return e->value;
+}
+
 int32_t config_getI(const int8_t* variable)
 {
-    const int8_t* str;
+    register const int8_t* str;
     const int8_t* base;
     int32_t result = 0;
     int32_t neg = 0;
@@ -283,31 +340,24 @@ int32_t config_getI(const int8_t* variable)
 
     str = base = e->value;
 
-    while(*str)
+    while((*str) && (!is_space(*str)))
+		++str;
+
+	switch(*str)
+	{
+		case '0':
+			return 0;
+
+		case '-':
+			++str;
+			neg = 1;
+		break;
+	}
+
+    while((*str) && ((str - base) < 10) && (is_num(*str)))
     {
-        if(!is_space(*str))
-            break;
-
-        ++str;
-    }
-
-    if(str[0] == '0')
-        return 0;
-    else if(str[0] == '-')
-    {
-        ++str;
-        neg = 1;
-    }
-
-    while(*str)
-    {
-        if(str - base > 9)
-            break;
-        else if(!isNumerical(*str))
-            break;
-
         result = (result * 10) + (*str - '0');
-        str++;
+        ++str;
     }
 
     if(neg)
@@ -316,9 +366,32 @@ int32_t config_getI(const int8_t* variable)
     return result;
 }
 
+float config_getF(const int8_t* variable)
+{
+    ConfigEntry* e = config_find(variable);
+
+	if(!e)
+		return 0.0f;
+	else if(!e->value)
+		return 0.0f;
+
+	return (float)atof((char*)e->value);
+}
+
+double config_getD(const int8_t* variable)
+{
+    ConfigEntry* e = config_find(variable);
+
+	if(!e)
+		return 0.0;
+	else if(!e->value)
+		return 0.0;
+
+	return (double)atof((char*)e->value);
+}
+
 int32_t config_loadFromBuffer(const int8_t* buf,const int32_t size)
 {
-    const int8_t* pa = buf;
     int32_t eof = 0;
     int32_t len = 0;
     int8_t token[1024];
@@ -414,6 +487,34 @@ int32_t config_getEntryCount()
     }
 
     return res;
+}
+
+uint32_t config_predictOutputBufferSize()
+{
+    ConfigEntry* e;
+	uint32_t res;
+
+	if(!entry)
+		return 0;
+
+	e = entry;
+	res = 0;
+
+	while(e)
+	{
+		if(e->variable)
+			res += string_length(e->variable);
+
+		if(e->value)
+			res += string_length(e->value);
+
+		//const '=\r\n'
+		res += 3;
+
+		e = e->next;
+	}
+
+	return res + ((res+3)&1) ? 4 : 3;
 }
 
 /*********************************************** PUBLIC END *********************************************************/
