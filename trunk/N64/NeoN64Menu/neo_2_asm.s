@@ -2,10 +2,8 @@
 /*Interface : neo_2_asm.h*/
 
 .section .text
+
 .align 2 /*.align 3*/
-
-.equ NEO_PSRAM_BRUTEFORCE_RETRIES,96
-
 .set push
 .set noreorder
 .set noat
@@ -128,18 +126,11 @@
 	addu $10,$10,$5
 
 	0:
-	
 		lw $12,0($4)
-		lw $13,4($4)
-
 		lw $11,0($10)
 		sw $12,0($10)
-		lw $11,4($10)
-		sw $13,4($10)
-
-		addiu $10,$10,8
-		addiu $4,$4,8
-
+		addiu $10,$10,4
+		addiu $4,$4,4
 		bne $4,$8,0b
 		nop	
 
@@ -147,55 +138,6 @@
 	nop
 
 .end	neo_xferto_psram
-
-/*
-		ori $13,$0,NEO_PSRAM_BRUTEFORCE_RETRIES
-
-		1:
-			lw $11,($4)
-			sw $11,($10)
-			lw $12,($10)
-			j 8f
-			nop
-
-			2:
-					sw $11,($10)
-					lw $12,($10)
-
-				3:
-					addi $13,$13,-1
-
-					bltz $13,4f
-					nop
-
-					bne $11,$12,2b
-					nop
-
-					j 5f
-					nop
-
-						8:
-							bne $11,$12,2b
-							nop
-
-					j 5f
-					nop
-
-				4:
-					sw $11,($10)
-
-					.rept 440
-						nop
-					.endr
-				
-			5:
-				addiu $10,$10,4
-
-		6:
-			bne $4,$8,0b
-			addiu $4,$4,4
-	7:
-*/
 
 .set pop
 .set reorder
