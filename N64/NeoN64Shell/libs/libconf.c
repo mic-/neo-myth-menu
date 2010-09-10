@@ -7,26 +7,26 @@
 
 static ConfigEntry* entry = NULL;
 static ConfigEntry* entries = NULL;
-static int8_t* confConvBuf = NULL;
+static char* confConvBuf = NULL;
 
 /*********************************************** PRIVATE BEGIN *********************************************************/
-static int32_t string_length(register const int8_t* src)
+static int32_t string_length(register const char* src)
 {
-    register const int8_t* pa = src;
+    register const char* pa = src;
 
     while(*(pa++) != '\0');
 
     return (int32_t)(pa - src);
 }
 
-static int8_t* clone_string(const int8_t* src,int32_t* saveLength)
+static char* clone_string(const char* src,int32_t* saveLength)
 {
     int32_t len = string_length(src);
 
     if(saveLength)
         *saveLength = len;
 
-    int8_t* res = (int8_t*)malloc( ( ((len + 1)&1) ? (len + 2) : (len + 1) ) );
+    char* res = (char*)malloc( ( ((len + 1)&1) ? (len + 2) : (len + 1) ) );
         
     if(!res)
         return NULL;
@@ -79,9 +79,9 @@ inline int32_t is_num(int32_t c)
     return ((c  >= 0) && (c <= 9));
 }
 
-static int32_t skip_whitespace(const int8_t* src)
+static int32_t skip_whitespace(const char* src)
 {
-    const int8_t* sp = src;
+    const char* sp = src;
 
     while(is_space(*src))
         ++src;
@@ -89,9 +89,9 @@ static int32_t skip_whitespace(const int8_t* src)
     return src - sp;
 }
 
-static int32_t get_token(int8_t* dst,const int8_t* src,const int32_t srcSize,const int32_t allow_sp,int32_t* len,int32_t* eof)
+static int32_t get_token(char* dst,const char* src,const int32_t srcSize,const int32_t allow_sp,int32_t* len,int32_t* eof)
 {
-    const int8_t* sp = src;
+    const char* sp = src;
 
     *eof = *len = 0;
 
@@ -137,14 +137,14 @@ void config_init()
     entry = entries = NULL;
 
 	if(!confConvBuf)
-		confConvBuf = (int8_t*)malloc(256);
+		confConvBuf = (char*)malloc(256);
 
 	//pointless? :)
 	if(!confConvBuf)
-		confConvBuf = (int8_t*)malloc(128);
+		confConvBuf = (char*)malloc(128);
 
 	if(!confConvBuf)
-		confConvBuf = (int8_t*)malloc(64);
+		confConvBuf = (char*)malloc(64);
 }
 
 void config_shutdown()
@@ -167,7 +167,7 @@ void config_shutdown()
     entry = entries = NULL;
 }
 
-ConfigEntry* config_push(const int8_t* variable,const int8_t* value)
+ConfigEntry* config_push(const char* variable,const char* value)
 {
     ConfigEntry* e;
 
@@ -194,35 +194,35 @@ ConfigEntry* config_push(const int8_t* variable,const int8_t* value)
     return e;
 }
 
-ConfigEntry* config_pushI(const int8_t* variable,const int32_t value)
+ConfigEntry* config_pushI(const char* variable,const int32_t value)
 {
 	confConvBuf[0] = '\0';
 	sprintf((char*)confConvBuf,"%d",(int)value);
 	return config_push(variable,confConvBuf);
 }
 
-ConfigEntry* config_pushF(const int8_t* variable,const float value)
+ConfigEntry* config_pushF(const char* variable,const float value)
 {
 	confConvBuf[0] = '\0';
 	sprintf((char*)confConvBuf,"%f",value);
 	return config_push(variable,confConvBuf);
 }
 
-ConfigEntry* config_pushD(const int8_t* variable,const double value)
+ConfigEntry* config_pushD(const char* variable,const double value)
 {
 	confConvBuf[0] = '\0';
 	sprintf((char*)confConvBuf,"%f",value);
 	return config_push(variable,confConvBuf);
 }
 
-ConfigEntry* config_pushHex(const int8_t* variable,const uint32_t value)
+ConfigEntry* config_pushHex(const char* variable,const uint32_t value)
 {
 	confConvBuf[0] = '\0';
 	sprintf((char*)confConvBuf,"%x",(unsigned int)value);
 	return config_push(variable,confConvBuf);
 }
 
-ConfigEntry* config_find(const int8_t* variable)
+ConfigEntry* config_find(const char* variable)
 {
     ConfigEntry* e = entry;
 
@@ -237,7 +237,7 @@ ConfigEntry* config_find(const int8_t* variable)
     return NULL;
 }
 
-void config_remove(const int8_t* variable)
+void config_remove(const char* variable)
 {
     //a nice trick to avoid making a linked list
     ConfigEntry* e = entry;
@@ -274,7 +274,7 @@ void config_remove(const int8_t* variable)
     return;
 }
 
-ConfigEntry* config_replaceS(const int8_t* variable,const int8_t* newValue)
+ConfigEntry* config_replaceS(const char* variable,const char* newValue)
 {
     ConfigEntry* e;
 
@@ -291,7 +291,7 @@ ConfigEntry* config_replaceS(const int8_t* variable,const int8_t* newValue)
     return e;
 }
 
-ConfigEntry* config_replace(ConfigEntry* e,const int8_t* newValue)
+ConfigEntry* config_replace(ConfigEntry* e,const char* newValue)
 {
     if(e->value)
         free(e->value);
@@ -301,7 +301,7 @@ ConfigEntry* config_replace(ConfigEntry* e,const int8_t* newValue)
     return e;
 }
 
-int8_t* config_getS(const int8_t* variable)
+char* config_getS(const char* variable)
 {
     ConfigEntry* e;
 
@@ -313,7 +313,7 @@ int8_t* config_getS(const int8_t* variable)
     return e->value;
 }
 
-int8_t* config_getHex(const int8_t* variable)
+char* config_getHex(const char* variable)
 {
     ConfigEntry* e;
 
@@ -325,10 +325,10 @@ int8_t* config_getHex(const int8_t* variable)
     return e->value;
 }
 
-int32_t config_getI(const int8_t* variable)
+int32_t config_getI(const char* variable)
 {
-    register const int8_t* str;
-    const int8_t* base;
+    register const char* str;
+    const char* base;
     int32_t result = 0;
     int32_t neg = 0;
     ConfigEntry* e;
@@ -366,7 +366,7 @@ int32_t config_getI(const int8_t* variable)
     return result;
 }
 
-float config_getF(const int8_t* variable)
+float config_getF(const char* variable)
 {
     ConfigEntry* e = config_find(variable);
 
@@ -378,7 +378,7 @@ float config_getF(const int8_t* variable)
 	return (float)atof((char*)e->value);
 }
 
-double config_getD(const int8_t* variable)
+double config_getD(const char* variable)
 {
     ConfigEntry* e = config_find(variable);
 
@@ -390,19 +390,19 @@ double config_getD(const int8_t* variable)
 	return (double)atof((char*)e->value);
 }
 
-int32_t config_loadFromBuffer(const int8_t* buf,const int32_t size)
+int32_t config_loadFromBuffer(const char* buf,const int32_t size)
 {
     int32_t eof = 0;
     int32_t len = 0;
-    int8_t token[1024];
+    char token[1024];
     ConfigEntry* obj = (ConfigEntry*)malloc(sizeof(ConfigEntry));
 
     if(!obj)
         return 1;
 
     //dummy object
-    obj->variable = (int8_t*)malloc(256);
-    obj->value = (int8_t*)malloc(512);
+    obj->variable = (char*)malloc(256);
+    obj->value = (char*)malloc(512);
 
     if(!obj->variable || !obj->value)
         return 1;
@@ -449,10 +449,10 @@ int32_t config_loadFromBuffer(const int8_t* buf,const int32_t size)
     return 0;
 }
 
-int32_t config_saveToBuffer(int8_t* buf)
+int32_t config_saveToBuffer(unsigned char* buf)
 {
     ConfigEntry* e = entry;
-    int8_t* p;
+    unsigned char* p;
 
     if(!e)
         return 1;
