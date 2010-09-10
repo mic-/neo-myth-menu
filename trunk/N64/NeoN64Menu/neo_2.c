@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <libdragon.h>
 #include "neo_2_asm.h"
+#include "configuration.h"
 
 typedef volatile unsigned short vu16;
 typedef volatile unsigned int vu32;
@@ -70,12 +71,10 @@ inline void bus_delay(int cnt)
         asm("\tnop\n"::);
 }
 
-/*inline void hw_delay()
+inline void hw_delay() //#define hw_delay() asm("\nlbu $15,(0xB0000000)\n") --same thing ..
 {
 	bus_delay(384);
-}*/
-
-#define hw_delay() asm("\nlbu $15,(0xB0000000)\n")
+}
 
 #define _neo_asic_op(cmd) *(vu32 *)(0xB2000000 | (cmd<<1))
 
@@ -941,6 +940,7 @@ void simulate_pif_boot(u32 cic_chip)
             gGPR[25]=0x00000000465E3F72LL;
             break;
     }
+
 
     // set HW registers - PI_BSD_DOM1 regs, etc
 
