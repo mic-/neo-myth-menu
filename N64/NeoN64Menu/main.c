@@ -7,7 +7,7 @@
 #include <diskio.h>
 #include <ff.h>
 #include "neo_2_asm.h"
-#include "../NeoN64Shell/libs/libconf.h"
+#include "configuration.h"
 
 typedef volatile unsigned short vu16;
 typedef volatile unsigned int vu32;
@@ -1775,6 +1775,7 @@ int main(void)
 
             setTextColors((loading) ? 4 : 0);
             copySD2Psram(0, (loading) ? 4 : 0);
+
             neo_run_psram(gTable[0].options, 1);
         }
         neo2_disable_sd();
@@ -1857,6 +1858,9 @@ int main(void)
     }
     else
         bmax = getGFInfo();             // preload flash menu entries
+
+	config_init();
+	config_load("/menu/n64/config.cfg");
 
     while (1)
     {
@@ -2251,5 +2255,6 @@ int main(void)
         delay(1);
     }
 
+	config_shutdown();//will never reach here anyway
     return 0;
 }
