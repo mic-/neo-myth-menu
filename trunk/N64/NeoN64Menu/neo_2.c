@@ -70,11 +70,12 @@ inline void bus_delay(int cnt)
         asm("\tnop\n"::);
 }
 
-inline void hw_delay()
+/*inline void hw_delay()
 {
-    bus_delay(384);
-}
+	bus_delay(384);
+}*/
 
+#define hw_delay() asm("\nlbu $15,(0xB0000000)\n")
 
 #define _neo_asic_op(cmd) *(vu32 *)(0xB2000000 | (cmd<<1))
 
@@ -319,6 +320,11 @@ void neo_copyto_sram(void *src, int sstart, int len)
     hw_delay();
 
     // Init the PI for sram
+	vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
+	vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
+	vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
+	vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
+
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
     PI_BSD_DOM2_PGS_REG = 0x0000000D;
@@ -341,6 +347,11 @@ void neo_copyto_sram(void *src, int sstart, int len)
         SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
 
+	PI_BSD_DOM2_LAT_REG = piLatReg;
+	PI_BSD_DOM2_PWD_REG = piPwdReg;
+	PI_BSD_DOM2_PGS_REG = piPgsReg;
+	PI_BSD_DOM2_RLS_REG = piRlsReg;
+	hw_delay();
     //neo_select_menu();
 }
 
@@ -368,6 +379,10 @@ void neo_copyfrom_sram(void *dst, int sstart, int len)
     hw_delay();
 
     // Init the PI for sram
+	vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
+	vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
+	vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
+	vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
     PI_BSD_DOM2_PGS_REG = 0x0000000D;
@@ -390,9 +405,12 @@ void neo_copyfrom_sram(void *dst, int sstart, int len)
     else
         SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
-    hw_delay();
 
-    //neo_select_menu();
+	PI_BSD_DOM2_LAT_REG = piLatReg;
+	PI_BSD_DOM2_PWD_REG = piPwdReg;
+	PI_BSD_DOM2_PGS_REG = piPgsReg;
+	PI_BSD_DOM2_RLS_REG = piRlsReg;
+    hw_delay();
 }
 
 void neo_copyto_nsram(void *src, int sstart, int len)
@@ -413,6 +431,10 @@ void neo_copyto_nsram(void *src, int sstart, int len)
     hw_delay();
 
     // Init the PI for sram
+	vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
+	vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
+	vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
+	vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
     PI_BSD_DOM2_PGS_REG = 0x0000000D;
@@ -439,9 +461,12 @@ void neo_copyto_nsram(void *src, int sstart, int len)
 
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
-    hw_delay();
 
-    //neo_select_menu();
+	PI_BSD_DOM2_LAT_REG = piLatReg;
+	PI_BSD_DOM2_PWD_REG = piPwdReg;
+	PI_BSD_DOM2_PGS_REG = piPgsReg;
+	PI_BSD_DOM2_RLS_REG = piRlsReg;
+    hw_delay();
 }
 
 void neo_copyfrom_nsram(void *dst, int sstart, int len)
@@ -460,6 +485,10 @@ void neo_copyfrom_nsram(void *dst, int sstart, int len)
     hw_delay();
 
     // Init the PI for sram
+	vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
+	vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
+	vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
+	vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
     PI_BSD_DOM2_PGS_REG = 0x0000000D;
@@ -487,7 +516,11 @@ void neo_copyfrom_nsram(void *dst, int sstart, int len)
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
 
-    //neo_select_menu();
+	PI_BSD_DOM2_LAT_REG = piLatReg;
+	PI_BSD_DOM2_PWD_REG = piPwdReg;
+	PI_BSD_DOM2_PGS_REG = piPgsReg;
+	PI_BSD_DOM2_RLS_REG = piRlsReg;
+    hw_delay();
 }
 
 void neo_copyto_eeprom(void *src, int sstart, int len, int mode)

@@ -1,41 +1,40 @@
 
 #include <string.h>
 #include <stdio.h>
-
+#include "neo_2_asm.h"
 #include <diskio.h>
 
 typedef unsigned int u32;
 typedef volatile unsigned int vu32;
 
 #define SD_CRC_SIZE (512)
-
-//extern void neo2_recv_sd(unsigned char *buf);
-extern int neo2_recv_sd_multi(unsigned char *buf, int count);
-extern void neo2_pre_sd(void);
-extern void neo2_post_sd(void);
-
-
+#define CACHE_SIZE (16)                   /* number sectors in cache */
+#define R1_LEN (48/8)
+#define R2_LEN (136/8)
+#define R3_LEN (48/8)
+#define R6_LEN (48/8)
+#define R7_LEN (48/8)
+#define INIT_RETRIES (64)
+#define RESP_TIME_R (1024/2)
+#define RESP_TIME_W (1024*4)
 //#define DEBUG_PRINT
 //#define DEBUG_RESP
 
+extern int neo2_recv_sd_multi(unsigned char *buf, int count);
+extern void neo2_pre_sd(void);
+extern void neo2_post_sd(void);
 extern void debugText(char *msg, int x, int y, int d);
 
-
 /* global variables and arrays */
-
 unsigned short cardType;                /* b0 = block access, b1 = V2 and/or HC, b15 = funky read timing */
-
 unsigned char pkt[6];                    /* command packet */
-
 unsigned int num_sectors;
-
 unsigned int sd_speed;
-
-
-#define CACHE_SIZE 16                    /* number sectors in cache */
 unsigned int sec_tags[CACHE_SIZE];
 unsigned char __attribute__((aligned(16))) sec_cache[CACHE_SIZE*512 + 8];
 unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads */
+unsigned char sd_csd[R2_LEN];
+static int respTime = RESP_TIME_R;
 
 /*
 +  Polynomial = 0x89 (2^7 + 2^3 + 1)
@@ -113,21 +112,6 @@ static const unsigned short __attribute__((aligned(16))) ccitt_crc_table[256] = 
 	0x6e17U, 0x7e36U, 0x4e55U, 0x5e74U, 0x2e93U, 0x3eb2U, 0x0ed1U, 0x1ef0U
 };
 
-#define R1_LEN (48/8)
-#define R2_LEN (136/8)
-#define R3_LEN (48/8)
-#define R6_LEN (48/8)
-#define R7_LEN (48/8)
-
-unsigned char sd_csd[R2_LEN];
-
-#define INIT_RETRIES (64)
-
-#define RESP_TIME_R (1024/2)
-#define RESP_TIME_W (1024*4)
-
-static int respTime = RESP_TIME_R;
-
 /*-----------------------------------------------------------------------*/
 /*                             support code                              */
 /*-----------------------------------------------------------------------*/
@@ -161,8 +145,14 @@ inline void wrMmcCmdBit( unsigned int bit )
 
 inline void wrMmcCmdByte( unsigned int byte )
 {
-    for(int i=0; i<8; i++)
-        wrMmcCmdBit((byte>>(7-i)) & 1);
+	wrMmcCmdBit((byte>>7) & 1);
+	wrMmcCmdBit((byte>>6) & 1);
+	wrMmcCmdBit((byte>>5) & 1);
+	wrMmcCmdBit((byte>>4) & 1);
+	wrMmcCmdBit((byte>>3) & 1);
+	wrMmcCmdBit((byte>>2) & 1);
+	wrMmcCmdBit((byte>>1) & 1);
+	wrMmcCmdBit((byte) & 1);
 }
 
 #if 1
@@ -189,8 +179,14 @@ inline void wrMmcDatBit( unsigned int bit )
 
 inline void wrMmcDatByte( unsigned int byte )
 {
-    for(int i=0; i<8; i++)
-        wrMmcDatBit((byte>>(7-i)) & 1);
+	wrMmcDatBit((byte>>7) & 1);
+	wrMmcDatBit((byte>>6) & 1);
+	wrMmcDatBit((byte>>5) & 1);
+	wrMmcDatBit((byte>>4) & 1);
+	wrMmcDatBit((byte>>3) & 1);
+	wrMmcDatBit((byte>>2) & 1);
+	wrMmcDatBit((byte>>1) & 1);
+	wrMmcDatBit((byte>>0) & 1);
 }
 #endif
 
@@ -231,7 +227,18 @@ inline unsigned char rdMmcCmdBits( int num )
 
 inline unsigned char rdMmcCmdByte()
 {
-    return rdMmcCmdBits(8);
+    register unsigned char byte;
+
+	byte = /*(byte << 1) | */rdMmcCmdBit();
+	byte = (byte << 1) | rdMmcCmdBit();
+	byte = (byte << 1) | rdMmcCmdBit();
+	byte = (byte << 1) | rdMmcCmdBit();
+	byte = (byte << 1) | rdMmcCmdBit();
+	byte = (byte << 1) | rdMmcCmdBit();
+	byte = (byte << 1) | rdMmcCmdBit();
+	byte = (byte << 1) | rdMmcCmdBit();
+
+    return byte;
 }
 
 inline unsigned int rdMmcDatBit()
@@ -313,19 +320,14 @@ inline void wrMmcDatByte4( unsigned char val )
 inline unsigned char rdMmcDatByte4()
 {
 	return ( (rdMmcDatBit4() << 4) | rdMmcDatBit4() );
-	/*
-    unsigned char byte = rdMmcDatBit4();
-    byte = (byte << 4) | rdMmcDatBit4();
-    return byte;*/
 }
 
 // 1 to 8 bits please
-
 inline unsigned char rdMmcDatByte()
 {
-    register unsigned char byte = 0;
+    register unsigned char byte;
 	
-	byte = (byte << 1) | rdMmcDatBit();
+	byte = /*(byte << 1) | */rdMmcDatBit();
 	byte = (byte << 1) | rdMmcDatBit();
 	byte = (byte << 1) | rdMmcDatBit();
 	byte = (byte << 1) | rdMmcDatBit();
@@ -333,57 +335,20 @@ inline unsigned char rdMmcDatByte()
 	byte = (byte << 1) | rdMmcDatBit();
 	byte = (byte << 1) | rdMmcDatBit();
 
-	/*
-    for(int i=0; i<8; i++)
-        byte = (byte << 1) | rdMmcDatBit();
-	*/
     return byte;
 }
-
-/*
- * Computation of CRC-7 0x48 polynom (x**7 + x**3 + 1)
- * Used in MMC commands and responses.
- */
  
 unsigned char crc7(register unsigned char *buf)
 {
-	register unsigned char crc = 0x00;
+	register unsigned char crc = 0;
 
-	/*int i;
-
-	for (i=0;  i < (sizeof(pkt) - sizeof(unsigned char)); i++)
-		crc = crc7_table[(crc << 1) ^ buf[i]];*/
-
-	crc = crc7_table[(crc << 1) ^ buf[0]];
+	crc = crc7_table[(crc) ^ buf[0]];
 	crc = crc7_table[(crc << 1) ^ buf[1]];
 	crc = crc7_table[(crc << 1) ^ buf[2]];
 	crc = crc7_table[(crc << 1) ^ buf[3]];
 	crc = crc7_table[(crc << 1) ^ buf[4]];
 
 	return crc;
-
-	/*
-	register int i = 5 * 8;
-    register unsigned int r4 = 0x80808080;
-    register unsigned char crc = 0;
-    register unsigned char c = *(buf++);
-
-	goto crc7_jmp1; //desperate
-
-    do {
-        c = (r4 & 0x80) ? *(buf++) : c;
-        crc = crc << 1;
-
-        if (crc & 0x80) crc ^= 9;
-
-		crc7_jmp1:
-        if (c & (r4>>24)) crc ^= 9;
-
-        r4 = (r4 >> 1) | (r4 << 31);
-
-    } while (--i > 0);
-	
-    return crc;*/
 } 
  
 #ifdef DEBUG_RESP
@@ -480,15 +445,19 @@ int sdReadSingleBlock( unsigned char *buf, unsigned int addr )
 
     sendMmcCmd(17, addr);               // READ_SINGLE_BLOCK
     if (!(cardType & 0x8000))
+	{
         if (!recvMmcCmdResp(resp, R1_LEN, 0) || (resp[0] != 17))
             return 0;
+	}
 
     while ((rdMmcDatBit4()&1) != 0)
+	{
         if (i-- <= 0)
         {
             debugMmcPrint("Timeout");
             return 0;               // timeout on start bit
         }
+	}
 #if 1
 	for (i=0; i<SD_CRC_SIZE; i++)
 		buf[i] = rdMmcDatByte4();
@@ -516,12 +485,16 @@ int sdReadStartMulti( unsigned int addr )
 
     sendMmcCmd(18, addr);               // READ_MULTIPLE_BLOCK
     if (!(cardType & 0x8000))
+	{
         if (!recvMmcCmdResp(resp, R1_LEN, 0) || (resp[0] != 18))
             return 0;
+	}
 
     return 1;
 }
 
+#define sdReadMultiBlocks(__A__,__B__) neo2_recv_sd_multi(__A__,__B__)
+/*
 int sdReadMultiBlocks( BYTE *buff, BYTE count )
 {
 #if 0
@@ -556,7 +529,7 @@ int sdReadMultiBlocks( BYTE *buff, BYTE count )
 #else
     return neo2_recv_sd_multi(buff, count);
 #endif
-}
+}*/
 
 int sdReadStopMulti( void )
 {
@@ -586,38 +559,6 @@ void sdCrc16(unsigned char *p_crc, unsigned char *data, int len)
 	p_crc[2] = crc; crc >>= 8;
 	p_crc[1] = crc; crc >>= 8;
 	p_crc[0] = crc;
-	
-	/*
-	register int i;
-	register unsigned char nybble;
-	register unsigned long long poly = 0x0001000000100001LL;
-	register unsigned long long crc = 0;
-	register unsigned long long n_crc;           // This can probably be unsigned int
-
-    // Load crc from array
-    for (i = 0; i < 8; i++)
-    {
-        crc <<= 8;
-        crc |= p_crc[i];
-    }
-
-    for (i = 0; i < (len << 1); i++)
-    {
-        nybble = (i & 1) ? (data[i >> 1] & 0x0F) : (data[i >> 1] >> 4);
-        n_crc = (crc >> (15 * 4));
-        crc <<= 4;
-        if ((nybble ^ n_crc) & 1) crc ^= (poly << 0);
-        if ((nybble ^ n_crc) & 2) crc ^= (poly << 1);
-        if ((nybble ^ n_crc) & 4) crc ^= (poly << 2);
-        if ((nybble ^ n_crc) & 8) crc ^= (poly << 3);
-    }
-
-    // Output crc to array
-    for (i = 7; i >= 0; i--)
-    {
-        p_crc[i] = crc;
-        crc >>= 8;
-    }*/
 }
 
 int sendSdWriteBlock4( unsigned char *buf, unsigned char *crcbuf )
@@ -892,10 +833,10 @@ DRESULT MMC_disk_read (
         {
             // sector not in cache - fetch it
             neo2_pre_sd();
-            if (!sdReadSingleBlock(&sec_cache[ix*512], sector << ((cardType & 1) ? 0 : 9)))
+            if (!sdReadSingleBlock(&sec_cache[ix << 9], sector << ((cardType & 1) ? 0 : 9)))
             {
                 // read failed, retry once
-                if (!sdReadSingleBlock(&sec_cache[ix*512], sector << ((cardType & 1) ? 0 : 9)))
+                if (!sdReadSingleBlock(&sec_cache[ix << 9], sector << ((cardType & 1) ? 0 : 9)))
                 {
                     // read failed
                     neo2_post_sd();
@@ -907,7 +848,7 @@ DRESULT MMC_disk_read (
             neo2_post_sd();
             sec_tags[ix] = sector;
         }
-        memcpy(buff, &sec_cache[ix*512], 512);
+        neo_memcpy32(buff, &sec_cache[ix << 9], 512);
     }
     else
     {
@@ -1020,7 +961,8 @@ DRESULT MMC_disk_write (
         iy = (sector + ix) & (CACHE_SIZE - 1);    // really simple hash
         if (sec_tags[iy] == (sector + ix))
             sec_tags[iy] = 0xFFFFFFFF;
-        memcpy(sec_buf, (void *)((unsigned int)buff + ix*512), 512);
+
+        neo_memcpy32(sec_buf, (void *)((unsigned int)buff + (ix << 9) ), 512);
         neo2_pre_sd();
         if (!sdWriteSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
         {
@@ -1080,3 +1022,4 @@ DWORD get_fattime (void)
 {
     return 0;
 }
+
