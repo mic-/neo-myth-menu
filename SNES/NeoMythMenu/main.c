@@ -14,6 +14,8 @@
 #include "common.h"
 #include "cheats/cheat.h"
 #include "string.h"
+#include "pff.h"
+
 
 
 // Some resources defined in separate source files
@@ -48,6 +50,10 @@ static u8 bg0BufferDirty;
 
 static char tempString[32];
 static rect_t printxyClipRect;
+
+FATFS sdFatFs;
+extern u16 cardType;
+
 
 // These three strings are modified at runtime by the shell, so they are declared separately in order to get them into
 // the .data section rather than .rodata.
@@ -212,12 +218,13 @@ static const u16 objColors[] =
 };
 
 
+
+
 void wait_nmi()
 {
 	while (REG_RDNMI & 0x80);
 	while (!(REG_RDNMI & 0x80));
 }
-
 
 
 
@@ -251,6 +258,7 @@ void add_full_pointer(void **pptr, u8 bank, u16 offset)
 		bp[2]++;
 	}
 }
+
 
 
 void update_screen()
@@ -557,18 +565,9 @@ void show_scroll_indicators()
 		print_meta_string(35 - (can_games_list_scroll(DIRECTION_UP) << 1));
 		print_meta_string(36 - (can_games_list_scroll(DIRECTION_DOWN) << 1));
 	}
-	else if (currentMenu == MID_CHEAT_DB_MENU)
+	/*else if (currentMenu == MID_CHEAT_DB_MENU)
 	{
-		/*if (can_cheat_list_scroll(DIRECTION_UP))
-			printxy("\x86", 29,  8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
-		else
-			printxy(" ",    29,  8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
-
-		if (can_cheat_list_scroll(DIRECTION_DOWN))
-			printxy("\x87", 29, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);
-		else
-			printxy(" ",    29, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 1);*/
-	}
+	}*/
 }
 
 
@@ -713,23 +712,29 @@ void run_game_from_gba_card_c()
 	update_screen();*/
 
 	// Read 32 bytes from offset 0x10080 in the highlighted ROM
-	read_rom = neo2_myth_current_rom_read & 0x7fff;
-	add_full_pointer((void**)&read_rom, 0x7d, 0x8000);
+	MAKE_RAM_FPTR(read_rom, neo2_myth_current_rom_read);
 	read_rom(tempString, 1, 0x0080, 32);
 	tempString[31] = 0;
 
+	// DEBUG
+	/*for (i=0; i<12; i++) {
+		print_hex(tempString[i], 2+i+i, 5, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	}
+	update_screen();
+	return;*/
+
 	if (strcmp(tempString, "SNES-SPC700 Sound File Data v0.") == 0)
 	{
-		gameMode = 32;
+		gameMode = GAME_MODE_SPC;
 	}
 
-	if (gameMode == 4)
+	if (gameMode == GAME_MODE_NORMAL_ROM)
 	{
-		run_game = run_game_from_gba_card & 0x7fff;
+		MAKE_RAM_FPTR(run_game, run_game_from_gba_card);
 	}
-	else if (gameMode == 32)
+	else if (gameMode == GAME_MODE_SPC)
 	{
-		run_game = play_spc_from_gba_card & 0x7fff;
+		MAKE_RAM_FPTR(run_game, play_spc_from_gba_card);
 	}
 	else
 	{
@@ -762,53 +767,47 @@ void run_game_from_gba_card_c()
 	}
 
 
-	// The AND-operation above will not mask out bits 16-23, so we only add 0x7d to the bank here
-	// to get the result we want (0x7e).
-	add_full_pointer((void**)&run_game, 0x7d, 0x8000);
-
 	run_game();
 }
 
 
 void run_secondary_cart_c()
 {
-	void (*run_cart)(void) = run_secondary_cart & 0x7fff;
+	void (*run_cart)(void);
 
-	add_full_pointer((void**)&run_cart, 0x7d, 0x8000);
-
+  	MAKE_RAM_FPTR(run_cart, run_secondary_cart);
 	run_cart();
 }
 
 
 
-
-int main()
+int init_sd()
 {
-	u8 *bp;
+	cardType = 0;
+
+	neo2_enable_sd();
+    if (pf_mount(&sdFatFs))
+    {
+    	cardType = 0x8000;                      /* try funky read timing */
+        if (pf_mount(&sdFatFs))
+     	{
+			return -1;
+        }
+    }
+
+    if (pf_open("/Map.spc"))
+    {
+		return -2;
+    }
+
+    return 0;
+}
+
+
+void setup_video()
+{
 	int i;
-	u16 keys;
-
-	*(u8*)0x00c040 = 0;				// CPLD ROM
-
-	if ((*(u8*)0x00ffe1 == 0x63) &&
-	    (*(u8*)0x00ffe2 == 0x57))
-	{
-		cpID = *(u8*)0x00ffe0;
-	}
-
-	*(u8*)0x00c040 = 1;				// GBA card menu
-
-	cardModel = *(u8*)0x00fff0;
-
-	copy_ram_code();
-
-	REG_DISPCNT = 0x80;				// Turn screen off
-
-	// Mark all Game Genie codes as unused
-	for (i = 0; i < MAX_GG_CODES * 2; i++)
-	{
-		ggCodes[i].used = CODE_UNUSED;
-	}
+	u8 *bp;
 
 	expand_font_data();
 	load_font_colors();
@@ -863,6 +862,39 @@ int main()
 	REG_BG0VOFS = REG_BG0HOFS = 0;
 	REG_BG1VOFS = REG_BG1HOFS = 0;
 	REG_BG1VOFS = REG_BG1HOFS = 0;
+}
+
+
+
+int main()
+{
+	u8 *bp;
+	int i;
+	u16 keys;
+
+	*(u8*)0x00c040 = 0;				// CPLD ROM
+
+	if ((*(u8*)0x00ffe1 == 0x63) &&
+	    (*(u8*)0x00ffe2 == 0x57))
+	{
+		cpID = *(u8*)0x00ffe0;
+	}
+
+	*(u8*)0x00c040 = 1;				// GBA card menu
+
+	cardModel = *(u8*)0x00fff0;
+
+	copy_ram_code();
+
+	REG_DISPCNT = 0x80;				// Turn screen off
+
+	// Mark all Game Genie codes as unused
+	for (i = 0; i < MAX_GG_CODES * 2; i++)
+	{
+		ggCodes[i].used = CODE_UNUSED;
+	}
+
+	setup_video();
 
 	REG_NMI_TIMEN = 1;
 
@@ -871,6 +903,23 @@ int main()
 	update_screen();
 
 	REG_BGCNT = 3;			// Enable BG0 and BG1
+
+	if ((i = init_sd()) == 0)
+	{
+		printxy("File open ok", 2, 6, 4, 32);
+	}
+	else
+	{
+		neo2_disable_sd();
+		if (i == -1)
+		{
+			printxy("Failed to mount root", 2, 6, 4, 32);
+		}
+		else if (i == -2)
+		{
+			printxy("Failed to open map.spc", 2, 6, 4, 32);
+		}
+	}
 
 	while (1)
 	{

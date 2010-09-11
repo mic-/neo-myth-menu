@@ -14,6 +14,16 @@
 #define GAME_LIST_BANK 0
 #endif
 
+
+#define RAM_CODE_BANK 0x7e
+#define RAM_CODE_OFFSET 0x8000
+
+
+// Offset a function pointer so that it points to a copy of the function in RAM
+#define MAKE_RAM_FPTR(fptr, fun) fptr = fun & 0x7fff; \
+                                 add_full_pointer((void**)&fptr, RAM_CODE_BANK-1, RAM_CODE_OFFSET)
+
+
 // Maximum number of Game Genie codes allowed
 #define MAX_GG_CODES 4
 
@@ -50,6 +60,12 @@
 
 #define SHELL_OBJPAL_DARK_OLIVE 0
 #define SHELL_OBJPAL_WHITE 1
+
+
+#define GAME_MODE_NORMAL_ROM 4
+#define GAME_MODE_SPC 32
+#define GAME_MODE_VGM 33
+#define GAME_MODE_PACKED_VGM 34
 
 
 typedef struct

@@ -490,7 +490,6 @@ void move_to_next_cheat()
 				y2 += d;
 				if (y2 > 17) break;
 			}
-			//if ((y1 > 13) && (i < (cheatList.count - 1))) cheatList.firstShown++;
 			if ((cheatList.highlighted > ((cheatList.firstShown + i) >> 1)) && (i < (cheatList.count - 1))) cheatList.firstShown++;
 		}
 		hide_cheat_list();
@@ -650,8 +649,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			highlightedOption[MID_CHEAT_DB_MENU] = 0;
 
 			// Get ROM info
-			get_info = neo2_myth_current_rom_read & 0x7fff;
-			add_full_pointer((void**)&get_info, 0x7d, 0x8000);
+			MAKE_RAM_FPTR(get_info, neo2_myth_current_rom_read);
 			if (romRunMode)
 			{
 				// LoROM
@@ -731,8 +729,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			print_meta_string(MS_ROM_INFO_MENU_INSTRUCTIONS);
 
 			// Get ROM info
-			get_info = neo2_myth_current_rom_read & 0x7fff;
-			add_full_pointer((void**)&get_info, 0x7d, 0x8000);
+			MAKE_RAM_FPTR(get_info, neo2_myth_current_rom_read);
 			if (romRunMode)
 			{
 				// LoROM

@@ -1749,43 +1749,32 @@ RUN_M01:
 ; do a Neo Flash ASIC command
 ; entry: XY = Neo Flash ASIC command
 _neo_asic_cmd:
-	rep 	#$30
-	phx
-	phy
-	; do unlocking sequence
-	ldx		#$00FF			; address
-	ldy		#$D200			; value
-	jsr		_neo_asic_op
-	ldx		#$0000			; address
-	ldy		#$1500			; value
-	jsr		_neo_asic_op
-	ldx		#$0001
-	ldy		#$D200
-	jsr		_neo_asic_op
-	ldx		#$0002
-	ldy		#$1500
-	jsr		_neo_asic_op
-	ldx		#$00FE
-	ldy		#$1500
-	jsr		_neo_asic_op
-	; do ASIC command
-	ply
-	plx
-	; fall into _neo_asic_op for last operation
+	php
+	sep 	#$20
+	rep		#$10
 
+    jsr    SET_NEOCM5
 
-
-; do a Neo Flash ASIC operation
-; entry: XY = Neo Flash ASIC operation
-;             X = addr, Y = value
-; exit:  A = result (usually dummy read)
-_neo_asic_op:
-	; TODO: write this function
-
-	rts		; RTS is used here instead of RTL since this function only is supposed to be
-			; called from other RAM-resident assembly functions -- i.e. not from C functions.
-
-
+	; E.g. command = 0x370003 (X=0x0037, Y=0x0003):
+	;   Set MYTH_GBAC_LIO = X & 0xE0 (== 0x20)
+	;   Do an indirect 8-bit read from (u16)(0x370003 << 1) | 0xC00000 (== 0xEE0006)
+	
+	txa
+	and		#$E0
+	sta.l	MYTH_GBAC_LIO
+	rep		#$20
+	sty		tcc__r1
+	stx		tcc__r1h
+	asl		tcc__r1
+	sep		#$20
+	rol		tcc__r1h
+	lda		tcc__r1h
+	ora		#$C0
+	sta		tcc__r1h
+	lda		[tcc__r1]
+         
+	plp
+	rts
 
 
 
