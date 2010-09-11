@@ -8,7 +8,7 @@
 .ENDME          ; End MemoryMap definition
 
 .ROMBANKSIZE $8000              ; Every ROM bank is 32 KBytes in size
-.ROMBANKS 4                     ; 1 Mbit - Tell WLA we want to use 4 ROM Banks
+.ROMBANKS 8                     ; 1 Mbit - Tell WLA we want to use 4 ROM Banks
 
 .SNESHEADER
   ID "SNES"                     ; 1-4 letter string, just leave it as "SNES"
@@ -62,6 +62,11 @@
 
 .DSB $8000,0
 .ENDIF
+
+.BANK 4 SLOT 0                  ; Defines the ROM bank and the slot it is inserted in memory.
+.ORG 0  
+.DSB $8000,0					; Fill up $020000-$027FFF
+
 
 .bank 1 slot 0
 .org 0

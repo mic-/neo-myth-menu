@@ -13,6 +13,8 @@ extern void neo2_myth_psram_write(char *src, u16 psramBank, u16 psramOffset, u16
 extern void neo2_recv_sd(unsigned char *buf);
 extern void neo2_pre_sd();
 extern void neo2_post_sd();
+extern void neo2_enable_sd();
+extern void neo2_disable_sd();
 
 extern void run_game_from_gba_card();
 
