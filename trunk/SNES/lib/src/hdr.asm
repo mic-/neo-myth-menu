@@ -8,7 +8,7 @@
 .ENDME          ; End MemoryMap definition
 
 .ROMBANKSIZE $8000              ; Every ROM bank is 32 KBytes in size
-.ROMBANKS 4                     ; 1 Mbit - Tell WLA we want to use 4 ROM Banks
+.ROMBANKS 8                     ; 1 Mbit - Tell WLA we want to use 4 ROM Banks
 
 .SNESHEADER
   ID "SNES"                     ; 1-4 letter string, just leave it as "SNES"
@@ -55,6 +55,8 @@
 .bank 1 slot 0
 .org 0
 ;nop
+
+.base $0
 
 .EMPTYFILL $00                  ; fill unused areas with $00, opcode for BRK.  
                                 ; BRK will crash the snes if executed.
