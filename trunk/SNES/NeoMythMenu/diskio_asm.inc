@@ -365,7 +365,8 @@ recvMmcCmdResp:
 	dex
 	bra		--
 ++:
-
+	plx
+	
 	rep		#$20
 	lda		13,s			; cflag
 	beq		++
@@ -378,6 +379,9 @@ recvMmcCmdResp:
 	sta		tcc__r0			; return TRUE
 	rts
 +:
+	dex
+	bne		-
+	
 	stz		tcc__r0			; return FALSE
 	rts
 	
