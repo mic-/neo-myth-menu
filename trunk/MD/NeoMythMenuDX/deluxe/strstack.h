@@ -10,10 +10,10 @@ extern unsigned short strstackBlockPtr;
 void strstack_init();
 
 #define strstack_push(TYPE)\
-((strstackBlockPtr > STRINGSTACK_BLOCK_DIVISIONS-1) ? (TYPE*)strstackBlock[STRINGSTACK_BLOCK_DIVISIONS-1)] : (TYPE*)strstackBlock[strstackBlockPtr++])
+((strstackBlockPtr > STRINGSTACK_BLOCK_DIVISIONS-1) ? (TYPE*)0 : (TYPE*)strstackBlock[strstackBlockPtr++])
 
 #define strstack_pop(TYPE)\
-((strstackBlockPtr <= 0) ? (TYPE*)strstackBlock[0] : (TYPE*)strstackBlock[--strstackBlockPtr])
+((strstackBlockPtr <= 0) ? (TYPE*)0 : (TYPE*)strstackBlock[--strstackBlockPtr])
 
 #define cstrstack_push() strstack_push(char)
 #define ustrstack_push() strstack_push(unsigned char)
