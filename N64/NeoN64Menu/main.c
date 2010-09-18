@@ -769,11 +769,11 @@ int getSDInfo(int entry)
     DIR dir;
     FILINFO fno;
     int ix, max = 0;
-    WCHAR lfnbuf[256];
+    XCHAR lfnbuf[256];
     XCHAR fpath[1280];
-    static WCHAR privateName[64];
+    XCHAR privateName[8];
 
-    c2wstrcpy(privateName,"menu");
+    c2wstrcpy(privateName, "menu");
 
     gSdDetected = 0;
 
@@ -848,10 +848,9 @@ int getSDInfo(int entry)
 
     // if root, check directory structure
     if( (entry == -1) && (check_sd() == -1) )
-            do_sd_mgr(1);
+        do_sd_mgr(1);
 
     // add parent directory entry if not root
-    f_opendir(&dir, fpath);
     if (path[1] != 0)
     {
         gTable[max].valid = 1;
@@ -865,9 +864,9 @@ int getSDInfo(int entry)
     for(;;)
     {
         FRESULT fres;
-        fno.lfname = (WCHAR*)lfnbuf;
+        fno.lfname = (XCHAR*)lfnbuf;
         fno.lfsize = 255;
-        fno.lfname[0] = (WCHAR)0;
+        fno.lfname[0] = (XCHAR)0;
         if ((fres = f_readdir(&dir, &fno)))
         {
             //char temp[40];
@@ -884,12 +883,12 @@ int getSDInfo(int entry)
         if (fno.fname[0] == '.')
             continue;                   /* skip links */
 
-        if (fno.lfname[0] == (WCHAR)'.')
+        if (fno.lfname[0] == (XCHAR)'.')
             continue;                   /* skip "hidden" files and directories */
 
         if (fno.fattrib & AM_DIR)
         {
-            if(!wstrcmp(privateName,fno.lfname)) /*skip "menu" */
+            if (!wstrcmp(privateName, fno.lfname)) /*skip "menu" */
                 continue;
 
             gTable[max].valid = 1;
@@ -897,7 +896,7 @@ int getSDInfo(int entry)
             if (fno.lfname[0])
                 w2cstrcpy(gTable[max].name, fno.lfname);
             else
-                w2cstrcpy(gTable[max].name, fno.fname);
+                strcpy(gTable[max].name, fno.fname);
         }
         else
         {
@@ -914,7 +913,7 @@ int getSDInfo(int entry)
             if (fno.lfname[0])
                 w2cstrcpy(gTable[max].name, fno.lfname);
             else
-                w2cstrcpy(gTable[max].name, fno.fname);
+                strcpy(gTable[max].name, fno.fname);
             memset(gTable[max].rom, 0, 0x20);
 
             //get_sd_info(max); // slows directory load
@@ -1563,6 +1562,10 @@ void saveSaveState(void)
     flags = 0;
 
     neo_copyto_sram(&flags, 0x3FF00, 8);
+
+    neo2_enable_sd();
+    getSDInfo(-1);
+    neo2_disable_sd();
 }
 
 void saveBrowserFlags(int brwsr, int bopt, int bfill)
@@ -1859,8 +1862,8 @@ int main(void)
     else
         bmax = getGFInfo();             // preload flash menu entries
 
-	config_init();
-	config_load("/menu/n64/config.cfg");
+    config_init();
+    config_load("/menu/n64/config.cfg");
 
     while (1)
     {
@@ -2255,6 +2258,6 @@ int main(void)
         delay(1);
     }
 
-	config_shutdown();//will never reach here anyway
+    config_shutdown();//will never reach here anyway
     return 0;
 }

@@ -8,14 +8,14 @@
 .set noreorder
 .set noat
 
-.global neo2_recv_sd_multi /*ChillyWilly's MASTERPIECE*/
+.global neo2_recv_sd_multi
 .ent    neo2_recv_sd_multi
 		neo2_recv_sd_multi:
 
         la $15,0xB30E6060         /* $15 = 0xB30E6060*/
         ori $14,$4,0              /* $14 = buf*/
         ori $12,$5,0              /* $12 = count*/
-		
+
 		/*
 			t8 = 0xF000 , t9 = 0x0F00 (not saved)
 			s0 = 0x00F0 , s1 = 0x000F (saved)
@@ -27,7 +27,7 @@
 		lui $25,0x0F00
 		lui $16,0x00F0
 		lui $17,0x000F
- 
+
         oloop:
         lui $11,0x0001            /* $11 = timeout = 64 * 1024*/
 
@@ -120,7 +120,7 @@
         bne $12,$0,oloop          /* next sector*/
         nop
 
-        ori $2,$0,1                 /* res = TRUE*/
+        ori $2,$0,1               /* res = TRUE*/
 
 		___exit:
 		lw $16,0($sp)
@@ -132,6 +132,7 @@
 
 .end neo2_recv_sd_multi
 
+
 .global neo_xferto_psram
 .ent    neo_xferto_psram
 		neo_xferto_psram:
@@ -140,17 +141,17 @@
 	ori $8,$4,0
 	addu $8,$8,$6
 	addu $10,$10,$5
-	
+
 	0:
 		lw $12,0($4)
 		lbu $11,0($10)
 		sw $12,0($10)
-		
+
 		addiu $10,$10,4
 		addiu $4,$4,4
 
 		bne $4,$8,0b
-		nop	
+		nop
 
 	jr $ra
 	nop
