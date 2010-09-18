@@ -214,7 +214,7 @@ void neo_psram_offset(int offs)
     hw_delay();
     NEO_IO = 0xFFFFFFFF;                // 16 bit mode
     hw_delay();
-   
+
     hw_delay();
 }
 
@@ -656,7 +656,7 @@ int neo2_recv_sd_multi(unsigned char *buf, int count)
         "lui $15,0xB30E\n\t"            // $15 = 0xB30E0000
         "ori $14,%1,0\n\t"              // $14 = buf
         "ori $12,%2,0\n"                // $12 = count
-		
+
         "oloop:\n\t"
         "lui $11,0x0001\n"              // $11 = timeout = 64 * 1024
 
@@ -758,7 +758,8 @@ int neo2_recv_sd_multi(unsigned char *buf, int count)
         : "$0" );                       // clobbered
 
     return res;
-}*/
+}
+*/
 
 //----------------------------------------------------------------------
 //
