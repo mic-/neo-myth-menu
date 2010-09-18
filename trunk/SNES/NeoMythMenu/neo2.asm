@@ -1746,6 +1746,8 @@ RUN_M01:
 ;-------------------------------------------------------------------------------
 
 
+    
+
 ; do a Neo Flash ASIC command
 ; entry: XY = Neo Flash ASIC command
 _neo_asic_cmd:
@@ -1780,7 +1782,6 @@ _neo_asic_cmd:
 
 ; select Neo Flash Menu Flash ROM
 ; allows you to access the menu flash via flash space
-; entry: a1 = hardware base (0xA10000)
 _neo_select_menu:
 	sep		#$20
 	rep		#$10
@@ -1806,6 +1807,7 @@ _neo_select_menu:
 	lda		#0
 	sta.l	MYTH_GBAC_LIO				; clear low bank select reg
 	sta.l	MYTH_GBAC_HIO				; clear high bank select reg
+	;sta.l	MYTH_GBAC_ZIO
 
 	rep		#$30
 	ply
@@ -1820,8 +1822,8 @@ neo2_enable_sd:
 	lda		#$0480
 	sta.l	$7d0000+neo_mode
 	jsr		_neo_select_menu
-	cli								; enable interrupts
-	rtl
+	;cli								; enable interrupts
+	rts
 
 
 ; void neo2_disable_sd(void);
@@ -1831,8 +1833,8 @@ neo2_disable_sd:
 	lda		#0
 	sta.l	$7d0000+neo_mode
 	jsr		_neo_select_menu
-	cli								; enable interrupts
-	rtl
+	;cli								; enable interrupts
+	rts
 
 
 ; void neo2_pre_sd(void);
@@ -1842,7 +1844,7 @@ neo2_pre_sd:
 	lda		#$80
 	sta.l	MYTH_GBAC_LIO
 	rep		#$20
-	rtl
+	rts
 
 
 ; void neo2_post_sd(void);
@@ -1851,8 +1853,8 @@ neo2_post_sd:
 	lda		#0
 	sta.l	MYTH_GBAC_LIO
 	rep		#$20
-	cli						; enable interrupts
-	rtl
+	;cli						; enable interrupts
+	rts
 
 
 ; void neo2_recv_sd(unsigned char *buf);
@@ -1874,15 +1876,15 @@ neo2_recv_sd:
 	ldy		#512						; counter
 _nrsd_loop:
 	rep		#$20
-	lda.l	$6060
+	lda.l	$C06060
 	sep		#$20
 	asl		a
 	asl		a
 	asl		a
 	asl		a
-	rep		#$20
 	sta		tcc__r0
-	lda.l	$6060
+	rep		#$20
+	lda.l	$C06060
 	and		#$000F
 	ora		tcc__r0						; sector byte
 	sep		#$20
@@ -1894,7 +1896,7 @@ _nrsd_loop:
 	ldy		#8
 _nrsd_crc:
 	rep		#$20
-	lda.l	$6060
+	lda.l	$C06060
 	sep		#$20
 	asl		a
 	asl		a
@@ -1902,7 +1904,7 @@ _nrsd_crc:
 	asl		a
 	rep		#$20
 	sta		tcc__r0
-	lda.l	$6060
+	lda.l	$C06060
 	and		#$000F
 	ora		tcc__r0						; crc byte
 	sep		#$20
@@ -1912,7 +1914,7 @@ _nrsd_crc:
 	bne		_nrsd_crc
 
 	rep		#$20
-	lda.l	$6060						; end bit
+	lda.l	$C06060						; end bit
 
 	sep		#$20
 	lda		#$80
@@ -1922,10 +1924,18 @@ _nrsd_crc:
 	ply
 	plx
 	plp
-	rtl
+	rts
 
+
+neo2_recv_sd_multi:
+	rts
+	
 
 neo_mode:	.dw 0
+
+
+.include "diskio_asm.inc"
+
 
 ram_code_end:
 

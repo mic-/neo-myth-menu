@@ -47,6 +47,8 @@ tools\optimore-816 navigation.s navigopt.s
 tools\optimore-816 game_genie.s ggopt.s
 tools\optimore-816 action_replay.s aropt.s
 tools\optimore-816 ppuc.s ppucopt.s
+tools\optimore-816 pff.s pffopt.s
+tools\optimore-816 diskio.s diskioopt.s
 
 tools\constify main.c mainopt.s mainopt2.s
 tools\constify navigation.c navigopt.s navigopt2.s
@@ -72,7 +74,7 @@ REM ..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
 
 ..\bin\wla-65816.exe -io diskio.s diskio.obj
 ..\bin\wla-65816.exe -io myth_io.s myth_io.obj
-..\bin\wla-65816.exe -io pff.s pff.obj
+..\bin\wla-65816.exe -io pffopt.s pff.obj
 ..\bin\wla-65816.exe -io u_strings.s u_strings.obj
 
 ..\bin\wla-65816.exe -io aplib_decrunch.asm aplib_decrunch.obj
@@ -83,7 +85,7 @@ REM OBJ -> SMC
 @echo off
 REM Delete files
 del *.ps2
-del *.s
+REM del *.s
 del *.obj
 REM del *.sym
 @echo on

@@ -14,6 +14,7 @@
 #include "common.h"
 #include "cheats/cheat.h"
 #include "string.h"
+#include "diskio.h"
 #include "pff.h"
 
 
@@ -53,6 +54,9 @@ static rect_t printxyClipRect;
 
 FATFS sdFatFs;
 extern u16 cardType;
+extern long long num_sectors;
+extern u8 diskioPacket[7];
+extern u8 diskioResp[17];
 
 
 // These three strings are modified at runtime by the shell, so they are declared separately in order to get them into
@@ -260,9 +264,16 @@ void add_full_pointer(void **pptr, u8 bank, u16 offset)
 }
 
 
+void testlongarg(unsigned long long foo)
+{
+	if (foo == 1) return 3;
+	return 0;
+}
+
 
 void update_screen()
 {
+	testlongarg(0x10203040);
 	wait_nmi();
 	load_vram(bg0Buffer, 0x2000, 0x800);
 	update_oam(&marker, 0, 1);
@@ -781,16 +792,56 @@ void run_secondary_cart_c()
 
 
 
+unsigned char crc8 (unsigned char *buf)
+{
+    int i;
+    unsigned long long r4 = 0x80808080;
+    unsigned char crc = 0;
+    unsigned char c = 0;
+
+    i = 5 * 8;
+    do {
+        if (r4 & 0x80) c = *buf++;
+        crc = crc << 1;
+
+        if (crc & 0x80) crc ^= 9;
+        if (c & (r4>>24)) crc ^= 9;
+        r4 = (r4 >> 1) | (r4 << 31);
+      } while (--i > 0);
+
+  return crc;
+}
+
+
+
+extern unsigned char pkt[6];
+
+void sendCmd( unsigned char cmd, unsigned long long arg )
+{
+    pkt[0]=cmd|0x40;                         // b7 = 0 => start bit, b6 = 1 => host command
+    pkt[1]=(unsigned char)(arg >> 24);
+    pkt[2]=(unsigned char)(arg >> 16);
+    pkt[3]=(unsigned char)(arg >> 8);
+    pkt[4]=(unsigned char)(arg);
+    pkt[5]=( crc8(pkt) << 1 ) | 1;             // b0 = 1 => stop bit
+}
+
 int init_sd()
 {
+	int mountResult = 0;
+
 	cardType = 0;
 
-	neo2_enable_sd();
-    if (pf_mount(&sdFatFs))
+	diskio_init();
+
+	//neo2_enable_sd();
+    if (mountResult = pf_mount(&sdFatFs))
     {
-    	cardType = 0x8000;                      /* try funky read timing */
-        if (pf_mount(&sdFatFs))
+		print_hex(mountResult, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+    	cardType = 0x8000;
+        if (mountResult = pf_mount(&sdFatFs))
      	{
+			print_hex(mountResult, 6, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 			return -1;
         }
     }
@@ -865,6 +916,7 @@ void setup_video()
 }
 
 
+extern unsigned char pfmountbuf[36];
 
 int main()
 {
@@ -906,19 +958,45 @@ int main()
 
 	if ((i = init_sd()) == 0)
 	{
-		printxy("File open ok", 2, 6, 4, 32);
+		//neo2_disable_sd();
+		printxy("File open ok", 2, 7, 4, 32);
 	}
 	else
 	{
-		neo2_disable_sd();
+		//neo2_disable_sd();
 		if (i == -1)
 		{
-			printxy("Failed to mount root", 2, 6, 4, 32);
+			printxy("Failed to mount root", 2, 7, 4, 32);
 		}
 		else if (i == -2)
 		{
-			printxy("Failed to open map.spc", 2, 6, 4, 32);
+			printxy("Failed to open map.spc", 2, 7, 4, 32);
 		}
+		for (i = 0; i < 12; i++)
+		{
+			print_hex(pfmountbuf[i], 2+i+i, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		}
+
+		print_hex(cardType>>8, 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		print_hex(cardType, 4, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+		print_hex(num_sectors>>24, 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		print_hex(num_sectors>>16, 4, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		print_hex(num_sectors>>8, 6, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		print_hex(num_sectors, 8, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+		for (i = 0; i < 7; i++)
+		{
+			print_hex(diskioPacket[i], 2+i+i, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		}
+		for (i = 0; i < 6; i++)
+		{
+			print_hex(diskioResp[i], 2+i+i, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		}
+
+		sendCmd(8, 0x1AA);
+		print_hex(pkt[5], 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
 	}
 
 	while (1)
