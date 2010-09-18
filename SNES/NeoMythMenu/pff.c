@@ -18,6 +18,7 @@
 
 #include "pff.h"		/* Petit FatFs configurations and declarations */
 #include "diskio.h"		/* Declarations of low level disk I/O functions */
+#include "string.h"
 
 /*--------------------------------------------------------------------------
 
@@ -85,7 +86,7 @@ CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 	switch (fs->fs_type) {
 	case FS_FAT12 :
 		bc = (WORD)clst; bc += bc / 2;
-		ofs = bc % 512; bc /= 512;
+		ofs = bc & 511; bc >>= 9;
 		if (ofs != 511) {
 			if (disk_readp(buf, fs->fatbase + bc, ofs, 2)) break;
 		} else {
@@ -96,11 +97,11 @@ CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 		return (clst & 1) ? (wc >> 4) : (wc & 0xFFF);
 
 	case FS_FAT16 :
-		if (disk_readp(buf, fs->fatbase + clst / 256, (WORD)(((WORD)clst % 256) * 2), 2)) break;
+		if (disk_readp(buf, fs->fatbase + (clst >> 8), (WORD)(((WORD)clst & 255) * 2), 2)) break;
 		return LD_WORD(buf);
 #if _FS_FAT32
 	case FS_FAT32 :
-		if (disk_readp(buf, fs->fatbase + clst / 128, (WORD)(((WORD)clst % 128) * 4), 4)) break;
+		if (disk_readp(buf, fs->fatbase + (clst >> 7), (WORD)(((WORD)clst & 127) * 4), 4)) break;
 		return LD_DWORD(buf) & 0x0FFFFFFF;
 #endif
 	}
@@ -224,7 +225,7 @@ FRESULT dir_find (
 
 	dir = FatFs->buf;
 	do {
-		res = disk_readp(dir, dj->sect, (WORD)((dj->index % 16) * 32), 32)	/* Read an entry */
+		res = disk_readp(dir, dj->sect, (WORD)((dj->index & 15) << 5), 32)	/* Read an entry */
 			? FR_DISK_ERR : FR_OK;
 		if (res != FR_OK) break;
 		c = dir[DIR_Name];	/* First character */
@@ -450,6 +451,8 @@ BYTE check_fs (	/* 0:The FAT boot record, 1:Valid boot record but not an FAT, 2:
 /* Mount/Unmount a Locical Drive                                         */
 /*-----------------------------------------------------------------------*/
 
+unsigned char pfmountbuf[36];
+
 FRESULT pf_mount (
 	FATFS *fs		/* Pointer to new file system object (NULL: Unmount) */
 )
@@ -461,12 +464,16 @@ FRESULT pf_mount (
 	FatFs = 0;
 	if (!fs) return FR_OK;				/* Unregister fs object */
 
-	if (disk_initialize() & STA_NOINIT)	/* Check if the drive is ready or not */
+	if (disk_initialize() != 0) //& STA_NOINIT)	/* Check if the drive is ready or not */
 		return FR_NOT_READY;
 
 	/* Search FAT partition on the drive */
 	bsect = 0;
 	fmt = check_fs(buf, bsect);			/* Check sector 0 as an SFD format */
+
+//DEBUG
+memcpy(pfmountbuf, buf, 36);
+
 	if (fmt == 1) {						/* Not an FAT boot record, it may be FDISK format */
 		/* Check a partition listed in top of the partition table */
 		if (disk_readp(buf, bsect, MBR_Table, 16)) {	/* 1st partition entry */
@@ -514,7 +521,7 @@ FRESULT pf_mount (
 	else
 #endif
 		fs->dirbase = fs->fatbase + fsize;				/* Root directory start sector (lba) */
-	fs->database = fs->fatbase + fsize + fs->n_rootdir / 16;	/* Data start sector (lba) */
+	fs->database = fs->fatbase + fsize + (fs->n_rootdir >> 4); /// 16;	/* Data start sector (lba) */
 
 	fs->flag = 0;
 	FatFs = fs;
@@ -593,8 +600,8 @@ FRESULT pf_read (
 
 	for ( ;  btr;									/* Repeat until all data transferred */
 		rbuff += rcnt, fs->fptr += rcnt, *br += rcnt, btr -= rcnt) {
-		if ((fs->fptr % 512) == 0) {				/* On the sector boundary? */
-			if ((fs->fptr / 512 % fs->csize) == 0) {	/* On the cluster boundary? */
+		if ((fs->fptr & 511) == 0) {				/* On the sector boundary? */
+			if (((fs->fptr >> 9) & (fs->csize - 1)) == 0) {	/* On the cluster boundary? */
 				clst = (fs->fptr == 0) ?			/* On the top of the file? */
 					fs->org_clust : get_fat(fs->curr_clust);
 				if (clst <= 1) {
@@ -611,16 +618,16 @@ FRESULT pf_read (
 			fs->dsect = sect;
 			fs->csect++;							/* Next sector address in the cluster */
 		}
-		rcnt = 512 - ((WORD)fs->fptr % 512);		/* Get partial sector data from sector buffer */
+		rcnt = 512 - ((WORD)fs->fptr & 511);		/* Get partial sector data from sector buffer */
 		if (rcnt > btr) rcnt = btr;
 		if (fs->flag & FA_STREAM) {
-			dr = disk_readp(dest, fs->dsect, (WORD)(fs->fptr % 512), (WORD)(rcnt | 0x8000));
+			dr = disk_readp(dest, fs->dsect, (WORD)(fs->fptr & 511), (WORD)(rcnt | 0x8000));
 		} else {
-			dr = disk_readp(rbuff, fs->dsect, (WORD)(fs->fptr % 512), rcnt);
+			dr = disk_readp(rbuff, fs->dsect, (WORD)(fs->fptr & 511), rcnt);
 		}
 		if (dr) {
 			fs->flag = 0;
-			return (dr == RES_STRERR) ? FR_STREAM_ERR : FR_DISK_ERR;
+			return (dr == RES_WRPRT/*STRERR*/) ? FR_STREAM_ERR : FR_DISK_ERR;
 		}
 	}
 
@@ -652,7 +659,7 @@ FRESULT pf_lseek (
 	ifptr = fs->fptr;
 	fs->fptr = 0;
 	if (ofs > 0) {
-		bcs = (DWORD)fs->csize * 512;	/* Cluster size (byte) */
+		bcs = (DWORD)fs->csize << 9; //* 512;	/* Cluster size (byte) */
 		if (ifptr > 0 &&
 			(ofs - 1) / bcs >= (ifptr - 1) / bcs) {	/* When seek to same or following cluster, */
 			fs->fptr = (ifptr - 1) & ~(bcs - 1);	/* start from the current cluster */
@@ -672,7 +679,7 @@ FRESULT pf_lseek (
 			ofs -= bcs;
 		}
 		fs->fptr += ofs;
-		fs->csect = (BYTE)(ofs / 512) + 1;	/* Sector offset in the cluster */
+		fs->csect = (BYTE)(ofs >> 9) + 1;	/* Sector offset in the cluster */
 		nsect = clust2sect(clst);	/* Current sector */
 		if (!nsect) {
 			fs->flag = 0; return FR_DISK_ERR;

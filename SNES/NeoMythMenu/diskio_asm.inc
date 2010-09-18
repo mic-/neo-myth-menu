@@ -2,6 +2,14 @@
 ; /Mic
 
 
+; Fixed bugs:
+;
+; * Missing PLX/PLY instructions
+; * Wrong loop count in recvMmcCmdResp
+; * sdInit's rca value getting overwritten by crc7
+; * wrMmcxxxByte writing the bits in reversed order
+
+
 .EQU R1_LEN 6
 .EQU R2_LEN 17
 .EQU R3_LEN 6
@@ -107,15 +115,17 @@ wrMmcCmdByte:
     lda    _wrMmcCmdByte_byte,s ; read argument from stack
     ldx    #8
 -:
+	asl 	a					; d7 -> d8
     pha							; save A
+	xba							; d8 -> d0
     and    #1
     pha							; put argument on stack
-    jsr    wrMmcCmdBit			; write  byte & 1
+    jsr    wrMmcCmdBit			; write  (byte >> (7-i)) & 1
     pla							; remove argument for wrMmcCmdBit
     pla							; restore A
-    lsr    a					; byte >>= 1
     dex
     bne    -
+    plx
     rts
         	
 
@@ -133,15 +143,17 @@ wrMmcDatByte:
     lda    _wrMmcDatByte_byte,s    
     ldx    #8
 -:
-    pha
+	asl 	a
+	pha
+	xba
     and    #1
     pha
-    jsr    wrMmcDatBit			; write  byte & 1
+    jsr    wrMmcDatBit			; write  (byte >> (7-i)) & 1
     pla
     pla
-    lsr    a					; byte >>= 1
     dex
     bne    -
+    plx
     rts
 
 
@@ -211,6 +223,7 @@ rdMmcCmdBits:
     bra    -
 +:
     sta    tcc__r0
+    plx
     rts
 
 
@@ -291,6 +304,7 @@ rdMmcDatByte:
     dex
     bne    -
     sta    tcc__r0
+    plx
     rts
     
 
@@ -347,6 +361,8 @@ crc7:
    
     dex
     bne    	-
+    ply
+    plx
     rts    
  
 
@@ -367,7 +383,7 @@ sendMmcCmd:
     sep   	#$20
     lda    	_sendMmcCmd_cmd,s		; cmd
     ora    	#$40					; b7 = 0 => start bit, b6 = 1 => host command
-    sta.l	diskioPacket
+    sta.w	diskioPacket
     rep		#$20
     and		#$FF
     pha
@@ -376,7 +392,7 @@ sendMmcCmd:
     
     sep   	#$20
     lda		_sendMmcCmd_arg+3,s		; arg >> 24
-    sta.l	diskioPacket+1
+    sta.w	diskioPacket+1
     rep		#$20
     and		#$FF
     pha
@@ -385,7 +401,7 @@ sendMmcCmd:
 
     sep   	#$20
     lda		_sendMmcCmd_arg+2,s		; arg >> 16
-    sta.l	diskioPacket+2
+    sta.w	diskioPacket+2
     rep		#$20
     and		#$FF
     pha
@@ -394,7 +410,7 @@ sendMmcCmd:
 
     sep   	#$20
     lda		_sendMmcCmd_arg+1,s		; arg >> 8
-    sta.l	diskioPacket+3
+    sta.w	diskioPacket+3
     rep		#$20
     and		#$FF
     pha
@@ -403,7 +419,7 @@ sendMmcCmd:
 
     sep   	#$20
     lda		_sendMmcCmd_arg,s		; arg 
-    sta.l	diskioPacket+4
+    sta.w	diskioPacket+4
     rep		#$20
     and		#$FF
     pha
@@ -418,17 +434,24 @@ sendMmcCmd:
     lda		tcc__r0
     asl		a
     ora		#1						; b0 = 1 => stop bit
+
+; DEBUG
+sep #$20
+sta.w diskioPacket+5
+rep #$20
+
     and		#$FF
     pha
     jsr		wrMmcCmdByte			; wrMmcCmdByte( crc7(pkt) << 1 ) | 1 )
     pla
+    
     plx
     rts
 
 
-.MACRO SEND_MMC_CMD
-	pea.w	>\2
-	pea.w	<\2
+.MACRO SEND_MMC_CMD ;cmd, arg
+	pea.w	\2 / 65536
+	pea.w	\2 & 65535
 	pea.w	\1
 	jsr		sendMmcCmd			
 	pla
@@ -474,9 +497,10 @@ recvMmcCmdResp:
 	
 	rep		#$20
 	lda		_recvMmcCmdResp_len,s		; len
-	dea
 	phx
---:										; for(j=0; j<len; j++)
+	dea
+	tax
+--:										; len--; for(j=0; j<len; j++)
 	cpx		#0
 	beq		++
 	jsr		rdMmcCmdByte
@@ -1062,6 +1086,8 @@ sdInit:
 	rep		#$30
 	phx
 
+	jsr		neo2_enable_sd
+	
 	ldx		#80
 	pea.w	1
 -:
@@ -1097,6 +1123,7 @@ sdInit:
 	bra		+	
 ++:
 	rep		#$20
+	jsr		neo2_disable_sd
 	plx
 	stz		tcc__r0						; return FALSE
 	rts
@@ -1166,6 +1193,7 @@ _sdInit_loop_end:
 	cpx		#0
 	bne		+
 	; timed out
+	jsr		neo2_disable_sd
 	plx
 	stz		tcc__r0						; return FALSE
 	rts
@@ -1181,6 +1209,7 @@ _sdInit_loop_end:
 	rep		#$20
 	beq		++
 +:
+	jsr		neo2_disable_sd
 	plx
 	stz		tcc__r0						; return FALSE
 	rts
@@ -1196,6 +1225,7 @@ _sdInit_loop_end:
 	rep		#$20
 	beq		++
 +:
+	jsr		neo2_disable_sd
 	plx
 	stz		tcc__r0						; return FALSE
 	rts
@@ -1203,13 +1233,13 @@ _sdInit_loop_end:
 
 	; rca = (resp[1]<<8) | resp[2]
 	sep		#$20
-	lda.l	diskioResp+2
-	sta		tcc__r3
-	lda.l	diskioResp+1
-	sta		tcc__r3+1		
+	lda.w	diskioResp+2
+	sta.w	diskioTemp
+	lda.w	diskioResp+1
+	sta.w	diskioTemp+1
 	rep		#$20
 
-	lda		tcc__r3
+	lda.w	diskioTemp
 	pha
 	pea.w	$FFFF
 	pea.w	9
@@ -1219,7 +1249,7 @@ _sdInit_loop_end:
 	pla	
 	RECV_MMC_CMD_RESP sd_csd,R2_LEN,1	
 
-	lda		tcc__r3
+	lda.w	diskioTemp
  	pha
 	pea.w	$FFFF
 	pea.w	7
@@ -1236,12 +1266,13 @@ _sdInit_loop_end:
 	rep		#$20
 	beq		++
 +:
+	jsr		neo2_disable_sd
 	plx
 	stz		tcc__r0						; return FALSE
 	rts
 ++:
 
-	lda		tcc__r3
+	lda.w	diskioTemp
  	pha
 	pea.w	$FFFF
 	pea.w	55
@@ -1256,6 +1287,7 @@ _sdInit_loop_end:
 	and		#$20	
 	bne		++
 +:
+	jsr		neo2_disable_sd
 	plx
 	stz		tcc__r0						; return FALSE
 	rts
@@ -1271,6 +1303,7 @@ _sdInit_loop_end:
 	rep		#$20
 	beq		++
 +:
+	jsr		neo2_disable_sd
 	plx
 	stz		tcc__r0						; return FALSE
 	rts
