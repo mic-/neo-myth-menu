@@ -1764,12 +1764,12 @@ _neo_asic_cmd:
 	txa
 	and		#$E0
 	sta.l	MYTH_GBAC_LIO
-	rep		#$20
+	rep		#$20						; 16-bit A
 	sty		tcc__r1
 	stx		tcc__r1h
-	asl		tcc__r1
-	sep		#$20
-	rol		tcc__r1h
+	asl		tcc__r1						; shift left lower 16 bits
+	sep		#$20						; 8-bit A
+	rol		tcc__r1h					; shift left the upper 8 bits, with d0 being replaced by d15 from the lower 16 bits
 	lda		tcc__r1h
 	ora		#$C0
 	sta		tcc__r1h
@@ -1791,7 +1791,7 @@ _neo_select_menu:
 	lda		#0
 	sta.l	MYTH_OPTION_IO				; set mode 0
 	lda		#$20
-	sta.l	MYTH_GBAC_ZIO				; clear bank size reg
+	sta.l	MYTH_GBAC_ZIO				; A21 off
 
 	ldx		#$0037
 	rep		#$20
@@ -1857,7 +1857,11 @@ neo2_post_sd:
 	rts
 
 
-; void neo2_recv_sd(unsigned char *buf);
+; void neo2_recv_sd(unsigned char *buf)
+;
+.EQU _neo2_recv_sd_save_regs 6
+.EQU _neo2_recv_sd_buf 3+_neo2_recv_sd_save_regs
+;
 neo2_recv_sd:
 	php
 	rep		#$30
@@ -1865,55 +1869,55 @@ neo2_recv_sd:
 	phy
 	phb
 
-	lda		10,s						; buf
+	lda		_neo2_recv_sd_buf,s			; buf
 	tax
 	sep		#$20
 	lda		#$87
 	sta.l	MYTH_GBAC_LIO
-	lda		12,s						; buf bank
+	lda		_neo2_recv_sd_buf+2,s		; buf bank
 	pha
-	plb
+	plb									; DBR points to buf's bank
 	ldy		#512						; counter
 _nrsd_loop:
-	rep		#$20
-	lda.l	$C06060
-	sep		#$20
+	;rep		#$20						; 16-bit A
+	lda.l	$C06060						; read first nybble
+	;sep		#$20						; 8-bit A
 	asl		a
 	asl		a
 	asl		a
 	asl		a
 	sta		tcc__r0
-	rep		#$20
-	lda.l	$C06060
-	and		#$000F
+	;rep		#$20						; 16-bit A	
+	lda.l	$C06060						; read second nybble
+	and		#$0F
 	ora		tcc__r0						; sector byte
-	sep		#$20
-	sta.w	$0000,x
+	;sep		#$20						; 8-bit A
+	sta.w	$0000,x						; write to buf
 	inx
 	dey
-	bne		_nrsd_loop
+	bne		_nrsd_loop					; repeat 512 times
 
 	ldy		#8
 _nrsd_crc:
-	rep		#$20
-	lda.l	$C06060
-	sep		#$20
+	;rep		#$20
+	lda.l	$C06060						; read first nybble
+	;sep		#$20
 	asl		a
 	asl		a
 	asl		a
 	asl		a
-	rep		#$20
+	;rep		#$20
 	sta		tcc__r0
-	lda.l	$C06060
-	and		#$000F
+	lda.l	$C06060						; read second nybble
+	and		#$0F
 	ora		tcc__r0						; crc byte
-	sep		#$20
+	;sep		#$20
 ;	sta.w	$0000,x
 ;	inx
 	dey
 	bne		_nrsd_crc
 
-	rep		#$20
+	;rep		#$20
 	lda.l	$C06060						; end bit
 
 	sep		#$20
