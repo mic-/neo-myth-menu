@@ -11,6 +11,8 @@
 ;
 ; * Changed 16-bit Myth reads to 8-bit
 ; * Changed stack offsets in neo2_recv_sd
+;
+; * Switched order between neo2_enable_sd and neo2_pre_sd
 
 
 .EQU R1_LEN 6
@@ -1108,8 +1110,6 @@ sdInit:
 	rep		#$30
 	phx
 
-	jsr		neo2_enable_sd
-	
 	ldx		#128 ;80
 	pea.w	1
 -:
@@ -1323,6 +1323,8 @@ disk_initialize_asm:
 	php
 	rep		#$30
 	phx
+
+	jsr		neo2_enable_sd
 
 	; Invalidate all chache entries
 	ldx		#0
