@@ -13,6 +13,8 @@
 ; * Changed stack offsets in neo2_recv_sd
 ;
 ; * Switched order between neo2_enable_sd and neo2_pre_sd
+;
+; * Wrong loop condition in rdMmcCmdBits
 
 
 .EQU R1_LEN 6
@@ -33,9 +35,14 @@
 
 
 ; MMC commands
+.EQU GO_IDLE_STATE 0
+.EQU SEND_IF_COND 8
 .EQU STOP_TRANSMISSION 12
 .EQU READ_SINGLE_BLOCK 17
 .EQU READ_MULTIPLE_BLOCK 18
+.EQU SD_SEND_OP_COND 41
+.EQU APP_CMD 55
+
 
 .EQU DISKIO_CACHE_SIZE 16
 
@@ -129,6 +136,11 @@ wrMmcCmdByte:
 	asl 	a					; d7 -> d8
     pha							; save A
 	xba							; d8 -> d0
+; DEBUG
+sep #$20
+sta.l cmdBitsWritten,x
+rep #$20
+
     and    #1
     pha							; put argument on stack
     jsr    wrMmcCmdBit			; write  (byte >> (7-i)) & 1
@@ -187,6 +199,10 @@ sta.w diskioTemp+4
     rep		#$20						; 16-bit A
     and	   	#1
     sta.b  	tcc__r0						; return ((*(u8*)0xCFFE80) >> 4) & 1
+
+;DEBUG
+sta.l diskioTemp+5
+
     rts
 
 
@@ -233,16 +249,19 @@ rdMmcCmdBits:
     tax
     lda    #0
 -:
-    cpx    #0
-    bne    +
     pha
     jsr    rdMmcCmdBit
     pla
     asl    a
     ora    tcc__r0				; A = (A << 1) | rdMmcCmdBit()
+
+;DEBUG
+sep #$20
+sta.l cmdBitsRead,x
+rep #$20
+
     dex
-    bra    -
-+:
+	bne		-
     sta    tcc__r0
     plx
     rts
@@ -1110,7 +1129,8 @@ sdInit:
 	rep		#$30
 	phx
 
-	ldx		#128 ;80
+	; Send 80 clks on. Initializes the mmc card into spi mode
+	ldx		#80
 	pea.w	1
 -:
 	jsr		wrMmcCmdBit					; wrMmcCmdBit(1)
@@ -1118,12 +1138,12 @@ sdInit:
 	bne		-
 	pla
 
-	SEND_MMC_CMD 0,0					; GO_IDLE_STATE
+	SEND_MMC_CMD GO_IDLE_STATE,0		
 	pea.w	$FF
 	jsr		wrMmcCmdByte
 	pla
 
-	SEND_MMC_CMD 8,$1AA					; SEND_IF_COND
+	SEND_MMC_CMD SEND_IF_COND,$1AA		; Check if the card can operate on the given voltage (2.7-3.6 V)
 
 	RECV_MMC_CMD_RESP diskioResp,R7_LEN,1
 	lda		tcc__r0
@@ -1133,7 +1153,7 @@ sdInit:
 	cmp		#8
 	bne		++
 	lda.l	diskioResp+3
-	cmp		#1
+	cmp		#1							; if successul, the card should've echoed back the voltage and check pattern we specified in the command
 	bne		++
 	lda.l	diskioResp+4
 	cmp		#$AA
@@ -1149,7 +1169,7 @@ sdInit:
 
 	ldx		#INIT_RETRIES
 -:
-	SEND_MMC_CMD 55,$FFFF				; APP_CMD 
+	SEND_MMC_CMD APP_CMD,$FFFF				
 	RECV_MMC_CMD_RESP diskioResp,R1_LEN,1
 	lda		tcc__r0
 	beq		+
@@ -1168,8 +1188,8 @@ sdInit:
 	phx
 	ldx		tcc__r1						; restore X
 	pea.w	0
-	pea.w	41
-	jsr		sendMmcCmd					;  SD_SEND_OP_COND		
+	pea.w	SD_SEND_OP_COND
+	jsr		sendMmcCmd					
 	pla
 	pla
 	pla

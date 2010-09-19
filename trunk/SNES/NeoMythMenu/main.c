@@ -818,7 +818,9 @@ unsigned char crc8 (unsigned char *buf)
 
 
 extern unsigned char pkt[6];
-extern u16 diskioTemp[4];
+extern u8 diskioTemp[8];
+u8 cmdBitsWritten[16];
+u8 cmdBitsRead[16];
 
 void sendCmd( unsigned char cmd, unsigned long long arg )
 {
@@ -1004,6 +1006,19 @@ int main()
 
 		//sendCmd(8, 0x1AA);
 		print_hex(diskioTemp[4], 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		print_hex(diskioTemp[5], 6, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+		sendCmd(0,0);
+		print_hex(pkt[5], 10, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+		for (i = 0; i < 8; i++)
+		{
+			print_hex(cmdBitsWritten[8-i], 2+i+i, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		}
+		for (i = 0; i < 8; i++)
+		{
+			print_hex(cmdBitsRead[8-i], 2+i+i, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		}
 
 	}
 

@@ -37,7 +37,7 @@ u8 diskioCrcbuf[8];
 u8 diskioPacket[7];
 u8 diskioResp[R2_LEN];
 u16 diskioRegBackup[6];
-u16 diskioTemp[4];
+u8 diskioTemp[8];
 
 
 DSTATUS (*disk_initialize) (void);
