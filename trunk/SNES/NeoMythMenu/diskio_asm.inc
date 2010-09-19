@@ -1,4 +1,4 @@
-; SNES specific implementation of diskio (work in progress)
+; SNES specific implementation of diskio 
 ; /Mic
 
 
@@ -8,6 +8,9 @@
 ; * Wrong loop count in recvMmcCmdResp
 ; * sdInit's rca value getting overwritten by crc7
 ; * wrMmcxxxByte writing the bits in reversed order
+;
+; * Changed 16-bit Myth reads to 8-bit
+; * Changed stack offsets in neo2_recv_sd
 
 
 .EQU R1_LEN 6
@@ -44,15 +47,17 @@
 .EQU _wrMmcCmdBit_bit 3+_wrMmcCmdBit_save_regs	; the stack-relative position of the 'bit' argument, after registers have been saved upon function entry
 ;
 wrMmcCmdBit:
-    rep    #$30    				; 16-bit regs
+    rep    	#$30    			; 16-bit regs
     phx
-    lda    _wrMmcCmdBit_bit,s 	; read argument from stack
-    and    #1
-    beq    +
-    lda    #$2000  				; set a.13 if (bit & 1) == 1
+    lda    	_wrMmcCmdBit_bit,s 	; read argument from stack
+    and    	#1
+    beq    	+
+    lda    	#$2000  			; set a.13 if (bit & 1) == 1
 +:
     tax
-    lda.l  $CFDE00,x  			; read either $CFDE00 or $CFFE00 depending on the value of bit & 1
+    sep	   	#$20				; 8-bit A
+    lda.l  	$CFDE00,x  			; read either $CFDE00 or $CFFE00 depending on the value of bit & 1
+    rep    	#$20				; 16-bit A
     plx
     rts
 
@@ -66,15 +71,17 @@ wrMmcCmdBit:
 .EQU _wrMmcDatBit_bit 3+_wrMmcDatBit_save_regs
 ;	
 wrMmcDatBit:
-    rep    #$30    				; 16-bit regs
+    rep    	#$30    				; 16-bit regs
     phx
-    lda    _wrMmcDatBit_bit,s 	; read argument from stack
-    and    #1
-    beq    +
-    lda    #$200  				; set a.9 if (bit & 1) == 1
+    lda    	_wrMmcDatBit_bit,s 		; read argument from stack
+    and    	#1
+    beq    	+
+    lda    	#$200  					; set a.9 if (bit & 1) == 1
 +:
     tax
-    lda.l  $CFFC00,x  			; read either $CFFC00 or $CFFE00 depending on the value of bit & 1
+    sep  	#$20					; 8-bit A
+    lda.l  	$CFFC00,x  				; read either $CFFC00 or $CFFE00 depending on the value of bit & 1
+    rep		#$20					; 16-bit A
     plx
     rts
     
@@ -88,14 +95,16 @@ wrMmcDatBit:
 .EQU _wrMmcDatBit4_dat 3+_wrMmcDatBit4_save_regs	
 ;
 wrMmcDatBit4:
-    rep    #$30    				; 16-bit regs
+    rep    #$30    					; 16-bit regs
     phx
-    lda    _wrMmcDatBit4_dat,s  ; read argument from stack
+    lda    _wrMmcDatBit4_dat,s  	; read argument from stack
     and    #15
     asl	   a
-    xba							; A = (dat & 15) << 9
+    xba								; A = (dat & 15) << 9
     tax
-    lda.l  $CFE000,x  
+    sep		#$20					; 8-bit A
+    lda.l  	$CFE000,x
+    rep		#$20					; 16-bit A
     plx
     rts
 
@@ -161,15 +170,21 @@ wrMmcDatByte:
 
 
 ; unsigned int rdMmcCmdBit()
+;
 rdMmcCmdBit:
-    rep    #$30
-    lda.l  $CFFE80
-    lsr    a
-    lsr    a
-    lsr    a
-    lsr    a
-    and	   #1
-    sta.b  tcc__r0
+    sep		#$20						; 8-bit A
+    lda.l  	$CFFE80
+
+;DEBUG
+sta.w diskioTemp+4
+
+    lsr    	a
+    lsr    	a
+    lsr    	a
+    lsr    	a
+    rep		#$20						; 16-bit A
+    and	   	#1
+    sta.b  	tcc__r0						; return ((*(u8*)0xCFFE80) >> 4) & 1
     rts
 
 
@@ -177,11 +192,13 @@ rdMmcCmdBit:
 
 
 ; unsigned int rdMmcDatBit()
+;
 rdMmcDatBit:
-    rep    #$30
-    lda.l  $CF7C20
-    and	   #1
-    sta.b  tcc__r0
+    sep		#$20						; 8-bit A
+    lda.l  	$CF7C20
+    rep		#$20						; 16-bit A
+    and	   	#1
+    sta.b  	tcc__r0
     rts
 
 
@@ -189,11 +206,13 @@ rdMmcDatBit:
 
 
 ; unsigned int rdMmcDatBit4()
+;
 rdMmcDatBit4:
-    rep    #$30
-    lda.l  $CE6060
-    and	   #15
-    sta.b  tcc__r0
+    sep		#$20						; 8-bit A
+    lda.l  	$CE6060
+    rep		#$20						; 16-bit A
+    and	  	#15
+    sta.b  	tcc__r0
     rts
 
 
@@ -270,8 +289,9 @@ wrMmcDatByte4:
 
 
 ; unsigned char rdMmcDatByte4()
+;
 rdMmcDatByte4:
-	rep	   #$30
+	rep	   #$30						; 16-bit regs
 	jsr    rdMmcDatBit4
 	lda	   tcc__r0
 	asl    a
@@ -290,6 +310,7 @@ rdMmcDatByte4:
 
 
 ; unsigned char rdMmcDatByte()
+;
 rdMmcDatByte:
     rep    #$30    					; 16-bit regs
     phx
@@ -332,7 +353,7 @@ crc7:
     ldx    	#40						; 40 bits
     ldy    	#0
 -:
-    sep    	#$20
+    sep    	#$20					; 8-bit A
     lda    	tcc__r2					; if (r4 & 0x80) c = *buf++;
     bpl    	+
     lda    	[tcc__r1],y
@@ -353,7 +374,7 @@ crc7:
     eor    	#9
     sta    	tcc__r0
 +:
-    rep    	#$20
+    rep    	#$20					; 16-bit A
     lda    	tcc__r2					; r4 = (r4 >> 1) | (r4 << 31);
     lsr    	a
     ror    	tcc__r2h
@@ -380,11 +401,11 @@ sendMmcCmd:
     rep  	#$30    				; 16-bit regs
     phx
     
-    sep   	#$20
+    sep   	#$20					; 8-bit A
     lda    	_sendMmcCmd_cmd,s		; cmd
     ora    	#$40					; b7 = 0 => start bit, b6 = 1 => host command
     sta.w	diskioPacket
-    rep		#$20
+    rep		#$20					; 16-bit A
     and		#$FF
     pha
     jsr		wrMmcCmdByte
@@ -490,12 +511,12 @@ recvMmcCmdResp:
 	pea.w	7
 	jsr		rdMmcCmdBits
 	pla
-	sep		#$20
+	sep		#$20						; 8-bit A
 	lda		tcc__r0
 	sta		[tcc__r1],y					; *r++ = rdMmcCmdBits(7);
 	iny
 	
-	rep		#$20
+	rep		#$20						; 16-bit A
 	lda		_recvMmcCmdResp_len,s		; len
 	phx
 	dea
@@ -504,7 +525,7 @@ recvMmcCmdResp:
 	cpx		#0
 	beq		++
 	jsr		rdMmcCmdByte
-	sep		#$20
+	sep		#$20						; 8-bit A
 	lda		tcc__r0
 	sta		[tcc__r1],y					; *r++ = rdMmcCmdByte();
 	iny
@@ -513,8 +534,8 @@ recvMmcCmdResp:
 ++:
 	plx
 	
-	rep		#$20
-	lda		_recvMmcCmdResp_cflag,s	; cflag
+	rep		#$20						; 16-bit A
+	lda		_recvMmcCmdResp_cflag,s		; cflag
 	beq		++
 	pea.w	$FF
 	jsr		wrMmcCmdByte				; wrMmcCmdByte(0xFF);
@@ -575,7 +596,7 @@ sdReadSingleBlock:
 	lda		tcc__r0
 	beq		++
 	sep		#$20
-	lda.l	diskioResp
+	lda.w	diskioResp
 	cmp		#READ_SINGLE_BLOCK
 	beq		+
 ++:
@@ -858,7 +879,7 @@ _sdCrc16_loop_end:
 	sta		tcc__r9h
 	ldy		#7
 	ldx		#0
-	sep		#$20
+	sep		#$20				; 8-bit A
 -:
 	lda		tcc__r2,x
 	inx
@@ -866,7 +887,7 @@ _sdCrc16_loop_end:
 	dey
 	bpl		-	
 
-	rep		#$20
+	rep		#$20				; 16-bit A
 
 	; restore the TCC zeropage vars
     ldx		#12
@@ -1052,7 +1073,7 @@ sdWriteSingleBlock:
 	RECV_MMC_CMD_RESP diskioResp,R1_LEN,0
 	lda		tcc__r0
 	beq		+
-	sep		#$20
+	sep		#$20							
 	lda.l	diskioResp
 	cmp		#24								; diskioResp[0] == 24 ?
 	rep		#$20
@@ -1082,13 +1103,14 @@ sdWriteSingleBlock:
 
 
 ; BOOL sdInit(void)
+;
 sdInit:
 	rep		#$30
 	phx
 
 	jsr		neo2_enable_sd
 	
-	ldx		#80
+	ldx		#128 ;80
 	pea.w	1
 -:
 	jsr		wrMmcCmdBit					; wrMmcCmdBit(1)
@@ -1106,7 +1128,7 @@ sdInit:
 	RECV_MMC_CMD_RESP diskioResp,R7_LEN,1
 	lda		tcc__r0
 	beq		+
-	sep		#$20
+	sep		#$20						; 8-bit A
 	lda.l	diskioResp
 	cmp		#8
 	bne		++
@@ -1116,17 +1138,13 @@ sdInit:
 	lda.l	diskioResp+4
 	cmp		#$AA
 	bne		++
-	rep		#$20
+	rep		#$20						; 16-bit A
 	lda.l	cardType
 	ora		#2
 	sta.l	cardType					; V2 and/or HC card
 	bra		+	
 ++:
-	rep		#$20
-	jsr		neo2_disable_sd
-	plx
-	stz		tcc__r0						; return FALSE
-	rts
+	jmp		_sdInit_failed
 +:
 
 	ldx		#INIT_RETRIES
@@ -1159,7 +1177,7 @@ sdInit:
 	RECV_MMC_CMD_RESP diskioResp,R3_LEN,1
 	lda		tcc__r0
 	beq		++
-	sep		#$20
+	sep		#$20						; 8-bit A
 	lda.l	diskioResp
 	cmp		#$3F						; diskioResp[0] == 0x3F ?
 	bne		++
@@ -1175,15 +1193,15 @@ sdInit:
 	lda.l	diskioResp+2
 	and		#$30
 	bne		+++
-	rep		#$20
+	rep		#$20						; 16-bit A
 	plx
 	stz		tcc__r0						; if (!(resp[2] & 0x30)) return FALSE
 	rts
 +++:
-	rep		#$20
+	rep		#$20						; 16-bit A
 	bra		_sdInit_loop_end
 ++:
-	rep		#$20
+	rep		#$20						; 16-bit A
 +:	
 	dex
 	beq		_sdInit_loop_end
@@ -1193,51 +1211,42 @@ _sdInit_loop_end:
 	cpx		#0
 	bne		+
 	; timed out
-	jsr		neo2_disable_sd
-	plx
-	stz		tcc__r0						; return FALSE
-	rts
+	jmp		_sdInit_failed
 +:
 
 	SEND_MMC_CMD 2,$FFFFFFFF			; ALL_SEND_CID
 	RECV_MMC_CMD_RESP diskioResp,R2_LEN,1
 	lda		tcc__r0
 	beq		+
-	sep		#$20
+	sep		#$20						; 8-bit A
 	lda.l	diskioResp
 	cmp		#$3F						; diskioResp[0] == 0x3F ?
-	rep		#$20
+	rep		#$20						; 16-bit A
 	beq		++
 +:
-	jsr		neo2_disable_sd
-	plx
-	stz		tcc__r0						; return FALSE
-	rts
+	jmp		_sdInit_failed
 ++:
 
 	SEND_MMC_CMD 3,1					; SEND_RELATIVE_ADDR
 	RECV_MMC_CMD_RESP diskioResp,R6_LEN,1
 	lda		tcc__r0
 	beq		+
-	sep		#$20
+	sep		#$20						; 8-bit A
 	lda.l	diskioResp
 	cmp		#3							; diskioResp[0] == 2 ?
-	rep		#$20
+	rep		#$20						; 16-bit A	
 	beq		++
 +:
-	jsr		neo2_disable_sd
-	plx
-	stz		tcc__r0						; return FALSE
-	rts
+	jmp		_sdInit_failed
 ++:
 
 	; rca = (resp[1]<<8) | resp[2]
-	sep		#$20
+	sep		#$20						; 8-bit A
 	lda.w	diskioResp+2
 	sta.w	diskioTemp
 	lda.w	diskioResp+1
 	sta.w	diskioTemp+1
-	rep		#$20
+	rep		#$20						; 16-bit A
 
 	lda.w	diskioTemp
 	pha
@@ -1260,16 +1269,13 @@ _sdInit_loop_end:
 	RECV_MMC_CMD_RESP diskioResp,R1_LEN,1	
 	lda		tcc__r0
 	beq		+
-	sep		#$20
+	sep		#$20						; 8-bit A
 	lda.l	diskioResp
 	cmp		#7
-	rep		#$20
+	rep		#$20						; 16-bit A
 	beq		++
 +:
-	jsr		neo2_disable_sd
-	plx
-	stz		tcc__r0						; return FALSE
-	rts
+	jmp		_sdInit_failed
 ++:
 
 	lda.w	diskioTemp
@@ -1282,38 +1288,32 @@ _sdInit_loop_end:
 	pla
 	RECV_MMC_CMD_RESP diskioResp,R1_LEN,1	
 	lda		tcc__r0
-	beq		+
+	beq		_sdInit_failed
 	lda.l	diskioResp
 	and		#$20	
-	bne		++
-+:
-	jsr		neo2_disable_sd
-	plx
-	stz		tcc__r0						; return FALSE
-	rts
-++:
+	beq		_sdInit_failed
 
 	SEND_MMC_CMD 6,2					; SET_BUS_WIDTH (to 4 bits)
 	RECV_MMC_CMD_RESP diskioResp,R1_LEN,1	
 	lda		tcc__r0
-	beq		+
+	beq		_sdInit_failed
 	sep		#$20
 	lda.l	diskioResp
 	cmp		#6
 	rep		#$20
-	beq		++
-+:
-	jsr		neo2_disable_sd
-	plx
-	stz		tcc__r0						; return FALSE
-	rts
-++:
+	bne		_sdInit_failed
 
 	plx
 	lda		#1
 	sta		tcc__r0						; return TRUE
 	rts
 
+_sdInit_failed:
+	rep		#$20
+	jsr		neo2_disable_sd
+	plx
+	stz		tcc__r0						; return FALSE
+	rts
 
 ;**********************************************************************************************
 
@@ -1783,7 +1783,7 @@ disk_readp_asm:
 	rep		#$30
 	phx
 	phy
-	lda		tcc__r9
+	lda		tcc__r9					; save tcc__r9/r9h
 	pha
 	lda		tcc__r9h
 	pha
@@ -1795,14 +1795,8 @@ disk_readp_asm:
 	bcs		+
 	bra		++
 +:
-	pla
-	pla
 	lda		#RES_PARERR
-	sta		tcc__r0
-	ply
-	plx
-	plp
-	rtl
+	jmp		_disk_readp_return
 ++:
 
 	cmp		#41
@@ -1840,13 +1834,7 @@ disk_readp_asm:
 	sta.l	sec_last
 	sta.l	sec_last+2
 	lda		#RES_ERROR
-	sta		tcc__r0
-	pla
-	pla
-	ply
-	plx
-	plp
-	rtl
+	jmp		_disk_readp_return
 ++++:
 	pla
 	pla
@@ -1917,13 +1905,14 @@ _disk_readp_fetch_single:
 	sta.l	sec_tags,x						; sec_tags[ix] = 0xFFFFFFFF
 	sta.l	sec_tags+2,x
 	lda		#RES_ERROR
-	sta		tcc__r0
-	pla
-	pla
-	ply
-	plx
-	plp
-	rtl
+	;sta		tcc__r0
+	;pla
+	;pla
+	;ply
+	;plx
+	;plp
+	;rtl
+	jmp		_disk_readp_return
 ++:
 	pla
 	pla
@@ -1948,6 +1937,8 @@ _disk_readp_copy_data:
 	bpl		+
 	; streaming file mode
 	; TODO: Handle this?
+	lda		#RES_ERROR
+	bra		_disk_readp_return
 +:
 	lda		_disk_readp_sofs,s
 	clc
@@ -1971,15 +1962,17 @@ _disk_readp_copy_data:
 	rep		#$20
 
 	lda		#RES_OK
+_disk_readp_return:
 	sta		tcc__r0
 	pla
+	sta		tcc__r9h
 	pla
+	sta		tcc__r9
 	ply
 	plx
 	plp
 	rtl
 	
-
 
 ; Helper subroutine
 _disk_readp_calc_sector:

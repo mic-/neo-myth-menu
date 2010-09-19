@@ -792,6 +792,9 @@ void run_secondary_cart_c()
 
 
 
+
+///////////// DEBUG ///////////////////
+
 unsigned char crc8 (unsigned char *buf)
 {
     int i;
@@ -815,6 +818,7 @@ unsigned char crc8 (unsigned char *buf)
 
 
 extern unsigned char pkt[6];
+extern u16 diskioTemp[4];
 
 void sendCmd( unsigned char cmd, unsigned long long arg )
 {
@@ -825,6 +829,10 @@ void sendCmd( unsigned char cmd, unsigned long long arg )
     pkt[4]=(unsigned char)(arg);
     pkt[5]=( crc8(pkt) << 1 ) | 1;             // b0 = 1 => stop bit
 }
+
+///////////////////////////////////////////////
+
+
 
 int init_sd()
 {
@@ -994,8 +1002,8 @@ int main()
 			print_hex(diskioResp[i], 2+i+i, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 		}
 
-		sendCmd(8, 0x1AA);
-		print_hex(pkt[5], 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		//sendCmd(8, 0x1AA);
+		print_hex(diskioTemp[4], 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 
 	}
 
