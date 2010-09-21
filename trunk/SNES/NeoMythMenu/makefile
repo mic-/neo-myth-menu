@@ -6,9 +6,9 @@ OPTIMIZE = python $(SNESSDK)/bin/816-opt.py
 OPTIMORE = ./tools/optimore-816
 STRIPCOM = ./tools/stripcom
 CONSTIFY = ./tools/constify
-SIXPACK = tools/sixpack
+SIXPACK = wine tools/sixpack.exe
 
-OBJS = main.obj navigation.obj ppuc.obj assets/data.obj diskio.obj dma.obj game_genie.obj action_replay.obj hw_math.obj aplib_decrunch.obj neo2.obj neo2_spc.obj pff.obj ppu.obj u_strings.obj cheats/cheat_database.obj dummy_games_list.obj
+OBJS = main.obj navigation.obj ppuc.obj assets/data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj aplib_decrunch.obj neo2.obj neo2_spc.obj ppu.obj cheats/cheat_database.obj dummy_games_list.obj diskio.obj myth_io.obj pff.obj u_strings.obj
 
 EMUOBJS = main.eobj navigation.eobj ppuc.eobj assets/data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj lzss_decode.obj neo2.eobj neo2_spc.eobj ppu.eobj cheats/cheat_database.obj dummy_games_list.obj
 
