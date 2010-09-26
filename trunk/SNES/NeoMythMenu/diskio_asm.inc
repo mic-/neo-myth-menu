@@ -187,7 +187,7 @@ wrMmcDatByte:
 ;
 rdMmcCmdBit:
     sep		#$20						; 8-bit A
-    lda.l  	$CFFE80
+    lda.l  	$CFFE81
 
 ;DEBUG
 sta.w diskioTemp+4
@@ -198,7 +198,7 @@ sta.w diskioTemp+4
     lsr    	a
     rep		#$20						; 16-bit A
     and	   	#1
-    sta.b  	tcc__r0						; return ((*(u8*)0xCFFE80) >> 4) & 1
+    sta.b  	tcc__r0						; return ((*(u8*)0xCFFE81) >> 4) & 1
 
 ;DEBUG
 sta.l diskioTemp+5
@@ -213,7 +213,7 @@ sta.l diskioTemp+5
 ;
 rdMmcDatBit:
     sep		#$20						; 8-bit A
-    lda.l  	$CF7C20
+    lda.l  	$CF7C21
     rep		#$20						; 16-bit A
     and	   	#1
     sta.b  	tcc__r0
@@ -227,7 +227,7 @@ rdMmcDatBit:
 ;
 rdMmcDatBit4:
     sep		#$20						; 8-bit A
-    lda.l  	$CE6060
+    lda.l  	$CE6061
     rep		#$20						; 16-bit A
     and	  	#15
     sta.b  	tcc__r0
@@ -1946,12 +1946,18 @@ _disk_readp_fetch_single:
 	lda		_disk_readp_sector+2,s
 	sta.l	sec_tags+2,x
 _disk_readp_fetch_done:
-	jsr		_disk_readp_calc_sector
-	lda		tcc__r1h
+	; buf = &sec_cache[ix << 9]
+	txa
+	xba
+	and		#$FC00
+	lsr		a								
+	clc
+	adc		#sec_cache
+	sta		tcc__r9
+	lda		#0
+	adc		#:sec_cache
 	sta		tcc__r9h
-	lda		tcc__r1
-	sta		tcc__r9						; buf = &sec_cache[ix << 9]
-
+	
 _disk_readp_copy_data:
 
 	lda		_disk_readp_count,s
