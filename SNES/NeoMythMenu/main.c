@@ -34,6 +34,8 @@ u8 gameMode;
 u8 romSize, romRunMode, sramSize, sramBank, sramMode;
 u8 extDsp, extSram;
 
+u16 neo_mode;
+
 sortOrder_t sortOrder = SORT_LOGICALLY;
 char sortLetter = 'A';
 
@@ -821,6 +823,9 @@ extern unsigned char pkt[6];
 extern u8 diskioTemp[8];
 u8 cmdBitsWritten[16];
 u8 cmdBitsRead[16];
+u8 asicCommands[16];
+extern unsigned char pfmountbuf[36];
+unsigned char pfMountFmt;
 
 void sendCmd( unsigned char cmd, unsigned long long arg )
 {
@@ -835,6 +840,59 @@ void sendCmd( unsigned char cmd, unsigned long long arg )
 ///////////////////////////////////////////////
 
 
+void print_sd_status()
+{
+	int i;
+
+	print_hex(cardType>>8, 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(cardType, 4, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+	print_hex(num_sectors>>24, 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(num_sectors>>16, 4, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(num_sectors>>8, 6, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(num_sectors, 8, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+	print_hex(pfMountFmt, 12, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(sdFatFs.n_rootdir, 15, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+	for (i = 0; i < 7; i++)
+	{
+		print_hex(diskioPacket[i], 2+i+i, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	}
+	for (i = 0; i < 6; i++)
+	{
+		print_hex(diskioResp[i], 2+i+i, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	}
+
+	//sendCmd(8, 0x1AA);
+	print_hex(diskioTemp[4], 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(diskioTemp[5], 6, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+	sendCmd(0,0);
+	print_hex(pkt[5], 10, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+	print_hex(asicCommands[2], 14, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(asicCommands[1], 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(asicCommands[0], 18, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+	print_hex(asicCommands[6], 22, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(asicCommands[5], 24, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(asicCommands[4], 26, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+	for (i = 0; i < 8; i++)
+	{
+		print_hex(cmdBitsWritten[8-i], 2+i+i, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	}
+	for (i = 0; i < 8; i++)
+	{
+		print_hex(cmdBitsRead[8-i], 2+i+i, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	}
+	for (i = 0; i < 12; i++)
+	{
+		print_hex(pfmountbuf[i], 2+i+i, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	}
+}
+
 
 int init_sd()
 {
@@ -848,6 +906,7 @@ int init_sd()
     if (mountResult = pf_mount(&sdFatFs))
     {
 		print_hex(mountResult, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		print_sd_status();
     	cardType = 0x8000;
         if (mountResult = pf_mount(&sdFatFs))
      	{
@@ -926,8 +985,6 @@ void setup_video()
 }
 
 
-extern unsigned char pfmountbuf[36];
-
 int main()
 {
 	u8 *bp;
@@ -982,43 +1039,7 @@ int main()
 		{
 			printxy("Failed to open map.spc", 2, 7, 4, 32);
 		}
-		for (i = 0; i < 12; i++)
-		{
-			print_hex(pfmountbuf[i], 2+i+i, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		}
 
-		print_hex(cardType>>8, 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		print_hex(cardType, 4, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-
-		print_hex(num_sectors>>24, 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		print_hex(num_sectors>>16, 4, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		print_hex(num_sectors>>8, 6, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		print_hex(num_sectors, 8, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-
-		for (i = 0; i < 7; i++)
-		{
-			print_hex(diskioPacket[i], 2+i+i, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		}
-		for (i = 0; i < 6; i++)
-		{
-			print_hex(diskioResp[i], 2+i+i, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		}
-
-		//sendCmd(8, 0x1AA);
-		print_hex(diskioTemp[4], 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		print_hex(diskioTemp[5], 6, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-
-		sendCmd(0,0);
-		print_hex(pkt[5], 10, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-
-		for (i = 0; i < 8; i++)
-		{
-			print_hex(cmdBitsWritten[8-i], 2+i+i, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		}
-		for (i = 0; i < 8; i++)
-		{
-			print_hex(cmdBitsRead[8-i], 2+i+i, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		}
 
 	}
 

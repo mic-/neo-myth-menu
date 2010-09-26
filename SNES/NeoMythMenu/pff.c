@@ -452,6 +452,7 @@ BYTE check_fs (	/* 0:The FAT boot record, 1:Valid boot record but not an FAT, 2:
 /*-----------------------------------------------------------------------*/
 
 unsigned char pfmountbuf[36];
+extern unsigned char pfMountFmt;
 
 FRESULT pf_mount (
 	FATFS *fs		/* Pointer to new file system object (NULL: Unmount) */
@@ -460,6 +461,8 @@ FRESULT pf_mount (
 	BYTE fmt, buf[36];
 	DWORD bsect, fsize, tsect, mclst;
 
+// DEBUG
+pfMountFmt = 0xAB;
 
 	FatFs = 0;
 	if (!fs) return FR_OK;				/* Unregister fs object */
@@ -485,6 +488,9 @@ memcpy(pfmountbuf, buf, 36);
 			}
 		}
 	}
+
+	pfMountFmt = fmt;
+
 	if (fmt == 3) return FR_DISK_ERR;
 	if (fmt) return FR_NO_FILESYSTEM;	/* No valid FAT patition is found */
 
@@ -507,12 +513,19 @@ memcpy(pfmountbuf, buf, 36);
 
 	fmt = FS_FAT12;							/* Determine the FAT sub type */
 	if (mclst >= 0xFF7) fmt = FS_FAT16;		/* Number of clusters >= 0xFF5 */
+
+// DEBUG
+pfMountFmt = fmt;
+
 	if (mclst >= 0xFFF7)					/* Number of clusters >= 0xFFF5 */
+	{
 #if _FS_FAT32
 		fmt = FS_FAT32;
 #else
+pfMountFmt = 0xAC;
 		return FR_NO_FILESYSTEM;
 #endif
+    }
 
 	fs->fs_type = fmt;		/* FAT sub-type */
 #if _FS_FAT32

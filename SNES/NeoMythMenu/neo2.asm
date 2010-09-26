@@ -1795,13 +1795,27 @@ _neo_select_menu:
 
 	ldx		#$0037
 	rep		#$20
-	lda.l	$7d0000+neo_mode			; enable/disable SD card interface
-	ora		#$0003
-	tay
+	;lda	 	;neo_mode					; enable/disable SD card interface
+	;ora		#$1003
+	;tay
+	ldy		#$0483
 	jsr		_neo_asic_cmd				; set cr = select menu flash
+
+;DEBUG
+lda tcc__r1
+sta.w asicCommands+0
+lda tcc__r1h
+sta.w asicCommands+2
+
 	ldx		#$00DA
 	ldy		#$0044
 	jsr		_neo_asic_cmd				; set iosr = disable game flash
+
+;DEBUG
+lda tcc__r1
+sta.w asicCommands+4
+lda tcc__r1h
+sta.w asicCommands+6
 
 	sep		#$20
 	lda		#0
@@ -1820,9 +1834,16 @@ neo2_enable_sd:
 	sei								; disable interrupts
 	rep		#$30
 	lda		#$0480
-	sta.l	$7d0000+neo_mode
+	sta.l	neo_mode
 	jsr		_neo_select_menu
-	;cli								; enable interrupts
+	
+	sep     #$20                        ; 8-bit A
+   	;lda     #GBAC_TO_PSRAM_COPY_MODE
+   	;sta.l   MYTH_OPTION_IO
+   	;lda     #$F8
+   	;sta.l   MYTH_GBAC_ZIO               ; GBA CARD 8M SIZE
+   	rep     #$20                        ; 16-bit A
+   
 	rts
 
 
@@ -1831,9 +1852,8 @@ neo2_disable_sd:
 	sei								; disable interrupts
 	rep		#$30
 	lda		#0
-	sta.l	$7d0000+neo_mode
+	sta.l	neo_mode
 	jsr		_neo_select_menu
-	;cli								; enable interrupts
 	rts
 
 
@@ -1853,7 +1873,6 @@ neo2_post_sd:
 	lda		#0
 	sta.l	MYTH_GBAC_LIO
 	rep		#$20
-	;cli						; enable interrupts
 	rts
 
 
@@ -1861,6 +1880,8 @@ neo2_post_sd:
 ;
 .EQU _neo2_recv_sd_save_regs 6
 .EQU _neo2_recv_sd_buf 3+_neo2_recv_sd_save_regs
+;
+.EQU NEO2_R_DATA4 $CE6061
 ;
 neo2_recv_sd:
 	php
@@ -1872,26 +1893,22 @@ neo2_recv_sd:
 	lda		_neo2_recv_sd_buf,s			; buf
 	tax
 	sep		#$20
-	lda		#$87
+	lda		#$80 ;87
 	sta.l	MYTH_GBAC_LIO
 	lda		_neo2_recv_sd_buf+2,s		; buf bank
 	pha
 	plb									; DBR points to buf's bank
 	ldy		#512						; counter
 _nrsd_loop:
-	;rep		#$20						; 16-bit A
-	lda.l	$C06060						; read first nybble
-	;sep		#$20						; 8-bit A
+	lda.l	NEO2_R_DATA4				; read first nybble
 	asl		a
 	asl		a
 	asl		a
 	asl		a
 	sta		tcc__r0
-	;rep		#$20						; 16-bit A	
-	lda.l	$C06060						; read second nybble
+	lda.l	NEO2_R_DATA4				; read second nybble
 	and		#$0F
 	ora		tcc__r0						; sector byte
-	;sep		#$20						; 8-bit A
 	sta.w	$0000,x						; write to buf
 	inx
 	dey
@@ -1899,28 +1916,22 @@ _nrsd_loop:
 
 	ldy		#8
 _nrsd_crc:
-	;rep		#$20
-	lda.l	$C06060						; read first nybble
-	;sep		#$20
+	lda.l	NEO2_R_DATA4				; read first nybble
 	asl		a
 	asl		a
 	asl		a
 	asl		a
-	;rep		#$20
 	sta		tcc__r0
-	lda.l	$C06060						; read second nybble
+	lda.l	NEO2_R_DATA4				; read second nybble
 	and		#$0F
 	ora		tcc__r0						; crc byte
-	;sep		#$20
 ;	sta.w	$0000,x
 ;	inx
 	dey
 	bne		_nrsd_crc
 
-	;rep		#$20
-	lda.l	$C06060						; end bit
+	lda.l	NEO2_R_DATA4				; end bit
 
-	sep		#$20
 	lda		#$80
 	sta.l	MYTH_GBAC_LIO
 
@@ -1934,9 +1945,6 @@ _nrsd_crc:
 neo2_recv_sd_multi:
 	rts
 	
-
-neo_mode:	.dw 0
-
 
 .include "diskio_asm.inc"
 
