@@ -1795,10 +1795,9 @@ _neo_select_menu:
 
 	ldx		#$0037
 	rep		#$20
-	;lda	 	;neo_mode					; enable/disable SD card interface
-	;ora		#$1003
-	;tay
-	ldy		#$0483
+	lda.l 	neo_mode					; enable/disable SD card interface
+	ora		#$0003
+	tay
 	jsr		_neo_asic_cmd				; set cr = select menu flash
 
 ;DEBUG
@@ -1893,13 +1892,14 @@ neo2_recv_sd:
 	lda		_neo2_recv_sd_buf,s			; buf
 	tax
 	sep		#$20
-	lda		#$80 ;87
-	sta.l	MYTH_GBAC_LIO
+;	lda		#$80 ;87
+;	sta.l	MYTH_GBAC_LIO
 	lda		_neo2_recv_sd_buf+2,s		; buf bank
 	pha
 	plb									; DBR points to buf's bank
-	ldy		#512						; counter
+	ldy		#256						; counter
 _nrsd_loop:
+.rept 2
 	lda.l	NEO2_R_DATA4				; read first nybble
 	asl		a
 	asl		a
@@ -1911,29 +1911,19 @@ _nrsd_loop:
 	ora		tcc__r0						; sector byte
 	sta.w	$0000,x						; write to buf
 	inx
+.endr
 	dey
 	bne		_nrsd_loop					; repeat 512 times
 
-	ldy		#8
-_nrsd_crc:
-	lda.l	NEO2_R_DATA4				; read first nybble
-	asl		a
-	asl		a
-	asl		a
-	asl		a
-	sta		tcc__r0
-	lda.l	NEO2_R_DATA4				; read second nybble
-	and		#$0F
-	ora		tcc__r0						; crc byte
-;	sta.w	$0000,x
-;	inx
-	dey
-	bne		_nrsd_crc
+	; Read 8 CRC bytes (16 nybbles)
+.rept 16
+	lda.l	NEO2_R_DATA4
+.endr
 
 	lda.l	NEO2_R_DATA4				; end bit
 
-	lda		#$80
-	sta.l	MYTH_GBAC_LIO
+;	lda		#$80
+;	sta.l	MYTH_GBAC_LIO
 
 	plb
 	ply

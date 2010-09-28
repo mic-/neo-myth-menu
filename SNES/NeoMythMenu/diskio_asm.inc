@@ -36,6 +36,7 @@
 
 ; MMC commands
 .EQU GO_IDLE_STATE 0
+.EQU SET_BUS_WIDTH 6
 .EQU SEND_IF_COND 8
 .EQU STOP_TRANSMISSION 12
 .EQU READ_SINGLE_BLOCK 17
@@ -136,11 +137,6 @@ wrMmcCmdByte:
 	asl 	a					; d7 -> d8
     pha							; save A
 	xba							; d8 -> d0
-; DEBUG
-sep #$20
-sta.l cmdBitsWritten,x
-rep #$20
-
     and    #1
     pha							; put argument on stack
     jsr    wrMmcCmdBit			; write  (byte >> (7-i)) & 1
@@ -188,10 +184,6 @@ wrMmcDatByte:
 rdMmcCmdBit:
     sep		#$20						; 8-bit A
     lda.l  	$CFFE81
-
-;DEBUG
-sta.w diskioTemp+4
-
     lsr    	a
     lsr    	a
     lsr    	a
@@ -199,10 +191,6 @@ sta.w diskioTemp+4
     rep		#$20						; 16-bit A
     and	   	#1
     sta.b  	tcc__r0						; return ((*(u8*)0xCFFE81) >> 4) & 1
-
-;DEBUG
-sta.l diskioTemp+5
-
     rts
 
 
@@ -254,12 +242,6 @@ rdMmcCmdBits:
     pla
     asl    a
     ora    tcc__r0				; A = (A << 1) | rdMmcCmdBit()
-
-;DEBUG
-sep #$20
-sta.l cmdBitsRead,x
-rep #$20
-
     dex
 	bne		-
     sta    tcc__r0
@@ -1261,14 +1243,11 @@ _sdInit_loop_end:
 ++:
 
 	; rca = (resp[1]<<8) | resp[2]
-	sep		#$20						; 8-bit A
-	lda.w	diskioResp+2
-	sta.w	diskioTemp
 	lda.w	diskioResp+1
-	sta.w	diskioTemp+1
-	rep		#$20						; 16-bit A
+	xba
+	sta.w	diskioTemp
 
-	lda.w	diskioTemp
+;	lda.w	diskioTemp
 	pha
 	pea.w	$FFFF
 	pea.w	9
@@ -1301,7 +1280,7 @@ _sdInit_loop_end:
 	lda.w	diskioTemp
  	pha
 	pea.w	$FFFF
-	pea.w	55
+	pea.w	APP_CMD
 	jsr		sendMmcCmd					; APP_CMD
 	pla
 	pla
@@ -1313,7 +1292,7 @@ _sdInit_loop_end:
 	and		#$20	
 	beq		_sdInit_failed
 
-	SEND_MMC_CMD 6,2					; SET_BUS_WIDTH (to 4 bits)
+	SEND_MMC_CMD SET_BUS_WIDTH,2		; SET_BUS_WIDTH (to 4 bits)
 	RECV_MMC_CMD_RESP diskioResp,R1_LEN,1	
 	lda		tcc__r0
 	beq		_sdInit_failed
@@ -1764,9 +1743,9 @@ _disk_read_return:
 
 ; Helper subroutine
 _disk_read_calc_sector:
-	lda		_disk_read_sector,s
-	sta		tcc__r1
 	lda		_disk_read_sector+2,s
+	sta		tcc__r1
+	lda		_disk_read_sector+4,s
 	sta		tcc__r1h
 	lda.l	cardType
 	and		#1
@@ -1822,15 +1801,15 @@ disk_readp_asm:
 ++:
 
 	cmp		#41
-	bcc		+
+	bcc		_disk_readp_small_read
     ; too big for anything but a file read, don't fetch to cache
 	lda		_disk_readp_sector,s
 	cmp.w	sec_last
-	bne		++
+	bne		+
 	lda		_disk_readp_sector+2,s
 	cmp.w	sec_last+2
-	beq		+++
-++:
+	beq		++
++:
 	; read sector
 	jsr		neo2_pre_sd
 	jsr		_disk_readp_calc_sector		
@@ -1842,10 +1821,11 @@ disk_readp_asm:
 	pea.w	sec_buf
 	jsr		sdReadSingleBlock			; sdReadSingleBlock(sec_buf, sector << ((cardType & 1) ? 0 : 9))
 	lda		tcc__r0
-	bne		++++
+	bne		+++
 	; read failed, retry once
 	jsr		sdReadSingleBlock
-	bne		++++
+	lda		tcc__r0
+	bne		+++
 	; read failed
 	pla
 	pla
@@ -1857,7 +1837,7 @@ disk_readp_asm:
 	sta.l	sec_last+2
 	lda		#RES_ERROR
 	jmp		_disk_readp_return
-++++:
++++:
 	pla
 	pla
 	pla
@@ -1867,7 +1847,7 @@ disk_readp_asm:
 	sta.l	sec_last
 	lda		_disk_readp_sector+2,s
 	sta.l	sec_last+2
-+++:								; end if (sec_last != sector)
+++:									; end if (sec_last != sector)
 
 	lda		#sec_buf
 	sta		tcc__r9
@@ -1875,7 +1855,7 @@ disk_readp_asm:
 	sta		tcc__r9h				; buf = sec_buf
 	jmp		_disk_readp_copy_data
 
-+:
+_disk_readp_small_read:
 
 	lda		_disk_readp_sector,s
 	and		#DISKIO_CACHE_SIZE-1
@@ -1927,13 +1907,6 @@ _disk_readp_fetch_single:
 	sta.l	sec_tags,x						; sec_tags[ix] = 0xFFFFFFFF
 	sta.l	sec_tags+2,x
 	lda		#RES_ERROR
-	;sta		tcc__r0
-	;pla
-	;pla
-	;ply
-	;plx
-	;plp
-	;rtl
 	jmp		_disk_readp_return
 ++:
 	pla
@@ -1957,6 +1930,11 @@ _disk_readp_fetch_done:
 	lda		#0
 	adc		#:sec_cache
 	sta		tcc__r9h
+
+; DEBUG
+lda _disk_readp_count,s
+sta.w diskioTemp+6
+
 	
 _disk_readp_copy_data:
 
@@ -2004,9 +1982,9 @@ _disk_readp_return:
 
 ; Helper subroutine
 _disk_readp_calc_sector:
-	lda		_disk_readp_sector,s
-	sta		tcc__r1
 	lda		_disk_readp_sector+2,s
+	sta		tcc__r1
+	lda		_disk_readp_sector+4,s
 	sta		tcc__r1h
 	lda.l	cardType
 	and		#1
