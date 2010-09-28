@@ -458,8 +458,9 @@ FRESULT pf_mount (
 	FATFS *fs		/* Pointer to new file system object (NULL: Unmount) */
 )
 {
-	BYTE fmt, buf[36];
-	DWORD bsect, fsize, tsect, mclst;
+	BYTE fmt;
+	static BYTE buf[36];
+	static DWORD bsect, fsize, tsect, mclst;
 
 // DEBUG
 pfMountFmt = 0xAB;
@@ -555,7 +556,7 @@ FRESULT pf_open (
 {
 	FRESULT res;
 	DIR dj;
-	BYTE sp[12], dir[32];
+	static BYTE sp[12], dir[32];
 	FATFS *fs = FatFs;
 
 
@@ -595,9 +596,9 @@ FRESULT pf_read (
 	WORD* br		/* Pointer to number of bytes read */
 )
 {
-	DRESULT dr;
-	CLUST clst;
-	DWORD sect, remain;
+	static DRESULT dr;
+	static CLUST clst;
+	static DWORD sect, remain;
 	WORD rcnt;
 	BYTE *rbuff = dest;
 	FATFS *fs = FatFs;
@@ -659,8 +660,8 @@ FRESULT pf_lseek (
 	DWORD ofs		/* File pointer from top of file */
 )
 {
-	CLUST clst;
-	DWORD bcs, nsect, ifptr;
+	static CLUST clst;
+	static DWORD bcs, nsect, ifptr;
 	FATFS *fs = FatFs;
 
 
@@ -716,7 +717,7 @@ FRESULT pf_opendir (
 )
 {
 	FRESULT res;
-	BYTE sp[12], dir[32];
+	static BYTE sp[12], dir[32];
 	FATFS *fs = FatFs;
 
 
@@ -761,7 +762,7 @@ FRESULT pf_readdir (
 )
 {
 	FRESULT res;
-	BYTE sp[12], dir[32];
+	static BYTE sp[12], dir[32];
 	FATFS *fs = FatFs;
 
 

@@ -25,7 +25,7 @@
 #ifndef _FATFS
 #define _FATFS
 
-#define _WORD_ACCESS	0
+#define _WORD_ACCESS	1
 /* The _WORD_ACCESS option defines which access method is used to the word
 /  data in the FAT structure.
 /

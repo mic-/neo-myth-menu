@@ -827,6 +827,9 @@ u8 asicCommands[16];
 extern unsigned char pfmountbuf[36];
 unsigned char pfMountFmt;
 
+extern unsigned long long sec_tags[16];
+extern unsigned char sec_cache[16*512 + 8];
+
 void sendCmd( unsigned char cmd, unsigned long long arg )
 {
     pkt[0]=cmd|0x40;                         // b7 = 0 => start bit, b6 = 1 => host command
@@ -891,6 +894,19 @@ void print_sd_status()
 	{
 		print_hex(pfmountbuf[i], 2+i+i, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	}
+
+	print_hex(sec_tags[0]>>8, 2, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(sec_tags[0], 4, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(sec_tags[1]>>8, 7, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(sec_tags[1], 9, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+	print_hex(diskioTemp[6], 12, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+	for (i = 0; i < 10; i++)
+	{
+		print_hex(sec_cache[508+i], 2+i+i, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	}
+
 }
 
 

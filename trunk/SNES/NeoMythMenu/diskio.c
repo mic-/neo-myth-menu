@@ -20,7 +20,7 @@ unsigned char pkt[6];                    /* command packet */
 unsigned long long num_sectors;
 
 #define CACHE_SIZE 16                    /* number sectors in cache */
-unsigned int sec_tags[CACHE_SIZE];
+unsigned long long sec_tags[CACHE_SIZE];
 unsigned char sec_cache[CACHE_SIZE*512 + 8];
 unsigned char sec_buf[520]; /* for uncached reads */
 
