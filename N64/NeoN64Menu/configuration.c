@@ -3,7 +3,6 @@
 #include <malloc.h>
 extern void c2wstrcpy(void *dst, void *src);
 
-
 int32_t config_test_sdc_speed()
 {
 	int32_t cnt,r;
@@ -30,7 +29,7 @@ int32_t config_test_sdc_speed()
 			hash += (cnt + ( (lSDFile.fptr+1) >> 1 ));//new "hash"
 		}while(( (++cnt) < ( 2048 >> 2 )) && (r) && (ts == 4));
 
-		r = (r) && (lSDFile.fsize == (2048 >> 2)) && (ts == 4);
+		r = (r) && (lSDFile.fsize == ((2048 >> 2) << 2)) && (ts == 4);
 
 		f_close(&lSDFile);
 		f_unlink(wname);
@@ -49,7 +48,7 @@ void config_create_initial_settings(const char* filename)
 	config_push("firstRun","1");
 	config_push("forcePAL","0");
 	config_push("lastGameLoaded","NULL");
-	config_push("lastGameLoadedSaveType","NULL");//EEP16K,EEP4K,SRAM32K,FLASHRAM
+	config_push("lastGameLoadedSaveType","NULL");//EEP16K,EEP4K,SRAM32K,FLASHRAM,CPACK,CARD
 	config_push("useBoxarts","0");
 	config_push("showLogo","0");
 	config_push("menuBootcode","6102");
@@ -60,11 +59,13 @@ void config_create_initial_settings(const char* filename)
 
 void config_save(const char* filename)
 {
-	return;//disabled currently (untested)
 	uint32_t pred;
 	unsigned char* mem;
 	FIL file;
 	WCHAR out[512];
+
+	//mute,always
+	config_push("firstRun","0");
 
 	pred = config_predictOutputBufferSize();
 
@@ -75,9 +76,6 @@ void config_save(const char* filename)
 
 	if(!mem)
 		return;
-
-	//mute,always
-	config_push("firstRun","0");
 
 	if(!config_saveToBuffer(mem))
 	{

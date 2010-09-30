@@ -319,10 +319,10 @@ void neo_copyto_sram(void *src, int sstart, int len)
     hw_delay();
 
     // Init the PI for sram
-	vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
-	vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
-	vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
-	vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
+    vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
+    vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
+    vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
+    vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
 
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
@@ -346,11 +346,11 @@ void neo_copyto_sram(void *src, int sstart, int len)
         SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
 
-	PI_BSD_DOM2_LAT_REG = piLatReg;
-	PI_BSD_DOM2_PWD_REG = piPwdReg;
-	PI_BSD_DOM2_PGS_REG = piPgsReg;
-	PI_BSD_DOM2_RLS_REG = piRlsReg;
-	hw_delay();
+    PI_BSD_DOM2_LAT_REG = piLatReg;
+    PI_BSD_DOM2_PWD_REG = piPwdReg;
+    PI_BSD_DOM2_PGS_REG = piPgsReg;
+    PI_BSD_DOM2_RLS_REG = piRlsReg;
+    hw_delay();
     //neo_select_menu();
 }
 
@@ -378,10 +378,10 @@ void neo_copyfrom_sram(void *dst, int sstart, int len)
     hw_delay();
 
     // Init the PI for sram
-	vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
-	vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
-	vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
-	vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
+    vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
+    vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
+    vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
+    vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
     PI_BSD_DOM2_PGS_REG = 0x0000000D;
@@ -405,10 +405,10 @@ void neo_copyfrom_sram(void *dst, int sstart, int len)
         SRAM2C_IO = 0x00000000;         // disable gba sram
     hw_delay();
 
-	PI_BSD_DOM2_LAT_REG = piLatReg;
-	PI_BSD_DOM2_PWD_REG = piPwdReg;
-	PI_BSD_DOM2_PGS_REG = piPgsReg;
-	PI_BSD_DOM2_RLS_REG = piRlsReg;
+    PI_BSD_DOM2_LAT_REG = piLatReg;
+    PI_BSD_DOM2_PWD_REG = piPwdReg;
+    PI_BSD_DOM2_PGS_REG = piPgsReg;
+    PI_BSD_DOM2_RLS_REG = piRlsReg;
     hw_delay();
 }
 
@@ -430,10 +430,10 @@ void neo_copyto_nsram(void *src, int sstart, int len)
     hw_delay();
 
     // Init the PI for sram
-	vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
-	vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
-	vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
-	vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
+    vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
+    vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
+    vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
+    vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
     PI_BSD_DOM2_PGS_REG = 0x0000000D;
@@ -461,10 +461,10 @@ void neo_copyto_nsram(void *src, int sstart, int len)
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
 
-	PI_BSD_DOM2_LAT_REG = piLatReg;
-	PI_BSD_DOM2_PWD_REG = piPwdReg;
-	PI_BSD_DOM2_PGS_REG = piPgsReg;
-	PI_BSD_DOM2_RLS_REG = piRlsReg;
+    PI_BSD_DOM2_LAT_REG = piLatReg;
+    PI_BSD_DOM2_PWD_REG = piPwdReg;
+    PI_BSD_DOM2_PGS_REG = piPgsReg;
+    PI_BSD_DOM2_RLS_REG = piRlsReg;
     hw_delay();
 }
 
@@ -484,10 +484,10 @@ void neo_copyfrom_nsram(void *dst, int sstart, int len)
     hw_delay();
 
     // Init the PI for sram
-	vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
-	vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
-	vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
-	vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
+    vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
+    vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
+    vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
+    vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
     PI_BSD_DOM2_PGS_REG = 0x0000000D;
@@ -515,10 +515,10 @@ void neo_copyfrom_nsram(void *dst, int sstart, int len)
     SAVE_IO = 0x00050005;               // save off
     hw_delay();
 
-	PI_BSD_DOM2_LAT_REG = piLatReg;
-	PI_BSD_DOM2_PWD_REG = piPwdReg;
-	PI_BSD_DOM2_PGS_REG = piPgsReg;
-	PI_BSD_DOM2_RLS_REG = piRlsReg;
+    PI_BSD_DOM2_LAT_REG = piLatReg;
+    PI_BSD_DOM2_PWD_REG = piPwdReg;
+    PI_BSD_DOM2_PGS_REG = piPgsReg;
+    PI_BSD_DOM2_RLS_REG = piRlsReg;
     hw_delay();
 }
 
@@ -779,6 +779,9 @@ void simulate_pif_boot(u32 cic_chip)
     vu32 *src, *dst;
     u32 country = ((*(vu32 *)0xB000003C) >> 8) & 0xFF;
     vu64 *gGPR = (vu64 *)0xA0300000;
+
+    /* Clear XBUS/Flush/Freeze */
+    ((vu32 *)0xA4100000)[3] = 0x15; 
 
     // clear some OS globals for cleaner boot
     *(vu32*)0xA000030C = 0;             // cold boot

@@ -8,6 +8,7 @@
 #include <ff.h>
 #include "neo_2_asm.h"
 #include "configuration.h"
+#include "interrupts.h"
 
 typedef volatile unsigned short vu16;
 typedef volatile unsigned int vu32;
@@ -1864,6 +1865,8 @@ int main(void)
 
     config_init();
     config_load("/menu/n64/config.cfg");
+    sys_set_boot_cic(6102);
+    ints_setup();
 
     while (1)
     {
