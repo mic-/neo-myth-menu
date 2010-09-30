@@ -12,6 +12,12 @@
 .ent    neo2_recv_sd_multi
 		neo2_recv_sd_multi:
 
+		mfc0 $8,$12
+		la $9,~1
+		and $8,$9
+		mtc0 $8,$12
+		nop
+
         la $15,0xB30E6060         /* $15 = 0xB30E6060*/
         ori $14,$4,0              /* $14 = buf*/
         ori $12,$5,0              /* $12 = count*/
@@ -27,7 +33,7 @@
 		lui $25,0x0F00
 		lui $16,0x00F0
 		lui $17,0x000F
-
+		
         oloop:
         lui $11,0x0001            /* $11 = timeout = 64 * 1024*/
 
@@ -122,13 +128,18 @@
 
         ori $2,$0,1               /* res = TRUE*/
 
-		___exit:
+	___exit:
 		lw $16,0($sp)
 		lw $17,4($sp)
 		addiu $sp,$sp,8
 
-		jr $ra
-		nop
+	mfc0 $8,$12
+	ori $8,1
+	mtc0 $8,$12
+	nop
+
+	jr $ra
+	nop
 
 .end neo2_recv_sd_multi
 
@@ -136,6 +147,12 @@
 .global neo_xferto_psram
 .ent    neo_xferto_psram
 		neo_xferto_psram:
+
+	mfc0 $15,$12
+	la $8,~1
+	and $15,$8
+	mtc0 $15,$12
+	nop
 
 	la $10,0xB0000000
 	ori $8,$4,0
@@ -152,6 +169,10 @@
 
 		bne $4,$8,0b
 		nop
+
+	ori $15,1 /*enable ints back*/
+	mtc0 $15,$12
+	nop
 
 	jr $ra
 	nop
