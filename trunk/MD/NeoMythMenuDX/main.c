@@ -284,6 +284,7 @@ unsigned char rtc[8];                   /* RTC from Neo2/3 flash cart */
 unsigned char __attribute__((aligned(16))) rom_hdr[256];             /* rom header from selected rom (if loaded) */
 
 unsigned char __attribute__((aligned(16))) buffer[XFER_SIZE*2];      /* Work RAM buffer - big enough for SMD decoding */
+unsigned char __attribute__((aligned(16))) cacheBuffer[1024];
 
 selEntry_t gSelections[MAX_ENTRIES];    /* entries for flash or current SD directory */
 
@@ -2561,7 +2562,7 @@ int cache_process()
 void cache_loadPA(WCHAR* sss)
 {
     UINT fbr = 0;
-    WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fnbuf = (WCHAR*)&cacheBuffer[0];
 
     if(gCurMode != MODE_SD)
         return;
@@ -2656,7 +2657,7 @@ void cache_load()
 void cache_sync()
 {
     UINT fbr = 0;
-    WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fnbuf = (WCHAR*)&cacheBuffer[0];
 
     if(gCurMode != MODE_SD)
         return;
