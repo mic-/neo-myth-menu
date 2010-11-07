@@ -144,13 +144,13 @@ static CheatEntry cheatEntries[CHEAT_ENTRIES_COUNT];
 static short registeredCheatEntries = 0;
 static short gResponseMsgStatus = 0;
 
-#define eeprom_inc_path "/.menu/md/eeprom.inc"
-#define dxcore_dir "/.menu/md"
-#define dxconf_cfg "/.menu/md/DXCONF.CFG"
-#define cheats_dir_default ".menu/md/cheats"
-#define ips_dir_default ".menu/md/ips"
-#define saves_dir_default ".menu/md/saves"
-#define cache_dir_default ".menu/md/cache"
+#define eeprom_inc_path "/menu/md/eeprom.inc"
+#define dxcore_dir "/menu/md"
+#define dxconf_cfg "/menu/md/DXCONF.CFG"
+#define cheats_dir_default "menu/md/cheats"
+#define ips_dir_default "menu/md/ips"
+#define saves_dir_default "menu/md/saves"
+#define cache_dir_default "menu/md/cache"
 #define md_32x_save_ext_default ".srm"
 #define sms_save_ext_default ".ssm"
 #define brm_save_ext_default ".brm"
@@ -5194,11 +5194,11 @@ int main(void)
         get_sd_directory(-1);           /* get root directory of sd card */
         if(gSdDetected)
         {
-            utility_c2wstrcpy(fss, "/.menu/md/MDEBIOS.BIN");
+            utility_c2wstrcpy(fss, "/menu/md/MDEBIOS.BIN");
             if(f_open(&gSDFile, fss, FA_OPEN_EXISTING | FA_READ) == FR_OK)
             {
                 gCurEntry = 0;
-                utility_c2wstrcpy(path, "/.menu/md");
+                utility_c2wstrcpy(path, "/menu/md");
                 utility_c2wstrcpy(gSelections[gCurEntry].name, "MDEBIOS.BIN");
                 gSelections[gCurEntry].type = 0;
                 gSelections[gCurEntry].bbank = 0;
