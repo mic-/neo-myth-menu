@@ -16,8 +16,8 @@ extern void neo2_post_sd(void);
 // for debug
 extern void delay(int count);
 extern void put_str(char *str, int fcolor);
-extern short int gCursorX;                /* range is 0 to 63 (only 0 to 39 onscreen) */
-extern short int gCursorY;                /* range is 0 to 31 (only 0 to 27 onscreen) */
+extern short int gCursorX;              /* range is 0 to 63 (only 0 to 39 onscreen) */
+extern short int gCursorY;              /* range is 0 to 31 (only 0 to 27 onscreen) */
 
 //#define DEBUG_PRINT
 //#define DEBUG_RESP
@@ -26,17 +26,17 @@ extern short int gCursorY;                /* range is 0 to 31 (only 0 to 27 onsc
 
 unsigned short cardType;                /* b0 = block access, b1 = V2 and/or HC, b15 = funky read timing */
 
-unsigned char pkt[6];                    /* command packet */
+unsigned char pkt[6];                   /* command packet */
 
 unsigned int num_sectors;
 
-#define CACHE_SIZE 16                    /* number sectors in cache */
+#define CACHE_SIZE 8                    /* number sectors in cache */
 unsigned int sec_tags[CACHE_SIZE];
 unsigned char __attribute__((aligned(16))) sec_cache[CACHE_SIZE*512 + 8];
 unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads */
 
 #define R1_LEN (48/8)
-#define    R2_LEN (136/8)
+#define R2_LEN (136/8)
 #define R3_LEN (48/8)
 #define R6_LEN (48/8)
 #define R7_LEN (48/8)
@@ -812,8 +812,8 @@ DRESULT MMC_disk_read (
                 return RES_ERROR;
             }
         }
-	else if (!neo2_recv_sd_multi(buff, count))
-	{
+    else if (!neo2_recv_sd_multi(buff, count))
+    {
             // read failed, retry once
             if (!sdReadStartMulti(sector << ((cardType & 1) ? 0 : 9)))
             {
@@ -829,7 +829,7 @@ DRESULT MMC_disk_read (
                 //debugPrint("Read failed!");
                 return RES_ERROR;
             }
-	}
+    }
 
         sdReadStopMulti();
         neo2_post_sd();
