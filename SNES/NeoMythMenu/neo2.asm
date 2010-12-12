@@ -294,6 +294,7 @@ CHEAT:
 +:
 
 	sep		#$20
+bra slowmo_disabled
 	lda		cpldArEnabled
 	beq		ram_cheats_disabled	
 ram_cheat1:
@@ -824,7 +825,7 @@ _frc_copy_pattern:
 
 
 ; Updates and displays the "LOADING......(nn)" string
-show_loading_progress:
+_show_loading_progress:
 	jsr.w	_wait_nmi
 	rep	#$30
 	lda	#$22a3			; VRAM base address
@@ -832,19 +833,19 @@ show_loading_progress:
 	sep	#$20
 	plx
 	phx
-	lda.w	load_progress+15
+	lda.l	load_progress+15
 	dea
 	cmp	#'0'-1			; Do we need to wrap from 0 to 9?
 	bne	+
-	lda.w	load_progress+14
+	lda.l	load_progress+14
 	dea
-	sta.w	load_progress+14
+	sta.l	load_progress+14
 	lda	#'9'
 +:
-	sta.w	load_progress+15
+	sta.l	load_progress+15
 	ldx	#0
 -:
-	lda.w	load_progress,x
+	lda.l	load_progress,x
 	beq	+
 	sta.l	REG_VRAM_DATAW1		; Write the character number
 	lda	#8
@@ -854,6 +855,48 @@ show_loading_progress:
 +:
 	rts
 
+; Updates and displays the "LOADING......(nn)" string
+show_loading_progress:
+	php
+	rep #$30
+	pha
+	phx
+	phy
+	jsr.w	_wait_nmi
+	rep		#$30
+	lda		#$22a3			; VRAM base address
+	sta.l	REG_VRAM_ADDR_L
+	sep		#$20
+	plx
+	phx
+	lda.l	load_progress+15
+	dea
+	cmp	#'0'-1			; Do we need to wrap from 0 to 9?
+	bne	+
+	lda.l	load_progress+14
+	dea
+	sta.l	load_progress+14
+	lda	#'9'
++:
+	sta.l	load_progress+15
+	ldx	#0
+-:
+	lda.l	load_progress,x
+	beq	+
+	sta.l	REG_VRAM_DATAW1		; Write the character number
+	lda	#8
+	sta.l	REG_VRAM_DATAW2		; Write attributes (palette number)
+	inx
+	bra	-
++:
+	rep		#$30
+	ply
+	plx
+	pla
+	plp
+	rtl
+	
+	
 show_copied_data:
  .DEFINE NEO2_DEBUG 1
  .IFDEF NEO2_DEBUG
@@ -866,7 +909,9 @@ show_copied_data:
 	sep	#$20
 	ldx	#0
 -:
-	lda.l	$5014e8,x
+rep #$20
+	lda.l	$520600,x
+sep #$20
 	lsr	a
 	lsr	a
 	lsr	a
@@ -881,7 +926,9 @@ show_copied_data:
 	sta.l	REG_VRAM_DATAW1
 	lda	#8
 	sta.l	REG_VRAM_DATAW2
-	lda.l	$5014e8,x
+rep #$20
+	lda.l	$520600,x
+sep #$20
 	and	#15
 	clc
 	adc	#'0'
@@ -894,10 +941,45 @@ show_copied_data:
 	lda	#8
 	sta.l	REG_VRAM_DATAW2
 	inx
-	cpx	#8
+	cpx	#7
 	bne	-
- .ENDIF
+	
 
+	ldx	#0
+-:
+	lda.l	pfmountbuf,x
+	lsr	a
+	lsr	a
+	lsr	a
+	lsr	a
+	clc
+	adc	#'0'
+	cmp	#58
+	bcc	+
+	clc
+	adc	#7
++:
+	sta.l	REG_VRAM_DATAW1
+	lda	#8
+	sta.l	REG_VRAM_DATAW2
+	lda.l	pfmountbuf,x
+	and	#15
+	clc
+	adc	#'0'
+	cmp	#58
+	bcc	+
+	clc
+	adc	#7
++:
+	sta.l	REG_VRAM_DATAW1
+	lda	#8
+	sta.l	REG_VRAM_DATAW2
+	inx
+	cpx	#4
+	bne	-
+
+ .ENDIF
+	rep #$20
 	rts
 
 
@@ -994,7 +1076,7 @@ neo2_myth_current_rom_read:
 	STA.L   MYTH_OPTION_IO
 
 	LDA     #$00
-	STA.L   MYTH_EXTM_ON   ; A25,A24 ON
+	STA.L   MYTH_EXTM_ON   ; A25,A24 OFF
 
 	LDA     #$20       	; OFF A21
 	STA.L   MYTH_GBAC_ZIO
@@ -1165,8 +1247,8 @@ _nctmp_write:
 
 
 
-load_progress:
-	.db "Loading......(  )",0
+;load_progress:
+;	.db "Loading......(  )",0
 
 
  .MACRO MOV_PSRAM_SETUP
@@ -1326,9 +1408,9 @@ MOV_4M:
 ;===============================================================================
 MOV_PSRAM:
 	lda	tcc__r0+1
-	sta.w	load_progress+15
+	sta.l	load_progress+15
 	lda	tcc__r0h
-	sta.w	load_progress+14
+	sta.l	load_progress+14
 
 	 LDA    #$00
 	 STA    tcc__r1+1
@@ -1371,7 +1453,7 @@ MOV_PSRAM_LOOP:
 	 INC    tcc__r2
 	 INC    tcc__r2+1
 
-	 jsr	show_loading_progress
+	 jsr	_show_loading_progress
 
 	 LDA	tcc__r1h
 	 sta.l	$7d0000+copy_1mbit_from_gbac_to_psram+$07
@@ -1837,10 +1919,10 @@ neo2_enable_sd:
 	jsr		_neo_select_menu
 	
 	sep     #$20                        ; 8-bit A
-   	;lda     #GBAC_TO_PSRAM_COPY_MODE
-   	;sta.l   MYTH_OPTION_IO
-   	;lda     #$F8
-   	;sta.l   MYTH_GBAC_ZIO               ; GBA CARD 8M SIZE
+
+	;LDA     #$01
+	;STA.L   MYTH_EXTM_ON   ; A25,A24 ON
+	
    	rep     #$20                        ; 16-bit A
    
 	rts
@@ -1860,8 +1942,19 @@ neo2_disable_sd:
 neo2_pre_sd:
 	sei						; disable interrupts
 	sep		#$20
-	lda		#$80
+	lda		#$87 ;80
 	sta.l	MYTH_GBAC_LIO
+
+    lda    #$F8
+    sta.l  MYTH_PRAM_ZIO
+	LDA    #GBAC_TO_PSRAM_COPY_MODE
+	STA.L  MYTH_OPTION_IO
+	LDA    #$F8
+	STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+
+	lda #1
+	sta.l MYTH_WE_IO
+
 	rep		#$20
 	rts
 
@@ -1871,16 +1964,24 @@ neo2_post_sd:
 	sep		#$20
 	lda		#0
 	sta.l	MYTH_GBAC_LIO
+
+	LDA    #0
+	STA.L  MYTH_OPTION_IO
+	LDA    #$0
+	STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+
+	lda #0
+	sta.l MYTH_WE_IO
+	
 	rep		#$20
 	rts
+
 
 
 ; void neo2_recv_sd(unsigned char *buf)
 ;
 .EQU _neo2_recv_sd_save_regs 6
 .EQU _neo2_recv_sd_buf 3+_neo2_recv_sd_save_regs
-;
-.EQU NEO2_R_DATA4 $CE6061
 ;
 neo2_recv_sd:
 	php
@@ -1898,32 +1999,29 @@ neo2_recv_sd:
 	pha
 	plb									; DBR points to buf's bank
 	ldy		#256						; counter
-_nrsd_loop:
-.rept 2
-	lda.l	NEO2_R_DATA4				; read first nybble
-	asl		a
-	asl		a
-	asl		a
-	asl		a
-	sta		tcc__r0
-	lda.l	NEO2_R_DATA4				; read second nybble
-	and		#$0F
-	ora		tcc__r0						; sector byte
-	sta.w	$0000,x						; write to buf
-	inx
-.endr
-	dey
-	bne		_nrsd_loop					; repeat 512 times
+	_nrsd_loop:
+		.rept 2
+		lda.l	MYTH_NEO2_RD_DAT4			; read first nybble
+		asl		a
+		asl		a
+		asl		a
+		asl		a
+		sta		tcc__r0
+		lda.l	MYTH_NEO2_RD_DAT4			; read second nybble
+		and		#$0F
+		ora		tcc__r0						; sector byte
+		sta.w	$0000,x						; write to buf
+		inx
+		.endr
+		dey
+		bne		_nrsd_loop					; repeat 256 times
 
 	; Read 8 CRC bytes (16 nybbles)
-.rept 16
-	lda.l	NEO2_R_DATA4
-.endr
+	.rept 16
+	lda.l	MYTH_NEO2_RD_DAT4
+	.endr
 
-	lda.l	NEO2_R_DATA4				; end bit
-
-;	lda		#$80
-;	sta.l	MYTH_GBAC_LIO
+	lda.l	MYTH_NEO2_RD_DAT4			; end bit
 
 	plb
 	ply
@@ -1932,10 +2030,429 @@ _nrsd_loop:
 	rts
 
 
+
+; void neo2_recv_sd(WORD prbank, WORD proffs)
+;
+.EQU _neo2_recv_sd_psram_save_regs 6
+.EQU _neo2_recv_sd_psram_prbank 3+_neo2_recv_sd_psram_save_regs
+.EQU _neo2_recv_sd_psram_proffs _neo2_recv_sd_psram_prbank+2
+;
+neo2_recv_sd_psram:
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+
+	lda		_neo2_recv_sd_psram_proffs,s
+sta.l	pfmountbuf
+	tax
+	sep		#$20
+	lda		_neo2_recv_sd_psram_prbank,s	
+	pha
+sta.l pfmountbuf+2
+	plb									; DBR points to buf's bank
+	ldy		#256						; counter
+	_nrsdp_loop:
+
+		sep		#$20
+		lda.l	MYTH_NEO2_RD_DAT4		; Read high nybble of low byte (S)
+		asl		a	
+		asl		a	
+		asl		a	
+		asl		a
+		sta		tcc__r0	
+		lda.l	MYTH_NEO2_RD_DAT4		; Read low nybble of low byte (s)
+		and		#$0F
+		ora		tcc__r0
+		sta		tcc__r0					; tcc__r0 = 0x??Ss
+		lda.l	MYTH_NEO2_RD_DAT4		; Read high nybble of high byte (T)
+		asl		a	
+		asl		a	
+		asl		a	
+		asl		a
+		sta		tcc__r0+1				; tcc__r0 = 0xT0Ss
+		lda.l	MYTH_NEO2_RD_DAT4		; Read low nybble of high byte (t)
+		rep		#$20
+		and		#$0F					; A = 0x000t
+		xba								; A = 0x0t00
+		ora		tcc__r0					; A = 0xTtSs
+		sta.w	$0000,x					; Write 16 bits to PSRAM
+		inx
+		inx
+		dey
+				
+		bne		_nrsdp_loop				; repeat 256 times
+
+	; Read 8 CRC bytes (16 nybbles)
+	.rept 16
+	lda.l	MYTH_NEO2_RD_DAT4
+	.endr
+
+	lda.l	MYTH_NEO2_RD_DAT4			; end bit
+
+	;jsr.w show_copied_data
+	
+	plb
+	ply
+	plx
+	plp
+	rts
+	
+	
+
 neo2_recv_sd_multi:
 	rts
 	
 
+
+
+ .MACRO MOV_SD_PSRAM_SETUP
+        LDA.L  romSize
+        CMP    #\1
+        BNE    +
+        LDA    #\2
+        STA    tcc__r0
+
+        LDA    #<\3
+        STA    tcc__r0+1
+        LDA    #>\3
+        STA    tcc__r0h
+
+        LDA    #\4
+        STA    tcc__r0h+1
+
+        LDA    #\5
+        STA    tcc__r1
+        JMP    MOV_SD_PSRAM
+	+:
+ .ENDM
+ 
+
+run_game_from_sd_card:
+	jsl	clear_status_window
+	jsl	update_screen
+
+	sep	#$20
+
+	lda	#$7e
+	pha
+	plb
+
+	lda.l	romAddressPins
+	sta	tcc__r2h
+
+	LDA    #$20      	; OFF A21
+	STA.L  MYTH_GBAC_ZIO
+	JSR    SET_NEOCMA  	;
+	JSR    SET_NEOCMB  	;
+	JSR    SET_NEOCMC  	; ON_NEO CARD A24 & A25 + SA16 & SA17
+
+	LDA.L   romAddressPins+1
+	STA.L   MYTH_GBAC_HIO	; SET AH25,AH25
+
+	LDA     #$01
+	STA.L   MYTH_EXTM_ON   ; A25,A24 ON
+
+
+	;                    4M    4M    4M  4M~8M
+	MOV_SD_PSRAM_SETUP $04, $3C, $3035, $04, $00
+	;                    8M    8M    8M  4M~8M
+	MOV_SD_PSRAM_SETUP $08, $38, $3039, $08, $00
+	;                    16M   16M   8M   16M
+	MOV_SD_PSRAM_SETUP $09, $30, $3137, $08, $01
+	;                    32M   24M   8M   24M
+	MOV_SD_PSRAM_SETUP $0A, $20, $3235, $08, $02
+	;                    32M   32M   8M   32M
+	MOV_SD_PSRAM_SETUP $0B, $20, $3333, $08, $03
+	;                    64M   40M   8M   40M
+	MOV_SD_PSRAM_SETUP $0C, $00, $3431, $08, $04
+	;                    64M   48M   8M   48M
+	MOV_SD_PSRAM_SETUP $0D, $00, $3439, $08, $05
+	;                    64M   64M   8M   64M
+	MOV_SD_PSRAM_SETUP $0E, $00, $3635, $08, $07
+
+;===============================================================================
+MOV_SD_PSRAM:
+	 lda	tcc__r0+1
+	 sta.l	load_progress+15
+	 lda	tcc__r0h
+	 sta.l	load_progress+14
+
+	 LDA    #$00
+	 STA    tcc__r1+1
+	 sta	tcc__r3
+
+	 LDA    #GBAC_TO_PSRAM_COPY_MODE
+	 STA.L  MYTH_OPTION_IO
+
+	 LDA    #$01       	; PSRAM WE ON !
+	 STA.L  MYTH_WE_IO
+
+	 LDA    #$F8
+	 STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+	 STA.L  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
+
+	 ;LDA.L  romAddressPins
+	 ;STA.L  MYTH_GBAC_LIO
+
+	 ;jsr	neo2_pre_sd
+	 
+	 LDA    #$00
+	 STA.L  MYTH_PRAM_BIO
+
+; The game has already been copied to PSRAM by run_game_from_sd_card_c.
+; This loop just applies region fixes and game genie codes.
+MOV_SD_PSRAM_LOOP:
+	 LDA    #$3E
+	 STA    tcc__r1h
+	 LDA    #PSRAM_BANK-2
+	 STA    tcc__r2
+
+	 LDA    #$3F
+	 STA    tcc__r1h+1
+
+	 LDA    #PSRAM_BANK-1
+	 STA    tcc__r2+1
+
+-:
+	 INC    tcc__r1h
+	 INC    tcc__r2
+	 INC    tcc__r2+1
+
+	 INC    tcc__r1h
+	 INC    tcc__r2
+	 INC    tcc__r2+1
+
+     LDA    tcc__r2
+
+	 DEC    tcc__r0+1
+	 LDA    tcc__r0+1        ; L-BYTE
+	 LDA    tcc__r0h        ; H-BYTE
+
+	 jsr	fix_region_checks
+
+	; Replace the NMI vector with the cheat routine if needed
+	 lda	tcc__r3
+	 bne	+
+	 lda.l	anyRamCheats
+	 beq	+
+	 lda.l	romRunMode
+	 bne	_patch_nmi_lorom
+	 rep	#$20
+	 lda.l	$50ffea
+	 sta.l	$7d0000+branch_to_real_nmi+1
+	 lda	#$3e00
+	 sta.l	$50ffea		; Native mode vector
+	 sep	#$20
+	 bra	+
+	 _patch_nmi_lorom:
+	 rep	#$20
+	 lda.l	$507fea
+	 sta.l	$7d0000+branch_to_real_nmi+1
+	 lda	#$3e00
+	 sta.l	$507fea		; Native mode vector
+	 sep	#$20
+	 +:
+
+	 jsr	apply_cheat_codes
+	 inc	tcc__r3
+	 inc	tcc__r3
+
+;	 jsr	show_copied_data
+
+	 DEC    tcc__r0h+1
+	 BEQ	+
+	 JMP    -
+	 +:
+
+	 LDA    tcc__r1
+	 CMP    tcc__r1+1
+	 BNE    MOV_SD_PSRAM_1
+	 JMP    MOV_SD_PSRAM_DONE
+MOV_SD_PSRAM_1:
+;===============================================================================
+	 INC    tcc__r1+1
+	 LDA    tcc__r1+1
+	 CMP    #$01
+	 BNE    +
+
+	 LDA    #$01        ;16M
+	 STA.L  MYTH_PRAM_BIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_SD_PSRAM_LOOP
+;-------------------------------------------------------------------------------
++:   CMP    #$02        ;24M
+	 BNE    +
+	 LDA    #$02
+	 STA.L  MYTH_PRAM_BIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1
+	 JMP    MOV_SD_PSRAM_LOOP
+;-------------------------------------------------------------------------------
++:   CMP    #$03        ;32M
+	 BNE    +
+	 LDA    #$03
+	 STA.L  MYTH_PRAM_BIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_SD_PSRAM_LOOP
+;-------------------------------------------------------------------------------
++:   CMP    #$04        ;40M
+	 BNE    +
+	 LDA    #$04
+	 STA.L  MYTH_PRAM_BIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_SD_PSRAM_LOOP
+;-------------------------------------------------------------------------------
++:   CMP    #$05        ;48M
+	 BNE    +
+	 LDA    #$05
+	 STA.L  MYTH_PRAM_BIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_SD_PSRAM_LOOP
+;-------------------------------------------------------------------------------
++:   CMP    #$06        ;56M
+	 BNE    +
+	 LDA    #$06
+	 STA.L  MYTH_PRAM_BIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_SD_PSRAM_LOOP
+;-------------------------------------------------------------------------------
++:   CMP    #$07        ;64M
+	 BNE    MOV_SD_PSRAM_DONE
+	 LDA    #$07
+	 STA.L  MYTH_PRAM_BIO
+
+	 LDA    #$8
+	 STA    tcc__r0h+1      ;
+	 JMP    MOV_SD_PSRAM_LOOP
+MOV_SD_PSRAM_DONE:
+;===============================================================================
+	 LDA     #$00       ;
+	 STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
+;-------------------------------------------------------------------------------
+;neo gba card menu ,swap back to power on mode
+
+	 LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
+	 STA.L   MYTH_OPTION_IO
+
+	 LDA     #$20       	; OFF A21
+	 STA.L   MYTH_GBAC_ZIO
+	 JSR     SET_NEOCMD	; SET MENU
+
+	 LDA     #$00
+	 STA.L   MYTH_GBAC_LIO
+	 STA.L   MYTH_GBAC_HIO
+	 STA.L   MYTH_GBAC_ZIO
+;-------------------------------------------------------------------------------
+;SET  SNES PSRAM RUN
+	 LDA     #$01       	; SET PSRAM RUN
+	 STA.L   MYTH_OPTION_IO
+
+	 LDA     #$00
+	 STA.L   MYTH_PRAM_BIO
+
+	 LDA     tcc__r0
+	 STA.L   MYTH_PRAM_ZIO
+
+	 LDA.L   sramBank
+	 LDA     #$00
+	 STA.L   MYTH_GBAS_BIO
+;===============================================================================
+;SET  GAME SAVE  SIZE & BANK
+	 LDA.L   sramSize
+;	 CMP     #$00
+;	 BNE     MAP_SRAM
+;	 CMP     #$00
+	 STA.L   MYTH_SRAM_TYPE ;  OFF SRAM TYPE
+;	 JMP     _SET_EXT_DSP
+;-------------------------------------------------------------------------------
+;MAP_SRAM:
+;	 LDA.L   sramMode
+
+; 	MAP_SRAM_CHECK $01, $02
+; 	MAP_SRAM_CHECK $08, $03
+; 	MAP_SRAM_CHECK $07, $07
+; 	MAP_SRAM_CHECK $06, $07
+; 	MAP_SRAM_CHECK $05, $0F
+; 	MAP_SRAM_CHECK $04, $0F
+
+;MAP_SRAM_DONE:
+;	 LDA     #$01
+;	 STA.L   MYTH_SRAM_WE    ; GBA SRAM WE ON !
+;-------------------------------------------------------------------------------
+;SET SAVE SRAM BANK
+
+; TODO: handle this
+
+;-------------------------------------------------------------------------------
+_SET_EXT_DSP:
+
+	 LDA.L   extDsp
+	 CMP     #$00
+	 BNE     +
+	 STA.L   MYTH_DSP_TYPE
+	 LDA     #$00
+	 STA.L   MYTH_DSP_MAP
+	 JMP     _MAP_DSP_DONE
+;-------------------------------------------------------------------------------
++:
+	 LDA.L   extDsp
+	 CMP     #$01
+	 BNE     +
+	 STA.L   MYTH_DSP_TYPE
+	 LDA     #$00
+	 STA.L   MYTH_DSP_MAP
+	 JMP     _MAP_DSP_DONE
+;-------------------------------------------------------------------------------
++:
+	 CMP     #$03
+	 BNE     +
+	 STA.L   MYTH_DSP_TYPE   ;EXT DSP
+	 LDA.L   romSize
+	 CMP     #$04     ;4M ROM
+	 BNE     +
+	 LDA     #$03     ;$300000
+	 STA.L   MYTH_DSP_MAP
+	 JMP     _MAP_DSP_DONE
+;-------------------------------------------------------------------------------
++:
+     LDA     #$03
+     STA.L   MYTH_DSP_TYPE  ;EXT DSP
+     LDA     #$06    ;$600000
+     STA.L   MYTH_DSP_MAP
+     JMP     _MAP_DSP_DONE
+
+;-------------------------------------------------------------------------------
+;-------------------------------------------------------------------------------
+_MAP_DSP_DONE:
+         LDA.L   extSram
+         CMP     #$07    ;
+         BNE     +      ;
+         LDA     #$06    ;
+         STA.L   MYTH_OPTION_IO  ;
+         LDA     #$C0    ;
+         STA.L   $C01F  ;
++:
+
+         LDA.L   romRunMode
+         STA.L   MYTH_RUN_IO
+_RUN_M01:
+         JMP     run_3800     ; FOR EXIT RAM
+         
+         
+	
 .include "diskio_asm.inc"
 
 

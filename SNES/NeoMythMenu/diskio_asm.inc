@@ -17,6 +17,7 @@
 ; * Wrong loop condition in rdMmcCmdBits
 
 
+; MMC response lengths
 .EQU R1_LEN 6
 .EQU R2_LEN 17
 .EQU R3_LEN 6
@@ -45,6 +46,7 @@
 .EQU APP_CMD 55
 
 
+; Number of entries in the sector cache. The cache itself is declared in diskio.c.
 .EQU DISKIO_CACHE_SIZE 16
 
 ;**********************************************************************************************
@@ -66,7 +68,7 @@ wrMmcCmdBit:
 +:
     tax
     sep	   	#$20				; 8-bit A
-    lda.l  	$CFDE00,x  			; read either $CFDE00 or $CFFE00 depending on the value of bit & 1
+    lda.l  	MYTH_NEO2_WR_CMD1,x ; read either $CFDE00 or $CFFE00 depending on the value of bit & 1
     rep    	#$20				; 16-bit A
     plx
     rts
@@ -90,7 +92,7 @@ wrMmcDatBit:
 +:
     tax
     sep  	#$20					; 8-bit A
-    lda.l  	$CFFC00,x  				; read either $CFFC00 or $CFFE00 depending on the value of bit & 1
+    lda.l  	MYTH_NEO2_WR_DAT1,x  	; read either $CFFC00 or $CFFE00 depending on the value of bit & 1
     rep		#$20					; 16-bit A
     plx
     rts
@@ -113,7 +115,7 @@ wrMmcDatBit4:
     xba								; A = (dat & 15) << 9
     tax
     sep		#$20					; 8-bit A
-    lda.l  	$CFE000,x
+    lda.l  	MYTH_NEO2_WR_DAT4,x
     rep		#$20					; 16-bit A
     plx
     rts
@@ -183,7 +185,7 @@ wrMmcDatByte:
 ;
 rdMmcCmdBit:
     sep		#$20						; 8-bit A
-    lda.l  	$CFFE81
+    lda.l  	MYTH_NEO2_RD_CMD1
     lsr    	a
     lsr    	a
     lsr    	a
@@ -201,7 +203,7 @@ rdMmcCmdBit:
 ;
 rdMmcDatBit:
     sep		#$20						; 8-bit A
-    lda.l  	$CF7C21
+    lda.l  	MYTH_NEO2_RD_DAT1
     rep		#$20						; 16-bit A
     and	   	#1
     sta.b  	tcc__r0
@@ -215,7 +217,7 @@ rdMmcDatBit:
 ;
 rdMmcDatBit4:
     sep		#$20						; 8-bit A
-    lda.l  	$CE6061
+    lda.l  	MYTH_NEO2_RD_DAT4
     rep		#$20						; 16-bit A
     and	  	#15
     sta.b  	tcc__r0
@@ -2000,3 +2002,213 @@ _disk_readp_calc_sector:
 	rol		tcc__r1h
 +:
 	rts
+
+
+
+
+
+
+; BOOL sdReadSingleBlockPsram( WORD prbank, WORD proffs, unsigned int addr )
+sdReadSingleBlockPsram:
+	rep		#$30
+	phx
+
+	lda		11,s				; addr bank
+	pha
+	lda		11,s				; addr offset (at 9,s. but the PHA on the previous line pushed it 2 bytes further away)
+	pha
+	pea.w	READ_SINGLE_BLOCK				
+	jsr		sendMmcCmd
+	pla
+	pla
+	pla
+	
+	lda.l	cardType
+	and		#$8000				; cardType & 0x8000 ?
+	bne		+
+	RECV_MMC_CMD_RESP diskioResp,R1_LEN,0
+	lda		tcc__r0
+	beq		++
+	sep		#$20
+	lda.w	diskioResp
+	cmp		#READ_SINGLE_BLOCK
+	beq		+
+++:
+	plx
+	rep		#$20
+	stz		tcc__r0				; return FALSE
+	rts
++:
+	rep		#$20
+
+	ldx		#8191	
+-:								; while ((rdMmcDatBit4()&1) != 0)
+	jsr		rdMmcDatBit4		
+	lda		tcc__r0
+	and		#1
+	beq		+
+	txa
+	bmi		++
+	dex
+	bra		-
+++:
+	plx
+	stz		tcc__r0				; if (i-- < 0) return FALSE (timeout on start bit)
+	rts
++:
+
+	lda		7,s					; proffs
+;sta.l pfmountbuf
+	pha
+	lda		7,s					; prbank (at 5,s. but the PHA on the previous line pushed it 2 bytes further away)
+;sta.l pfmountbuf+2
+	pha
+	jsr		neo2_recv_sd_psram
+	pla
+	pla
+
+	pea.w	$FF
+	jsr		wrMmcCmdByte		; wrMmcCmdByte(0xFF);
+	pla
+
+	lda		#1
+	sta		tcc__r0				; return TRUE
+	plx
+	rts
+	
+	
+
+; DRESULT disk_readsect_psram (
+;     WORD prbank,
+;     WORD proffs,
+;     DWORD sector,       /* Sector number (LBA) */
+; )
+;
+.EQU _disk_readrsp_save_regs 9
+.EQU _disk_readrsp_prbank 4+_disk_readrsp_save_regs
+.EQU _disk_readrsp_proffs _disk_readrsp_prbank+2
+.EQU _disk_readrsp_sector _disk_readrsp_proffs+2
+;
+disk_readsect_psram_asm:
+	php
+	rep		#$30
+	phx
+	phy
+	lda		tcc__r9					; save tcc__r9/r9h
+	pha
+	lda		tcc__r9h
+	pha
+
+;	lda		_disk_readrsp_count,s
+;	and		#$7FFF
+;	beq		+
+;	cmp		#513
+;	bcs		+
+;	bra		++
+;+:
+;	lda		#RES_PARERR
+;	jmp		_disk_readrsp_return
+;++:
+
+;	cmp		#41
+;	bcc		_disk_readrsp_small_read
+    ; too big for anything but a file read, don't fetch to cache
+;	lda		_disk_readrsp_sector,s
+;	cmp.w	sec_last
+;	bne		+
+;	lda		_disk_readrsp_sector+2,s
+;	cmp.w	sec_last+2
+;	beq		++
+;+:
+	; read sector
+	jsr		neo2_pre_sd
+	jsr		_disk_readrsp_calc_sector		
+	lda		tcc__r1h
+	pha
+	lda		tcc__r1
+	pha
+	;pea.w	:sec_buf
+	;pea.w	sec_buf
+	lda		_disk_readrsp_proffs+4,s		; need to offset by 4 bytes because of the two above PHAs
+	pha
+sta.l pfmountbuf
+	lda		_disk_readrsp_prbank+6,s
+	pha
+sta.l pfmountbuf+2
+lda.l pfmountbuf+3
+ina
+sta.l pfmountbuf+3
+	jsr		sdReadSingleBlockPsram			; sdReadSingleBlock(sec_buf, sector << ((cardType & 1) ? 0 : 9))
+	lda		tcc__r0
+	bne		+++
+	; read failed, retry once
+	jsr		sdReadSingleBlockPsram
+	lda		tcc__r0
+	bne		+++
+	; read failed
+	pla
+	pla
+	pla
+	pla
+	jsr		neo2_post_sd
+	lda		#$FFFF
+	sta.l	sec_last
+	sta.l	sec_last+2
+	lda		#RES_ERROR
+	jmp		_disk_readrsp_return
++++:
+	pla
+	pla
+	pla
+	pla
+	jsr		neo2_post_sd
+	;lda		_disk_readp_sector,s
+	;sta.l	sec_last
+	;lda		_disk_readp_sector+2,s
+	;sta.l	sec_last+2
+++:									; end if (sec_last != sector)
+
+	;lda		#sec_buf
+	;sta		tcc__r9
+	;lda		#:sec_buf
+	;sta		tcc__r9h				; buf = sec_buf
+	;jmp		_disk_readp_copy_data
+
+	
+;_disk_readrsp_copy_data:
+	rep		#$20
+
+	lda		#RES_OK
+_disk_readrsp_return:
+	sta		tcc__r0
+	pla
+	sta		tcc__r9h
+	pla
+	sta		tcc__r9
+	ply
+	plx
+	plp
+	rtl
+	
+
+; Helper subroutine
+_disk_readrsp_calc_sector:
+	lda		_disk_readrsp_sector+2,s
+	sta		tcc__r1
+	lda		_disk_readrsp_sector+4,s
+	sta		tcc__r1h
+	lda.l	cardType
+	and		#1
+	bne		+
+	; sector << 9
+	lda		tcc__r1+1
+	sta		tcc__r1h
+	lda		tcc__r1
+	xba
+	and		#$FF00
+	asl		a
+	sta		tcc__r1
+	rol		tcc__r1h
++:
+	rts
+	

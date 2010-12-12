@@ -36,7 +36,7 @@ extern DRESULT (*disk_read) (BYTE*, DWORD, BYTE);
 //DRESULT disk_ioctl (BYTE, void*);
 
 extern DRESULT (*disk_readp) (void* dest, DWORD sector, WORD sofs, WORD count);
-
+extern DRESULT (*disk_readsect_psram) (WORD prbank, WORD proffs, DWORD sector);
 
 extern void diskio_init();
 

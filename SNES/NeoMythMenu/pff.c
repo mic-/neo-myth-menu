@@ -75,8 +75,8 @@ CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 	CLUST clst	/* Cluster# to get the link information */
 )
 {
-	WORD wc, bc, ofs;
-	BYTE buf[4];
+	static WORD wc, bc, ofs;
+	static BYTE buf[4];
 	FATFS *fs = FatFs;
 
 
@@ -85,8 +85,10 @@ CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 
 	switch (fs->fs_type) {
 	case FS_FAT12 :
-		bc = (WORD)clst; bc += bc / 2;
-		ofs = bc & 511; bc >>= 9;
+		bc = (WORD)clst;
+		bc += bc >> 1;
+		ofs = bc & 511;
+		bc >>= 9;
 		if (ofs != 511) {
 			if (disk_readp(buf, fs->fatbase + bc, ofs, 2)) break;
 		} else {
@@ -97,11 +99,11 @@ CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 		return (clst & 1) ? (wc >> 4) : (wc & 0xFFF);
 
 	case FS_FAT16 :
-		if (disk_readp(buf, fs->fatbase + (clst >> 8), (WORD)(((WORD)clst & 255) * 2), 2)) break;
+		if (disk_readp(buf, fs->fatbase + (clst >> 8), (WORD)(((WORD)clst & 255) << 1), 2)) break;
 		return LD_WORD(buf);
 #if _FS_FAT32
 	case FS_FAT32 :
-		if (disk_readp(buf, fs->fatbase + (clst >> 7), (WORD)(((WORD)clst & 127) * 4), 4)) break;
+		if (disk_readp(buf, fs->fatbase + (clst >> 7), (WORD)(((WORD)clst & 127) << 2), 4)) break;
 		return LD_DWORD(buf) & 0x0FFFFFFF;
 #endif
 	}
@@ -188,7 +190,7 @@ FRESULT dir_next (	/* FR_OK:Succeeded, FR_NO_FILE:End of table, FR_DENIED:EOT an
 				return FR_NO_FILE;
 		}
 		else {					/* Dynamic table */
-			if (((i / 16) & (fs->csize-1)) == 0) {	/* Cluster changed? */
+			if (((i >> 4) & (fs->csize-1)) == 0) {	/* Cluster changed? */
 				clst = get_fat(dj->clust);		/* Get next cluster */
 				if (clst <= 1) return FR_DISK_ERR;
 				if (clst >= fs->max_clust)		/* When it reached end of dynamic table */
@@ -508,7 +510,7 @@ memcpy(pfmountbuf, buf, 36);
 	tsect = LD_WORD(buf+BPB_TotSec16-13);				/* Number of sectors on the file system */
 	if (!tsect) tsect = LD_DWORD(buf+BPB_TotSec32-13);
 	mclst = (tsect						/* Last cluster# + 1 */
-		- LD_WORD(buf+BPB_RsvdSecCnt-13) - fsize - fs->n_rootdir / 16
+		- LD_WORD(buf+BPB_RsvdSecCnt-13) - fsize - (fs->n_rootdir >> 4)
 		) / fs->csize + 2;
 	fs->max_clust = (CLUST)mclst;
 
@@ -650,6 +652,61 @@ FRESULT pf_read (
 
 
 
+FRESULT pf_read_sect_to_psram (
+	WORD prbank,
+	WORD proffs,
+	WORD *br
+)
+{
+	static DRESULT dr;
+	static CLUST clst;
+	static DWORD sect, remain;
+	FATFS *fs = FatFs;
+
+	*br = 0;
+	if (!fs) return FR_NOT_ENABLED;		/* Check file system */
+	if (!(fs->flag & FA_READ))
+			return FR_INVALID_OBJECT;
+
+	remain = fs->fsize - fs->fptr;
+	if (512 > remain) return FR_INVALID_OBJECT;			/* Truncate btr by remaining bytes */
+
+	if ((fs->fptr & 511) == 0) {				/* On the sector boundary? */
+		if (((fs->fptr >> 9) & (fs->csize - 1)) == 0) {	/* On the cluster boundary? */
+			clst = (fs->fptr == 0) ?			/* On the top of the file? */
+				fs->org_clust : get_fat(fs->curr_clust);
+			if (clst <= 1) {
+				fs->flag = 0; return FR_DISK_ERR;
+			}
+			fs->curr_clust = clst;				/* Update current cluster */
+			fs->csect = 0;						/* Reset sector offset in the cluster */
+		}
+		sect = clust2sect(fs->curr_clust);		/* Get current sector */
+		if (!sect) {
+			fs->flag = 0; return FR_DISK_ERR;
+		}
+		sect += fs->csect;
+		fs->dsect = sect;
+		fs->csect++;							/* Next sector address in the cluster */
+	}
+
+	dr = disk_readsect_psram(prbank, proffs, fs->dsect);
+
+	if (dr) {
+		fs->flag = 0;
+		return (dr == RES_WRPRT/*STRERR*/) ? FR_STREAM_ERR : FR_DISK_ERR;
+	}
+
+	fs->fptr += 512;
+	*br = 512;
+
+	return FR_OK;
+}
+
+
+
+DWORD pffbcs;
+WORD pffclst;
 
 #if _USE_LSEEK
 /*-----------------------------------------------------------------------*/
@@ -662,6 +719,7 @@ FRESULT pf_lseek (
 {
 	static CLUST clst;
 	static DWORD bcs, nsect, ifptr;
+	static DWORD bo1,bo2;
 	FATFS *fs = FatFs;
 
 
@@ -669,24 +727,47 @@ FRESULT pf_lseek (
 	if (!(fs->flag & FA_READ))
 			return FR_INVALID_OBJECT;
 
+// DEBUG
+pffclst = 0;
+
 	if (ofs > fs->fsize) ofs = fs->fsize;	/* Clip offset with the file size */
 	ifptr = fs->fptr;
 	fs->fptr = 0;
-	if (ofs > 0) {
-		bcs = (DWORD)fs->csize << 9; //* 512;	/* Cluster size (byte) */
-		if (ifptr > 0 &&
-			(ofs - 1) / bcs >= (ifptr - 1) / bcs) {	/* When seek to same or following cluster, */
-			fs->fptr = (ifptr - 1) & ~(bcs - 1);	/* start from the current cluster */
-			ofs -= fs->fptr;
-			clst = fs->curr_clust;
-		} else {							/* When seek to back cluster, */
-			clst = fs->org_clust;			/* start from the first cluster */
-			fs->curr_clust = clst;
+
+	if (ofs) {
+		bcs = (DWORD)fs->csize << 9; 	/* Cluster size (byte) */
+		bo1 = (ofs - 1) / bcs;
+		bo2 = (ifptr - 1) / bcs;
+		//if ((ifptr != 0) &&	(bo1 >= bo2))
+		if (ifptr)
+		{
+			if (bo1 >= bo2)
+			{
+				/* When seek to same or following cluster, */
+				fs->fptr = (ifptr - 1) & ~(bcs - 1);	/* start from the current cluster */
+				ofs -= fs->fptr;
+				clst = fs->curr_clust;
+					pffclst = 1;
+			} else {							/* When seek to back cluster, */
+				clst = fs->org_clust;			/* start from the first cluster */
+				fs->curr_clust = clst;
+					pffclst = 2;
+			}
 		}
+		else
+		{
+				clst = fs->org_clust;			/* start from the first cluster */
+				fs->curr_clust = clst;
+					pffclst = 3;
+		}
+
+pffbcs = ifptr;
+
 		while (ofs > bcs) {				/* Cluster following loop */
-				clst = get_fat(clst);	/* Follow cluster chain if not in write mode */
-			if (clst <= 1 || clst >= fs->max_clust) {
-				fs->flag = 0; return FR_DISK_ERR;
+
+			clst = get_fat(clst);	/* Follow cluster chain if not in write mode */
+			if ((clst <= 1) || (clst >= fs->max_clust)) {
+				fs->flag = 0; return FR_DISK_ERR + 1;
 			}
 			fs->curr_clust = clst;
 			fs->fptr += bcs;

@@ -2,6 +2,7 @@
 #define _NAVIGATION_H_
 
 #include "snes.h"
+#include "pff.h"
 
 #define NUMBER_OF_GAMES_TO_SHOW 9
 
@@ -19,6 +20,8 @@ enum
 								// the highlighted game.
 	MID_ROM_INFO_MENU,
 
+	MID_SD_ERROR_MENU,
+
 	MID_LAST_MENU
 };
 
@@ -27,6 +30,9 @@ extern u8 currentMenu;
 extern u8 cheatGameIdx;
 extern u8 gameFoundInDb;
 extern u8 highlightedOption[MID_LAST_MENU];
+extern DIR sdDir;
+extern FILINFO sdFileInfo;
+extern int lastSdError, lastSdOperation;
 
 extern u16 read_joypad();
 
