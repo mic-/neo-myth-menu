@@ -130,11 +130,13 @@ typedef enum {
 FRESULT pf_mount (FATFS*);				/* Mount/Unmount a logical drive */
 FRESULT pf_open (const char*);			/* Open a file */
 FRESULT pf_read (void*, WORD, WORD*);	/* Read data from a file */
-FRESULT pf_read_sect_to_psram (WORD, WORD, WORD*);	/* Read data from a file */
+FRESULT pf_read_sect_to_psram (WORD, WORD, WORD);	/* Read data from a file */
+FRESULT pf_read_1mbit_to_psram (WORD, WORD, WORD);	/* Read data from a file */
 FRESULT pf_lseek (DWORD);				/* Move file pointer of a file object */
 FRESULT pf_opendir (DIR*, const char*);	/* Open an existing directory */
 FRESULT pf_readdir (DIR*, FILINFO*);	/* Read a directory item */
 
+extern FRESULT pf_read_1mbit_to_psram_asm (WORD, WORD, WORD);	/* Read data from a file */
 
 
 /*--------------------------------------------------------------*/

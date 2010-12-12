@@ -13,81 +13,82 @@ neo2_spc_ram_code_begin:
         
         
 play_spc_from_gba_card:
+play_spc_from_sd_card:
 	php
 	phb
-	rep	#$30
+	rep		#$30
 	phx
 
-	jsl	clear_screen
+	jsl		clear_screen
 
-	pea	73
-	jsl	print_meta_string			; Print instructions
+	pea		73
+	jsl		print_meta_string			; Print instructions
 	pla
 	pea		0
 	jsl		print_meta_string			; Print instructions
 	pla	
-	jsl	print_hw_card_rev
+	jsl		print_hw_card_rev
 
-	jsl	update_screen
+	jsl		update_screen
 	
-	sep	#$20
+	sep		#$20
 	
-	lda	#$7e
+	lda		#$7e
 	pha
 	plb
 	
 	lda.l	romAddressPins
-	sta	tcc__r2h
+	sta		tcc__r2h
 	
-        LDA    #$20      	; OFF A21
-        STA.L  MYTH_GBAC_ZIO
-        JSR    SET_NEOCMA  	;
-        JSR    SET_NEOCMB  	;
-        JSR    SET_NEOCMC  	; ON_NEO CARD A24 & A25 + SA16 & SA17
+    LDA    #$20      	; OFF A21
+    STA.L  MYTH_GBAC_ZIO
+    JSR    SET_NEOCMA  	;
+    JSR    SET_NEOCMB  	;
+    JSR    SET_NEOCMC  	; ON_NEO CARD A24 & A25 + SA16 & SA17
 
-        LDA.L   romAddressPins+1
-        STA.L   MYTH_GBAC_HIO	; SET AH25,AH25
+    LDA.L   romAddressPins+1
+    STA.L   MYTH_GBAC_HIO	; SET AH25,AH25
          
-        LDA     #$01
-        STA.L   MYTH_EXTM_ON   ; A25,A24 ON
+    LDA     #$01
+    STA.L   MYTH_EXTM_ON   ; A25,A24 ON
 
 	LDA    #$04       	; COPY MODE !
-        STA.L  MYTH_OPTION_IO
+    STA.L  MYTH_OPTION_IO
 
-        LDA    #$01       	; PSRAM WE ON !
-        STA.L  MYTH_WE_IO
+    LDA    #$01       	; PSRAM WE ON !
+    STA.L  MYTH_WE_IO
                          
-        LDA    #$F8
-        STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
-        STA.L  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
+    LDA    #$F8
+    STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+    STA.L  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
 
-        LDA.L  romAddressPins
-        STA.L  MYTH_GBAC_LIO
+    LDA.L  romAddressPins
+    STA.L  MYTH_GBAC_LIO
          
-        LDA    #$00
-        STA.L  MYTH_PRAM_BIO
+    LDA    #$00
+    STA.L  MYTH_PRAM_BIO
 
-		jsr	load_spc
-		jsr	neo2_spc_puts_tag
+	jsr	load_spc
+	jsr	neo2_spc_puts_tag
 	
-        LDA     #$00       ;
-        STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
+    LDA     #$00       ;
+    STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
 
-        LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
-        STA.L   MYTH_OPTION_IO
+    LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
+    STA.L   MYTH_OPTION_IO
 
-        LDA     #$20       	; OFF A21
-        STA.L   MYTH_GBAC_ZIO
-        JSR     SET_NEOCMD	; SET MENU
+    LDA     #$20       	; OFF A21
+    STA.L   MYTH_GBAC_ZIO
+    JSR     SET_NEOCMD	; SET MENU
 
-        LDA     #$00
-        STA.L   MYTH_GBAC_LIO
-        STA.L   MYTH_GBAC_HIO
-        STA.L   MYTH_GBAC_ZIO
+    LDA     #$00
+    STA.L   MYTH_GBAC_LIO
+    STA.L   MYTH_GBAC_HIO
+    STA.L   MYTH_GBAC_ZIO
 
-    	; copy .data section to RAM (same as in crt0).
-    	; This data has been overwritten by the SPC loader, so we need to copy it again.
-    	ldx #0
+    ; copy .data section to RAM (same as in crt0).
+    ; This data has been overwritten by the SPC loader, so we need to copy it again.
+    ldx #0
 -   	lda.l __startsection.data,x
     	sta.l __startramsectionram.data,x
     	inx
@@ -100,36 +101,36 @@ play_spc_from_gba_card:
 -:
 	bra	-
 	
-        plx
-        plb
-        plp
-        rtl
+    plx
+    plb
+    plp
+    rtl
         
-
+     
 
 neo2_spc_puts_tag:
 	php
  	jsr.w	_wait_nmi
-	rep	#$30
-	lda	#$2163
+	rep		#$30
+	lda		#$2163
 	sta.l	REG_VRAM_ADDR_L
-	ldx	#SPC_TAG_TITLE_ADDR
-	jsr	++
-	lda	#$2183
+	ldx		#SPC_TAG_TITLE_ADDR
+	jsr		++
+	lda		#$2183
 	sta.l	REG_VRAM_ADDR_L
-	ldx	#SPC_TAG_GAME_ADDR
-	jsr	++
-	lda	#$21A3
+	ldx		#SPC_TAG_GAME_ADDR
+	jsr		++
+	lda		#$21A3
 	sta.l	REG_VRAM_ADDR_L
-	ldx	#SPC_TAG_ARTIST_ADDR
-	jsr	++
+	ldx		#SPC_TAG_ARTIST_ADDR
+	jsr		++
 	plp
 	rts
 ++:	
-	sep	#$20
-	ldy	#0
+	sep		#$20
+	ldy		#0
 -:
-	lda.l	$410000,x
+	lda.l	SPC_TAG_BASE,x
 	beq		+
 	sta.l	REG_VRAM_DATAW1
 	lda		#8
@@ -147,12 +148,13 @@ neo2_spc_puts_tag:
  ; The initialization code will be written to this address in SPC RAM if no better location is found
  .equ SPC_DEFAULT_INIT_ADDRESS	$ff70
  
- .equ SPC_REG_ADDR		$4100A5 ;00
- .equ SPC_DSP_REG_ADDR		$410000 ;8
-  
- .equ SPC_TAG_TITLE_ADDR	$4100AE
- .equ SPC_TAG_GAME_ADDR		$4100CE
- .equ SPC_TAG_ARTIST_ADDR	$410131
+ .equ SPC_REG_ADDR		$510225 ;$4100A5 ;00
+ .equ SPC_DSP_REG_ADDR	$510000 ;	$410000 ;8
+ 
+ .equ SPC_TAG_BASE $510000
+ .equ SPC_TAG_TITLE_ADDR	$51022E ;$4100AE
+ .equ SPC_TAG_GAME_ADDR		$51024E ;$4100CE
+ .equ SPC_TAG_ARTIST_ADDR	$5102B1 ;$410131
   
  ; The length of our init routine in bytes
  .equ SPC_INIT_CODE_LENGTH 	$2b 
@@ -206,48 +208,106 @@ neo2_spc_puts_tag:
  
  
  load_spc:
- 	stz	spcSongNr
+ 	stz		spcSongNr
  	
 	; Make sure echo is off
- 	sep	#$20
- 	lda	#$7d		; Register $7d (EDL)
+ 	sep		#$20
+ 	lda		#$7d		; Register $7d (EDL)
  	sta.l	$7f0100
- 	lda	#$00		
+ 	lda		#$00		
  	sta.l	$7f0101
  	sendMusicBlockM $7f, $0100, $00f2, $0002 	
- 	sep	#$20
- 	lda	#$6c		; Register $6c (FLG)
+ 	sep		#$20
+ 	lda		#$6c		; Register $6c (FLG)
  	sta.l	$7f0100
- 	lda	#$20		; Bit 5 on (~ECEN)	
+ 	lda		#$20		; Bit 5 on (~ECEN)	
  	sta.l	$7f0101
  	sendMusicBlockM $7f, $0100, $00f2, $0002
- 	
+
+	lda		sourceMedium
+	bne		+
+		; GBAC
+		rep #$30
+		ldx	#254	; Move page 0
+		-:
+			lda.l	$400000,x
+			sta.l	$500000,x
+			dex
+			dex
+			bpl		-
+		ldx	#126	; Move DSP regs
+		-:
+			lda.l	$410000,x
+			sta.l	$510000,x
+			dex
+			dex
+			bpl		-
+		ldx	#126	; Move header
+		-:
+			lda.l	$410080,x
+			sta.l	$510200,x
+			dex
+			dex
+			bpl		-
+		bra ++
+	+:
+		; SD
+		rep #$30
+		ldx	#254	; Move header
+		-:
+			lda.l	$500000,x
+			sta.l	$510200,x
+			dex
+			dex
+			bpl		-
+		ldx	#126	; Move DSP regs
+		-:
+			lda.l	$510100,x
+			sta.l	$510000,x
+			dex
+			dex
+			bpl		-
+		ldx	#254	; Move page 0
+		-:
+			lda.l	$500100,x
+			sta.l	$500000,x
+			dex
+			dex
+			bpl		-			
+	++:
+	
   	; Initialize DSP registers, except FLG, EDL, KON and KOF
  	jsr     init_dsp
 
 	; Copy the SPC RAM dump to SNES RAM
- 	jsr     copy_spc_memory_to_ram
- 
+	lda		sourceMedium
+	bne		+
+ 		jsr     copy_spc_memory_to_ram
+ 		bra		++
+ 	+:
+ 		jsr     copy_spc_psram_to_ram
+ 	++:
+ 	
  	; Now we try to find a good place to inject our init code on the SPC side
   	;========================================================================
-  	rep	#$10
-  	ldx	#SPC_DEFAULT_INIT_ADDRESS
-  	stx	spcExecAddr
+  	rep		#$10
+  	ldx		#SPC_DEFAULT_INIT_ADDRESS
+  	stx		spcExecAddr
   	
   	; Check if we've got a non-zero EDL. In that case we use ESA*$100 + $200 as the base
   	; address for our init code.
-  	sep	#$20
+  	sep		#$20
   	lda.l	SPC_DSP_REG_ADDR+$7d	; EDL
-  	beq	+			
+  	beq		+			
   	lda.l	SPC_DSP_REG_ADDR+$6d	; ESA
  	clc
- 	adc	#2
+ 	adc		#2
   	xba
-  	lda	#0
-  	rep	#$20
+  	lda		#0
+  	rep		#$20
   	tax				; X = ESA*$100 + $200
-  	stx	spcExecAddr
-  	jmp	addr_search_done
+  	stx		spcExecAddr
+  	jmp		addr_search_done
   	+:
   	
   	; Search for a free chunk of RAM somewhere in the range $0100..$ff9f
@@ -258,91 +318,91 @@ neo2_spc_puts_tag:
   	; If a string containing $00 is found first, the search will continue
   	; until a string containing $ff is found, or until we've reached then
   	; end address ($ff9f).
-  	sep	#$20
-  	stz	spcFound00
-  	stz	spcFoundFF
-  	ldx	#0
-  	stx	spcFree00
-  	stx	spcFreeFF
-  	ldx	#$100
+  	sep		#$20
+  	stz		spcFound00
+  	stz		spcFoundFF
+  	ldx		#0
+  	stx		spcFree00
+  	stx		spcFreeFF
+  	ldx		#$100
   	search_free_ram:
- 		cpx	#$ff9f
- 		bcs	pick_best_address	; Found no free RAM. Give up and use the default address
- 		lda	#0
- 		sta	spcScanLen	
+ 		cpx		#$ff9f
+ 		bcs		pick_best_address	; Found no free RAM. Give up and use the default address
+ 		lda		#0
+ 		sta		spcScanLen	
  		search_free_ram_inner:
  			lda.l	$7f0000,x	; Read one byte from RAM
  			xba			; Save it in the high byte of A
- 			lda	spcScanLen	; Is this a new string, or one we've already begun matching?
- 			beq	search_free_ram_new_string
+ 			lda		spcScanLen	; Is this a new string, or one we've already begun matching?
+ 			beq		search_free_ram_new_string
  			xba
- 			cmp	spcScanVal	; Compare with the current value we're scanning for
- 			bne	scan_next_row	; No match?
- 			inc	spcScanLen
- 			lda	spcScanLen
- 			cmp	#($0C+SPC_INIT_CODE_LENGTH)
- 			beq	found_free_ram
+ 			cmp		spcScanVal	; Compare with the current value we're scanning for
+ 			bne		scan_next_row	; No match?
+ 			inc		spcScanLen
+ 			lda		spcScanLen
+ 			cmp		#($0C+SPC_INIT_CODE_LENGTH)
+ 			beq		found_free_ram
  			inx
- 			bra	search_free_ram_inner
+ 			bra		search_free_ram_inner
  			scan_next_row:		; Move to the next row, i.e. (16 - (current_offset % 16)) bytes ahead. 
- 			rep	#$20
+ 			rep		#$20
  			txa
  			clc
- 			adc	#$0010
- 			and	#$FFF0
+ 			adc		#$0010
+ 			and		#$FFF0
  			tax
- 			sep	#$20
- 			jmp	search_free_ram	; Gotta keep searchin' searchin'..
+ 			sep		#$20
+ 			jmp		search_free_ram	; Gotta keep searchin' searchin'..
  			search_free_ram_new_string:
  			xba			; Restore the value we read from RAM
- 			cmp	#$00
- 			beq	search_free_ram_new_string00
- 			cmp	#$ff
- 			beq	search_free_ram_new_stringFF
- 			bra	scan_next_row	; Neither $00 or $ff. Try the next row
+ 			cmp		#$00
+ 			beq		search_free_ram_new_string00
+ 			cmp		#$ff
+ 			beq		search_free_ram_new_stringFF
+ 			bra		scan_next_row	; Neither $00 or $ff. Try the next row
  			search_free_ram_new_string00:
- 			lda	spcFound00	
- 			bne	scan_next_row	; We've already found a 00-string
- 			stz	spcScanVal
- 			bra	+
+ 			lda		spcFound00	
+ 			bne		scan_next_row	; We've already found a 00-string
+ 			stz		spcScanVal
+ 			bra		+
  			search_free_ram_new_stringFF:
- 			lda	spcFoundFF
- 			bne	scan_next_row	; We've already found an FF-string
- 			lda	#$ff
- 			sta	spcScanVal
+ 			lda		spcFoundFF
+ 			bne		scan_next_row	; We've already found an FF-string
+ 			lda		#$ff
+ 			sta		spcScanVal
  			+:
- 			inc	spcScanLen
+ 			inc		spcScanLen
  			inx
- 			jmp	search_free_ram_inner	
+ 			jmp		search_free_ram_inner	
  	found_free_ram:
- 	rep	#$20
+ 	rep		#$20
  	txa
  	sec
- 	sbc	#($0B+SPC_INIT_CODE_LENGTH)
+ 	sbc		#($0B+SPC_INIT_CODE_LENGTH)
  	tax
- 	sep	#$20
- 	lda	spcScanVal
- 	bne	found_stringFF	
- 	stx	spcFree00			; This was a 00-string that we found
- 	lda	#1
- 	sta	spcFound00
- 	jmp	search_free_ram			; Find a place to hide, searchin' searchin'..
+ 	sep		#$20
+ 	lda		spcScanVal
+ 	bne		found_stringFF	
+ 	stx		spcFree00			; This was a 00-string that we found
+ 	lda		#1
+ 	sta		spcFound00
+ 	jmp		search_free_ram			; Find a place to hide, searchin' searchin'..
  	found_stringFF:
- 	stx	spcFreeFF			; This was an FF-string that we found
- 	lda	#1
- 	sta	spcFoundFF
+ 	stx		spcFreeFF			; This was an FF-string that we found
+ 	lda		#1
+ 	sta		spcFoundFF
  	
  	pick_best_address:
- 	lda	spcFoundFF			; Prefer the FF-string if we've found one
- 	beq	+
- 	ldx	spcFreeFF
- 	stx	spcExecAddr
- 	bra	addr_search_done
+ 	lda		spcFoundFF			; Prefer the FF-string if we've found one
+ 	beq		+
+ 	ldx		spcFreeFF
+ 	stx		spcExecAddr
+ 	bra		addr_search_done
  	+:
- 	lda	spcFound00
- 	beq	addr_search_done
- 	ldx	spcFree00
- 	stx	spcExecAddr
+ 	lda		spcFound00
+ 	beq		addr_search_done
+ 	ldx		spcFree00
+ 	stx		spcExecAddr
  	
    	addr_search_done:
    	;========================================================================
@@ -394,7 +454,7 @@ neo2_spc_puts_tag:
  
   	ldx	#0
  	copy_spc_page0:
- 		lda.l	$400000,x	; Read from GBAC
+ 		lda.l	$500000,x	; Read from PSRAM
  		sta.l	REG_APUI01
  		txa
  		sta.l	REG_APUI00
@@ -408,7 +468,7 @@ neo2_spc_puts_tag:
  	lda	#$f0
  	sta.l	REG_APUI00
  	waitForAudio0M
- 	lda.l	$4000f1
+ 	lda.l	$5000f1
  	and	#7		; Mask out everything except the timer enable bits
  	sta.l	REG_APUI01
  	lda	#$f1
@@ -427,6 +487,7 @@ neo2_spc_puts_tag:
  	
  	rts 	
  
+ 
  copy_spc_memory_to_ram:
   	; Copy music data from ROM to RAM, from the end backwards.
   	rep	#$10        ; xy in 16-bit mode.
@@ -439,9 +500,33 @@ neo2_spc_puts_tag:
   	sta.l	$7f8000,x
   	dex
   	bpl 	-
-	
-  
  	rts
+
+
+ copy_spc_psram_to_ram:
+  	; Copy music data from PSRAM to RAM, from the end backwards.
+  	rep	#$10        ; xy in 16-bit mode.
+  	;sep	#$20
+  	rep #$20
+  	ldx.w 	#$0          
+  
+  -: lda.l 	$500100,x     	
+  	 sta.l 	$7f0000,x
+  	 inx
+  	 inx
+  	 cpx	#$ff00
+  	 bne 	-
+
+  	ldx.w 	#$0          
+  -: lda.l 	$510000,x     	
+  	 sta.l 	$7fff00,x
+  	 inx
+  	 inx
+  	 cpx	#$100
+  	 bne 	-
+  	 
+    rts
+ 	
  
   ; Loads the DSP init values in reverse order
  init_dsp:
