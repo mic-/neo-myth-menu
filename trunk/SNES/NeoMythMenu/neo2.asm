@@ -910,7 +910,7 @@ show_copied_data:
 	ldx	#0
 -:
 rep #$20
-	lda.l	$520600,x
+	lda.l	$500000,x
 sep #$20
 	lsr	a
 	lsr	a
@@ -927,7 +927,7 @@ sep #$20
 	lda	#8
 	sta.l	REG_VRAM_DATAW2
 rep #$20
-	lda.l	$520600,x
+	lda.l	$500000,x
 sep #$20
 	and	#15
 	clc
@@ -1883,20 +1883,20 @@ _neo_select_menu:
 	jsr		_neo_asic_cmd				; set cr = select menu flash
 
 ;DEBUG
-lda tcc__r1
-sta.w asicCommands+0
-lda tcc__r1h
-sta.w asicCommands+2
+;lda tcc__r1
+;sta.w asicCommands+0
+;lda tcc__r1h
+;sta.w asicCommands+2
 
 	ldx		#$00DA
 	ldy		#$0044
 	jsr		_neo_asic_cmd				; set iosr = disable game flash
 
 ;DEBUG
-lda tcc__r1
-sta.w asicCommands+4
-lda tcc__r1h
-sta.w asicCommands+6
+;lda tcc__r1
+;sta.w asicCommands+4
+;lda tcc__r1h
+;sta.w asicCommands+6
 
 	sep		#$20
 	lda		#0
@@ -1919,10 +1919,6 @@ neo2_enable_sd:
 	jsr		_neo_select_menu
 	
 	sep     #$20                        ; 8-bit A
-
-	;LDA     #$01
-	;STA.L   MYTH_EXTM_ON   ; A25,A24 ON
-	
    	rep     #$20                        ; 16-bit A
    
 	rts
@@ -2045,44 +2041,48 @@ neo2_recv_sd_psram:
 	phb
 
 	lda		_neo2_recv_sd_psram_proffs,s
-sta.l	pfmountbuf
 	tax
 	sep		#$20
 	lda		_neo2_recv_sd_psram_prbank,s	
+	sta.l	$7d0000+_nrsdp_write+3
+
+	lda		#$40
 	pha
-sta.l pfmountbuf+2
-	plb									; DBR points to buf's bank
+	plb									
 	ldy		#256						; counter
 	_nrsdp_loop:
 
 		sep		#$20
-		lda.l	MYTH_NEO2_RD_DAT4		; Read high nybble of low byte (S)
+		lda.w	$6061					; Read high nybble of low byte (S)
 		asl		a	
 		asl		a	
 		asl		a	
 		asl		a
 		sta		tcc__r0	
-		lda.l	MYTH_NEO2_RD_DAT4		; Read low nybble of low byte (s)
+		lda.w	$6061					; Read low nybble of low byte (s)
 		and		#$0F
 		ora		tcc__r0
 		sta		tcc__r0					; tcc__r0 = 0x??Ss
-		lda.l	MYTH_NEO2_RD_DAT4		; Read high nybble of high byte (T)
+		lda.w	$6061					; Read high nybble of high byte (T)
 		asl		a	
 		asl		a	
 		asl		a	
 		asl		a
 		sta		tcc__r0+1				; tcc__r0 = 0xT0Ss
-		lda.l	MYTH_NEO2_RD_DAT4		; Read low nybble of high byte (t)
+		lda.w	$6061
 		rep		#$20
 		and		#$0F					; A = 0x000t
 		xba								; A = 0x0t00
 		ora		tcc__r0					; A = 0xTtSs
-		sta.w	$0000,x					; Write 16 bits to PSRAM
+_nrsdp_write:
+		sta.l $500000,x					; Write 16 bits to PSRAM
 		inx
 		inx
 		dey
 				
 		bne		_nrsdp_loop				; repeat 256 times
+
+	plb
 
 	; Read 8 CRC bytes (16 nybbles)
 	.rept 16
@@ -2093,7 +2093,6 @@ sta.l pfmountbuf+2
 
 	;jsr.w show_copied_data
 	
-	plb
 	ply
 	plx
 	plp
@@ -2193,11 +2192,6 @@ MOV_SD_PSRAM:
 	 STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
 	 STA.L  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
 
-	 ;LDA.L  romAddressPins
-	 ;STA.L  MYTH_GBAC_LIO
-
-	 ;jsr	neo2_pre_sd
-	 
 	 LDA    #$00
 	 STA.L  MYTH_PRAM_BIO
 
@@ -2258,8 +2252,6 @@ MOV_SD_PSRAM_LOOP:
 	 jsr	apply_cheat_codes
 	 inc	tcc__r3
 	 inc	tcc__r3
-
-;	 jsr	show_copied_data
 
 	 DEC    tcc__r0h+1
 	 BEQ	+

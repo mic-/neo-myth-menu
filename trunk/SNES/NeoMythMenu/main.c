@@ -861,12 +861,71 @@ void run_secondary_cart_c()
 
 
 
+void play_spc_from_sd_card_c()
+{
+	static u8 *myth_pram_bio = (u8*)0xC006;
+	static WORD prbank, proffs, readFromStart;
+	WORD i, progress;
+	void (*play_file)(void);
+
+	if ((lastSdError = pf_open(tempString)) != FR_OK)
+	{
+		lastSdOperation = SD_OP_OPEN_FILE;
+		switch_to_menu(MID_SD_ERROR_MENU, 0);
+		return;
+	}
+
+	/*if ((lastSdError = pf_lseek(0x100)) != FR_OK)
+	{
+		lastSdOperation = SD_OP_SEEK;
+		switch_to_menu(MID_SD_ERROR_MENU, 0);
+		return;
+	}*/
+
+	clear_status_window();
+	update_screen();
+	load_progress[14] = '6'; load_progress[15] = '5';
+
+	*myth_pram_bio = 0;
+	prbank = 0x50;
+	proffs = 0;
+	progress = 1;
+	for (i = 0; i < 129; i++)
+	{
+		if (progress)
+		{
+			show_loading_progress();
+		}
+		progress ^= 1;
+
+		if ((lastSdError = pf_read_sect_to_psram(prbank, proffs, 1)) != FR_OK)
+		{
+			lastSdOperation = SD_OP_READ_FILE;
+			switch_to_menu(MID_SD_ERROR_MENU, 0);
+			return;
+		}
+		proffs += 512;
+		if (proffs == 0)
+		{
+			prbank++;
+		}
+	}
+
+	//pf_read_sect_to_psram(0x51, 0, 1);	// DSP registers
+	//pf_lseek(0);
+	//pf_read_sect_to_psram(0x51, 0x200, 0);	// Header
+
+	MAKE_RAM_FPTR(play_file, play_spc_from_sd_card);
+
+	play_file();
+}
+
 
 void run_game_from_sd_card_c()
 {
 	int i,j;
 	void (*run_game)(void);
-	static WORD mbits, bytesRead, mythprbank, prbank, proffs;
+	static WORD mbits, bytesRead, mythprbank, prbank, proffs, readFromStart;
 	static u8 *myth_pram_bio = (u8*)0xC006;
 
 	strcpy(tempString, sdRootDir);
@@ -878,6 +937,10 @@ void run_game_from_sd_card_c()
 	    (strstri(".BIN", highlightedFileName) > 0))
 	{
 		gameMode = GAME_MODE_NORMAL_ROM;
+	}
+	else if (strstri(".SPC", highlightedFileName) > 0)
+	{
+		play_spc_from_sd_card_c();
 	}
 	else
 	{
@@ -967,6 +1030,9 @@ void run_game_from_sd_card_c()
 		}
 	}
 
+	clear_status_window();
+	update_screen();
+
 	if ((lastSdError = pf_open(tempString)) != FR_OK)
 	{
 		lastSdOperation = SD_OP_OPEN_FILE;
@@ -975,14 +1041,16 @@ void run_game_from_sd_card_c()
 	}
 
 	// Skip past the SMC header if present
+	readFromStart = 1;
 	if (highlightedFileSize & 0x3FF)
 	{
-		if ((lastSdError = pf_lseek(highlightedFileSize & 0x3FF)) != FR_OK)
+		if ((lastSdError = pf_lseek(512)) != FR_OK)
 		{
 			lastSdOperation = SD_OP_SEEK;
 			switch_to_menu(MID_SD_ERROR_MENU, 0);
 			return;
 		}
+		readFromStart = 0;
 	}
 
 	prbank = 0x50;
@@ -993,26 +1061,20 @@ void run_game_from_sd_card_c()
 	{
 		show_loading_progress();
 
-		// Read 256 sectors (1 Mbit)
-		for (j = 0; j < 256; j++)
+		if ((lastSdError = pf_read_1mbit_to_psram_asm(prbank, proffs, readFromStart)) != FR_OK)
 		{
-			if ((lastSdError = pf_read_sect_to_psram(prbank, proffs, &bytesRead)) != FR_OK)
-			{
-				lastSdOperation = SD_OP_READ_FILE;
-				switch_to_menu(MID_SD_ERROR_MENU, 0);
-				return;
-			}
-			proffs += 512;
-			if (proffs == 0)
-			{
-				prbank++;
-				if (prbank == 0x60)
-				{
-					prbank = 0x50;
-					mythprbank++;
-					*myth_pram_bio = mythprbank;
-				}
-			}
+			lastSdOperation = SD_OP_READ_FILE;
+			switch_to_menu(MID_SD_ERROR_MENU, 0);
+			return;
+		}
+		readFromStart = 1;
+
+		prbank += 2;
+		if (prbank == 0x60)
+		{
+			prbank = 0x50;
+			mythprbank++;
+			*myth_pram_bio = mythprbank;
 		}
 	}
 
@@ -1027,6 +1089,7 @@ romLayout_t get_rom_info_sd(char *fname, u8 *romInfo)
 	romLayout_t result = LAYOUT_UNKNOWN;
 	DWORD ofs;
 	WORD bytesRead;
+	static u8 buf[0x40];
 
 	lastSdOperation = SD_OP_OPEN_FILE;
 	if ((lastSdError = pf_open(fname)) == FR_OK)
@@ -1051,16 +1114,17 @@ romLayout_t get_rom_info_sd(char *fname, u8 *romInfo)
 					if ((lastSdError = pf_lseek(ofs)) == FR_OK)
 					{
 						lastSdOperation = SD_OP_READ_FILE;
-						if ((lastSdError = pf_read(romInfo, 0x40, &bytesRead)) == FR_OK)
+						if ((lastSdError = pf_read(buf, 0x40, &bytesRead)) == FR_OK)
 						{
-							if (((romInfo[0x1c] ^ romInfo[0x1e]) != 0xff) ||
-								((romInfo[0x1d] ^ romInfo[0x1f]) != 0xff))
+							if (((buf[0x1c] ^ buf[0x1e]) != 0xff) ||
+								((buf[0x1d] ^ buf[0x1f]) != 0xff))
 							{
 								result = LAYOUT_LOROM;
 							}
 							else
 							{
 								// HiROM
+								memcpy(romInfo, buf, 0x40);
 								result = LAYOUT_HIROM;
 							}
 						}
@@ -1158,12 +1222,10 @@ int init_sd()
 
     if (mountResult = pf_mount(&sdFatFs))
     {
-		//print_hex(mountResult, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 		//print_sd_status();
     	cardType = 0x8000;
         if (mountResult = pf_mount(&sdFatFs))
      	{
-			//print_hex(mountResult, 6, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 			sourceMedium = SOURCE_GBAC;
         }
     }
@@ -1273,38 +1335,6 @@ int main()
 	update_screen();
 
 	REG_BGCNT = 3;			// Enable BG0 and BG1
-
-	/*if ((i = init_sd()) == 0)
-	{
-		//neo2_disable_sd();
-		printxy("File open ok", 2, 7, 4, 32);
-		pf_opendir(&dir, "/");
-		for (i = 0; i < 8; i++)
-		{
-			if (pf_readdir(&dir, &fileInfo) == FR_OK)
-			{
-				printxy(fileInfo.fname, 2, 7+i, 4, 32);
-			}
-			else
-			{
-				break;
-			}
-		}
-	}
-	else
-	{
-		//neo2_disable_sd();
-		if (i == -1)
-		{
-			printxy("Failed to mount root", 2, 7, 4, 32);
-		}
-		else if (i == -2)
-		{
-			printxy("Failed to open map.spc", 2, 7, 4, 32);
-		}
-
-
-	}*/
 
 	while (1)
 	{

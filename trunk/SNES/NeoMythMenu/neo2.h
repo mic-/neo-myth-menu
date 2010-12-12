@@ -23,6 +23,7 @@ extern void run_game_from_sd_card();
 extern void run_secondary_cart();
 
 extern void play_spc_from_gba_card();
+extern void play_spc_from_sd_card();
 
 extern void show_loading_progress();
 

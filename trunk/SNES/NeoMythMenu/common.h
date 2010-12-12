@@ -114,7 +114,7 @@ typedef enum
 
 typedef enum
 {
-	SOURCE_GBAC,
+	SOURCE_GBAC = 0,
 	SOURCE_SD
 } sourceMedium_t;
 

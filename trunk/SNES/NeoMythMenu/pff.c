@@ -26,7 +26,7 @@
 
 ---------------------------------------------------------------------------*/
 
-static
+//static
 FATFS *FatFs;	/* Pointer to the file system object (logical drive) */
 
 
@@ -70,7 +70,7 @@ int chk_chr (const char* str, int chr) {
 /* FAT access - Read value of a FAT entry                                */
 /*-----------------------------------------------------------------------*/
 
-static
+//static
 CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 	CLUST clst	/* Cluster# to get the link information */
 )
@@ -118,7 +118,7 @@ CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 /* Get sector# from cluster#                                             */
 /*-----------------------------------------------------------------------*/
 
-static
+//static
 DWORD clust2sect (	/* !=0: Sector number, 0: Failed - invalid cluster# */
 	CLUST clst		/* Cluster# to be converted */
 )
@@ -655,7 +655,7 @@ FRESULT pf_read (
 FRESULT pf_read_sect_to_psram (
 	WORD prbank,
 	WORD proffs,
-	WORD *br
+	WORD readfromstart
 )
 {
 	static DRESULT dr;
@@ -663,7 +663,7 @@ FRESULT pf_read_sect_to_psram (
 	static DWORD sect, remain;
 	FATFS *fs = FatFs;
 
-	*br = 0;
+	//*br = 0;
 	if (!fs) return FR_NOT_ENABLED;		/* Check file system */
 	if (!(fs->flag & FA_READ))
 			return FR_INVALID_OBJECT;
@@ -671,23 +671,26 @@ FRESULT pf_read_sect_to_psram (
 	remain = fs->fsize - fs->fptr;
 	if (512 > remain) return FR_INVALID_OBJECT;			/* Truncate btr by remaining bytes */
 
-	if ((fs->fptr & 511) == 0) {				/* On the sector boundary? */
-		if (((fs->fptr >> 9) & (fs->csize - 1)) == 0) {	/* On the cluster boundary? */
-			clst = (fs->fptr == 0) ?			/* On the top of the file? */
-				fs->org_clust : get_fat(fs->curr_clust);
-			if (clst <= 1) {
+	if (readfromstart)
+	{
+		if ((fs->fptr & 511) == 0) {				/* On the sector boundary? */
+			if (((fs->fptr >> 9) & (fs->csize - 1)) == 0) {	/* On the cluster boundary? */
+				clst = (fs->fptr == 0) ?			/* On the top of the file? */
+					fs->org_clust : get_fat(fs->curr_clust);
+				if (clst <= 1) {
+					fs->flag = 0; return FR_DISK_ERR;
+				}
+				fs->curr_clust = clst;				/* Update current cluster */
+				fs->csect = 0;						/* Reset sector offset in the cluster */
+			}
+			sect = clust2sect(fs->curr_clust);		/* Get current sector */
+			if (!sect) {
 				fs->flag = 0; return FR_DISK_ERR;
 			}
-			fs->curr_clust = clst;				/* Update current cluster */
-			fs->csect = 0;						/* Reset sector offset in the cluster */
+			sect += fs->csect;
+			fs->dsect = sect;
+			fs->csect++;							/* Next sector address in the cluster */
 		}
-		sect = clust2sect(fs->curr_clust);		/* Get current sector */
-		if (!sect) {
-			fs->flag = 0; return FR_DISK_ERR;
-		}
-		sect += fs->csect;
-		fs->dsect = sect;
-		fs->csect++;							/* Next sector address in the cluster */
 	}
 
 	dr = disk_readsect_psram(prbank, proffs, fs->dsect);
@@ -698,7 +701,79 @@ FRESULT pf_read_sect_to_psram (
 	}
 
 	fs->fptr += 512;
-	*br = 512;
+	//*br = 512;
+
+	return FR_OK;
+}
+
+
+
+FRESULT pf_read_1mbit_to_psram (
+	WORD prbank,
+	WORD proffs,
+	WORD readfromstart
+)
+{
+	static DRESULT dr;
+	static CLUST clst;
+	static DWORD basesect, sect, remain;
+	static WORD numSects;
+	FATFS *fs = FatFs;
+
+	if (!fs) return FR_NOT_ENABLED;		/* Check file system */
+	if (!(fs->flag & FA_READ))
+			return FR_INVALID_OBJECT;
+
+	remain = fs->fsize - fs->fptr;
+	if (0x20000 > remain) return FR_INVALID_OBJECT;			/* Truncate btr by remaining bytes */
+
+	basesect = clust2sect(fs->curr_clust);
+	numSects = 256;
+	while (numSects)
+	{
+		if (readfromstart)
+		{
+			if (((fs->fptr >> 9) & (fs->csize - 1)) == 0) {	/* On the cluster boundary? */
+				clst = (fs->fptr == 0) ? fs->org_clust : get_fat(fs->curr_clust);
+				if (clst <= 1)
+				{
+					fs->flag = 0;
+					return FR_DISK_ERR;
+				}
+				fs->curr_clust = clst;				/* Update current cluster */
+				fs->csect = 0;						/* Reset sector offset in the cluster */
+				basesect = clust2sect(fs->curr_clust);
+			}
+			//sect = clust2sect(fs->curr_clust);		/* Get current sector */
+			if (!basesect)
+			{
+				fs->flag = 0;
+				return FR_DISK_ERR;
+			}
+			//sect += fs->csect;
+			fs->dsect = basesect + fs->csect; //sect;
+			fs->csect++;							/* Next sector address in the cluster */
+		}
+		readfromstart = 1;
+
+		dr = disk_readsect_psram(prbank, proffs, fs->dsect);
+
+		if (dr)
+		{
+			fs->flag = 0;
+			return (dr == RES_WRPRT/*STRERR*/) ? FR_STREAM_ERR : FR_DISK_ERR;
+		}
+
+		proffs += 512;
+		if (proffs == 0)
+		{
+			prbank++;
+		}
+
+		fs->fptr += 512;
+		numSects--;
+	}
+
 
 	return FR_OK;
 }
