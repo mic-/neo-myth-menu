@@ -34,6 +34,7 @@
 #define MS_GG_ENTRY_MENU_INSTRUCTIONS 76
 #define MS_GG_EDIT_MENU_INSTRUCTIONS 77
 #define MS_ROM_INFO_MENU_INSTRUCTIONS 80
+#define MS_SD_ERROR_MENU_INSTRUCTIONS 81
 
 
 // Masks for the joypad data returned by read_joypad
@@ -68,6 +69,19 @@
 #define GAME_MODE_PACKED_VGM 34
 
 
+enum
+{
+	SD_OP_MOUNT,
+	SD_OP_OPEN_FILE,
+	SD_OP_READ_FILE,
+	SD_OP_WRITE_FILE,
+	SD_OP_SEEK,
+	SD_OP_OPEN_DIR,
+	SD_OP_READ_DIR,
+	SD_OP_UNKNOWN
+};
+
+
 typedef struct
 {
 	u16 count;
@@ -97,12 +111,29 @@ typedef enum
 	SORT_ALPHABETICALLY
 } sortOrder_t;
 
+
+typedef enum
+{
+	SOURCE_GBAC,
+	SOURCE_SD
+} sourceMedium_t;
+
+
+typedef enum
+{
+	LAYOUT_LOROM = 0,
+	LAYOUT_HIROM = 1,
+	LAYOUT_UNKNOWN = 2
+} romLayout_t;
+
+
 extern u8 romSize, romRunMode, sramSize, sramBank, sramMode;
 extern u8 extDsp, extSram;
 extern itemList_t gamesList;
 extern itemList_t cheatList;
 extern char MS4[];
 extern const char * const metaStrings[];
+extern const char sdRootDir[];
 extern u16 gbaCardAlphabeticalIdx[500];
 extern u8 cheatApplied[128];
 extern sortOrder_t sortOrder;
@@ -110,6 +141,14 @@ extern u8 freeCodeSlots;
 extern u8 snesRomInfo[0x40];
 extern u8 doRegionPatch;
 extern oamEntry_t marker;
+extern sourceMedium_t sourceMedium;
+extern u16 cardType;
+extern unsigned long long num_sectors;
+extern u8 diskioPacket[7];
+extern u8 diskioResp[17];
+extern char load_progress[];
+extern char highlightedFileName[100];
+extern long long highlightedFileSize;
 extern void (*keypress_handler)(u16);
 
 extern void set_full_pointer(void **, u8, u16);
@@ -136,6 +175,14 @@ extern void print_dec(u16, u16, u16, u16);
 extern void set_printxy_clip_rect(u16 x1, u16 y1, u16 x2, u16 y2);
 
 extern void show_scroll_indicators();
-extern void update_game_params();
+extern void update_game_params(int force);
+
+extern int init_sd();
+romLayout_t get_rom_info_sd(char *fname, u8 *romInfo);
+extern void run_game_from_sd_card_c();
+
+extern int strstri(char *lookFor, char *lookIn);
+
+extern int is_file_to_list(char *fname);
 
 #endif

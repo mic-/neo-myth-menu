@@ -38,11 +38,11 @@
 /  performance and code efficiency. */
 
 
-#define	_USE_DIR	0
+#define	_USE_DIR	1
 /* To enable pf_opendir and pf_readdir function, set _USE_DIR to 1. */
 
 
-#define	_USE_LSEEK	0
+#define	_USE_LSEEK	1
 /* To enable pf_lseek function, set _USE_LSEEK to 1. */
 
 
@@ -130,6 +130,7 @@ typedef enum {
 FRESULT pf_mount (FATFS*);				/* Mount/Unmount a logical drive */
 FRESULT pf_open (const char*);			/* Open a file */
 FRESULT pf_read (void*, WORD, WORD*);	/* Read data from a file */
+FRESULT pf_read_sect_to_psram (WORD, WORD, WORD*);	/* Read data from a file */
 FRESULT pf_lseek (DWORD);				/* Move file pointer of a file object */
 FRESULT pf_opendir (DIR*, const char*);	/* Open an existing directory */
 FRESULT pf_readdir (DIR*, FILINFO*);	/* Read a directory item */

@@ -43,11 +43,12 @@ u8 diskioTemp[8];
 DSTATUS (*disk_initialize) (void);
 DRESULT (*disk_read) (BYTE*, DWORD, BYTE);
 DRESULT (*disk_readp) (void* dest, DWORD sector, WORD sofs, WORD count);
+DRESULT (*disk_readsect_psram) (WORD prbank, WORD proffs, DWORD sector);
 
 extern DSTATUS disk_initialize_asm(void);
 extern DRESULT disk_read_asm(BYTE*, DWORD, BYTE);
 extern DRESULT disk_readp_asm(void* dest, DWORD sector, WORD sofs, WORD count);
-
+extern DRESULT disk_readsect_psram_asm(WORD prbank, WORD proffs, DWORD sector);
 
 
 void diskio_init()
@@ -55,5 +56,6 @@ void diskio_init()
 	MAKE_RAM_FPTR(disk_initialize, disk_initialize_asm);
 	MAKE_RAM_FPTR(disk_read, disk_read_asm);
 	MAKE_RAM_FPTR(disk_readp, disk_readp_asm);
+	MAKE_RAM_FPTR(disk_readsect_psram, disk_readsect_psram_asm);
 }
 

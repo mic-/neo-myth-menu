@@ -17,11 +17,14 @@ extern void neo2_enable_sd();
 extern void neo2_disable_sd();
 
 extern void run_game_from_gba_card();
+extern void run_game_from_sd_card();
 
 // Used for running the secondary cart (plugged in at the back of the Myth)
 extern void run_secondary_cart();
 
 extern void play_spc_from_gba_card();
+
+extern void show_loading_progress();
 
 //extern void get_rom_info();
 

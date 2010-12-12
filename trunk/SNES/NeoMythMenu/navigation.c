@@ -24,6 +24,10 @@ u8 highlightedOption[MID_LAST_MENU];
 u8 cheatGameIdx = 0;
 u8 gameFoundInDb = 0;
 
+int lastSdError, lastSdOperation;
+char highlightedFileName[100];
+long long highlightedFileSize;
+
 extern ggCode_t ggCodes[MAX_GG_CODES * 2];
 extern const cheatDbEntry_t cheatDatabase[];
 
@@ -32,6 +36,33 @@ extern const cheatDbEntry_t cheatDatabase[];
 #ifdef EMULATOR
 static char psramTestData[24] = {0,1,2,3,4,5,6,7,7,6,5,4,3,2,1,0, 2,3,7,11,13,17,19,23};
 #endif
+
+const char * const sdFrStrings[] =
+{
+	"Ok",
+	"Disk error",
+	"Not ready",
+	"No file",
+	"No path",
+	"Invalid name",
+	"Stream error",
+	"Invalid object",
+	"Not enabled",
+	"No filesystem"
+};
+
+const char * const sdOpErrorStrings[] =
+{
+	"Mount error",
+	"Open error",
+	"Read error",
+	"Write error",
+	"Seek error",
+	"Opendir error",
+	"Readdir error",
+	"Unknown error"
+};
+
 
 const char * const countryCodeStrings[] =
 {
@@ -127,6 +158,7 @@ void ar_code_edit_menu_process_keypress(u16);
 void cheat_db_menu_process_keypress(u16);
 void cheat_db_no_codes_menu_process_keypress(u16);
 void rom_info_menu_process_keypress(u16);
+void sd_error_menu_process_keypress(u16);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -223,6 +255,77 @@ void update_game_number_string(int offset)
 }
 
 
+char toupper(char c)
+{
+	if ((c >= 'a') && (c <= 'z'))
+	{
+		c -= ' ';
+	}
+	return c;
+}
+
+
+int strstri(char *lookFor, char *lookIn)
+{
+	int len1,len2,i,j;
+	static int x = 2;
+	static int y = 9;
+	char c,d;
+
+	len1 = strlen(lookFor);
+	len2 = strlen(lookIn);
+
+	if (len2 >= len1)
+	{
+		for (i = 0; i < len2; i++)
+		{
+			for (j = 0; j < len1; j++)
+			{
+				if (i+j >= len2)
+				{
+					break;
+				} else //if ((char)toupper(lookIn[i+j]) != (char)toupper(lookFor[j]))
+				{
+					c = toupper(lookFor[j]);
+					d = toupper(lookIn[j+i]);
+					if (c != d)
+					{
+						break;
+					}
+				}
+			}
+			if (j == len1)
+			{
+				return i;
+			}
+		}
+	}
+
+	/*print_hex(i, x, y, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_TOS_GREEN));
+	x += 2;
+	if (x > 28)
+	{
+		x = 2;
+		y++;
+	}*/
+
+	return -1;
+}
+
+
+int is_file_to_list(char *fname)
+{
+	if ((strstri(".SMC", fname) > 0) ||
+	    (strstri(".BIN", fname) > 0) ||
+	    (strstri(".SPC", fname) > 0) ||
+	    (strstri(".VGM", fname) > 0))
+	{
+		return 1;
+	}
+	return 0;
+}
+
+
 // Return the number of games stored on the GBA card
 //
 u16 count_games_on_gba_card()
@@ -244,6 +347,43 @@ u16 count_games_on_gba_card()
 	return cnt;
 }
 
+
+// Return the number of games stored on the SD card
+//
+u16 count_games_on_sd_card()
+{
+	u16 cnt = 0, i = 0;
+	static DIR dir;
+
+   	if (pf_opendir(&dir, sdRootDir) != FR_OK)
+   	{
+		switch_to_menu(MID_SD_ERROR_MENU, 0);
+		return 0;
+	}
+
+	while (cnt != 0xffff)
+	{
+		if (pf_readdir(&dir, &sdFileInfo) == FR_OK)
+		{
+			if (dir.sect != 0)
+			{
+				//if (is_file_to_list(&sdFileInfo.fname[0]))
+				//{
+					cnt++;
+				//}
+
+			} else
+			{
+				break;
+			}
+		} else
+		{
+			break;
+		}
+	}
+
+	return cnt;
+}
 
 
 void swap(u16 *a, u16 *b)
@@ -318,6 +458,9 @@ void navigation_init()
 	gamesList.count = count_games_on_gba_card();
 	create_alphabetical_index();
 
+	lastSdOperation = SD_OP_UNKNOWN;
+	lastSdError = FR_OK;
+
 	marker.chr = 200;
 	marker.x = MARKER_LEFT;
 	marker.y = MARKER_TOP;
@@ -363,10 +506,11 @@ void move_to_next_game()
 			(gamesList.firstShown + NUMBER_OF_GAMES_TO_SHOW < gamesList.count))
 		{
 			gamesList.firstShown++;
+			pf_readdir(&sdDir, &sdFileInfo);
 		}
 	}
 
-	update_game_params();
+	update_game_params(0);
 	print_games_list();
 }
 
@@ -375,6 +519,8 @@ void move_to_next_game()
 //
 void move_to_previous_game()
 {
+	int i;
+
 	if (gamesList.highlighted)
 	{
 		gamesList.highlighted--;
@@ -386,10 +532,15 @@ void move_to_previous_game()
 			(gamesList.firstShown + ((NUMBER_OF_GAMES_TO_SHOW / 2) - 1) >= gamesList.highlighted))
 		{
 			gamesList.firstShown--;
+			pf_opendir(&sdDir, sdRootDir);
+			for (i = 0; i < gamesList.firstShown; i++)
+			{
+				pf_readdir(&sdDir, &sdFileInfo);
+			}
 		}
 	}
 
-	update_game_params();
+	update_game_params(0);
 	print_games_list();
 }
 
@@ -411,7 +562,7 @@ void move_to_next_page()
 		for (; gamesList.firstShown > gamesList.highlighted; gamesList.firstShown--);
 	}
 
-	update_game_params();
+	update_game_params(0);
 	print_games_list();
 }
 
@@ -433,7 +584,7 @@ void move_to_previous_page()
 		for (; gamesList.firstShown > gamesList.highlighted; gamesList.firstShown--);
 	}
 
-	update_game_params();
+	update_game_params(0);
 	print_games_list();
 
 }
@@ -549,11 +700,33 @@ void print_menu_item(menuOption_t *items, u16 idx, u16 attribs)
 }
 
 
+
+void run_highlighted_game()
+{
+	if (sourceMedium == SOURCE_GBAC)
+	{
+		run_game_from_gba_card_c();
+	}
+	else if (sourceMedium == SOURCE_SD)
+	{
+		run_game_from_sd_card_c();
+	}
+}
+
+
+
+extern DWORD pffbcs;
+extern WORD pffclst;
+
 void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 {
 	int i;
+	DWORD ofs;
 	u8 y;
+	WORD bytesRead;
+	static char strBuf[128];
 	cheat_t const *cheats;
+	romLayout_t romLayout;
 	void (*get_info)(char *, u16, u16, u16);
 
 	if (!reusePrevScreen)
@@ -648,17 +821,31 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			print_meta_string(78);
 			highlightedOption[MID_CHEAT_DB_MENU] = 0;
 
-			// Get ROM info
-			MAKE_RAM_FPTR(get_info, neo2_myth_current_rom_read);
-			if (romRunMode)
+			if (sourceMedium == SOURCE_GBAC)
 			{
-				// LoROM
-				get_info(snesRomInfo, 0, 0x7fc0, 0x40);
+				// Get ROM info
+				MAKE_RAM_FPTR(get_info, neo2_myth_current_rom_read);
+				if (romRunMode)
+				{
+					// LoROM
+					get_info(snesRomInfo, 0, 0x7fc0, 0x40);
+				}
+				else
+				{
+					// HiROM
+					get_info(snesRomInfo, 0, 0xffc0, 0x40);
+				}
 			}
 			else
 			{
-				// HiROM
-				get_info(snesRomInfo, 0, 0xffc0, 0x40);
+				strcpy(strBuf, sdRootDir);
+				strcpy(&strBuf[10], "/");
+				strcpy(&strBuf[11], highlightedFileName);
+				if ((romLayout = get_rom_info_sd(strBuf, snesRomInfo)) == LAYOUT_UNKNOWN)
+				{
+					switch_to_menu(MID_SD_ERROR_MENU, 1);
+					break;
+				}
 			}
 
 			gameFoundInDb = 0;
@@ -724,21 +911,73 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			}
 			break;
 
+		case MID_SD_ERROR_MENU:
+			keypress_handler = sd_error_menu_process_keypress;
+			print_meta_string(MS_SD_ERROR_MENU_INSTRUCTIONS);
+
+			printxy("SD card error", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+
+		/*print_hex(pffbcs>>16, 2, 19, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+		print_hex(pffbcs>>8, 4, 19, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+		print_hex(pffbcs, 6, 19, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+		print_hex(pffbcs>>24, 10, 19, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+		print_hex(pffclst, 12, 19, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));*/
+
+			printxy(sdOpErrorStrings[lastSdOperation], 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			printxy(sdFrStrings[lastSdError], 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+
+			printxy("Packet:", 2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			for (i = 0; i < 7; i++)
+			{
+				print_hex(diskioPacket[i], 2+i+i, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			}
+			printxy("Response:", 2, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			for (i = 0; i < 6; i++)
+			{
+				print_hex(diskioResp[i], 2+i+i, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			}
+
+			printxy("Type:", 2, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			print_hex(cardType>>8, 8, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(cardType, 10, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+
+			printxy("Sectors:", 2, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			print_hex(num_sectors>>24, 11, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(num_sectors>>16, 13, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(num_sectors>>8, 15, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(num_sectors, 17, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+
+			break;
+
 		case MID_ROM_INFO_MENU:
 			keypress_handler = rom_info_menu_process_keypress;
 			print_meta_string(MS_ROM_INFO_MENU_INSTRUCTIONS);
 
-			// Get ROM info
-			MAKE_RAM_FPTR(get_info, neo2_myth_current_rom_read);
-			if (romRunMode)
+			if (sourceMedium == SOURCE_GBAC)
 			{
-				// LoROM
-				get_info(snesRomInfo, 0, 0x7fc0, 0x40);
+				// Get ROM info
+				MAKE_RAM_FPTR(get_info, neo2_myth_current_rom_read);
+				if (romRunMode)
+				{
+					// LoROM
+					get_info(snesRomInfo, 0, 0x7fc0, 0x40);
+				}
+				else
+				{
+					// HiROM
+					get_info(snesRomInfo, 0, 0xffc0, 0x40);
+				}
 			}
 			else
 			{
-				// HiROM
-				get_info(snesRomInfo, 0, 0xffc0, 0x40);
+				strcpy(strBuf, sdRootDir);
+				strcpy(&strBuf[10], "/");
+				strcpy(&strBuf[11], highlightedFileName);
+				if ((romLayout = get_rom_info_sd(strBuf, snesRomInfo)) == LAYOUT_UNKNOWN)
+				{
+					switch_to_menu(MID_SD_ERROR_MENU, 1);
+					break;
+				}
 			}
 
 			printxy(snesRomInfo, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);	// ROM title
@@ -803,7 +1042,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			print_meta_string(MS_MAIN_MENU_INSTRUCTIONS);
 			print_meta_string(MS_GAME_NUMBER);
 			print_games_list();
-			update_game_params();
+			update_game_params(0);
 			break;
 	}
 
@@ -831,7 +1070,7 @@ void main_menu_process_keypress(u16 keys)
 	if (keys & JOY_B)
 	{
 		// B
-		run_game_from_gba_card_c();
+		run_highlighted_game();
 	}
 	else if (keys & JOY_Y)
 	{
@@ -883,6 +1122,44 @@ void main_menu_process_keypress(u16 keys)
 		// L
 		sortOrder = (sortOrder == SORT_LOGICALLY) ? SORT_ALPHABETICALLY : SORT_LOGICALLY;
 		print_games_list();
+	}
+	else if (keys & JOY_R)
+	{
+		// R
+		if (sourceMedium == SOURCE_GBAC)
+		{
+			lastSdOperation = SD_OP_MOUNT;
+			hide_games_list();
+			printxy("Mounting SD card", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			update_screen();
+			if ((lastSdError = init_sd()) == FR_OK)
+			{
+				printxy("Opening /SNES/ROMS/", 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				update_screen();
+				lastSdOperation = SD_OP_OPEN_DIR;
+				if ((lastSdError = pf_opendir(&sdDir, sdRootDir)) == FR_OK)
+				{
+					printxy("Counting games", 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+					update_screen();
+					gamesList.count = count_games_on_sd_card();
+					gamesList.firstShown = gamesList.highlighted = 0;
+					clear_screen();
+					switch_to_menu(MID_MAIN_MENU, 0);
+				}
+				else
+				{
+					switch_to_menu(MID_SD_ERROR_MENU, 0);
+				}
+			}
+			else
+			{
+				switch_to_menu(MID_SD_ERROR_MENU, 0);
+			}
+		}
+		else
+		{
+			// TODO: Handle switch from SD mode to GBAC mode?
+		}
 	}
 	else if (keys & JOY_RIGHT)
 	{
@@ -943,7 +1220,7 @@ void extended_run_menu_process_keypress(u16 keys)
 	else if (keys & JOY_START)
 	{
 		// B
-		run_game_from_gba_card_c();
+		run_highlighted_game();
 	}
 	else if (keys & JOY_UP)
 	{
@@ -995,7 +1272,7 @@ void gg_code_entry_menu_process_keypress(u16 keys)
 	else if (keys & JOY_START)
 	{
 		// B
-		run_game_from_gba_card_c();
+		run_highlighted_game();
 	}
 	else if (keys & JOY_Y)
 	{
@@ -1137,7 +1414,7 @@ void ar_code_entry_menu_process_keypress(u16 keys)
 	else if (keys & JOY_START)
 	{
 		// Start
-		run_game_from_gba_card_c();
+		run_highlighted_game();
 	}
 	else if (keys & JOY_Y)
 	{
@@ -1288,7 +1565,7 @@ void cheat_db_menu_process_keypress(u16 keys)
 	else if (keys & JOY_START)
 	{
 		// Start
-		run_game_from_gba_card_c();
+		run_highlighted_game();
 	}
 	else if (keys & JOY_B)
 	{
@@ -1409,5 +1686,15 @@ void rom_info_menu_process_keypress(u16 keys)
 	{
 		// Y
 		switch_to_menu(MID_EXT_RUN_MENU, 0);
+	}
+}
+
+
+void sd_error_menu_process_keypress(u16 keys)
+{
+	if (keys & JOY_Y)
+	{
+		// Y
+		switch_to_menu(MID_MAIN_MENU, 0);
 	}
 }

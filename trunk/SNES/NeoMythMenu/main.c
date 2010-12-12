@@ -1,5 +1,5 @@
 // SNES Myth Shell
-// C version 0.30
+// C version 0.50
 //
 // Mic, 2010
 
@@ -43,6 +43,9 @@ u16 gbaCardAlphabeticalIdx[500];
 
 itemList_t gamesList;
 
+// Default to the GBA card as the source for games
+sourceMedium_t sourceMedium = SOURCE_GBAC;
+
 void (*keypress_handler)(u16);
 
 // All the text strings are written to this buffer and then sent to VRAM using DMA in order to
@@ -55,10 +58,12 @@ static char tempString[32];
 static rect_t printxyClipRect;
 
 FATFS sdFatFs;
-extern u16 cardType;
-extern long long num_sectors;
-extern u8 diskioPacket[7];
-extern u8 diskioResp[17];
+DIR sdDir;
+FILINFO sdFileInfo;
+
+char load_progress[] = "Loading......(  )";
+
+const char sdRootDir[] = "/SNES/ROMS";
 
 
 // These three strings are modified at runtime by the shell, so they are declared separately in order to get them into
@@ -73,7 +78,7 @@ char MS4[] = "\xff\x15\x02\x02 Game (001)";
 //
 const char * const metaStrings[] =
 {
-    "\xff\x03\x01\x07 Shell v 0.30\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
+    "\xff\x03\x01\x07 Shell v 0.50\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
 	"\xff\x01\xfe\x0f\x0a\x68\x69\x6A\x20\x71\x72\x73\x20\x7a\x7b\x7c\x83\x84\x85\xfe\x10\x0a\x6b\x6c\x6d\x20\x74\x75 \
 	 \x76\x20\x7d\x7e\x7f\x86\x87\x88xfe\x11\x0a\x6e\x6f\x70\x20\x77\x78\x79\x20\x80\x81\x82\x89\x8a\x8b\xfe\x17\x06 \
 	 \x06\xff\x04                             ",
@@ -165,6 +170,7 @@ const char * const metaStrings[] =
     "\xff\x17\x03\x03\x42\xff\x17\x04\x07: Edit, \xff\x17\x0f\x03Y\xff\x17\x10\x07: Go back",
     // 80
     "\xff\x06\x02\x07Info\xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
+    "\xff\x06\x02\x07\x45rror\xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
 };
 
 extern const cheatDbEntry_t cheatDatabase[];
@@ -226,6 +232,25 @@ static const u16 objColors[] =
 
 
 
+///////////// DEBUG ///////////////////
+
+
+extern unsigned char pkt[6];
+extern u8 diskioTemp[8];
+u8 cmdBitsWritten[16];
+u8 cmdBitsRead[16];
+u8 asicCommands[16];
+extern unsigned char pfmountbuf[36];
+unsigned char pfMountFmt;
+
+extern unsigned long long sec_tags[16];
+extern unsigned char sec_cache[16*512 + 8];
+
+
+///////////////////////////////////////////////
+
+
+
 void wait_nmi()
 {
 	while (REG_RDNMI & 0x80);
@@ -266,16 +291,9 @@ void add_full_pointer(void **pptr, u8 bank, u16 offset)
 }
 
 
-void testlongarg(unsigned long long foo)
-{
-	if (foo == 1) return 3;
-	return 0;
-}
-
 
 void update_screen()
 {
-	testlongarg(0x10203040);
 	wait_nmi();
 	load_vram(bg0Buffer, 0x2000, 0x800);
 	update_oam(&marker, 0, 1);
@@ -352,39 +370,46 @@ static void load_obj_colors()
 }
 
 
-void update_game_params()
+void update_game_params(int force)
 {
 	int i;
 	u8 *pGame;
 
-	if (sortOrder == SORT_LOGICALLY)
+	if (sourceMedium == SOURCE_GBAC)
 	{
-		set_full_pointer((void**)&pGame, GAME_LIST_BANK, 0xc800 + (gamesList.highlighted << 6));
+		if (sortOrder == SORT_LOGICALLY)
+		{
+			set_full_pointer((void**)&pGame, GAME_LIST_BANK, 0xc800 + (gamesList.highlighted << 6));
+		}
+		else
+		{
+			set_full_pointer((void**)&pGame, GAME_LIST_BANK,
+							 0xc800 + (gbaCardAlphabeticalIdx[gamesList.highlighted] << 6));
+		}
+
+		if (pGame[0] == 0xff)
+		{
+			gameMode = pGame[1];
+
+			romSize = pGame[2] >> 4;
+
+			romAddressPins = pGame[3];
+			romAddressPins |= (pGame[2] & 0x0f) << 8;
+
+			sramBank = pGame[4] >> 4;
+			sramSize = pGame[4] & 0x0f;
+			sramMode = pGame[6] & 0x0f;
+
+			extDsp = pGame[5] >> 4;
+
+			extSram = pGame[5] & 0x0f;
+
+			romRunMode = pGame[6] >> 4;
+		}
 	}
-	else
+	else if ((sourceMedium == SOURCE_SD) && force)
 	{
-		set_full_pointer((void**)&pGame, GAME_LIST_BANK,
-		                 0xc800 + (gbaCardAlphabeticalIdx[gamesList.highlighted] << 6));
-	}
-
-	if (pGame[0] == 0xff)
-	{
-		gameMode = pGame[1];
-
-		romSize = pGame[2] >> 4;
-
-		romAddressPins = pGame[3];
-		romAddressPins |= (pGame[2] & 0x0f) << 8;
-
-		sramBank = pGame[4] >> 4;
-		sramSize = pGame[4] & 0x0f;
-		sramMode = pGame[6] & 0x0f;
-
-		extDsp = pGame[5] >> 4;
-
-		extSram = pGame[5] & 0x0f;
-
-		romRunMode = pGame[6] >> 4;
+		// TODO: Read ROM info from SD card
 	}
 }
 
@@ -633,18 +658,60 @@ void print_games_list()
 {
 	int i;
 	u16 vramOffs = 0x0244;
+	static DIR dir;
 
-	print_highlighted_game_info();
-	show_scroll_indicators();
-
-	for (i = 0; ((i < NUMBER_OF_GAMES_TO_SHOW) && (i < gamesList.count)); i++)
+	if (sourceMedium == SOURCE_GBAC)
 	{
-		puts_game_title(gamesList.firstShown + i,
-		                vramOffs,
-		                (gamesList.highlighted == gamesList.firstShown + i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
-		vramOffs += 0x40;
-	}
+		print_highlighted_game_info();
+		show_scroll_indicators();
 
+		for (i = 0; ((i < NUMBER_OF_GAMES_TO_SHOW) && (i < gamesList.count)); i++)
+		{
+			puts_game_title(gamesList.firstShown + i,
+							vramOffs,
+							(gamesList.highlighted == gamesList.firstShown + i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			vramOffs += 0x40;
+		}
+	}
+	else if (sourceMedium == SOURCE_SD)
+	{
+		show_scroll_indicators();
+
+		memcpy(&dir, &sdDir, sizeof(DIR));
+
+		for (i = 0; ((i < NUMBER_OF_GAMES_TO_SHOW) && (i < gamesList.count)); )
+		{
+			if (pf_readdir(&dir, &sdFileInfo) == FR_OK)
+			{
+				if (dir.sect != 0)
+				{
+					//if (is_file_to_list(&sdFileInfo.fname[0]))
+					//{
+						if (gamesList.highlighted == gamesList.firstShown + i)
+						{
+							strcpy(highlightedFileName, &sdFileInfo.fname[0]);
+							highlightedFileSize = sdFileInfo.fsize;
+						}
+						printxy("            ", 2, 9 + i, 0, 28);
+						printxy(&sdFileInfo.fname[0],
+							    2, 9 + i,
+							    (gamesList.highlighted == gamesList.firstShown + i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE),
+			                    28);
+			            i++;
+
+					//}
+				}
+				else
+				{
+					break;
+				}
+			}
+			else
+			{
+				break;
+			}
+		}
+	}
 }
 
 
@@ -795,54 +862,227 @@ void run_secondary_cart_c()
 
 
 
-///////////// DEBUG ///////////////////
-
-unsigned char crc8 (unsigned char *buf)
+void run_game_from_sd_card_c()
 {
-    int i;
-    unsigned long long r4 = 0x80808080;
-    unsigned char crc = 0;
-    unsigned char c = 0;
+	int i,j;
+	void (*run_game)(void);
+	static WORD mbits, bytesRead, mythprbank, prbank, proffs;
+	static u8 *myth_pram_bio = (u8*)0xC006;
 
-    i = 5 * 8;
-    do {
-        if (r4 & 0x80) c = *buf++;
-        crc = crc << 1;
+	strcpy(tempString, sdRootDir);
+	strcpy(&tempString[10], "/");
+	strcpy(&tempString[11], highlightedFileName);
+	romRunMode = get_rom_info_sd(tempString, snesRomInfo) ^ 1;
 
-        if (crc & 0x80) crc ^= 9;
-        if (c & (r4>>24)) crc ^= 9;
-        r4 = (r4 >> 1) | (r4 << 31);
-      } while (--i > 0);
+	if ((strstri(".SMC", highlightedFileName) > 0) ||
+	    (strstri(".BIN", highlightedFileName) > 0))
+	{
+		gameMode = GAME_MODE_NORMAL_ROM;
+	}
+	else
+	{
+		clear_status_window();
+		printxy("Not a ROM!", 3, 21, 4, 32);
+		update_screen();
+		return;
+	}
 
-  return crc;
+	if (romRunMode > 1)
+	{
+		clear_status_window();
+		printxy("Unknown ROM type!", 3, 21, 4, 32);
+		update_screen();
+		return;
+	}
+
+	mbits = highlightedFileSize >> 17;
+	switch (mbits)
+	{
+		case 2:
+			load_progress[14] = '0'; load_progress[15] = '3';
+			romSize = 4; break;
+		case 4:
+			load_progress[14] = '0'; load_progress[15] = '5';
+			romSize = 4; break;
+		case 6:
+			load_progress[14] = '0'; load_progress[15] = '7';
+			romSize = 8; break;
+		case 8:
+			load_progress[14] = '0'; load_progress[15] = '9';
+			romSize = 8; break;
+		case 12:
+			load_progress[14] = '1'; load_progress[15] = '3';
+			romSize = 9; break;
+		case 16:
+			load_progress[14] = '1'; load_progress[15] = '7';
+			romSize = 9; break;
+		case 24:
+			load_progress[14] = '2'; load_progress[15] = '5';
+			romSize = 0x0A; break;
+		case 32:
+			load_progress[14] = '3'; load_progress[15] = '3';
+			romSize = 0x0B; break;
+		case 40:
+			load_progress[14] = '4'; load_progress[15] = '1';
+			romSize = 0x0C; break;
+		case 48:
+			load_progress[14] = '4'; load_progress[15] = '9';
+			romSize = 0x0D; break;
+		case 64:
+			load_progress[14] = '6'; load_progress[15] = '5';
+			romSize = 0x0E; break;
+		default:
+			load_progress[14] = '1'; load_progress[15] = '7';
+			romSize = 9; break;  // TODO: Treat this as an error?
+	}
+
+	MAKE_RAM_FPTR(run_game, run_game_from_sd_card);
+
+	// Disable these for the time being
+	extDsp = 0;
+	extSram = 0;
+	sramBank = 0;
+	sramSize = 0;
+	sramMode = 0;
+
+	for (i = 0; i < MAX_GG_CODES * 2; i++)
+	{
+		if (ggCodes[i].used == CODE_TARGET_RAM)
+		{
+			anyRamCheats = 1;
+		}
+		else
+		{
+			ggCodes[i].bank &= 0x3f;
+		}
+		if (romRunMode == 1)
+		{
+			// Convert LOROM addresses to file offsets
+			if (ggCodes[i].used == CODE_TARGET_ROM)
+			{
+				ggCodes[i].offset &= 0x7fff;
+				if (ggCodes[i].bank & 1) ggCodes[i].offset |= 0x8000;
+				ggCodes[i].bank >>= 1;
+			}
+		}
+	}
+
+	if ((lastSdError = pf_open(tempString)) != FR_OK)
+	{
+		lastSdOperation = SD_OP_OPEN_FILE;
+		switch_to_menu(MID_SD_ERROR_MENU, 0);
+		return;
+	}
+
+	// Skip past the SMC header if present
+	if (highlightedFileSize & 0x3FF)
+	{
+		if ((lastSdError = pf_lseek(highlightedFileSize & 0x3FF)) != FR_OK)
+		{
+			lastSdOperation = SD_OP_SEEK;
+			switch_to_menu(MID_SD_ERROR_MENU, 0);
+			return;
+		}
+	}
+
+	prbank = 0x50;
+	mythprbank = 0;
+	*myth_pram_bio = mythprbank;
+	proffs = 0;
+	for (i = mbits; i > 0; i--)
+	{
+		show_loading_progress();
+
+		// Read 256 sectors (1 Mbit)
+		for (j = 0; j < 256; j++)
+		{
+			if ((lastSdError = pf_read_sect_to_psram(prbank, proffs, &bytesRead)) != FR_OK)
+			{
+				lastSdOperation = SD_OP_READ_FILE;
+				switch_to_menu(MID_SD_ERROR_MENU, 0);
+				return;
+			}
+			proffs += 512;
+			if (proffs == 0)
+			{
+				prbank++;
+				if (prbank == 0x60)
+				{
+					prbank = 0x50;
+					mythprbank++;
+					*myth_pram_bio = mythprbank;
+				}
+			}
+		}
+	}
+
+	run_game();
 }
 
 
 
-extern unsigned char pkt[6];
-extern u8 diskioTemp[8];
-u8 cmdBitsWritten[16];
-u8 cmdBitsRead[16];
-u8 asicCommands[16];
-extern unsigned char pfmountbuf[36];
-unsigned char pfMountFmt;
-
-extern unsigned long long sec_tags[16];
-extern unsigned char sec_cache[16*512 + 8];
-
-void sendCmd( unsigned char cmd, unsigned long long arg )
+romLayout_t get_rom_info_sd(char *fname, u8 *romInfo)
 {
-    pkt[0]=cmd|0x40;                         // b7 = 0 => start bit, b6 = 1 => host command
-    pkt[1]=(unsigned char)(arg >> 24);
-    pkt[2]=(unsigned char)(arg >> 16);
-    pkt[3]=(unsigned char)(arg >> 8);
-    pkt[4]=(unsigned char)(arg);
-    pkt[5]=( crc8(pkt) << 1 ) | 1;             // b0 = 1 => stop bit
+
+	romLayout_t result = LAYOUT_UNKNOWN;
+	DWORD ofs;
+	WORD bytesRead;
+
+	lastSdOperation = SD_OP_OPEN_FILE;
+	if ((lastSdError = pf_open(fname)) == FR_OK)
+	{
+		ofs = 0x7FC0;
+		if (highlightedFileSize & 0x3FF)
+		{
+			ofs += 512;
+		}
+		lastSdOperation = SD_OP_SEEK;
+		if ((lastSdError = pf_lseek(ofs)) == FR_OK)
+		{
+			lastSdOperation = SD_OP_READ_FILE;
+			if ((lastSdError = pf_read(romInfo, 0x40, &bytesRead)) == FR_OK)
+			{
+				// Is the checksum correct?
+				if (((romInfo[0x1c] ^ romInfo[0x1e]) != 0xff) ||
+					((romInfo[0x1d] ^ romInfo[0x1f]) != 0xff))
+				{
+					lastSdOperation = SD_OP_SEEK;
+					ofs += 0x8000;
+					if ((lastSdError = pf_lseek(ofs)) == FR_OK)
+					{
+						lastSdOperation = SD_OP_READ_FILE;
+						if ((lastSdError = pf_read(romInfo, 0x40, &bytesRead)) == FR_OK)
+						{
+							if (((romInfo[0x1c] ^ romInfo[0x1e]) != 0xff) ||
+								((romInfo[0x1d] ^ romInfo[0x1f]) != 0xff))
+							{
+								result = LAYOUT_LOROM;
+							}
+							else
+							{
+								// HiROM
+								result = LAYOUT_HIROM;
+							}
+						}
+					}
+				}
+				else
+				{
+					// LoROM
+					result = LAYOUT_LOROM;
+				}
+			}
+		}
+	}
+
+	return result;
 }
 
-///////////////////////////////////////////////
 
 
+
+
+// DEBUG
 void print_sd_status()
 {
 	int i;
@@ -870,9 +1110,6 @@ void print_sd_status()
 	//sendCmd(8, 0x1AA);
 	print_hex(diskioTemp[4], 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	print_hex(diskioTemp[5], 6, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-
-	sendCmd(0,0);
-	print_hex(pkt[5], 10, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 
 	print_hex(asicCommands[2], 14, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	print_hex(asicCommands[1], 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
@@ -915,28 +1152,23 @@ int init_sd()
 	int mountResult = 0;
 
 	cardType = 0;
+	sourceMedium = SOURCE_SD;
 
 	diskio_init();
 
-	//neo2_enable_sd();
     if (mountResult = pf_mount(&sdFatFs))
     {
-		print_hex(mountResult, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-		print_sd_status();
+		//print_hex(mountResult, 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		//print_sd_status();
     	cardType = 0x8000;
         if (mountResult = pf_mount(&sdFatFs))
      	{
-			print_hex(mountResult, 6, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-			return -1;
+			//print_hex(mountResult, 6, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+			sourceMedium = SOURCE_GBAC;
         }
     }
 
-    if (pf_open("/Map.spc"))
-    {
-		return -2;
-    }
-
-    return 0;
+    return mountResult;
 }
 
 
@@ -1007,6 +1239,9 @@ int main()
 	int i;
 	u16 keys;
 
+	static DIR dir;
+	static FILINFO fileInfo;
+
 	*(u8*)0x00c040 = 0;				// CPLD ROM
 
 	if ((*(u8*)0x00ffe1 == 0x63) &&
@@ -1039,10 +1274,22 @@ int main()
 
 	REG_BGCNT = 3;			// Enable BG0 and BG1
 
-	if ((i = init_sd()) == 0)
+	/*if ((i = init_sd()) == 0)
 	{
 		//neo2_disable_sd();
 		printxy("File open ok", 2, 7, 4, 32);
+		pf_opendir(&dir, "/");
+		for (i = 0; i < 8; i++)
+		{
+			if (pf_readdir(&dir, &fileInfo) == FR_OK)
+			{
+				printxy(fileInfo.fname, 2, 7+i, 4, 32);
+			}
+			else
+			{
+				break;
+			}
+		}
 	}
 	else
 	{
@@ -1057,7 +1304,7 @@ int main()
 		}
 
 
-	}
+	}*/
 
 	while (1)
 	{
