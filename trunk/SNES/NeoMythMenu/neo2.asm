@@ -2027,7 +2027,7 @@ neo2_recv_sd:
 
 
 
-; void neo2_recv_sd(WORD prbank, WORD proffs)
+; void neo2_recv_sd_psram(WORD prbank, WORD proffs)
 ;
 .EQU _neo2_recv_sd_psram_save_regs 6
 .EQU _neo2_recv_sd_psram_prbank 3+_neo2_recv_sd_psram_save_regs
@@ -2082,6 +2082,7 @@ _nrsdp_write:
 				
 		bne		_nrsdp_loop				; repeat 256 times
 
+	sep 	#$20
 	plb
 
 	; Read 8 CRC bytes (16 nybbles)
@@ -2097,6 +2098,115 @@ _nrsdp_write:
 	plx
 	plp
 	rts
+	
+
+
+; void neo2_recv_sd_psram_multi(WORD prbank, WORD proffs, WORD count)
+;
+.EQU _neo2_recv_sd_psram_multi_save_regs 6
+.EQU _neo2_recv_sd_psram_multi_prbank 3+_neo2_recv_sd_psram_multi_save_regs
+.EQU _neo2_recv_sd_psram_multi_proffs _neo2_recv_sd_psram_multi_prbank+2
+.EQU _neo2_recv_sd_psram_multi_count _neo2_recv_sd_psram_multi_proffs+2
+;
+neo2_recv_sd_psram_multi:
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+
+	lda		_neo2_recv_sd_psram_multi_proffs,s
+	tax
+	lda		_neo2_recv_sd_psram_multi_count,s
+	tay
+	sep		#$20
+	lda		_neo2_recv_sd_psram_multi_prbank,s	
+	sta.l	$7d0000+_nrsdpm_write+3
+
+	lda		#$40
+	pha
+	plb
+	
+_nrsdpm_sectors:
+	phy
+	sep 	#$20
+	ldy		#$1024
+-:									; Wait for start bit
+	lda.w	$6061
+	and		#1
+	beq		+
+	dey
+	bne		-
+	; Timeout
+	ply
+	stz.b	tcc__r0					; FALSE
+	jmp.w	_nrsdpm_return
++:
+
+	ldy		#256					; words per sector
+_nrsdpm_loop_inner:
+	sep		#$20
+	lda.w	$6061					; Read high nybble of low byte (S)
+	asl		a	
+	asl		a	
+	asl		a	
+	asl		a
+	sta		tcc__r0	
+	lda.w	$6061					; Read low nybble of low byte (s)
+	and		#$0F
+	ora		tcc__r0
+	sta		tcc__r0					; tcc__r0 = 0x??Ss
+	lda.w	$6061					; Read high nybble of high byte (T)
+	asl		a	
+	asl		a	
+	asl		a	
+	asl		a
+	sta		tcc__r0+1				; tcc__r0 = 0xT0Ss
+	lda.w	$6061
+	rep		#$20
+	and		#$0F					; A = 0x000t
+	xba								; A = 0x0t00
+	ora		tcc__r0					; A = 0xTtSs
+_nrsdpm_write:
+	sta.l $500000,x					; Write 16 bits to PSRAM
+	inx
+	inx
+	dey
+	bne		_nrsdpm_loop_inner		; repeat 256 times
+
+	sep		#$20
+	; Read 8 CRC bytes (16 nybbles)
+	.rept 16
+	lda.l	MYTH_NEO2_RD_DAT4
+	.endr
+
+	lda.l	MYTH_NEO2_RD_DAT4		; end bit
+
+	cpx		#0						; has proffs wrapped around (i.e. should we move to the next bank) ?
+	bne		+
+	lda.l	$7d0000+_nrsdpm_write+3
+	ina
+	sta.l	$7d0000+_nrsdpm_write+3
++:
+
+	ply								; count
+	dey
+	beq		+
+	jmp.w	_nrsdpm_sectors
++:
+	lda		#1
+	sta		tcc__r0					; TRUE
+	
+_nrsdpm_return:
+	plb
+	
+	;jsr.w show_copied_data
+	
+	ply
+	plx
+	plp
+	rts
+	
 	
 	
 

@@ -506,7 +506,10 @@ void move_to_next_game()
 			(gamesList.firstShown + NUMBER_OF_GAMES_TO_SHOW < gamesList.count))
 		{
 			gamesList.firstShown++;
-			pf_readdir(&sdDir, &sdFileInfo);
+			if (sourceMedium == SOURCE_SD)
+			{
+				pf_readdir(&sdDir, &sdFileInfo);
+			}
 		}
 	}
 
@@ -532,10 +535,13 @@ void move_to_previous_game()
 			(gamesList.firstShown + ((NUMBER_OF_GAMES_TO_SHOW / 2) - 1) >= gamesList.highlighted))
 		{
 			gamesList.firstShown--;
-			pf_opendir(&sdDir, sdRootDir);
-			for (i = 0; i < gamesList.firstShown; i++)
+			if (sourceMedium == SOURCE_SD)
 			{
-				pf_readdir(&sdDir, &sdFileInfo);
+				pf_opendir(&sdDir, sdRootDir);
+				for (i = 0; i < gamesList.firstShown; i++)
+				{
+					pf_readdir(&sdDir, &sdFileInfo);
+				}
 			}
 		}
 	}
@@ -549,10 +555,14 @@ void move_to_previous_game()
 //
 void move_to_next_page()
 {
+	int i;
+
 	if (gamesList.highlighted + NUMBER_OF_GAMES_TO_SHOW < gamesList.count)
 	{
 		gamesList.highlighted += NUMBER_OF_GAMES_TO_SHOW;
 		update_game_number_string(NUMBER_OF_GAMES_TO_SHOW);
+
+		i = gamesList.firstShown;
 
 		// firstShown = highlighted - (highlighted % NUMBER_OF_GAMES_TO_SHOW)
 		gamesList.firstShown = gamesList.highlighted - hw_div16_8_rem16(gamesList.highlighted, NUMBER_OF_GAMES_TO_SHOW);
@@ -560,6 +570,16 @@ void move_to_next_page()
 		// Make sure firstShown is in range
 		for (; gamesList.firstShown + NUMBER_OF_GAMES_TO_SHOW > gamesList.count; gamesList.firstShown--);
 		for (; gamesList.firstShown > gamesList.highlighted; gamesList.firstShown--);
+
+		if (sourceMedium == SOURCE_SD)
+		{
+			i = gamesList.firstShown - i;
+			while (i > 0)
+			{
+				pf_readdir(&sdDir, &sdFileInfo);
+				i--;
+			}
+		}
 	}
 
 	update_game_params(0);
@@ -571,6 +591,8 @@ void move_to_next_page()
 //
 void move_to_previous_page()
 {
+	int i;
+
 	if (gamesList.highlighted >= NUMBER_OF_GAMES_TO_SHOW)
 	{
 		gamesList.highlighted -= NUMBER_OF_GAMES_TO_SHOW;
@@ -582,6 +604,15 @@ void move_to_previous_page()
 		// Make sure firstShown is in range
 		for (; gamesList.firstShown + NUMBER_OF_GAMES_TO_SHOW > gamesList.count; gamesList.firstShown--);
 		for (; gamesList.firstShown > gamesList.highlighted; gamesList.firstShown--);
+
+		if (sourceMedium == SOURCE_SD)
+		{
+			pf_opendir(&sdDir, sdRootDir);
+			for (i = 0; i < gamesList.firstShown; i++)
+			{
+				pf_readdir(&sdDir, &sdFileInfo);
+			}
+		}
 	}
 
 	update_game_params(0);

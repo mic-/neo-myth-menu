@@ -2006,6 +2006,7 @@ _disk_readp_calc_sector:
 
 
 
+;###############################################################
 
 
 ; BOOL sdReadSingleBlockPsram( WORD prbank, WORD proffs, unsigned int addr )
@@ -2099,27 +2100,6 @@ disk_readsect_psram_asm:
 	lda		tcc__r9h
 	pha
 
-;	lda		_disk_readrsp_count,s
-;	and		#$7FFF
-;	beq		+
-;	cmp		#513
-;	bcs		+
-;	bra		++
-;+:
-;	lda		#RES_PARERR
-;	jmp		_disk_readrsp_return
-;++:
-
-;	cmp		#41
-;	bcc		_disk_readrsp_small_read
-    ; too big for anything but a file read, don't fetch to cache
-;	lda		_disk_readrsp_sector,s
-;	cmp.w	sec_last
-;	bne		+
-;	lda		_disk_readrsp_sector+2,s
-;	cmp.w	sec_last+2
-;	beq		++
-;+:
 	; read sector
 	jsr		neo2_pre_sd
 	jsr		_disk_readrsp_calc_sector		
@@ -2131,13 +2111,13 @@ disk_readsect_psram_asm:
 	;pea.w	sec_buf
 	lda		_disk_readrsp_proffs+4,s		; need to offset by 4 bytes because of the two above PHAs
 	pha
-sta.l pfmountbuf
+;sta.l pfmountbuf
 	lda		_disk_readrsp_prbank+6,s
 	pha
-sta.l pfmountbuf+2
-lda.l pfmountbuf+3
-ina
-sta.l pfmountbuf+3
+;sta.l pfmountbuf+2
+;lda.l pfmountbuf+3
+;ina
+;sta.l pfmountbuf+3
 	jsr		sdReadSingleBlockPsram			; sdReadSingleBlock(sec_buf, sector << ((cardType & 1) ? 0 : 9))
 	lda		tcc__r0
 	bne		+++
@@ -2167,15 +2147,6 @@ sta.l pfmountbuf+3
 	;lda		_disk_readp_sector+2,s
 	;sta.l	sec_last+2
 ++:									; end if (sec_last != sector)
-
-	;lda		#sec_buf
-	;sta		tcc__r9
-	;lda		#:sec_buf
-	;sta		tcc__r9h				; buf = sec_buf
-	;jmp		_disk_readp_copy_data
-
-	
-;_disk_readrsp_copy_data:
 	rep		#$20
 
 	lda		#RES_OK
@@ -2196,6 +2167,178 @@ _disk_readrsp_calc_sector:
 	lda		_disk_readrsp_sector+2,s
 	sta		tcc__r1
 	lda		_disk_readrsp_sector+4,s
+	sta		tcc__r1h
+	lda.l	cardType
+	and		#1
+	bne		+
+	; sector << 9
+	lda		tcc__r1+1
+	sta		tcc__r1h
+	lda		tcc__r1
+	xba
+	and		#$FF00
+	asl		a
+	sta		tcc__r1
+	rol		tcc__r1h
++:
+	rts
+
+
+;#########################################################
+
+; DRESULT disk_read_psram_multi (
+;     WORD prbank,           
+;	  WORD proffs,
+;     DWORD sector,        /* Sector address (LBA) */
+;     WORD count            /* Number of sectors to read (1..255) */
+; )
+;
+.EQU _disk_readprm_save_regs 5
+.EQU _disk_readprm_prbank 4+_disk_readprm_save_regs
+.EQU _disk_readprm_proffs _disk_readprm_prbank+2
+.EQU _disk_readprm_sector _disk_readprm_proffs+2
+.EQU _disk_readprm_count _disk_readprm_sector+4
+;
+disk_read_psram_multi_asm:
+	php
+	rep		#$30
+	phx
+	phy
+
+	jsr		neo2_pre_sd
+	jsr		_disk_readprm_calc_sector
+	lda		tcc__r1h
+	pha
+	lda		tcc__r1
+	pha
+	jsr		sdReadStartMulti			; sdReadStartMulti(sector << ((cardType & 1) ? 0 : 9))
+	lda		tcc__r0
+	bne		+
+	; read failed, retry once
+	jsr		sdReadStartMulti			; sdReadStartMulti(sector << ((cardType & 1) ? 0 : 9))
+	lda		tcc__r0
+	bne		++
+	; read failed
+	pla
+	pla
+	jsr		neo2_post_sd
+	lda		#RES_ERROR
+	sta		tcc__r0
+	ply
+	plx
+	plp
+	rtl
+++:
+	pla
+	pla
+	lda		_disk_readprm_count,s
+	pha
+	lda		_disk_readprm_proffs+2,s
+	pha
+	lda		_disk_readprm_prbank+4,s
+	pha
+	jsr		neo2_recv_sd_psram_multi			; neo2_recv_sd_psram_multi(prbank, proffs, count)
+	lda		tcc__r0
+	bne		++
+	; read failed
+	pla
+	pla
+	pla
+	jsr		neo2_post_sd
+	lda		#RES_ERROR
+	sta		tcc__r0
+	ply
+	plx
+	plp
+	rtl
+++:
+	pla
+	pla
+	pla
+	jmp		_disk_readprm_return
+	
++:
+	pla									; pop the arguments for sdReadStartMulti
+	pla
+
+	lda		_disk_readprm_count,s
+	pha
+	lda		_disk_readprm_proffs+2,s
+	pha
+	lda		_disk_readprm_prbank+4,s
+	pha
+	jsr		neo2_recv_sd_psram_multi	; neo2_recv_sd_psram_multi(prbank, proffs, count)
+	lda		tcc__r0
+	bne		+
+	pla
+	pla
+	pla
+	jsr		_disk_readprm_calc_sector
+	lda		tcc__r1h
+	pha
+	lda		tcc__r1
+	pha
+	jsr		sdReadStartMulti	
+	lda		tcc__r0
+	bne		++
+	; read failed
+	pla
+	pla
+	jsr		neo2_post_sd
+	lda		#RES_ERROR
+	sta		tcc__r0
+	ply
+	plx
+	plp
+	rtl
+++:
+	pla
+	pla
+	lda		_disk_readprm_count,s
+	pha
+	lda		_disk_readprm_proffs+2,s
+	pha
+	lda		_disk_readprm_prbank+4,s
+	pha
+	jsr		neo2_recv_sd_psram_multi			; neo2_recv_sd_psram_multi(prbank, proffs, count)
+	lda		tcc__r0
+	bne		++
+	; read failed
+	pla
+	pla
+	pla
+	jsr		neo2_post_sd
+	lda		#RES_ERROR
+	sta		tcc__r0
+	ply
+	plx
+	plp
+	rtl
+++:
+	pla
+	pla
+	pla
+	jmp		_disk_readprm_return
++:
+	pla
+	pla
+	pla
+
+_disk_readprm_return:
+	jsr		sdReadStopMulti
+	jsr		neo2_post_sd
+	lda		#RES_OK
+	sta		tcc__r0
+	ply
+	plx
+	plp
+	rtl
+
+; Helper subroutine
+_disk_readprm_calc_sector:
+	lda		_disk_readprm_sector+2,s
+	sta		tcc__r1
+	lda		_disk_readprm_sector+4,s
 	sta		tcc__r1h
 	lda.l	cardType
 	and		#1
