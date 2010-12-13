@@ -57,6 +57,9 @@ tools\constify navigation.c navigopt.s navigopt2.s
 tools\constify cheats\cheat_database.c cheat_db.s cheat_db2.s
 @echo on
 
+wla-spc700 -o vgmplay_spc700_ext.asm vgmplay.o
+wlalink -b vgmplay.link assets\vgmplay.bin
+
 REM ASM -> OBJ
 ..\bin\wla-65816.exe -io assets\data.asm data.obj
 ..\bin\wla-65816.exe -io dma.asm dma.obj
@@ -64,6 +67,7 @@ REM ASM -> OBJ
 REM ..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
 ..\bin\wla-65816.exe -io neo2.asm neo2.obj
 ..\bin\wla-65816.exe -io neo2_spc.asm neo2_spc.obj
+..\bin\wla-65816.exe -io neo2_vgm.asm neo2_vgm.obj
 ..\bin\wla-65816.exe -io ppu.asm ppu.obj
 ..\bin\wla-65816.exe -io pff_asm.asm pff_asm.obj
 ..\bin\wla-65816.exe -io dummy_games_list.asm dummy_games_list.obj
@@ -83,7 +87,7 @@ REM ..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
 ..\bin\wla-65816.exe -io aplib_decrunch.asm aplib_decrunch.obj
 
 REM OBJ -> SMC
-..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj aplib_decrunch.obj neo2.obj neo2_spc.obj ppu.obj cheat_db.obj dummy_games_list.obj diskio.obj myth_io.obj pff_asm.obj pff.obj u_strings.obj NEOSNES.BIN
+..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj aplib_decrunch.obj neo2.obj neo2_spc.obj neo2_vgm.obj ppu.obj cheat_db.obj dummy_games_list.obj diskio.obj myth_io.obj pff_asm.obj pff.obj u_strings.obj NEOSNES.BIN
 
 @echo off
 REM Delete files

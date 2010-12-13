@@ -864,7 +864,7 @@ void run_secondary_cart_c()
 void play_spc_from_sd_card_c()
 {
 	static u8 *myth_pram_bio = (u8*)0xC006;
-	static WORD prbank, proffs, readFromStart;
+	static WORD prbank, proffs;
 	WORD i, progress;
 	void (*play_file)(void);
 
@@ -875,12 +875,6 @@ void play_spc_from_sd_card_c()
 		return;
 	}
 
-	/*if ((lastSdError = pf_lseek(0x100)) != FR_OK)
-	{
-		lastSdOperation = SD_OP_SEEK;
-		switch_to_menu(MID_SD_ERROR_MENU, 0);
-		return;
-	}*/
 
 	clear_status_window();
 	update_screen();
@@ -911,11 +905,91 @@ void play_spc_from_sd_card_c()
 		}
 	}
 
-	//pf_read_sect_to_psram(0x51, 0, 1);	// DSP registers
-	//pf_lseek(0);
-	//pf_read_sect_to_psram(0x51, 0x200, 0);	// Header
-
 	MAKE_RAM_FPTR(play_file, play_spc_from_sd_card);
+
+	play_file();
+}
+
+
+void play_vgm_from_sd_card_c()
+{
+	static u8 *myth_pram_bio = (u8*)0xC006;
+	static WORD prbank, proffs, sects, bytesRead;
+	static char buf[4];
+	WORD i, progress;
+	void (*play_file)(void);
+
+	if (highlightedFileSize > 57856)
+	{
+		clear_status_window();
+		printxy("VGM too large!", 3, 21, 4, 32);
+		update_screen();
+		return;
+	}
+
+	if ((lastSdError = pf_open(tempString)) != FR_OK)
+	{
+		lastSdOperation = SD_OP_OPEN_FILE;
+		switch_to_menu(MID_SD_ERROR_MENU, 0);
+		return;
+	}
+
+	if ((lastSdError = pf_read(buf, 4, &bytesRead)) != FR_OK)
+	{
+		lastSdOperation = SD_OP_READ_FILE;
+		switch_to_menu(MID_SD_ERROR_MENU, 0);
+		return;
+	}
+	if ((buf[0] != 'V') || (buf[1] != 'g') || (buf[2] != 'm'))
+	{
+		clear_status_window();
+		printxy("Not a valid VGM!", 3, 21, 4, 32);
+		update_screen();
+		return;
+	}
+
+	if ((lastSdError = pf_open(tempString)) != FR_OK)
+	{
+		lastSdOperation = SD_OP_OPEN_FILE;
+		switch_to_menu(MID_SD_ERROR_MENU, 0);
+		return;
+	}
+
+	clear_status_window();
+	update_screen();
+	//load_progress[14] = '6'; load_progress[15] = '5';
+
+	*myth_pram_bio = 0;
+	prbank = 0x50;
+	proffs = 0;
+	progress = 1;
+	sects = highlightedFileSize >> 9;
+	if (highlightedFileSize & 0x1FF)
+	{
+		sects++;
+	}
+	for (i = 0; i < sects; i++)
+	{
+		if (progress)
+		{
+			show_loading_progress();
+		}
+		progress ^= 1;
+
+		if ((lastSdError = pf_read_sect_to_psram(prbank, proffs, 1)) != FR_OK)
+		{
+			lastSdOperation = SD_OP_READ_FILE;
+			switch_to_menu(MID_SD_ERROR_MENU, 0);
+			return;
+		}
+		proffs += 512;
+		if (proffs == 0)
+		{
+			prbank++;
+		}
+	}
+
+	MAKE_RAM_FPTR(play_file, play_vgm_from_sd_card);
 
 	play_file();
 }
@@ -925,7 +999,7 @@ void run_game_from_sd_card_c()
 {
 	int i,j;
 	void (*run_game)(void);
-	static WORD mbits, bytesRead, mythprbank, prbank, proffs, readFromStart;
+	static WORD mbits, bytesRead, mythprbank, prbank, proffs, recalcSector;
 	static u8 *myth_pram_bio = (u8*)0xC006;
 
 	strcpy(tempString, sdRootDir);
@@ -940,7 +1014,15 @@ void run_game_from_sd_card_c()
 	}
 	else if (strstri(".SPC", highlightedFileName) > 0)
 	{
+		gameMode = GAME_MODE_SPC;
 		play_spc_from_sd_card_c();
+		return;
+	}
+	else if (strstri(".VGM", highlightedFileName) > 0)
+	{
+		gameMode = GAME_MODE_VGM;
+		play_vgm_from_sd_card_c();
+		return;
 	}
 	else
 	{
@@ -1041,7 +1123,7 @@ void run_game_from_sd_card_c()
 	}
 
 	// Skip past the SMC header if present
-	readFromStart = 1;
+	recalcSector = 1;
 	if (highlightedFileSize & 0x3FF)
 	{
 		if ((lastSdError = pf_lseek(512)) != FR_OK)
@@ -1050,7 +1132,8 @@ void run_game_from_sd_card_c()
 			switch_to_menu(MID_SD_ERROR_MENU, 0);
 			return;
 		}
-		readFromStart = 0;
+		// Skip the sector calculation on the first read after the seek
+		recalcSector = 0;
 	}
 
 	prbank = 0x50;
@@ -1061,13 +1144,13 @@ void run_game_from_sd_card_c()
 	{
 		show_loading_progress();
 
-		if ((lastSdError = pf_read_1mbit_to_psram_asm(prbank, proffs, readFromStart)) != FR_OK)
+		if ((lastSdError = pf_read_1mbit_to_psram(prbank, proffs, recalcSector)) != FR_OK)
 		{
 			lastSdOperation = SD_OP_READ_FILE;
 			switch_to_menu(MID_SD_ERROR_MENU, 0);
 			return;
 		}
-		readFromStart = 1;
+		recalcSector = 1;
 
 		prbank += 2;
 		if (prbank == 0x60)

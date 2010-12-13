@@ -205,19 +205,21 @@ lda.b tcc__r0 ; DON'T OPTIMIZE
 bne +
 brl __local_313
 +
-lda -4 + __pf_read_1mbit_to_psram_locals + 1,s
+lda.w FatFs  ;lda -4 + __pf_read_1mbit_to_psram_locals + 1,s
 sta.b tcc__r0
-lda -2 + __pf_read_1mbit_to_psram_locals + 1,s
+lda.w FatFs+2 ;lda -2 + __pf_read_1mbit_to_psram_locals + 1,s
 sta.b tcc__r0h
-clc
-lda.b tcc__r0
-adc.w #28
-sta.b tcc__r0
-lda.b [tcc__r0]
+;clc
+;lda.b tcc__r0
+;adc.w #28
+;sta.b tcc__r0
+ldy #28
+lda.b [tcc__r0],y
 sta.b tcc__r1
-inc.b tcc__r0
-inc.b tcc__r0
-lda.b [tcc__r0]
+;inc.b tcc__r0
+;inc.b tcc__r0
+ldy #30
+lda.b [tcc__r0],y
 sta.b tcc__r2
 sta.b tcc__r0
 lda.b tcc__r2h
@@ -263,9 +265,9 @@ and #$7F
 sta.b tcc__r1
 ora.b tcc__r2
 sta.b tcc__r2
-lda -2 + __pf_read_1mbit_to_psram_locals + 1,s
+lda.w FatFs+2 ;lda -2 + __pf_read_1mbit_to_psram_locals + 1,s
 sta.b tcc__r1h
-lda -4 + __pf_read_1mbit_to_psram_locals + 1,s
+lda.w FatFs ;lda -4 + __pf_read_1mbit_to_psram_locals + 1,s
 inc a
 sta.b tcc__r1
 lda.w #0
@@ -303,15 +305,15 @@ ldx #1
 lda.b tcc__r0
 sec
 sbc.b tcc__r3
-tay
-beq +
-dex
-+
-stx.b tcc__r5
-txa
-bne +
-brl __local_314
-+
+;tay
+;beq +
+;dex
+;+
+;stx.b tcc__r5
+;txa
+;bne +
+bne __local_314 ;brl __local_314
+;+
 ldx #1
 lda.b tcc__r2
 sec
@@ -347,15 +349,15 @@ ldx #1
 lda.b tcc__r2
 sec
 sbc.b tcc__r3
-tay
-beq +
-dex
-+
-stx.b tcc__r5
-txa
-bne +
-brl __local_316
-+
+;tay
+;beq +
+;dex
+;+
+;stx.b tcc__r5
+;txa
+;bne +
+bne __local_316 ;brl __local_316
+;+
 ldx #1
 lda.b tcc__r1
 sec
@@ -414,8 +416,8 @@ lda.b tcc__r0
 sta -28 + __pf_read_1mbit_to_psram_locals + 1,s
 lda.b tcc__r1
 sta -26 + __pf_read_1mbit_to_psram_locals + 1,s
-lda -28 + __pf_read_1mbit_to_psram_locals + 1,s
-sta.b tcc__r0
+;lda -28 + __pf_read_1mbit_to_psram_locals + 1,s
+;sta.b tcc__r0
 stz.b tcc__r1h
 tsa
 clc
