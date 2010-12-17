@@ -22,6 +22,8 @@ enum
 
 	MID_SD_ERROR_MENU,
 
+	MID_VGM_PLAY_MENU,
+
 	MID_LAST_MENU
 };
 

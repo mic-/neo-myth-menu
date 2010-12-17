@@ -675,6 +675,9 @@ void print_games_list()
 	}
 	else if (sourceMedium == SOURCE_SD)
 	{
+		// Print "GAME (nnn)"
+		print_meta_string(4);
+
 		show_scroll_indicators();
 
 		memcpy(&dir, &sdDir, sizeof(DIR));
@@ -957,7 +960,6 @@ void play_vgm_from_sd_card_c()
 
 	clear_status_window();
 	update_screen();
-	//load_progress[14] = '6'; load_progress[15] = '5';
 
 	*myth_pram_bio = 0;
 	prbank = 0x50;
@@ -968,6 +970,10 @@ void play_vgm_from_sd_card_c()
 	{
 		sects++;
 	}
+
+	load_progress[14] = (((sects>>1)+1)/10)+'0';
+	load_progress[15] = (((sects>>1)+1)%10)+'0';
+
 	for (i = 0; i < sects; i++)
 	{
 		if (progress)
@@ -992,6 +998,9 @@ void play_vgm_from_sd_card_c()
 	MAKE_RAM_FPTR(play_file, play_vgm_from_sd_card);
 
 	play_file();
+
+		printxy("Now Playing", 3, 21, 4, 32);
+		update_screen();
 }
 
 
@@ -1144,7 +1153,7 @@ void run_game_from_sd_card_c()
 	{
 		show_loading_progress();
 
-		if ((lastSdError = pf_read_1mbit_to_psram(prbank, proffs, recalcSector)) != FR_OK)
+		if ((lastSdError = pf_read_1mbit_to_psram_asm(prbank, proffs, mythprbank, recalcSector)) != FR_OK)
 		{
 			lastSdOperation = SD_OP_READ_FILE;
 			switch_to_menu(MID_SD_ERROR_MENU, 0);
