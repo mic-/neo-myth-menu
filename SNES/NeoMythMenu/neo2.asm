@@ -129,6 +129,9 @@ run_3800:
     LDA     #$01                 ;
     STA.L   $C00E                ; HARD REST IO
 
+	lda.l	resetType
+	sta.l	$C050
+	
     LDA     #$01                 ;
     STA.L   $C012                ; CPLD RAM ON
     STA.L   $C015                ; CPLD RAM ON
@@ -895,9 +898,66 @@ show_loading_progress:
 	pla
 	plp
 	rtl
+
+
+show_debug_data:
+	php
+	rep #$30
+	pha
+	phx
+	phy
+	
+ 	jsr.w	_wait_nmi
+
+	rep	#$30
+	lda	#$22c3
+	sta.l	REG_VRAM_ADDR_L
+	sep	#$20
+	
+
+	ldx	#0
+-:
+	lda.l	pfmountbuf,x
+	lsr	a
+	lsr	a
+	lsr	a
+	lsr	a
+	clc
+	adc	#'0'
+	cmp	#58
+	bcc	+
+	clc
+	adc	#7
++:
+	sta.l	REG_VRAM_DATAW1
+	lda	#8
+	sta.l	REG_VRAM_DATAW2
+	lda.l	pfmountbuf,x
+	and	#15
+	clc
+	adc	#'0'
+	cmp	#58
+	bcc	+
+	clc
+	adc	#7
++:
+	sta.l	REG_VRAM_DATAW1
+	lda	#8
+	sta.l	REG_VRAM_DATAW2
+	inx
+	cpx	#4
+	bne	-
+
+	rep		#$30
+	ply
+	plx
+	pla
+	plp
+	rtl
 	
 	
 show_copied_data:
+ .DEFINE SHOWCOPYADDR $7f2300
  .DEFINE NEO2_DEBUG 1
  .IFDEF NEO2_DEBUG
  	jsr.w	_wait_nmi
@@ -910,7 +970,7 @@ show_copied_data:
 	ldx	#0
 -:
 rep #$20
-	lda.l	$500000,x
+	lda.l	SHOWCOPYADDR,x
 sep #$20
 	lsr	a
 	lsr	a
@@ -927,7 +987,7 @@ sep #$20
 	lda	#8
 	sta.l	REG_VRAM_DATAW2
 rep #$20
-	lda.l	$500000,x
+	lda.l	SHOWCOPYADDR,x
 sep #$20
 	and	#15
 	clc
@@ -2146,27 +2206,24 @@ _nrsdpm_sectors:
 	ldy		#256					; words per sector
 _nrsdpm_loop_inner:
 	sep		#$20
-	lda.w	$6061					; Read high nybble of low byte (S)
+	lda.w	$6061					; Read high nybble of low byte (D)
+	asl		a	
+	asl		a	
+	asl		a	
+	asl		a						; A = %DDDD0000					
+	eor		#$30					; Reading the 4-bit data register gives %0011dddd, so set A ^= %00110000
+	eor.w	$6061					; ..then A ^= DAT4 to get %DDDDdddd				
+	xba
+	
+	lda.w	$6061					; Read high nybble of high byte 
 	asl		a	
 	asl		a	
 	asl		a	
 	asl		a
-	sta		tcc__r0	
-	lda.w	$6061					; Read low nybble of low byte (s)
-	and		#$0F
-	ora		tcc__r0
-	sta		tcc__r0					; tcc__r0 = 0x??Ss
-	lda.w	$6061					; Read high nybble of high byte (T)
-	asl		a	
-	asl		a	
-	asl		a	
-	asl		a
-	sta		tcc__r0+1				; tcc__r0 = 0xT0Ss
-	lda.w	$6061
+	eor		#$30
+	eor.w	$6061
+	xba
 	rep		#$20
-	and		#$0F					; A = 0x000t
-	xba								; A = 0x0t00
-	ora		tcc__r0					; A = 0xTtSs
 _nrsdpm_write:
 	sta.l $500000,x					; Write 16 bits to PSRAM
 	inx

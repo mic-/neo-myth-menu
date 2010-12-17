@@ -140,6 +140,7 @@ extern sortOrder_t sortOrder;
 extern u8 freeCodeSlots;
 extern u8 snesRomInfo[0x40];
 extern u8 doRegionPatch;
+extern u8 resetType;
 extern oamEntry_t marker;
 extern sourceMedium_t sourceMedium;
 extern u16 cardType;

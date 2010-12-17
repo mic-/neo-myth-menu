@@ -136,7 +136,9 @@ FRESULT pf_lseek (DWORD);				/* Move file pointer of a file object */
 FRESULT pf_opendir (DIR*, const char*);	/* Open an existing directory */
 FRESULT pf_readdir (DIR*, FILINFO*);	/* Read a directory item */
 
-extern FRESULT pf_read_1mbit_to_psram_asm (WORD, WORD, WORD);	/* Read data from a file */
+extern DWORD clust2sect (CLUST clst);
+
+extern FRESULT pf_read_1mbit_to_psram_asm (WORD, WORD, WORD, WORD);	/* Read data from a file */
 
 
 /*--------------------------------------------------------------*/

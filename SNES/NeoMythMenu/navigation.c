@@ -23,6 +23,7 @@ u8 currentMenu = MID_MAIN_MENU;
 u8 highlightedOption[MID_LAST_MENU];
 u8 cheatGameIdx = 0;
 u8 gameFoundInDb = 0;
+u8 resetType = 0;
 
 int lastSdError, lastSdOperation;
 char highlightedFileName[100];
@@ -97,6 +98,14 @@ const char * const regionPatchStrings[] =
 	"Off     ", "Quick   ", "Complete",
 };
 
+const char * const resetTypeStrings[] =
+{
+	"To game         ",
+	"To menu after 3s",
+	"To menu         "
+};
+
+
 oamEntry_t marker;
 
 typedef struct
@@ -116,6 +125,7 @@ enum
 	MENU1_ITEM_ROM_INFO = 2,
 	MENU1_ITEM_RUN_MODE = 3,
 	MENU1_ITEM_FIX_REGION = 4,
+	MENU1_ITEM_RESET_TYPE = 5,
 	MENU1_ITEM_LAST
 };
 
@@ -126,6 +136,7 @@ menuOption_t extRunMenuItems[MENU1_ITEM_LAST + 1] =
 	{"ROM info", 0, 11, 0},
 	{"Mode:", 0, 13, 8},
 	{"Autofix region:", 0, 14, 18},
+	{"Reset:", 0, 15, 9},
 	{0,0,0,0}	// Terminator
 };
 
@@ -159,6 +170,7 @@ void cheat_db_menu_process_keypress(u16);
 void cheat_db_no_codes_menu_process_keypress(u16);
 void rom_info_menu_process_keypress(u16);
 void sd_error_menu_process_keypress(u16);
+void vgm_play_menu_process_keypress(u16);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -781,6 +793,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 
 			extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue = (char*)&(metaStrings[48 + romRunMode][4]);
 			extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue = (char*)regionPatchStrings[doRegionPatch];
+			extRunMenuItems[MENU1_ITEM_RESET_TYPE].optionValue = (char*)resetTypeStrings[resetType];
 			for (i = 0; i < MENU1_ITEM_LAST; i++)
 			{
 				print_menu_item(extRunMenuItems,
@@ -1230,6 +1243,17 @@ void extended_run_menu_process_keypress(u16 keys)
 			printxy(extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue,
 			        extRunMenuItems[MENU1_ITEM_FIX_REGION].optionColumn,
 			        extRunMenuItems[MENU1_ITEM_FIX_REGION].row,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+			        32);
+		}
+		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_RESET_TYPE)
+		{
+			resetType++; if (resetType > 2) resetType = 0;
+			extRunMenuItems[MENU1_ITEM_RESET_TYPE].optionValue = (char*)resetTypeStrings[resetType];
+
+			printxy(extRunMenuItems[MENU1_ITEM_RESET_TYPE].optionValue,
+			        extRunMenuItems[MENU1_ITEM_RESET_TYPE].optionColumn,
+			        extRunMenuItems[MENU1_ITEM_RESET_TYPE].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        32);
 		}

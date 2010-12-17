@@ -118,18 +118,20 @@ CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 /* Get sector# from cluster#                                             */
 /*-----------------------------------------------------------------------*/
 
+// Optimized version implemented in pff_asm.asm
+
 //static
-DWORD clust2sect (	/* !=0: Sector number, 0: Failed - invalid cluster# */
-	CLUST clst		/* Cluster# to be converted */
-)
-{
-	FATFS *fs = FatFs;
-
-
-	clst -= 2;
-	if (clst >= (fs->max_clust - 2)) return 0;		/* Invalid cluster# */
-	return (DWORD)clst * fs->csize + fs->database;
-}
+//DWORD clust2sect (	/* !=0: Sector number, 0: Failed - invalid cluster# */
+//	CLUST clst		/* Cluster# to be converted */
+//)
+//{
+//	FATFS *fs = FatFs;
+//
+//
+//	clst -= 2;
+//	if (clst >= (fs->max_clust - 2)) return 0;		/* Invalid cluster# */
+//	return (DWORD)clst * fs->csize + fs->database;
+//}
 
 
 
@@ -669,7 +671,7 @@ FRESULT pf_read_sect_to_psram (
 			return FR_INVALID_OBJECT;
 
 	remain = fs->fsize - fs->fptr;
-	if (512 > remain) return FR_INVALID_OBJECT;			/* Truncate btr by remaining bytes */
+	//if (512 > remain) return FR_INVALID_OBJECT;			/* Truncate btr by remaining bytes */
 
 	if (recalcsector)
 	{
