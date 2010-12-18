@@ -35,6 +35,8 @@
 #define MS_GG_EDIT_MENU_INSTRUCTIONS 77
 #define MS_ROM_INFO_MENU_INSTRUCTIONS 80
 #define MS_SD_ERROR_MENU_INSTRUCTIONS 81
+#define MS_SD_INFO_MENU_INSTRUCTIONS 82
+#define MS_VGM_PLAY_MENU_INSTRUCTIONS 83
 
 
 // Masks for the joypad data returned by read_joypad

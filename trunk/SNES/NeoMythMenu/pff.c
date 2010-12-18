@@ -29,6 +29,10 @@
 //static
 FATFS *FatFs;	/* Pointer to the file system object (logical drive) */
 
+//static
+WCHAR LfnBuf[_MAX_LFN + 1];
+#define	NAMEBUF(sp,lp)	BYTE sp[12]; WCHAR *lp = LfnBuf
+#define INITBUF(dj,sp,lp)	dj.fn = sp; dj.lfn = lp
 
 /*--------------------------------------------------------------------------
 
@@ -133,6 +137,96 @@ CLUST get_fat (	/* 1:IO error, Else:Cluster status */
 //	return (DWORD)clst * fs->csize + fs->database;
 //}
 
+
+
+
+#if _USE_LFN
+
+static WCHAR ff_wtoupper(WCHAR wc) {
+	char c = (char)wc;
+	if (c >= 'a' && c <= 'z') wc -= ' ';
+	return wc;
+}
+
+
+static
+const BYTE LfnOfs[] = {1,3,5,7,9,14,16,18,20,22,24,28,30};	/* Offset of LFN chars in the directory entry */
+
+
+static
+BOOL cmp_lfn (			/* TRUE:Matched, FALSE:Not matched */
+	WCHAR *lfnbuf,		/* Pointer to the LFN to be compared */
+	BYTE *dir			/* Pointer to the directory entry containing a part of LFN */
+)
+{
+	int i, s;
+	WCHAR wc, uc;
+
+
+	i = ((dir[LDIR_Ord] & 0xBF) - 1) * 13;	/* Get offset in the LFN buffer */
+	s = 0; wc = 1;
+	do {
+		uc = LD_WORD(dir+LfnOfs[s]);	/* Pick an LFN character from the entry */
+		if (wc) {	/* Last char has not been processed */
+			wc = ff_wtoupper(uc);		/* Convert it to upper case */
+			if (i >= _MAX_LFN || wc != ff_wtoupper(lfnbuf[i++]))	/* Compare it */
+				return FALSE;			/* Not matched */
+		} else {
+			if (uc != 0xFFFF) return FALSE;	/* Check filler */
+		}
+	} while (++s < 13);				/* Repeat until all chars in the entry are checked */
+
+	if ((dir[LDIR_Ord] & 0x40) && wc && lfnbuf[i])	/* Last segment matched but different length */
+		return FALSE;
+
+	return TRUE;					/* The part of LFN matched */
+}
+
+
+
+static
+BOOL pick_lfn (			/* TRUE:Succeeded, FALSE:Buffer overflow */
+	WCHAR *lfnbuf,		/* Pointer to the Unicode-LFN buffer */
+	BYTE *dir			/* Pointer to the directory entry */
+)
+{
+	int i, s;
+	WCHAR wc, uc;
+
+
+	i = ((dir[LDIR_Ord] & 0x3F) - 1) * 13;	/* Offset in the LFN buffer */
+
+	s = 0; wc = 1;
+	do {
+		uc = LD_WORD(dir+LfnOfs[s]);			/* Pick an LFN character from the entry */
+		if (wc) {	/* Last char has not been processed */
+			if (i >= _MAX_LFN) return FALSE;	/* Buffer overflow? */
+			lfnbuf[i++] = wc = uc;				/* Store it */
+		} else {
+			if (uc != 0xFFFF) return FALSE;		/* Check filler */
+		}
+	} while (++s < 13);						/* Read all character in the entry */
+
+	if (dir[LDIR_Ord] & 0x40) {				/* Put terminator if it is the last LFN part */
+		if (i >= _MAX_LFN) return FALSE;	/* Buffer overflow? */
+		lfnbuf[i] = 0;
+	}
+
+	return TRUE;
+}
+
+static
+BYTE sum_sfn (
+	const BYTE *dir		/* Ptr to directory entry */
+)
+{
+	BYTE sum = 0;
+	int n = 11;
+
+	do sum = (sum >> 1) + (sum << 7) + *dir++; while (--n);
+	return sum;
+}
+#endif
 
 
 
@@ -256,7 +350,9 @@ FRESULT dir_read (
 {
 	FRESULT res;
 	BYTE a, c, *dir;
-
+#if _USE_LFN
+	BYTE ord = 0xFF, sum = 0xFF;
+#endif
 
 	res = FR_NO_FILE;
 	while (dj->sect) {
@@ -267,8 +363,33 @@ FRESULT dir_read (
 		c = dir[DIR_Name];
 		if (c == 0) { res = FR_NO_FILE; break; }	/* Reached to end of table */
 		a = dir[DIR_Attr] & AM_MASK;
-		if (c != 0xE5 && c != '.' && !(a & AM_VOL))	/* Is it a valid entry? */
+		//if (c != 0xE5 && c != '.' && !(a & AM_VOL))	/* Is it a valid entry? */
+		//	break;
+
+#if _USE_LFN	/* LFN configuration */
+		a = dir[DIR_Attr] & AM_MASK;
+		if (c == 0xE5 || (!_FS_RPATH && c == '.') || ((a & AM_VOL) && a != AM_LFN)) {	/* An entry without valid data */
+			ord = 0xFF;
+		} else {
+			if (a == AM_LFN) {			/* An LFN entry is found */
+				if (c & 0x40) {			/* Is it start of LFN sequence? */
+					sum = dir[LDIR_Chksum];
+					c &= 0xBF; ord = c;
+					dj->lfn_idx = dj->index;
+				}
+				/* Check LFN validity and capture it */
+				ord = (c == ord && sum == dir[LDIR_Chksum] && pick_lfn(dj->lfn, dir)) ? ord - 1 : 0xFF;
+			} else {					/* An SFN entry is found */
+				if (ord || sum != sum_sfn(dir))	/* Is there a valid LFN? */
+					dj->lfn_idx = 0xFFFF;		/* It has no LFN. */
+				break;
+			}
+		}
+#else		/* Non LFN configuration */
+		if (c != 0xE5 && (_FS_RPATH || c != '.') && !(dir[DIR_Attr] & AM_VOL))	/* Is it a valid entry? */
 			break;
+#endif
+
 		res = dir_next(dj);				/* Next entry */
 		if (res != FR_OK) break;
 	}

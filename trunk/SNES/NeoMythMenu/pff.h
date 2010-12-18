@@ -49,6 +49,11 @@
 #define _FS_FAT32	1
 /* To enable FAT32 support, set _FS_FAT32 to 1. */
 
+#define _FS_RPATH 1
+
+#define _USE_LFN  1
+
+#define _MAX_LFN 64
 
 /* End of configuration options. Do not change followings without care.     */
 /*--------------------------------------------------------------------------*/
@@ -91,6 +96,10 @@ typedef struct _DIR_ {
 	CLUST	sclust;		/* Table start cluster (0:Static table) */
 	CLUST	clust;		/* Current cluster */
 	DWORD	sect;		/* Current sector */
+#if _USE_LFN
+	WCHAR*	lfn;		/* Pointer to the LFN working buffer */
+	WORD	lfn_idx;	/* Last matched LFN index number (0xFFFF:No LFN) */
+#endif
 } DIR;
 
 
@@ -103,6 +112,10 @@ typedef struct _FILINFO_ {
 	WORD	ftime;		/* Last modified time */
 	BYTE	fattrib;	/* Attribute */
 	char	fname[13];	/* File name */
+#if _USE_LFN
+	char*	lfname;		/* Pointer to the LFN buffer */
+	int 	lfsize;		/* Size of LFN buffer [chrs] */
+#endif
 } FILINFO;
 
 
@@ -139,7 +152,6 @@ FRESULT pf_readdir (DIR*, FILINFO*);	/* Read a directory item */
 extern DWORD clust2sect (CLUST clst);
 
 extern FRESULT pf_read_1mbit_to_psram_asm (WORD, WORD, WORD, WORD);	/* Read data from a file */
-
 
 /*--------------------------------------------------------------*/
 /* Flags and offset address                                     */
@@ -210,6 +222,7 @@ extern FRESULT pf_read_1mbit_to_psram_asm (WORD, WORD, WORD, WORD);	/* Read data
 
 #define MBR_Table			446
 
+/*
 #define	DIR_Name			0
 #define	DIR_Attr			11
 #define	DIR_NTres			12
@@ -220,6 +233,23 @@ extern FRESULT pf_read_1mbit_to_psram_asm (WORD, WORD, WORD, WORD);	/* Read data
 #define	DIR_WrtDate			24
 #define	DIR_FstClusLO		26
 #define	DIR_FileSize		28
+*/
+#define	DIR_Name			0
+#define	DIR_Attr			11
+#define	DIR_NTres			12
+#define	DIR_CrtTime			14
+#define	DIR_CrtDate			16
+#define	DIR_FstClusHI		20
+#define	DIR_WrtTime			22
+#define	DIR_WrtDate			24
+#define	DIR_FstClusLO		26
+#define	DIR_FileSize		28
+#define	LDIR_Ord			0
+#define	LDIR_Attr			11
+#define	LDIR_Type			12
+#define	LDIR_Chksum			13
+#define	LDIR_FstClusLO		26
+
 
 
 

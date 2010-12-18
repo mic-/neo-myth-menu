@@ -267,39 +267,45 @@ CHEAT:
 	
 	sei
 	;lda		REG_NMI_TIMEN
-	sta		cpldSaveTimEn
-	lda		#1
+	;sta		cpldSaveTimEn
+	;lda		#1
 	;sta		REG_NMI_TIMEN
 	
 	
 	rep		#$20
+	lda.l $4218
+	cmp #$6030		; Select, Y, L, R
+	bne	+
+	jmp.l $3800		; reset the game
++:
+
 ;lda $4218
 ;sta	cpldJoyData
-	lda		cpldJoyData
-	tax
-	eor		cpldJoyMask
-	stx		cpldJoyMask
-	and		cpldJoyMask
-	sta		cpldJoyData
-	lda		cpldJoyMask
-	and		#$C04 ;D0C			; don't block Select, L, R
-	sta		cpldJoyMask
+;	lda		cpldJoyData
+;	tax
+;	eor		cpldJoyMask
+;	stx		cpldJoyMask
+;	and		cpldJoyMask
+;	sta		cpldJoyData
+;	lda		cpldJoyMask
+;	and		#$C04 ;D0C			; don't block Select, L, R
+;	sta		cpldJoyMask
 
-	lda		cpldJoyData
-	and		#$D04 ;20B			; Select, L, R, A
-	cmp		#$D04 ;20B
-	bne		+
-	sep		#$20
-	lda		cpldArEnabled
-	eor		#1
-	sta		cpldArEnabled
+;	lda		cpldJoyData
+;	and		#$D04 ;20B			; Select, L, R, A
+;	cmp		#$D04 ;20B
+;	bne		+
+;	sep		#$20
+;	lda		cpldArEnabled
+;	eor		#1
+;	sta		cpldArEnabled
 	;beq		ram_cheats_disabled
 +:
 
 	sep		#$20
-bra slowmo_disabled
-	lda		cpldArEnabled
-	beq		ram_cheats_disabled	
+;bra slowmo_disabled
+;	lda		cpldArEnabled
+;	beq		ram_cheats_disabled	
 ram_cheat1:
 	lda		#0		;#0@+4
 	beq		+
@@ -350,6 +356,8 @@ ram_cheat8:
 	sta.l	$030201
 +:
 ram_cheats_disabled:
+
+bra slowmo_disabled
 
 	rep		#$20
 	lda		cpldJoyData
@@ -957,7 +965,7 @@ show_debug_data:
 	
 	
 show_copied_data:
- .DEFINE SHOWCOPYADDR $7f2300
+ .DEFINE SHOWCOPYADDR $500000
  .DEFINE NEO2_DEBUG 1
  .IFDEF NEO2_DEBUG
  	jsr.w	_wait_nmi
@@ -2211,8 +2219,12 @@ _nrsdpm_loop_inner:
 	asl		a	
 	asl		a	
 	asl		a						; A = %DDDD0000					
-	eor		#$30					; Reading the 4-bit data register gives %0011dddd, so set A ^= %00110000
-	eor.w	$6061					; ..then A ^= DAT4 to get %DDDDdddd				
+	;eor		#$30					; Reading the 4-bit data register gives %0011dddd, so set A ^= %00110000
+	;eor.w	$6061					; ..then A ^= DAT4 to get %DDDDdddd				
+		sta		tcc__r0	
+		lda.w	$6061					; Read low nybble of low byte (s)
+		and		#$0F
+		ora		tcc__r0
 	xba
 	
 	lda.w	$6061					; Read high nybble of high byte 
@@ -2220,8 +2232,12 @@ _nrsdpm_loop_inner:
 	asl		a	
 	asl		a	
 	asl		a
-	eor		#$30
-	eor.w	$6061
+	;eor		#$30
+	;eor.w	$6061
+		sta		tcc__r0	
+		lda.w	$6061					; Read low nybble of low byte (s)
+		and		#$0F
+		ora		tcc__r0
 	xba
 	rep		#$20
 _nrsdpm_write:
