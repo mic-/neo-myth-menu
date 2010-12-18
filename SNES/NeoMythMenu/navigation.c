@@ -29,6 +29,8 @@ int lastSdError, lastSdOperation;
 char highlightedFileName[100];
 long long highlightedFileSize;
 
+extern FATFS *FatFs;
+
 extern ggCode_t ggCodes[MAX_GG_CODES * 2];
 extern const cheatDbEntry_t cheatDatabase[];
 
@@ -102,7 +104,8 @@ const char * const resetTypeStrings[] =
 {
 	"To game         ",
 	"To menu after 3s",
-	"To menu         "
+	"To menu         ",
+	"Disabled        "
 };
 
 
@@ -123,9 +126,10 @@ enum
 	MENU1_ITEM_GAME_GENIE = 0,
 	MENU1_ITEM_ACTION_REPLAY = 1,
 	MENU1_ITEM_ROM_INFO = 2,
-	MENU1_ITEM_RUN_MODE = 3,
-	MENU1_ITEM_FIX_REGION = 4,
-	MENU1_ITEM_RESET_TYPE = 5,
+    MENU1_ITEM_SD_INFO = 3,
+	MENU1_ITEM_RUN_MODE = 4,
+	MENU1_ITEM_FIX_REGION = 5,
+	MENU1_ITEM_RESET_TYPE = 6,
 	MENU1_ITEM_LAST
 };
 
@@ -134,9 +138,10 @@ menuOption_t extRunMenuItems[MENU1_ITEM_LAST + 1] =
 	{"Game Genie", 0, 9, 0},
 	{"Action Replay", 0, 10, 0},
 	{"ROM info", 0, 11, 0},
-	{"Mode:", 0, 13, 8},
-	{"Autofix region:", 0, 14, 18},
-	{"Reset:", 0, 15, 9},
+	{"SD info", 0, 12, 0},
+	{"Mode:", 0, 14, 8},
+	{"Autofix region:", 0, 15, 18},
+	{"Reset:", 0, 16, 9},
 	{0,0,0,0}	// Terminator
 };
 
@@ -885,6 +890,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 				strcpy(strBuf, sdRootDir);
 				strcpy(&strBuf[10], "/");
 				strcpy(&strBuf[11], highlightedFileName);
+				strBuf[11+strlen(highlightedFileName)] = 0;
 				if ((romLayout = get_rom_info_sd(strBuf, snesRomInfo)) == LAYOUT_UNKNOWN)
 				{
 					switch_to_menu(MID_SD_ERROR_MENU, 1);
@@ -955,6 +961,56 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			}
 			break;
 
+		case MID_VGM_PLAY_MENU:
+			keypress_handler = vgm_play_menu_process_keypress;
+			print_meta_string(MS_VGM_PLAY_MENU_INSTRUCTIONS);
+
+			printxy("Playing ", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			printxy(highlightedFileName, 10, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			break;
+
+		case MID_SD_INFO_MENU:
+			keypress_handler = sd_error_menu_process_keypress;
+			print_meta_string(MS_SD_INFO_MENU_INSTRUCTIONS);
+
+			printxy("SD card info", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+
+			printxy("Card type:", 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+            print_hex(cardType>>8, 13, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+            print_hex(cardType, 15, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+			printxy("Sectors:", 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+            print_hex(num_sectors>>24, 11, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+            print_hex(num_sectors>>16, 13, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+            print_hex(num_sectors>>8, 15, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+            print_hex(num_sectors, 17, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+
+			printxy("File system:", 2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			printxy("Cluster size:", 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			if (FatFs)
+			{
+				if (FatFs->fs_type == FS_FAT12)
+					printxy("FAT12", 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+				else if (FatFs->fs_type == FS_FAT16)
+					printxy("FAT16", 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+				else if (FatFs->fs_type == FS_FAT32)
+					printxy("FAT32", 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+				else
+					printxy("??? ", 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+
+
+	            print_hex(FatFs->csize, 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+			}
+			else
+			{
+				printxy("??? ", 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+				printxy("??? ", 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			}
+
+
+			break;
+
 		case MID_SD_ERROR_MENU:
 			keypress_handler = sd_error_menu_process_keypress;
 			print_meta_string(MS_SD_ERROR_MENU_INSTRUCTIONS);
@@ -1017,6 +1073,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 				strcpy(strBuf, sdRootDir);
 				strcpy(&strBuf[10], "/");
 				strcpy(&strBuf[11], highlightedFileName);
+				strBuf[11+strlen(highlightedFileName)] = 0;
 				if ((romLayout = get_rom_info_sd(strBuf, snesRomInfo)) == LAYOUT_UNKNOWN)
 				{
 					switch_to_menu(MID_SD_ERROR_MENU, 1);
@@ -1172,37 +1229,47 @@ void main_menu_process_keypress(u16 keys)
 		// R
 		if (sourceMedium == SOURCE_GBAC)
 		{
-			lastSdOperation = SD_OP_MOUNT;
-			hide_games_list();
-			printxy("Mounting SD card", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
-			update_screen();
-			if ((lastSdError = init_sd()) == FR_OK)
-			{
-				printxy("Opening /SNES/ROMS/", 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			//if (FatFs == NULL)
+			//{
+				lastSdOperation = SD_OP_MOUNT;
+				hide_games_list();
+				printxy("Mounting SD card", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 				update_screen();
-				lastSdOperation = SD_OP_OPEN_DIR;
-				if ((lastSdError = pf_opendir(&sdDir, sdRootDir)) == FR_OK)
+				if ((lastSdError = init_sd()) == FR_OK)
 				{
-					printxy("Counting games", 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+					printxy("Opening /SNES/ROMS/", 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 					update_screen();
-					gamesList.count = count_games_on_sd_card();
-					gamesList.firstShown = gamesList.highlighted = 0;
-					clear_screen();
-					switch_to_menu(MID_MAIN_MENU, 0);
+					lastSdOperation = SD_OP_OPEN_DIR;
+					if ((lastSdError = pf_opendir(&sdDir, sdRootDir)) == FR_OK)
+					{
+						printxy("Counting games", 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+						update_screen();
+						gamesList.count = count_games_on_sd_card();
+						gamesList.firstShown = gamesList.highlighted = 0;
+						MS4[0xd] = '1'; MS4[0xc] = MS4[0xb] = '0';
+						clear_screen();
+						switch_to_menu(MID_MAIN_MENU, 0);
+					}
+					else
+					{
+						switch_to_menu(MID_SD_ERROR_MENU, 0);
+					}
 				}
 				else
 				{
 					switch_to_menu(MID_SD_ERROR_MENU, 0);
 				}
-			}
-			else
-			{
-				switch_to_menu(MID_SD_ERROR_MENU, 0);
-			}
+			//}
 		}
 		else
 		{
-			// TODO: Handle switch from SD mode to GBAC mode?
+			sourceMedium = SOURCE_GBAC;
+			update_screen();
+			gamesList.count = count_games_on_gba_card();
+			gamesList.firstShown = gamesList.highlighted = 0;
+			MS4[0xd] = '1'; MS4[0xc] = MS4[0xb] = '0';
+			clear_screen();
+			switch_to_menu(MID_MAIN_MENU, 0);
 		}
 	}
 	else if (keys & JOY_RIGHT)
@@ -1248,7 +1315,7 @@ void extended_run_menu_process_keypress(u16 keys)
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_RESET_TYPE)
 		{
-			resetType++; if (resetType > 2) resetType = 0;
+			resetType++; if (resetType > 3) resetType = 0;
 			extRunMenuItems[MENU1_ITEM_RESET_TYPE].optionValue = (char*)resetTypeStrings[resetType];
 
 			printxy(extRunMenuItems[MENU1_ITEM_RESET_TYPE].optionValue,
@@ -1260,6 +1327,10 @@ void extended_run_menu_process_keypress(u16 keys)
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_ROM_INFO)
 		{
 			switch_to_menu(MID_ROM_INFO_MENU, 0);
+		}
+		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_SD_INFO)
+		{
+			switch_to_menu(MID_SD_INFO_MENU, 0);
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_ACTION_REPLAY)
 		{
@@ -1750,6 +1821,27 @@ void sd_error_menu_process_keypress(u16 keys)
 	if (keys & JOY_Y)
 	{
 		// Y
+		switch_to_menu(MID_MAIN_MENU, 0);
+	}
+}
+
+
+void vgm_play_menu_process_keypress(u16 keys)
+{
+	u16 i;
+
+	if (keys & JOY_Y)
+	{
+		// Y
+		stop_vgm();
+
+		init_sd();
+		pf_opendir(&sdDir, sdRootDir);
+		for (i = 0; i < gamesList.firstShown; i++)
+		{
+			pf_readdir(&sdDir, &sdFileInfo);
+		}
+
 		switch_to_menu(MID_MAIN_MENU, 0);
 	}
 }

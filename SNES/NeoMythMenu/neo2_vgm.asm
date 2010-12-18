@@ -160,7 +160,7 @@ sta.l pfmountbuf
 	cmp.l 	REG_APUI00
  	bne 	-
 
-jsr.w show_copied_data
+;jsr.w show_copied_data
 
 	; Tell the driver to start playback
 	sep		#$20

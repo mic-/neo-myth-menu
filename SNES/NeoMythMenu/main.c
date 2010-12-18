@@ -171,6 +171,8 @@ const char * const metaStrings[] =
     // 80
     "\xff\x06\x02\x07Info\xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
     "\xff\x06\x02\x07\x45rror\xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
+    "\xff\x06\x02\x07Info \xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
+    "\xff\x06\x02\x07VGM  \xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
 };
 
 extern const cheatDbEntry_t cheatDatabase[];
@@ -999,8 +1001,7 @@ void play_vgm_from_sd_card_c()
 
 	play_file();
 
-		printxy("Now Playing", 3, 21, 4, 32);
-		update_screen();
+	switch_to_menu(MID_VGM_PLAY_MENU, 0);
 }
 
 
@@ -1014,6 +1015,7 @@ void run_game_from_sd_card_c()
 	strcpy(tempString, sdRootDir);
 	strcpy(&tempString[10], "/");
 	strcpy(&tempString[11], highlightedFileName);
+	tempString[11+strlen(highlightedFileName)] = 0;
 	romRunMode = get_rom_info_sd(tempString, snesRomInfo) ^ 1;
 
 	if ((strstri(".SMC", highlightedFileName) > 0) ||
@@ -1154,6 +1156,7 @@ void run_game_from_sd_card_c()
 		show_loading_progress();
 
 		if ((lastSdError = pf_read_1mbit_to_psram_asm(prbank, proffs, mythprbank, recalcSector)) != FR_OK)
+		//if ((lastSdError = pf_read_1mbit_to_psram(prbank, proffs, recalcSector)) != FR_OK)
 		{
 			lastSdOperation = SD_OP_READ_FILE;
 			switch_to_menu(MID_SD_ERROR_MENU, 0);

@@ -25,6 +25,7 @@ extern void run_secondary_cart();
 extern void play_spc_from_gba_card();
 extern void play_spc_from_sd_card();
 extern void play_vgm_from_sd_card();
+extern void stop_vgm();
 
 extern void show_loading_progress();
 
