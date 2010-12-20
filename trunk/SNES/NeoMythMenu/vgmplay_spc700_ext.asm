@@ -51,6 +51,8 @@
 .DEFINE CHN1TOGGLE	$41
 .DEFINE CHN2TOGGLE	$42
 .DEFINE CHN3TOGGLE	$43
+.DEFINE USECHO		$44
+
 
 ; Commands sent by the S-CPU
 .DEFINE CMD_PLAY			$21
@@ -99,6 +101,8 @@ pause:
 prepare:
 	mov		SPC_DSP_ADDR,#DSP_KOF
 	mov		SPC_DSP_DATA,#$00
+
+	call	!set_coefs
 	
 	mov		SPC_DSP_ADDR,#DSP_SRCN3
 	mov		SPC_DSP_DATA,#1
@@ -209,6 +213,26 @@ sample4:
 .DB $b2,$77,$77,$77,$77,$77,$77,$77,$77,$b2,$77,$77,$77,$77,$77,$77,$77,$77,$b2,$77,$77,$77,$77,$77,$77,$77,$77,$b3,$77,$77,$77,$77,$77,$77,$77,$77
 
 
+set_coefs:
+	mov		SPC_DSP_ADDR,#DSP_COEF0
+	mov		SPC_DSP_DATA,#127
+	mov		SPC_DSP_ADDR,#DSP_COEF1
+	mov		SPC_DSP_DATA,#0
+	mov		SPC_DSP_ADDR,#DSP_COEF2
+	mov		SPC_DSP_DATA,#0
+	mov		SPC_DSP_ADDR,#DSP_COEF3
+	mov		SPC_DSP_DATA,#0
+	mov		SPC_DSP_ADDR,#DSP_COEF4
+	mov		SPC_DSP_DATA,#0
+	mov		SPC_DSP_ADDR,#DSP_COEF5
+	mov		SPC_DSP_DATA,#0
+	mov		SPC_DSP_ADDR,#DSP_COEF6
+	mov		SPC_DSP_DATA,#0
+	mov		SPC_DSP_ADDR,#DSP_COEF7
+	mov		SPC_DSP_DATA,#0
+	ret	
+	
+
 .ORGA $0300
 
 start:
@@ -216,14 +240,16 @@ start:
 	mov		x,#$F0
 	mov 	sp,x
 	
+	mov		USECHO,#$20
+	
 	mov		SPC_DSP_ADDR,#DSP_EDL
 	mov		SPC_DSP_DATA,#0
 	mov		SPC_DSP_ADDR,#DSP_FLG
 	mov		SPC_DSP_DATA,#$20		; Disable echo
-	mov		SPC_DSP_ADDR,#DSP_EON
-	mov		SPC_DSP_DATA,#0
+	;mov		SPC_DSP_ADDR,#DSP_EON
+	;mov		SPC_DSP_DATA,#0
 
-	mov		MVOL,#112
+	mov		MVOL,#100
 	
 	mov		SENDLOOPS,#0
 	
@@ -250,15 +276,23 @@ play:
 	cmp		a,#CMD_PLAY				; Was it a Play command?
 	bne		+
 	call	!prepare
-	mov		SPC_PORT0,LAST_BYTE		; Echo back to the S-CPU
-	bra		no_new_command
+	;mov		SPC_PORT0,LAST_BYTE		; Echo back to the S-CPU
+	bra		processed_command ;no_new_command
 +:
 	cmp		a,#CMD_PAUSE			; Was it a Pause command?
 	bne		+
 	call	!pause
-	mov		SPC_PORT0,LAST_BYTE
-	bra		no_new_command
+	;mov		SPC_PORT0,LAST_BYTE
+	bra		processed_command ;no_new_command
 +:
+	cmp		a,#CMD_TOGGLE_ECHO
+	bne		+
+	eor		USECHO,#$20
+	call	!stop
+	call	!prepare
+	;mov		SPC_PORT0,LAST_BYTE		
+	bra		processed_command ;no_new_command
++:	
 	cmp		a,#CMD_STOP				; Was it a Stop command?
 	bne		+	
 	call	!stop
@@ -269,8 +303,8 @@ play:
 	mov		a,SENDLOOPS
 	eor		a,#1
 	mov		SENDLOOPS,a
-	mov		SPC_PORT0,LAST_BYTE		
-	bra		no_new_command
+	;mov		SPC_PORT0,LAST_BYTE		
+	bra		processed_command ;no_new_command
 +:
 	mov		TEMP,a
 	and		a,#$F0
@@ -286,8 +320,8 @@ play:
 	mov		SPC_DSP_DATA,MVOL
 	mov		SPC_DSP_ADDR,#DSP_MVOLR
 	mov		SPC_DSP_DATA,MVOL	
-	mov		SPC_PORT0,LAST_BYTE
-	bra		no_new_command
+	;mov		SPC_PORT0,LAST_BYTE
+	bra		processed_command ;no_new_command
 +:	
 	cmp		a,#CMD_TOGGLE_CHN		; Was it a Toggle Channel command?
 	bne		+
@@ -305,14 +339,15 @@ play:
 	and		a,#TONE_GAIN			; CHNxTOGGLE ^= 0xFF; DSP_GAINx = TONE_GAIN & CHNxTOGGLE;
 	mov		SPC_DSP_ADDR,TEMP2
 	mov		SPC_DSP_DATA,a
-	mov		SPC_PORT0,LAST_BYTE
-	bra		+
+	;mov		SPC_PORT0,LAST_BYTE
+	bra		processed_command ;+
 toggle_noise:						; Channel 3 (noise) has its own gain, which is why it's handled separately
 	eor		CHN3TOGGLE,#255
 	mov		a,CHN3TOGGLE
 	and		a,OLDNGAIN
 	mov		SPC_DSP_ADDR,#DSP_GAIN3
 	mov		SPC_DSP_DATA,a
+processed_command:
 	mov		SPC_PORT0,LAST_BYTE
 +:
 ; There are no new commands from the S-CPU. Are we in Playing or Paused/Stopped state?
@@ -325,28 +360,28 @@ no_new_command:
 
 	; Perform decompression..
 	
-;	mov		a,NUM_FLAGS		; any flags left?
-;	bne		+
-;	mov		NUM_FLAGS,#8
-;	mov		a,[VGM_PTR+x]	; load a new flags byte
-;	mov		FLAGS,a
-;	incw	VGM_PTR
-;+:
-;	dec		NUM_FLAGS
-;	ror		FLAGS			; put the next flag in C
-;	bcc		+
-;	call	!psg_param		; the flag was set; this is a PSG write command
-;	jmp		!play
+	mov		a,NUM_FLAGS		; any flags left?
+	bne		+
+	mov		NUM_FLAGS,#8
+	mov		a,[VGM_PTR+x]	; load a new flags byte
+	mov		FLAGS,a
+	incw	VGM_PTR
++:
+	dec		NUM_FLAGS
+	ror		FLAGS			; put the next flag in C
+	bcc		+
+	call	!psg_param		; the flag was set; this is a PSG write command
+	jmp		!play
 	
-;+:
++:
 	mov		a,[VGM_PTR+x]	; the was flag clear; this is not a PSG write command
 	incw	VGM_PTR
 
-	cmp		a,#$50
-	bne		+
-	call	!psg_param
-	jmp		!play
-	+:
+	;cmp		a,#$50
+	;bne		+
+	;call	!psg_param
+	;jmp		!play
+	;+:
 	
 	mov		TEMP,a			; save the command byte
 	and		a,#$F0
@@ -417,7 +452,7 @@ gg_stereo_param:
 wait_frame_ntsc:
 	mov		SPC_TIMER1,#131		; 133 = floor(8000/60)
 	mov		SPC_CTRL,#$02		; enable timer 1
-	
+wait_frame_2:
 	call	!update_vol	
 -: 
 	mov		a,SPC_COUNTER1
@@ -444,12 +479,13 @@ compressed_long_wait:
 wait_frame_pal:
 	mov		SPC_TIMER0,#160		; 160 = 8000 / 50
 	mov		SPC_CTRL,#$81		; enable timer 0
-	call	!update_vol	
--:
-	mov		a,SPC_COUNTER0
-	beq		-
-	mov		SPC_CTRL,#$80		; disable timers
-	jmp		!play
+	bra		wait_frame_2
+;	call	!update_vol	
+;-:
+;	mov		a,SPC_COUNTER0
+;	beq		-
+;	mov		SPC_CTRL,#$80		; disable timers
+;	jmp		!play
 	
 
 	
@@ -584,7 +620,7 @@ tone_reg_updated:
 	rol		a					; A = (psgPeriodHi << 1) | ((psgPeriodLo & 0x80) >> 7)
 	and		a,#7				; the frequency table is $800 bytes long
 	clrc
-	adc		a,#7				; ..and it starts at $700 
+	adc		a,#8				; ..and it starts at $700 
 	mov		FREQ_PTR+1,a
 	mov		a,[FREQ_PTR]+y		; load low byte of S-DSP period
 	mov		PVAL,a
@@ -639,7 +675,9 @@ noise_reg_updated:
 	adc		a,TEMP
 	mov		TEMP,a
 	; We want to set the noise clock to $1B - (param*3), i.e. 6400 Hz / (param+1). $20 is added to keep echo disabled
-	mov		a,#$3B				
+	;mov		a,#$3B
+	mov		a,USECHO
+	or		a,#$1B
 	setc
 	sbc		a,TEMP	
 	mov		SPC_DSP_ADDR,#DSP_FLG
@@ -658,7 +696,7 @@ noise_reg_updated:
 	and		a,#$1F
 	mov		x,a
 	mov		a,!noise2_table+x
-	or		a,#$20
+	or		a,USECHO ;#$20
 	mov		SPC_DSP_ADDR,#DSP_FLG
 	mov		SPC_DSP_DATA,a		
 	ret
@@ -672,7 +710,7 @@ noise_reg_updated:
 	rol		a					; A = (psgPeriodHi << 1) | ((psgPeriodLo & 0x80) >> 7)
 	and		a,#7				; the frequency table is $800 bytes long
 	clrc
-	adc		a,#$F				; ..and it starts at $F00 
+	adc		a,#$10				; ..and it starts at $F00 
 	mov		FREQ_PTR+1,a
 
 	mov		SAMPLE,#1
@@ -724,6 +762,9 @@ periodic_noise:
 
 stop:
 	mov		PLAYING,#0
+
+	mov		SPC_DSP_ADDR,#DSP_FLG
+	mov		SPC_DSP_DATA,#$20
 	
 	; Clear per-channel DSP registers (VOL, P, SRCN, ADSR, GAIN)
 	mov		x,#0
@@ -743,14 +784,36 @@ clear_dsp:
 	; No echo feedback, echo volume 0, echo buffer at $FE00. 
 	; These don't really matter since echo is disabled in FLG.
 	mov		SPC_DSP_ADDR,#DSP_ESA
-	mov		SPC_DSP_DATA,#$FE
+	mov		SPC_DSP_DATA,#$DF
 	mov		SPC_DSP_ADDR,#DSP_EFB
+	mov		SPC_DSP_DATA,#$64 ;0
+	mov		SPC_DSP_ADDR,#DSP_EVOLL
+	mov		SPC_DSP_DATA,#30
+	mov		SPC_DSP_ADDR,#DSP_EVOLR
+	mov		SPC_DSP_DATA,#30
+	
+	cmp		USECHO,#0
+	bne		+
+	mov		SPC_DSP_ADDR,#DSP_EON
+	mov		SPC_DSP_DATA,#$F
+	mov		SPC_DSP_ADDR,#DSP_EDL
+	mov		SPC_DSP_DATA,#4
+	mov		SPC_DSP_ADDR,#DSP_FLG
 	mov		SPC_DSP_DATA,#0
+	bra		++
+	+:
+	mov		SPC_DSP_ADDR,#DSP_EON
+	mov		SPC_DSP_DATA,#$F
+	mov		SPC_DSP_ADDR,#DSP_EDL
+	mov		SPC_DSP_DATA,#4
+	;mov		SPC_DSP_ADDR,#DSP_FLG
+	;mov		SPC_DSP_DATA,#$20
 	mov		SPC_DSP_ADDR,#DSP_EVOLL
 	mov		SPC_DSP_DATA,#0
 	mov		SPC_DSP_ADDR,#DSP_EVOLR
 	mov		SPC_DSP_DATA,#0
-
+	++:
+	
 	; Set master volume	
 	mov		SPC_DSP_ADDR,#DSP_MVOLL
 	mov		SPC_DSP_DATA,MVOL
@@ -801,7 +864,7 @@ noise2_table:
 .db $0A,$0A,$0A,$0A,$0A,$09,$09,$08
 
 
-.ORGA $0700
+.ORGA $0800
 freq_table:
 .INCLUDE "freqtb.inc"
 

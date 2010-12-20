@@ -34,6 +34,6 @@ vgmplayer:
 ; so I hardcoded it. 
 ;.dsb 32768-10122,0
 ;.dsb 32768-9329,0
-.dsb 32768-15217,0
+.dsb 32768-15473,0
 
 .ends

@@ -174,7 +174,7 @@ extern void print_cheat_list();
 extern void print_hw_card_rev();
 extern void printxy(char *, u16, u16, u16, u16);
 extern void print_hex(u8, u16, u16, u16);
-extern void print_dec(u16, u16, u16, u16);
+extern void print_dec(DWORD, u16, u16, u16);
 extern void set_printxy_clip_rect(u16 x1, u16 y1, u16 x2, u16 y2);
 
 extern void show_scroll_indicators();

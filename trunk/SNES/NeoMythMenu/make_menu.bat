@@ -57,8 +57,8 @@ tools\constify navigation.c navigopt.s navigopt2.s
 tools\constify cheats\cheat_database.c cheat_db.s cheat_db2.s
 @echo on
 
-wla-spc700 -o vgmplay_spc700_ext.asm vgmplay.o
-wlalink -b vgmplay.link assets\vgmplay.bin
+wla-spc700 -vo vgmplay_spc700_ext.asm vgmplay.o
+wlalink -vb vgmplay.link assets\vgmplay.bin
 
 REM ASM -> OBJ
 ..\bin\wla-65816.exe -io assets\data.asm data.obj
