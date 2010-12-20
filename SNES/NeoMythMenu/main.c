@@ -33,8 +33,11 @@ u16 romAddressPins;
 u8 gameMode;
 u8 romSize, romRunMode, sramSize, sramBank, sramMode;
 u8 extDsp, extSram;
-
 u16 neo_mode;
+
+u8 mSpcMirrorVal;
+DWORD compressedVgmSize;
+u8 compressVgmBuffer[512];
 
 sortOrder_t sortOrder = SORT_LOGICALLY;
 char sortLetter = 'A';
@@ -60,6 +63,9 @@ static rect_t printxyClipRect;
 FATFS sdFatFs;
 DIR sdDir;
 FILINFO sdFileInfo;
+#ifdef _USE_LFN
+char sdLfnBuf[80];
+#endif
 
 char load_progress[] = "Loading......(  )";
 
@@ -78,7 +84,7 @@ char MS4[] = "\xff\x15\x02\x02 Game (001)";
 //
 const char * const metaStrings[] =
 {
-    "\xff\x03\x01\x07 Shell v 0.50\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
+    "\xff\x03\x01\x07 Shell v 0.51\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2010 WWW.NEOFLASH.COM     ",
 	"\xff\x01\xfe\x0f\x0a\x68\x69\x6A\x20\x71\x72\x73\x20\x7a\x7b\x7c\x83\x84\x85\xfe\x10\x0a\x6b\x6c\x6d\x20\x74\x75 \
 	 \x76\x20\x7d\x7e\x7f\x86\x87\x88xfe\x11\x0a\x6e\x6f\x70\x20\x77\x78\x79\x20\x80\x81\x82\x89\x8a\x8b\xfe\x17\x06 \
 	 \x06\xff\x04                             ",
@@ -172,7 +178,7 @@ const char * const metaStrings[] =
     "\xff\x06\x02\x07Info\xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
     "\xff\x06\x02\x07\x45rror\xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
     "\xff\x06\x02\x07Info \xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
-    "\xff\x06\x02\x07VGM  \xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
+    "\xff\x06\x02\x07VGM  \xff\x16\x03\x03X\xff\x16\x04\x07: Toggle echo\xff\x17\x03\x03Y\xff\x17\x04\x07: Go back",
 };
 
 extern const cheatDbEntry_t cheatDatabase[];
@@ -501,7 +507,7 @@ void print_hex(u8 val, u16 x, u16 y, u16 attribs)
 }
 
 
-void print_dec(u16 val, u16 x, u16 y, u16 attribs)
+void print_dec(DWORD val, u16 x, u16 y, u16 attribs)
 {
 	char *p = &tempString[32];
 	char c;
@@ -509,9 +515,9 @@ void print_dec(u16 val, u16 x, u16 y, u16 attribs)
 
 	do
 	{
-		*(--p) = hw_div16_8_rem16(val, 10) + '0';
+		*(--p) = (val % 10) + '0';
 		chars++;
-		val = hw_div16_8_quot16(val, 10);
+		val = val / 10;
 	} while (val != 0);
 	printxy(p, x, y, attribs, chars);
 }
@@ -922,9 +928,9 @@ void play_vgm_from_sd_card_c()
 	static WORD prbank, proffs, sects, bytesRead;
 	static char buf[4];
 	WORD i, progress;
-	void (*play_file)(void);
+	long long (*play_file)(void);
 
-	if (highlightedFileSize > 57856)
+	if (highlightedFileSize > 0x20000)
 	{
 		clear_status_window();
 		printxy("VGM too large!", 3, 21, 4, 32);
@@ -961,6 +967,11 @@ void play_vgm_from_sd_card_c()
 	}
 
 	clear_status_window();
+
+	hide_games_list();
+	printxy("Uncompressed size:", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	print_dec(highlightedFileSize, 21, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
 	update_screen();
 
 	*myth_pram_bio = 0;
@@ -999,9 +1010,23 @@ void play_vgm_from_sd_card_c()
 
 	MAKE_RAM_FPTR(play_file, play_vgm_from_sd_card);
 
-	play_file();
+	printxy("Compressing..", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	update_screen();
+	compressedVgmSize = play_file();
 
-	switch_to_menu(MID_VGM_PLAY_MENU, 0);
+	printxy("Compressed size:", 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	print_dec(compressedVgmSize, 21, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+	if (compressedVgmSize <= 57856)
+	{
+		switch_to_menu(MID_VGM_PLAY_MENU, 0);
+	}
+	else
+	{
+		printxy("VGM too large!", 3, 21, 4, 32);
+		update_screen();
+		return;
+	}
 }
 
 
@@ -1312,6 +1337,10 @@ int init_sd()
 
 	cardType = 0;
 	sourceMedium = SOURCE_SD;
+
+#ifdef _USE_LFN
+	sdFileInfo.lfname = sdLfnBuf;
+#endif
 
 	diskio_init();
 

@@ -965,7 +965,7 @@ show_debug_data:
 	
 	
 show_copied_data:
- .DEFINE SHOWCOPYADDR $500000
+ .DEFINE SHOWCOPYADDR $521961
  .DEFINE NEO2_DEBUG 1
  .IFDEF NEO2_DEBUG
  	jsr.w	_wait_nmi

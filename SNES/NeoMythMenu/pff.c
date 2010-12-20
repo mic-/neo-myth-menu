@@ -357,7 +357,7 @@ FRESULT dir_read (
 	res = FR_NO_FILE;
 	while (dj->sect) {
 		dir = FatFs->buf;
-		res = disk_readp(dir, dj->sect, (WORD)((dj->index % 16) * 32), 32)	/* Read an entry */
+		res = disk_readp(dir, dj->sect, (WORD)((dj->index & 15) << 5), 32)	/* Read an entry */
 			? FR_DISK_ERR : FR_OK;
 		if (res != FR_OK) break;
 		c = dir[DIR_Name];
@@ -386,7 +386,7 @@ FRESULT dir_read (
 			}
 		}
 #else		/* Non LFN configuration */
-		if (c != 0xE5 && (_FS_RPATH || c != '.') && !(dir[DIR_Attr] & AM_VOL))	/* Is it a valid entry? */
+		if (c != 0xE5 &&  c != '.' && !(a & AM_VOL))	/* Is it a valid entry? */
 			break;
 #endif
 
@@ -449,13 +449,17 @@ FRESULT create_name (
 /* Get file information from directory entry                             */
 /*-----------------------------------------------------------------------*/
 #if _USE_DIR
+
+#define ff_convert(wc, x) ((char)wc)
+
+
 static
 void get_fileinfo (		/* No return code */
 	DIR *dj,			/* Pointer to the directory object */
 	FILINFO *fno	 	/* Pointer to store the file information */
 )
 {
-	BYTE i, c, *dir;
+	BYTE i, c, nt, *dir;
 	char *p;
 
 
@@ -482,6 +486,30 @@ void get_fileinfo (		/* No return code */
 		fno->ftime = LD_WORD(dir+DIR_WrtTime);		/* Time */
 	}
 	*p = 0;
+
+#if _USE_LFN
+	if (fno->lfname) {
+		XCHAR *tp = fno->lfname;
+		WCHAR w, *lfn;
+
+		i = 0;
+		if (dj->sect && dj->lfn_idx != 0xFFFF) {/* Get LFN if available */
+			lfn = dj->lfn;
+			while ((w = *lfn++) != 0) {			/* Get an LFN char */
+//#if !_LFN_UNICODE
+				w = ff_convert(w, 0);			/* Unicode -> OEM conversion */
+				if (!w) { i = 0; break; }		/* Could not convert, no LFN */
+				if (_DF1S && w >= 0x100)		/* Put 1st byte if it is a DBC */
+					tp[i++] = (XCHAR)(w >> 8);
+//#endif
+				if (i >= fno->lfsize - 1) { i = 0; break; }	/* Buffer overrun, no LFN */
+				tp[i++] = (XCHAR)w;
+			}
+		}
+		tp[i] = 0;	/* Terminator */
+	}
+#endif
+
 }
 #endif /* _USE_DIR */
 

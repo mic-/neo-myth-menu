@@ -51,9 +51,11 @@
 
 #define _FS_RPATH 1
 
-#define _USE_LFN  1
+//#define _USE_LFN  1
 
 #define _MAX_LFN 64
+
+#define _DF1S 0
 
 /* End of configuration options. Do not change followings without care.     */
 /*--------------------------------------------------------------------------*/
@@ -65,6 +67,8 @@
 #define	CLUST	WORD
 #endif
 
+
+typedef char XCHAR;
 
 /* File system object structure */
 
