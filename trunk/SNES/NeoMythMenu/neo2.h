@@ -2,6 +2,7 @@
 #define _NEO2_H_
 
 #include "snes.h"
+#include "integer.h"
 
 extern void copy_ram_code();
 
@@ -9,6 +10,10 @@ extern void neo2_myth_current_rom_read(char *dest, u16 romBank, u16 romOffset, u
 
 extern void neo2_myth_psram_read(char *dest, u16 psramBank, u16 psramOffset, u16 length);
 extern void neo2_myth_psram_write(char *src, u16 psramBank, u16 psramOffset, u16 length);
+
+// Copy data from one area of PSRAM to another
+extern void neo2_myth_psram_copy(DWORD dest, DWORD src, DWORD length);
+
 
 extern void neo2_recv_sd(unsigned char *buf);
 extern void neo2_pre_sd();
@@ -30,6 +35,5 @@ extern void vgm_echo();
 
 extern void show_loading_progress();
 
-//extern void get_rom_info();
 
 #endif

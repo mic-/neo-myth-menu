@@ -803,11 +803,9 @@ clear_dsp:
 	bra		++
 	+:
 	mov		SPC_DSP_ADDR,#DSP_EON
-	mov		SPC_DSP_DATA,#$F
+	mov		SPC_DSP_DATA,#0
 	mov		SPC_DSP_ADDR,#DSP_EDL
 	mov		SPC_DSP_DATA,#4
-	;mov		SPC_DSP_ADDR,#DSP_FLG
-	;mov		SPC_DSP_DATA,#$20
 	mov		SPC_DSP_ADDR,#DSP_EVOLL
 	mov		SPC_DSP_DATA,#0
 	mov		SPC_DSP_ADDR,#DSP_EVOLR

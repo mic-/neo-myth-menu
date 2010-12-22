@@ -630,10 +630,6 @@ ntsc_game_pattern0: .db $AD, $3F, $21, $29, $10			; lda $213f / and #$10
 ntsc_game_pattern1: .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
 ntsc_game_pattern2: .db $AD, $3F, $21, $89, $10			; lda $213f / bit #$10
 ntsc_game_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
-;ntsc_game_to_pal_pattern0: .db $AD, $3F, $21, $A9, $00		; lda $213f / lda #0
-;ntsc_game_to_pal_pattern1: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
-;ntsc_game_to_pal_pattern2: .db $AD, $3F, $21, $A9, $00		; lda $213f / lda #0
-;ntsc_game_to_pal_pattern3: .db $AF, $3F, $21, $00, $A9, $00	; lda.l $00213f / lda #0
 
 ; Region-checking patterns found in some PAL games - and what to replace them with
 ; to make them run on a NTSC system.
@@ -641,10 +637,7 @@ pal_game_pattern0: .db $AD, $3F, $21, $29, $10			; lda $213f / and #$10
 pal_game_pattern1: .db $AF, $3F, $21, $00, $89, $10		; lda.l $00213f / bit #$10
 pal_game_pattern2: .db $AD, $3F, $21, $89, $10			; lda $213f / bit #$10
 pal_game_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
-;pal_game_to_ntsc_pattern0: .db $AD, $3F, $21, $A9, $10		; lda $213f / lda #$10
-;pal_game_to_ntsc_pattern1: .db $AF, $3F, $21, $00, $A9, $10	; lda.l $00213f / lda #$10
-;pal_game_to_ntsc_pattern2: .db $AD, $3F, $21, $A9, $10		; lda $213f / lda #$10
-;pal_game_to_ntsc_pattern3: .db $AF, $3F, $21, $00, $A9, $10	; lda.l $00213f / lda #$10
+
 
 .db 0
 suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
@@ -1114,30 +1107,6 @@ neo2_myth_current_rom_read:
 	dec		tcc__r1
 	bne		-
 	
-;	lda.l	romRunMode
-;	beq	_gri_hirom
-;	rep	#$30
-;	ldx	#0
-;-:
-;	lda.l	$407fc0,x
-;	sta.l	snesRomInfo,x
-;	inx
-;	inx
-;	cpx	#$40
-;	bne	-
-;	bra	+
-;_gri_hirom:
-;	rep	#$30
-;	ldx	#0
-;-:
-;	lda.l	$40ffc0,x
-;	sta.l	snesRomInfo,x
-;	inx
-;	inx
-;	cpx	#$40
-;	bne	-
-;+:
-
 	sep	#$20
 
 	LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
@@ -1315,9 +1284,140 @@ _nctmp_write:
 
 
 
-;load_progress:
-;	.db "Loading......(  )",0
 
+; void neo2_myth_psram_copy(DWORD dest, DWORD src, DWORD length)
+;
+.EQU _neo2_myth_psram_copy_save_regs 5
+.EQU _neo2_myth_psram_copy_dest 4+_neo2_myth_psram_copy_save_regs
+.EQU _neo2_myth_psram_copy_src _neo2_myth_psram_copy_dest+4
+.EQU _neo2_myth_psram_copy_length _neo2_myth_psram_copy_src+4
+;
+neo2_myth_psram_copy:
+	php
+	rep		#$20
+	phx
+	phy
+
+ 	sep		#$20
+    LDA    #$20      	; OFF A21
+    STA.L  MYTH_GBAC_ZIO
+    JSR    SET_NEOCMA  	;
+    JSR    SET_NEOCMB  	;
+    JSR    SET_NEOCMC  	; ON_NEO CARD A24 & A25 + SA16 & SA17
+
+    LDA     #$01
+    STA.L   MYTH_EXTM_ON   ; A25,A24 ON
+
+	LDA    #$04       	; COPY MODE !
+    STA.L  MYTH_OPTION_IO
+
+    LDA    #$01       	; PSRAM WE ON !
+    STA.L  MYTH_WE_IO
+                         
+    LDA    #$F8
+    STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+    STA.L  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
+         
+    rep		#$20
+    lda		_neo2_myth_psram_copy_src+2,s
+    sec
+    sbc		#$50		; PSRAM starts at $500000
+	lsr		a
+	lsr		a
+	lsr		a
+	lsr		a
+	and		#7
+	sta		tcc__r0		; src PRAM_BIO
+	lda		_neo2_myth_psram_copy_src+2,s
+	and		#$0F
+	ora		#$50
+	sta		tcc__r2h
+	lda		_neo2_myth_psram_copy_src,s
+	sta		tcc__r2
+	
+    lda		_neo2_myth_psram_copy_dest+2,s
+    sec
+    sbc		#$50		; PSRAM starts at $500000
+	lsr		a
+	lsr		a
+	lsr		a
+	lsr		a
+	and		#7
+	sta		tcc__r0h	; dest PRAM_BIO
+sta.l pfmountbuf
+	lda		_neo2_myth_psram_copy_dest+2,s
+	and		#$0F
+	ora		#$50
+	sta		tcc__r10h
+sta.l pfmountbuf+2
+	lda		_neo2_myth_psram_copy_src,s
+	sta		tcc__r10
+	
+	lda		_neo2_myth_psram_copy_length+2,s
+	lsr		a
+	sta		tcc__r1h
+sta.l pfmountbuf+3
+	lda		_neo2_myth_psram_copy_length,s
+	ror		a
+	sta		tcc__r1
+
+	;jsr		show_copied_data
+-:
+	sep		#$20
+	lda		tcc__r0
+	sta.l	MYTH_PRAM_BIO
+	rep		#$20
+	lda		[tcc__r2]
+	tax
+	sep		#$20
+	lda		tcc__r0h
+	sta		MYTH_PRAM_BIO
+	rep		#$20
+	txa
+	sta		[tcc__r10]
+	
+	inc		tcc__r2
+	inc		tcc__r2
+	bne		+
+	inc		tcc__r2h
++:
+	inc		tcc__r10
+	inc		tcc__r10
+	bne		+
+	inc		tcc__r10h
++:
+	lda		tcc__r1
+	bne		+
+	dec		tcc__r1h
++:
+	dec		tcc__r1
+	lda		tcc__r1
+	ora		tcc__r1h
+	bne		-
+
+	sep		#$20
+    LDA     #$00       ;
+    STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
+
+    LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
+    STA.L   MYTH_OPTION_IO
+
+    LDA     #$20       	; OFF A21
+    STA.L   MYTH_GBAC_ZIO
+    JSR     SET_NEOCMD	; SET MENU
+
+    LDA     #$00
+    STA.L   MYTH_GBAC_LIO
+    STA.L   MYTH_GBAC_HIO
+    STA.L   MYTH_GBAC_ZIO
+    
+    rep		#$30
+    ply
+    plx
+    plp
+    rtl
+    
+    
 
  .MACRO MOV_PSRAM_SETUP
         LDA.L  romSize
