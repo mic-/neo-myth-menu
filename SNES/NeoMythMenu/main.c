@@ -1,5 +1,5 @@
 // SNES Myth Shell
-// C version 0.50
+// C version 0.51
 //
 // Mic, 2010
 
@@ -1034,7 +1034,8 @@ void run_game_from_sd_card_c()
 {
 	int i,j;
 	void (*run_game)(void);
-	static WORD mbits, bytesRead, mythprbank, prbank, proffs, recalcSector;
+	void (*mirror_psram)(DWORD,DWORD,DWORD);
+	static WORD mbits, sects, bytesRead, mythprbank, prbank, proffs, recalcSector;
 	static u8 *myth_pram_bio = (u8*)0xC006;
 
 	strcpy(tempString, sdRootDir);
@@ -1080,42 +1081,33 @@ void run_game_from_sd_card_c()
 	switch (mbits)
 	{
 		case 2:
-			load_progress[14] = '0'; load_progress[15] = '3';
 			romSize = 4; break;
 		case 4:
-			load_progress[14] = '0'; load_progress[15] = '5';
 			romSize = 4; break;
 		case 6:
-			load_progress[14] = '0'; load_progress[15] = '7';
 			romSize = 8; break;
 		case 8:
-			load_progress[14] = '0'; load_progress[15] = '9';
 			romSize = 8; break;
 		case 12:
-			load_progress[14] = '1'; load_progress[15] = '3';
 			romSize = 9; break;
 		case 16:
-			load_progress[14] = '1'; load_progress[15] = '7';
 			romSize = 9; break;
 		case 24:
-			load_progress[14] = '2'; load_progress[15] = '5';
 			romSize = 0x0A; break;
 		case 32:
-			load_progress[14] = '3'; load_progress[15] = '3';
 			romSize = 0x0B; break;
 		case 40:
-			load_progress[14] = '4'; load_progress[15] = '1';
 			romSize = 0x0C; break;
 		case 48:
-			load_progress[14] = '4'; load_progress[15] = '9';
 			romSize = 0x0D; break;
 		case 64:
-			load_progress[14] = '6'; load_progress[15] = '5';
 			romSize = 0x0E; break;
 		default:
-			load_progress[14] = '1'; load_progress[15] = '7';
 			romSize = 9; break;  // TODO: Treat this as an error?
 	}
+
+	load_progress[14] = ((mbits+1)/10)+'0';
+	load_progress[15] = ((mbits+1)%10)+'0';
 
 	MAKE_RAM_FPTR(run_game, run_game_from_sd_card);
 
@@ -1176,7 +1168,8 @@ void run_game_from_sd_card_c()
 	mythprbank = 0;
 	*myth_pram_bio = mythprbank;
 	proffs = 0;
-	for (i = mbits; i > 0; i--)
+	i = mbits;
+	while (i)
 	{
 		show_loading_progress();
 
@@ -1196,6 +1189,23 @@ void run_game_from_sd_card_c()
 			mythprbank++;
 			*myth_pram_bio = mythprbank;
 		}
+		i--;
+	}
+
+	// Special case for 20 Mbit ROMs: mirror the last 4 Mbit
+	if (mbits == 20)
+	{
+		MAKE_RAM_FPTR(mirror_psram, neo2_myth_psram_copy);
+
+		romSize = 0x0B;
+
+		printxy("Mirroring..     ", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+		update_screen();
+
+		// Mirror it 3 times to fill up 32 Mbit
+		mirror_psram(0x780000, 0x700000, 0x080000);
+		mirror_psram(0x800000, 0x700000, 0x080000);
+		mirror_psram(0x880000, 0x700000, 0x080000);
 	}
 
 	run_game();
@@ -1226,8 +1236,9 @@ romLayout_t get_rom_info_sd(char *fname, u8 *romInfo)
 			if ((lastSdError = pf_read(romInfo, 0x40, &bytesRead)) == FR_OK)
 			{
 				// Is the checksum correct?
-				if (((romInfo[0x1c] ^ romInfo[0x1e]) != 0xff) ||
-					((romInfo[0x1d] ^ romInfo[0x1f]) != 0xff))
+				if ((((romInfo[0x1c] ^ romInfo[0x1e]) != 0xff) ||
+					((romInfo[0x1d] ^ romInfo[0x1f]) != 0xff)) &&
+					(highlightedFileSize >= 0x10000))
 				{
 					lastSdOperation = SD_OP_SEEK;
 					ofs += 0x8000;

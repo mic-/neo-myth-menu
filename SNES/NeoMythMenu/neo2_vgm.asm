@@ -496,28 +496,6 @@ _compress_vgm_read_byte:
 	rts
 
 
-_compress_vgm_read_word:
-	; Load an uncompressed byte
-	rep		#$20
-	lda		tcc__r0
-	sec
-	sbc		#2
-	sta		tcc__r0
-	lda		tcc__r0h
-	sbc		#0
-	sta		tcc__r0h
-	lda		[tcc__r2],y
-	iny
-	bne		+
-	inc		tcc__r2h
-+:
-	iny
-	bne		+
-	inc		tcc__r2h
-+:
-	sep		#$20
-	rts
-	
 	
 _compress_vgm_write_buffer:
 	php
@@ -549,9 +527,11 @@ sty.w pfmountbuf+2
 	lda		#0
 	adc.l	compressedVgmSize+2
 	sta.l	compressedVgmSize+2
--:
 	lda		tcc__r1h
 	beq		+
+-:
+;	lda		tcc__r1h
+;	beq		+
 	lda.l	compressVgmBuffer,x
 	inx
 	inx
