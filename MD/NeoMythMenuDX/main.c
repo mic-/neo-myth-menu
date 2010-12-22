@@ -168,9 +168,9 @@ static short int gSRAMgrServiceStatus = SMGR_STATUS_NULL;
 static short int gSRAMgrServiceMode = 0x0000;
 
 #ifndef RUN_IN_PSRAM
-static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.4";
+static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.5";
 #else
-static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.4";
+static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.5";
 #endif
 
 #define MB (0x20000)
@@ -210,9 +210,10 @@ struct selEntry {
 typedef struct selEntry selEntry_t;
 
 /* global variables */
-
 static unsigned int gSelectionSize;
-short int gCpldVers;            /* 3 = V11 hardware, 4 = V12 hardware, 5 = V5 hardware */
+static short int gPSRAM;                /* 0 = gba psram, 1 = myth psram */
+
+short int gCpldVers;                    /* 3 = V11 hardware, 4 = V12 hardware, 5 = V5 hardware */
 short int gCardType;                    /* 0 = 512 Mbit Neo2 Flash, 1 = other */
 short int gCardOkay;                    /* 0 = okay, -1 = err */
 short int gCursorX;                     /* range is 0 to 63 (only 0 to 39 onscreen) */
@@ -237,7 +238,7 @@ extern unsigned char *sd_csd;           /* card specific data */
 FATFS gSDFatFs;                         /* global FatFs structure for FF */
 FIL gSDFile;                            /* global file structure for FF */
 
-short int gSdDetected = 0;                   /* 0 - not detected, 1 - detected */
+short int gSdDetected = 0;              /* 0 - not detected, 1 - detected */
 
 /* global options table entry definitions */
 
@@ -321,6 +322,7 @@ extern void neo_run_psram(int pstart, int psize, int bbank, int bsize, int run);
 extern void neo_run_myth_psram(int psize, int bbank, int bsize, int run);
 extern void neo_copy_game(unsigned char *dest, int fstart, int len);
 extern void neo_copyto_psram(unsigned char *src, int pstart, int len);
+extern void neo_copyfrom_psram(unsigned char *dst, int pstart, int len);
 extern void neo_copyto_myth_psram(unsigned char *src, int pstart, int len);
 extern void neo_copyfrom_myth_psram(unsigned char *dst, int pstart, int len);
 extern void neo_copyto_sram(unsigned char *src, int sstart, int len);
@@ -2220,7 +2222,8 @@ void importCheats(int index)
                 buffer[1] =  (cp->data & 0xFF);
 
                 ints_off();
-                neo_copyto_myth_psram(buffer,cp->addr,2);
+                if (gPSRAM) neo_copyto_myth_psram(buffer,cp->addr,2);
+                else neo_copyto_psram(buffer,cp->addr,2);
             }
         }
     }
@@ -2307,12 +2310,14 @@ void importIPS(int index)
                 ix = 1;
 
                 ints_off();
-                neo_copyfrom_myth_psram(buffer, addr, 2);
+                if (gPSRAM) neo_copyfrom_myth_psram(buffer, addr, 2);
+                else neo_copyfrom_psram(buffer, addr, 2);
             }
             if (nb & 1)
             {
                 ints_off();
-                neo_copyfrom_myth_psram(&buffer[nb-1], addr+nb-1, 2);
+                if (gPSRAM) neo_copyfrom_myth_psram(&buffer[nb-1], addr+nb-1, 2);
+                else neo_copyfrom_psram(&buffer[nb-1], addr+nb-1, 2);
                 nb++;
             }
 
@@ -2334,12 +2339,14 @@ void importIPS(int index)
                 ix = 1;
 
                 ints_off();
-                neo_copyfrom_myth_psram(buffer, addr, 2);
+                if (gPSRAM) neo_copyfrom_myth_psram(buffer, addr, 2);
+                else neo_copyfrom_psram(buffer, addr, 2);
             }
             if (nb & 1)
             {
                 ints_off();
-                neo_copyfrom_myth_psram(&buffer[nb-1], addr+nb-1, 2);
+                if (gPSRAM) neo_copyfrom_myth_psram(&buffer[nb-1], addr+nb-1, 2);
+                else neo_copyfrom_psram(&buffer[nb-1], addr+nb-1, 2);
                 nb++;
             }
 
@@ -2355,7 +2362,8 @@ void importIPS(int index)
             {
                 ints_off();
                 // doesn't cross 1MB boundary, copy all at once
-                neo_copyto_myth_psram(buffer, addr, nb);
+                if (gPSRAM) neo_copyto_myth_psram(buffer, addr, nb);
+                else neo_copyto_psram(buffer, addr, nb);
             }
             else
             {
@@ -2363,11 +2371,13 @@ void importIPS(int index)
 
                 ints_off();
                 // crosses 1MB boundary, copy up to 1MB boundary
-                neo_copyto_myth_psram(buffer, addr, len1);
+                if (gPSRAM) neo_copyto_myth_psram(buffer, addr, len1);
+                else neo_copyto_psram(buffer, addr, len1);
 
                 ints_off();
                 // copy the rest after the boundary
-                neo_copyto_myth_psram(&buffer[len1], addr+len1, nb-len1);
+                if (gPSRAM) neo_copyto_myth_psram(&buffer[len1], addr+len1, nb-len1);
+                else neo_copyto_psram(&buffer[len1], addr+len1, nb-len1);
             }
         }
     }
@@ -2376,6 +2386,28 @@ void importIPS(int index)
     setStatusMessage("Importing patch...OK");
 
     clearStatusMessage();
+}
+
+int patchesNeeded(void)
+{
+    CheatEntry* e;
+    short a;
+
+    if(gImportIPS)
+        return 1;
+
+    if(!registeredCheatEntries)
+        return 0;
+
+    for(a = 0; a < registeredCheatEntries; a++)
+    {
+        e = &cheatEntries[a];
+
+        if(e->active)
+            return 1;
+    }
+
+    return 0;
 }
 
 /* CACHE */
@@ -4051,7 +4083,23 @@ void do_options(void)
                     // Run selected rom
                     if ((gSelections[gCurEntry].type == 2) || (runmode == 7))
                     {
-                        neo_run_game(fstart, fsize, bbank, bsize, runmode); // never returns
+                        // if no cheats or patches enabled, run from flash
+                        if (!patchesNeeded())
+                            neo_run_game(fstart, fsize, bbank, bsize, runmode); // never returns
+
+                        // copy flash to gba psram
+                        copyGame(&neo_copyto_psram, &neo_copy_game, 0, fstart, fsize, "Loading ", temp);
+
+                        gSelectionSize = fsize;
+                        gPSRAM = 0; // gba psram
+                        // do patch callbacks
+                        for (ix=0; ix<maxOptions; ix++)
+                        {
+                            if (gOptions[ix].patch)
+                                (gOptions[ix].patch)(ix);
+                        }
+
+                        neo_run_psram(0, fsize, bbank, bsize, runmode); // never returns
                     }
                     else
                     {
@@ -4070,6 +4118,8 @@ void do_options(void)
                         if (!utility_memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
                             fsize = 0x300000;
 
+                        gSelectionSize = fsize;
+                        gPSRAM = 1; // myth psram
                         // do patch callbacks
                         for (ix=0; ix<maxOptions; ix++)
                           if (gOptions[ix].patch)
@@ -4088,8 +4138,6 @@ void do_options(void)
                     bbank = gSRAMBank;
                     bsize = gSRAMSize * 8192;
                     runmode = gSelections[gCurEntry].run;
-//                    if ((runmode & 0x1F) < 7)
-//                        runmode = gSRAMType ? 5 : !bsize ? 6 : (gSelections[gCurEntry].type == 1) ? 3 : (fsize > 0x200200) ? 2 : 1;
                     // Run selected rom
                     if (path[utility_wstrlen(path)-1] != (WCHAR)'/')
                         utility_c2wstrcat(path, "/");
@@ -4115,6 +4163,15 @@ void do_options(void)
                     {
                         // copy file to flash cart psram
                         copyGame(&neo_copyto_psram, &neo_copy_sd, 0, 0, fsize, "Loading ", temp);
+
+                        gSelectionSize = fsize;
+                        gPSRAM = 0; // gba psram
+                        // do patch callbacks
+                        for (ix=0; ix<maxOptions; ix++)
+                        {
+                            if (gOptions[ix].patch)
+                                (gOptions[ix].patch)(ix);
+                        }
 
                         if(gManageSaves)
                         {
@@ -4161,11 +4218,12 @@ void do_options(void)
                             fsize = 0x300000;
 
                         gSelectionSize = fsize;
+                        gPSRAM = 1; // myth psram
                         // do patch callbacks
-                         for (ix=0; ix<maxOptions; ix++)
-                         {
-                                if (gOptions[ix].patch)
-                                 (gOptions[ix].patch)(ix);
+                        for (ix=0; ix<maxOptions; ix++)
+                        {
+                            if (gOptions[ix].patch)
+                                (gOptions[ix].patch)(ix);
                         }
 
                         if(gManageSaves)
