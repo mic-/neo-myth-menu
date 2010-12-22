@@ -18,7 +18,7 @@
         .equ    CPLD_ID,    0x301E      /* on V4 Neo Myth */
         .equ    WE_IO,      0x3020
         .equ    RST_SEL,    0x3024      /* on V4 Neo Myth */
-	.equ	DAT_SWAP,   0x3026	/* on V5 Neo Myth */
+    .equ    DAT_SWAP,   0x3026  /* on V5 Neo Myth */
         .equ    EXTM_ON,    0x3028
 
 | Neo2/3 Flash Cart equates (the useful ones)
@@ -419,7 +419,7 @@ _neo_select_psram:
         move.l  #0x00C40000,d0
         bsr     _neo_asic_cmd           /* set flash bank to 0 */
 
-	move.w	#0x0000,DAT_SWAP(a1)	/* enable byte swap function */
+        move.w  #0x0000,DAT_SWAP(a1)    /* enable byte swap function */
         move.w  #0x0000,GBAC_LIO(a1)    /* clear low bank select reg */
         move.w  #0x0000,GBAC_HIO(a1)    /* clear high bank select reg */
         move.w  #0x00F8,GBAC_ZIO(a1)    /* set bank size reg to 1MB */
@@ -571,8 +571,9 @@ _neo_set_sram:
         move.w  #0x00E0,d0
         swap    d0
         move.w  d2,d0
+|        beq.b   8f
         bsr     _neo_asic_cmd           /* set sram bank offset */
-
+8:
         move.l  (sp)+,d2
 10:
         rts
@@ -677,8 +678,8 @@ neo_check_cpld:
         lea     0xA10000,a1
         move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
 
-	/* get CPLD version */
-	moveq	#3,d0
+    /* get CPLD version */
+    moveq   #3,d0
         move.w  #0x00FF,CPLD_ID(a1)
         cmpi.b  #0x63,0x300002
         bne.b   0f
@@ -688,9 +689,9 @@ neo_check_cpld:
 0:
         move.w  #0x0000,CPLD_ID(a1)
 
-	move.w	d0,-(sp)
+    move.w  d0,-(sp)
         bsr     _neo_select_menu
-	move.w	(sp)+,d0
+    move.w  (sp)+,d0
         rts
 
 
@@ -822,13 +823,13 @@ neo_chk_mahb:
         jmp     (a3)
 
 neo_run_sms:
+        move.l  12(sp),d0               /* bbank */
+        move.l  16(sp),d1               /* bsize */
+        bsr     _neo_set_sram           /* set the sram space bank and size registers */
         move.l  4(sp),d0                /* start */
         bsr     _neo_set_fbank          /* set the flash space bank registers */
         move.l  8(sp),d0                /* size */
         bsr     _neo_set_fsize          /* set the flash space bank size */
-        move.l  12(sp),d0               /* bbank */
-        move.l  16(sp),d1               /* bsize */
-        bsr     _neo_set_sram           /* set the sram space bank and size registers */
 
         bsr     _clear_hw
         move.l  20(sp),d0               /* run */
@@ -869,8 +870,8 @@ neo_run_myth_psram:
         move.l  16(sp),d0               /* run */
         cmpi.w  #0x0009,d0              /* SCD-RAM */
         bne.b   1f
-        move.l  #0xFF04FF04,0x1C8.w     /* fix memo overwritten by MYTH header */
-        move.l  #0xFF04FF04,0x1CC.w
+        move.l  #0xFF03FF03,0x1C8.w     /* fix memo overwritten by MYTH header */
+        move.l  #0xFF03FF03,0x1CC.w
 1:
         move.w  d0,OPTION_IO(a1)        /* set run mode for game */
 
@@ -930,7 +931,7 @@ neo_copy_game:
 neo_copyto_psram:
         lea     0xA10000,a1
         bsr     _neo_select_psram       /* select flash cart PSRAM (write-enabled) */
-	move.w	#0xFFFF,DAT_SWAP(a1)	/* disable byte swap function */
+        move.w  #0xFFFF,DAT_SWAP(a1)    /* disable byte swap function */
 
         movea.l 4(sp),a0                /* src */
         movea.l 8(sp),a1                /* pstart */
@@ -938,14 +939,43 @@ neo_copyto_psram:
         lsr.l   #1,d0                   /* # words to copy */
         subq.w  #1,d0
 1:
-	move.w  (a0)+,d1
-	ror.w	#8,d1
-	move.w	d1,(a1)+
+        move.w  (a0)+,d1
+        ror.w   #8,d1
+        move.w  d1,(a1)+
         dbra    d0,1b
 
         lea     0xA10000,a1
         move.w  #0x0000,WE_IO(a1)       /* write-protect psram */
-	move.w	#0x0000,DAT_SWAP(a1)	/* enable byte swap function */
+        move.w  #0x0000,DAT_SWAP(a1)    /* enable byte swap function */
+        move.l  #0x00E2D200,d0
+        bsr     _neo_asic_cmd           /* write-protect flash cart psram */
+        bra     _neo_select_menu        /* select Menu Flash */
+
+| void neo_copyfrom_psram(unsigned char *dst, int pstart, int len);
+        .global neo_copyfrom_psram
+neo_copyfrom_psram:
+        lea     0xA10000,a1
+        bsr     _neo_select_psram       /* select flash cart PSRAM (write-enabled) */
+
+        move.l  8(sp),d0                /* pstart */
+        bsr     _neo_set_fbank          /* set the flash space bank registers */
+        move.l  #0x100000,d0
+        bsr     _neo_set_fsize          /* set the flash space bank size to 1MB */
+
+        movea.l 4(sp),a1                /* dest */
+        move.l  8(sp),d1                /* pstart */
+        andi.l  #0x01FFFE,d1            /* offset inside flash space (bank was set to closest 128KB) */
+        movea.l d1,a0
+        move.l  12(sp),d0               /* len */
+        lsr.l   #1,d0                   /* # words to copy */
+        subq.w  #1,d0
+1:
+        move.w  (a0)+,(a1)+
+        dbra    d0,1b
+
+        lea     0xA10000,a1
+        move.w  #0x0000,WE_IO(a1)       /* write-protect psram */
+        move.w  #0x0000,DAT_SWAP(a1)    /* enable byte swap function */
         move.l  #0x00E2D200,d0
         bsr     _neo_asic_cmd           /* write-protect flash cart psram */
         bra     _neo_select_menu        /* select Menu Flash */
