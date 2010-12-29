@@ -2237,7 +2237,12 @@ disk_read_psram_multi_asm:
 	pha
 	lda		_disk_readprm_prbank+4,s
 	pha
-	jsr		neo2_recv_sd_psram_multi			; neo2_recv_sd_psram_multi(prbank, proffs, count)
+	;jsr		neo2_recv_sd_psram_multi			; neo2_recv_sd_psram_multi(prbank, proffs, count)
+lda.l recv_sd_psram_multi
+sta.b tcc__r10
+lda.l recv_sd_psram_multi+2
+sta.b tcc__r10h
+jsr.w jsr_r10
 	lda		tcc__r0
 	bne		++
 	; read failed
@@ -2267,7 +2272,12 @@ disk_read_psram_multi_asm:
 	pha
 	lda		_disk_readprm_prbank+4,s
 	pha
-	jsr		neo2_recv_sd_psram_multi	; neo2_recv_sd_psram_multi(prbank, proffs, count)
+	;jsr		neo2_recv_sd_psram_multi	; neo2_recv_sd_psram_multi(prbank, proffs, count)
+lda.l recv_sd_psram_multi
+sta.b tcc__r10
+lda.l recv_sd_psram_multi+2
+sta.b tcc__r10h
+jsr.w jsr_r10
 	lda		tcc__r0
 	bne		+
 	pla
@@ -2300,7 +2310,12 @@ disk_read_psram_multi_asm:
 	pha
 	lda		_disk_readprm_prbank+4,s
 	pha
-	jsr		neo2_recv_sd_psram_multi			; neo2_recv_sd_psram_multi(prbank, proffs, count)
+	;jsr		neo2_recv_sd_psram_multi			; neo2_recv_sd_psram_multi(prbank, proffs, count)
+lda.l recv_sd_psram_multi
+sta.b tcc__r10
+lda.l recv_sd_psram_multi+2
+sta.b tcc__r10h
+jsr.w jsr_r10
 	lda		tcc__r0
 	bne		++
 	; read failed

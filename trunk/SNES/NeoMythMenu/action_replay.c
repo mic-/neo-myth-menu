@@ -4,6 +4,7 @@
 #include "snes.h"
 #include "common.h"
 #include "cheats/cheat.h"
+#include "bg_buffer.h"
 
 char arCodeTemp[9];
 

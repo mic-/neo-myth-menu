@@ -109,12 +109,17 @@ play_vgm_from_sd_card:
  
   	rep		#$10	        ; xy in 16-bit mode.
   	sep		#$20
+  	lda.l	vgmPlayerLoaded
+  	bne		+
   	ldx.w 	#$16FF
   -:
   	lda.l 	vgmplayer,x    	; Copy player code
   	sta.l 	$7F2000,x
   	dex
  	bpl 	-
+ +:
+ 	lda		#1
+ 	sta.l	vgmPlayerLoaded
  	
  	sendMusicBlockM $7F, $2100, $0100, $1700
  	
@@ -180,7 +185,7 @@ sta.l pfmountbuf
 	sta.l	REG_APUI00
 	waitForAudio0M
 	lda		spcMirrorVal
-	sta.l	mSpcMirrorVal
+	sta.l	gSpcMirrorVal
 	
 _play_vgm_skip_upload:	
 	sep		#$20
@@ -233,12 +238,12 @@ vgm_echo:
 	sep		#$20
 	lda		#CMD_TOGGLE_ECHO
 	sta.l	REG_APUI01
-	lda.l	mSpcMirrorVal
+	lda.l	gSpcMirrorVal
 	ina
 	sta.l	REG_APUI00
 	waitForAudio0M
 	lda		spcMirrorVal
-	sta.l	mSpcMirrorVal
+	sta.l	gSpcMirrorVal
 
 	plp
 	rtl
@@ -451,7 +456,26 @@ _compress_vgm_next:
 	lda.w	__tccs__FUNC_compress_vgm_numFlags
 	cmp		#8
 	bne		+
+	cpx		#24
+	bcc		++
 	jsr.w	_compress_vgm_write_buffer
+	jmp.w	_compress_vgm_loop
+++:
+	sep	#$20
+	phx
+	; Copy the flags byte to the start of the compressed chunk
+	ldx.w	__tccs__FUNC_compress_vgm_chunkStart
+	lda.w	__tccs__FUNC_compress_vgm_flags
+	sta.l	compressVgmBuffer,x	
+	rep		#$20
+	plx
+	;txa	
+	stx.w	__tccs__FUNC_compress_vgm_chunkStart
+	inx
+	;tax
+	lda		#0
+	sta.w	__tccs__FUNC_compress_vgm_flags
+	sta.w	__tccs__FUNC_compress_vgm_numFlags
 +:	
 	jmp.w	_compress_vgm_loop
 
@@ -529,10 +553,15 @@ sty.w pfmountbuf+2
 	sta.l	compressedVgmSize+2
 	lda		tcc__r1h
 	beq		+
+	phb
+	sep		#$20
+	lda		#:compressVgmBuffer
+	pha
+	plb
+	rep		#$20
 -:
-;	lda		tcc__r1h
-;	beq		+
-	lda.l	compressVgmBuffer,x
+	;lda.l	compressVgmBuffer,x
+	lda.w	compressVgmBuffer,x
 	inx
 	inx
 	sta		[tcc__r3],y
@@ -543,6 +572,7 @@ sty.w pfmountbuf+2
 ++:
 	dec		tcc__r1h
 	bne		-
+	plb
 +:
 	sty.w	__tccs__FUNC_compress_vgm_destOffs
 	plx

@@ -14,6 +14,11 @@ extern void neo2_myth_psram_write(char *src, u16 psramBank, u16 psramOffset, u16
 // Copy data from one area of PSRAM to another
 extern void neo2_myth_psram_copy(DWORD dest, DWORD src, DWORD length);
 
+// Don't call these two functions from C. The prototypes are only included so that pointers to them can
+// be created
+extern void neo2_recv_sd_psram_multi(WORD prbank, WORD proffs, WORD count);
+extern void neo2_recv_sd_psram_multi_hwaccel(WORD prbank, WORD proffs, WORD count);
+
 
 extern void neo2_recv_sd(unsigned char *buf);
 extern void neo2_pre_sd();
