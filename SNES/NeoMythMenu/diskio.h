@@ -23,8 +23,12 @@ typedef enum {
 } DRESULT;
 
 
+extern unsigned short cardType;
+extern extern unsigned long long num_sectors;
+
 /*---------------------------------------*/
 /* Prototypes for disk control functions */
+
 
 BOOL assign_drives (int argc, char *argv[]);
 extern DSTATUS (*disk_initialize) (void); //BYTE);

@@ -224,7 +224,7 @@ neo2_spc_puts_tag:
  	sta.l	$7f0101
  	sendMusicBlockM $7f, $0100, $00f2, $0002
 
-	lda		sourceMedium
+	lda.l	sourceMedium
 	bne		+
 		; GBAC
 		rep #$30
@@ -280,7 +280,7 @@ neo2_spc_puts_tag:
  	jsr     init_dsp
 
 	; Copy the SPC RAM dump to SNES RAM
-	lda		sourceMedium
+	lda.l	sourceMedium
 	bne		+
  		jsr     copy_spc_memory_to_ram
  		bra		++

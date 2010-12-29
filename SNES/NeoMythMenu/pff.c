@@ -386,7 +386,7 @@ FRESULT dir_read (
 			}
 		}
 #else		/* Non LFN configuration */
-		if (c != 0xE5 &&  c != '.' && !(a & AM_VOL))	/* Is it a valid entry? */
+		if (c != 0xE5 &&  (_FS_RPATH || c != '.') && !(a & AM_VOL))	/* Is it a valid entry? */
 			break;
 #endif
 

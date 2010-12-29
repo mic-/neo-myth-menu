@@ -837,19 +837,19 @@ _show_loading_progress:
 	sep	#$20
 	plx
 	phx
-	lda.l	load_progress+15
+	lda.l	loadProgress+15
 	dea
 	cmp	#'0'-1			; Do we need to wrap from 0 to 9?
 	bne	+
-	lda.l	load_progress+14
+	lda.l	loadProgress+14
 	dea
-	sta.l	load_progress+14
+	sta.l	loadProgress+14
 	lda	#'9'
 +:
-	sta.l	load_progress+15
+	sta.l	loadProgress+15
 	ldx	#0
 -:
-	lda.l	load_progress,x
+	lda.l	loadProgress,x
 	beq	+
 	sta.l	REG_VRAM_DATAW1		; Write the character number
 	lda	#8
@@ -873,19 +873,19 @@ show_loading_progress:
 	sep		#$20
 	plx
 	phx
-	lda.l	load_progress+15
+	lda.l	loadProgress+15
 	dea
 	cmp	#'0'-1			; Do we need to wrap from 0 to 9?
 	bne	+
-	lda.l	load_progress+14
+	lda.l	loadProgress+14
 	dea
-	sta.l	load_progress+14
+	sta.l	loadProgress+14
 	lda	#'9'
 +:
-	sta.l	load_progress+15
+	sta.l	loadProgress+15
 	ldx	#0
 -:
-	lda.l	load_progress,x
+	lda.l	loadProgress,x
 	beq	+
 	sta.l	REG_VRAM_DATAW1		; Write the character number
 	lda	#8
@@ -958,7 +958,7 @@ show_debug_data:
 	
 	
 show_copied_data:
- .DEFINE SHOWCOPYADDR $521961
+ .DEFINE SHOWCOPYADDR $500000
  .DEFINE NEO2_DEBUG 1
  .IFDEF NEO2_DEBUG
  	jsr.w	_wait_nmi
@@ -1344,57 +1344,92 @@ neo2_myth_psram_copy:
 	lsr		a
 	and		#7
 	sta		tcc__r0h	; dest PRAM_BIO
-sta.l pfmountbuf
 	lda		_neo2_myth_psram_copy_dest+2,s
 	and		#$0F
 	ora		#$50
 	sta		tcc__r10h
-sta.l pfmountbuf+2
-	lda		_neo2_myth_psram_copy_src,s
+	lda		_neo2_myth_psram_copy_dest,s
 	sta		tcc__r10
 	
 	lda		_neo2_myth_psram_copy_length+2,s
-	lsr		a
+	;lsr		a
 	sta		tcc__r1h
-sta.l pfmountbuf+3
 	lda		_neo2_myth_psram_copy_length,s
-	ror		a
+	;ror		a
 	sta		tcc__r1
 
-	;jsr		show_copied_data
--:
+_neo2_myth_psram_copy_banks:
 	sep		#$20
 	lda		tcc__r0
 	sta.l	MYTH_PRAM_BIO
+	phb
+	lda		tcc__r2h
+	pha
+	plb
+	ldx		#$7FFE
 	rep		#$20
-	lda		[tcc__r2]
-	tax
+	; Copy 32kB from PSRAM to RAM
+-:
+	lda.w	$0000,x
+	sta.l	$7F4000,x
+	dex
+	dex
+	bpl		-
 	sep		#$20
 	lda		tcc__r0h
-	sta		MYTH_PRAM_BIO
+	sta.l	MYTH_PRAM_BIO
+	lda		tcc__r10h
+	pha
+	plb
+	ldx		#$7FFE
 	rep		#$20
-	txa
-	sta		[tcc__r10]
+	; Copy 32kB from RAM to PSRAM
+-:
+	lda.l	$7F4000,x
+	sta.w	$0000,x
+	dex
+	dex
+	bpl		-
 	
-	inc		tcc__r2
-	inc		tcc__r2
-	bne		+
-	inc		tcc__r2h
-+:
-	inc		tcc__r10
-	inc		tcc__r10
-	bne		+
-	inc		tcc__r10h
-+:
-	lda		tcc__r1
-	bne		+
-	dec		tcc__r1h
-+:
-	dec		tcc__r1
-	lda		tcc__r1
-	ora		tcc__r1h
-	bne		-
+	sep		#$20
+	lda		tcc__r0
+	sta.l	MYTH_PRAM_BIO
+	;phb
+	lda		tcc__r2h
+	pha
+	plb
+	ldx		#$7FFE
+	rep		#$20
+	; Copy 32kB from PSRAM to RAM
+-:
+	lda.w	$8000,x
+	sta.l	$7F4000,x
+	dex
+	dex
+	bpl		-
+	sep		#$20
+	lda		tcc__r0h
+	sta.l	MYTH_PRAM_BIO
+	lda		tcc__r10h
+	pha
+	plb
+	ldx		#$7FFE
+	rep		#$20
+	; Copy 32kB from RAM to PSRAM
+-:
+	lda.l	$7F4000,x
+	sta.w	$8000,x
+	dex
+	dex
+	bpl		-
+	
+	plb
 
+	inc		tcc__r2h
+	inc		tcc__r10h
+	dec		tcc__r1h
+	bne		_neo2_myth_psram_copy_banks
+	
 	sep		#$20
     LDA     #$00       ;
     STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
@@ -1447,7 +1482,7 @@ sta.l pfmountbuf+3
          STA.L   MYTH_SRAM_TYPE  ; SET SRAM SAVE TYPE
          LDA     #\2
          STA.L   MYTH_SRAM_MAP   ; SET $206000
-         JMP     MAP_SRAM_DONE
+         JMP     \3
 	 +:
  .ENDM
 
@@ -1576,9 +1611,9 @@ MOV_4M:
 ;===============================================================================
 MOV_PSRAM:
 	lda	tcc__r0+1
-	sta.l	load_progress+15
+	sta.l	loadProgress+15
 	lda	tcc__r0h
-	sta.l	load_progress+14
+	sta.l	loadProgress+14
 
 	 LDA    #$00
 	 STA    tcc__r1+1
@@ -1846,12 +1881,12 @@ MOV_PSRAM_DONE:
 MAP_SRAM:
 	 LDA.L   sramMode
 
- 	MAP_SRAM_CHECK $01, $02
- 	MAP_SRAM_CHECK $08, $03
- 	MAP_SRAM_CHECK $07, $07
- 	MAP_SRAM_CHECK $06, $07
- 	MAP_SRAM_CHECK $05, $0F
- 	MAP_SRAM_CHECK $04, $0F
+ 	MAP_SRAM_CHECK $01, $02,MAP_SRAM_DONE
+ 	MAP_SRAM_CHECK $08, $03,MAP_SRAM_DONE
+ 	MAP_SRAM_CHECK $07, $07,MAP_SRAM_DONE
+ 	MAP_SRAM_CHECK $06, $07,MAP_SRAM_DONE
+ 	MAP_SRAM_CHECK $05, $0F,MAP_SRAM_DONE
+ 	MAP_SRAM_CHECK $04, $0F,MAP_SRAM_DONE
 
 MAP_SRAM_DONE:
 	 LDA     #$01
@@ -2319,12 +2354,10 @@ _nrsdpm_loop_inner:
 	asl		a	
 	asl		a	
 	asl		a						; A = %DDDD0000					
-	;eor		#$30					; Reading the 4-bit data register gives %0011dddd, so set A ^= %00110000
-	;eor.w	$6061					; ..then A ^= DAT4 to get %DDDDdddd				
-		sta		tcc__r0	
-		lda.w	$6061					; Read low nybble of low byte (s)
-		and		#$0F
-		ora		tcc__r0
+	sta		tcc__r0	
+	lda.w	$6061					; Read low nybble of low byte (s)
+	and		#$0F
+	ora		tcc__r0
 	xba
 	
 	lda.w	$6061					; Read high nybble of high byte 
@@ -2332,14 +2365,13 @@ _nrsdpm_loop_inner:
 	asl		a	
 	asl		a	
 	asl		a
-	;eor		#$30
-	;eor.w	$6061
-		sta		tcc__r0	
-		lda.w	$6061					; Read low nybble of low byte (s)
-		and		#$0F
-		ora		tcc__r0
+	sta		tcc__r0	
+	lda.w	$6061					; Read low nybble of low byte (s)
+	and		#$0F
+	ora		tcc__r0
 	xba
 	rep		#$20
+
 _nrsdpm_write:
 	sta.l $500000,x					; Write 16 bits to PSRAM
 	inx
@@ -2360,6 +2392,7 @@ _nrsdpm_write:
 	lda.l	$7d0000+_nrsdpm_write+3
 	ina
 	sta.l	$7d0000+_nrsdpm_write+3
+
 +:
 
 	ply								; count
@@ -2381,12 +2414,124 @@ _nrsdpm_return:
 	rts
 	
 	
+
+; void neo2_recv_sd_psram_multi_hwaccel(WORD prbank, WORD proffs, WORD count)
+;
+.EQU _neo2_recv_sd_psram_multi_hwaccel_save_regs 6
+.EQU _neo2_recv_sd_psram_multi_hwaccel_prbank 3+_neo2_recv_sd_psram_multi_hwaccel_save_regs
+.EQU _neo2_recv_sd_psram_multi_hwaccel_proffs _neo2_recv_sd_psram_multi_hwaccel_prbank+2
+.EQU _neo2_recv_sd_psram_multi_hwaccel_count _neo2_recv_sd_psram_multi_hwaccel_proffs+2
+;
+neo2_recv_sd_psram_multi_hwaccel:
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+
+	lda		_neo2_recv_sd_psram_multi_hwaccel_proffs,s
+	tax
+	lda		_neo2_recv_sd_psram_multi_hwaccel_count,s
+	tay
+	sep		#$20
+	lda		_neo2_recv_sd_psram_multi_hwaccel_prbank,s	
+	sta.l	$7d0000+_nrsdpmhw_write+3
+	sta.l	$7d0000+_nrsdpmhw_write2+3
+
+	lda		#$40
+	pha
+	plb
+	
+_nrsdpmhw_sectors:
+	phy
+	sep 	#$20
+	ldy		#$1024
+-:									; Wait for start bit
+	lda.w	$6061
+	and		#1
+	beq		+
+	dey
+	bne		-
+	; Timeout
+	ply
+	stz.b	tcc__r0					; FALSE
+	jmp.w	_nrsdpmhw_return
++:
+
+	sep		#$20
+	lda		#1
+	sta.l	$C043					; Enter 4+4 buffered mode
+	
+	ldy		#256					; words per sector
+_nrsdpmhw_loop_inner:
+	;sep 	#$20
+	lda.w 	$6064
+	lda.w 	$6064
+_nrsdpmhw_write:
+	sta.l 	$500000,x				; Write 8 bits to PSRAM
+	inx
+
+	lda.w 	$6064
+	lda.w 	$6064
+_nrsdpmhw_write2:
+	sta.l 	$500000,x				; Write 8 bits to PSRAM
+
+	inx
+	dey
+	bne		_nrsdpmhw_loop_inner	; repeat 256 times
+
+	;sep		#$20
+	lda		#1
+	sta.l	$C043					; Exit 4+4 mode
+	
+	;sep		#$20
+	; Read 8 CRC bytes (16 nybbles)
+	.rept 16
+	lda.l	MYTH_NEO2_RD_DAT4
+	.endr
+
+	lda.l	MYTH_NEO2_RD_DAT4		; end bit
+
+	cpx		#0						; has proffs wrapped around (i.e. should we move to the next bank) ?
+	bne		+
+	lda.l	$7d0000+_nrsdpmhw_write+3
+	ina
+	sta.l	$7d0000+_nrsdpmhw_write+3
+	sta.l	$7d0000+_nrsdpmhw_write2+3
+
++:
+
+	ply								; count
+	dey
+	beq		+
+	jmp.w	_nrsdpmhw_sectors
++:
+	lda		#1
+	sta		tcc__r0					; TRUE
+	
+_nrsdpmhw_return:
+	plb
+	
+	jsr.w show_copied_data
+	
+	ply
+	plx
+	plp
+	rts
+	
 	
 
 neo2_recv_sd_multi:
 	rts
 	
 
+
+jsr_r10:
+	rep #$20
+    lda.b tcc__r10
+    dec a
+    pha
+    rts
 
 
  .MACRO MOV_SD_PSRAM_SETUP
@@ -2457,9 +2602,9 @@ run_game_from_sd_card:
 ;===============================================================================
 MOV_SD_PSRAM:
 	 lda	tcc__r0+1
-	 sta.l	load_progress+15
+	 sta.l	loadProgress+15
 	 lda	tcc__r0h
-	 sta.l	load_progress+14
+	 sta.l	loadProgress+14
 
 	 LDA    #$00
 	 STA    tcc__r1+1
@@ -2647,32 +2792,108 @@ MOV_SD_PSRAM_DONE:
 ;===============================================================================
 ;SET  GAME SAVE  SIZE & BANK
 	 LDA.L   sramSize
-;	 CMP     #$00
-;	 BNE     MAP_SRAM
+	 CMP     #$00
+	 BNE     SD_MAP_SRAM
 ;	 CMP     #$00
 	 STA.L   MYTH_SRAM_TYPE ;  OFF SRAM TYPE
-;	 JMP     _SET_EXT_DSP
+	 JMP     SD_SET_EXT_DSP
 ;-------------------------------------------------------------------------------
-;MAP_SRAM:
-;	 LDA.L   sramMode
+SD_MAP_SRAM:
+ 	LDA.L   sramMode
 
-; 	MAP_SRAM_CHECK $01, $02
-; 	MAP_SRAM_CHECK $08, $03
-; 	MAP_SRAM_CHECK $07, $07
-; 	MAP_SRAM_CHECK $06, $07
-; 	MAP_SRAM_CHECK $05, $0F
-; 	MAP_SRAM_CHECK $04, $0F
+ 	MAP_SRAM_CHECK $01, $02, SD_MAP_SRAM_DONE
+ 	MAP_SRAM_CHECK $08, $03, SD_MAP_SRAM_DONE
+ 	MAP_SRAM_CHECK $07, $07, SD_MAP_SRAM_DONE
+ 	MAP_SRAM_CHECK $06, $07, SD_MAP_SRAM_DONE
+ 	MAP_SRAM_CHECK $05, $0F, SD_MAP_SRAM_DONE
+ 	MAP_SRAM_CHECK $04, $0F, SD_MAP_SRAM_DONE
 
-;MAP_SRAM_DONE:
-;	 LDA     #$01
-;	 STA.L   MYTH_SRAM_WE    ; GBA SRAM WE ON !
+SD_MAP_SRAM_DONE:
+	 LDA     #$01
+	 STA.L   MYTH_SRAM_WE    ; GBA SRAM WE ON !
 ;-------------------------------------------------------------------------------
 ;SET SAVE SRAM BANK
 
-; TODO: handle this
+	 LDA.L   sramSize
+	 CMP     #$01
+	 BNE     +
+	 LDA     #$FF    ;2K  SIZE
+	 STA.L   MYTH_GBAS_ZIO
+
+	 LDA.L   sramBank
+	 ASL     A
+	 ASL     A
+	 AND     #$FC
+	 STA.L   MYTH_GBAS_BIO
+	 JMP     SD_SET_EXT_DSP
+
++:
+	 CMP     #$02
+	 BNE     +
+	 LDA     #$FC    ;8K   SIZE
+	 STA.L   MYTH_GBAS_ZIO
+
+	 LDA.L   sramBank
+	 ASL     A
+	 ASL     A
+	 AND     #$FC
+	 STA.L   MYTH_GBAS_BIO
+	 STA.L   MYTH_GBAS_BIO
+	 JMP     SD_SET_EXT_DSP
+
++:
+	 CMP     #$03
+	 BNE     +
+	 LDA     #$F0    ;32K  SIZE
+	 STA.L   MYTH_GBAS_ZIO
+
+	 LDA.L   sramBank
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 AND     #$F0
+	 STA.L   MYTH_GBAS_BIO
+	 JMP     SD_SET_EXT_DSP
+;-------------------------------------------------------------------------------
++:
+	 CMP     #$04
+	 BNE     +
+	 LDA     #$E0    ;64K SIZE
+	 STA.L   MYTH_GBAS_ZIO
+
+	 LDA.L   sramBank
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 AND     #$F0
+	 STA.L   MYTH_GBAS_BIO
+	 JMP     SD_SET_EXT_DSP
+;-------------------------------------------------------------------------------
++:
+	 CMP     #$05
+	 BNE     +
+	 LDA     #$C0    ;128K SIZE
+	 STA.L   MYTH_GBAS_ZIO
+
+	 LDA.L   sramBank
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 ASL     A
+	 AND     #$C0
+	 STA.L   MYTH_GBAS_BIO
+	 JMP     SD_SET_EXT_DSP
++:
+	 rtl
+
 
 ;-------------------------------------------------------------------------------
-_SET_EXT_DSP:
+SD_SET_EXT_DSP:
 
 	 LDA.L   extDsp
 	 CMP     #$00
@@ -2734,3 +2955,6 @@ _RUN_M01:
 ram_code_end:
 
 .ends
+
+
+
