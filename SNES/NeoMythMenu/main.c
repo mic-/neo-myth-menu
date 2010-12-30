@@ -20,7 +20,6 @@
 #include "bg_buffer.h"
 
 
-
 // Some resources defined in separate source files
 extern char bg_patterns, bg_patterns_end;
 extern char bg_palette[];

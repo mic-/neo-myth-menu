@@ -15,7 +15,6 @@
 #include "bg_buffer.h"
 #include "diskio.h"
 
-
 // Define the top-left corner for some of the text labels and the marker sprite
 #define MARKER_LEFT 12
 #define MARKER_TOP 67
