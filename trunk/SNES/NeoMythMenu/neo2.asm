@@ -2459,20 +2459,20 @@ _nrsdpmhw_sectors:
 +:
 
 	sep		#$20
-	lda		#1
-	sta.l	$C043					; Enter 4+4 buffered mode
+	lda		#SDBUF_HI_LO
+	sta.l	MYTH_SDBUF_IO			; Enter 4+4 buffered mode
 	
 	ldy		#256					; words per sector
 _nrsdpmhw_loop_inner:
 	;sep 	#$20
-	lda.w 	$6064
-	lda.w 	$6064
+	lda.w 	$6063
+	lda.w 	$6063
 _nrsdpmhw_write:
 	sta.l 	$500000,x				; Write 8 bits to PSRAM
 	inx
 
-	lda.w 	$6064
-	lda.w 	$6064
+	lda.w 	$6063
+	lda.w 	$6063
 _nrsdpmhw_write2:
 	sta.l 	$500000,x				; Write 8 bits to PSRAM
 
@@ -2480,11 +2480,9 @@ _nrsdpmhw_write2:
 	dey
 	bne		_nrsdpmhw_loop_inner	; repeat 256 times
 
-	;sep		#$20
-	lda		#1
-	sta.l	$C043					; Exit 4+4 mode
+	lda		#SDBUF_OFF
+	sta.l	MYTH_SDBUF_IO			; Exit 4+4 mode
 	
-	;sep		#$20
 	; Read 8 CRC bytes (16 nybbles)
 	.rept 16
 	lda.l	MYTH_NEO2_RD_DAT4
@@ -2512,7 +2510,7 @@ _nrsdpmhw_write2:
 _nrsdpmhw_return:
 	plb
 	
-	jsr.w show_copied_data
+	;jsr.w show_copied_data
 	
 	ply
 	plx
@@ -2950,6 +2948,8 @@ _RUN_M01:
          
 	
 .include "diskio_asm.inc"
+
+;.include "inflate.asm"
 
 
 ram_code_end:
