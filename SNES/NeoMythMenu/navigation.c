@@ -860,9 +860,17 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			else
 			{
 				strcpy(strBuf, sdRootDir);
-				strcpy(&strBuf[sdRootDirLength], "/");
-				strcpy(&strBuf[sdRootDirLength+1], highlightedFileName);
-				strBuf[sdRootDirLength+1+strlen(highlightedFileName)] = 0;
+				if (sdRootDirLength > 1)
+				{
+					strcpy(&strBuf[sdRootDirLength], "/");
+					strcpy(&strBuf[sdRootDirLength+1], highlightedFileName);
+					strBuf[sdRootDirLength+1+strlen(highlightedFileName)] = 0;
+				}
+				else
+				{
+					strcpy(&strBuf[sdRootDirLength], highlightedFileName);
+					strBuf[sdRootDirLength+strlen(highlightedFileName)] = 0;
+				}
 				if ((romLayout = get_rom_info_sd(strBuf, snesRomInfo)) == LAYOUT_UNKNOWN)
 				{
 					switch_to_menu(MID_SD_ERROR_MENU, 1);
@@ -1052,9 +1060,17 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			else
 			{
 				strcpy(strBuf, sdRootDir);
-				strcpy(&strBuf[sdRootDirLength], "/");
-				strcpy(&strBuf[sdRootDirLength+1], highlightedFileName);
-				strBuf[sdRootDirLength+1+strlen(highlightedFileName)] = 0;
+				if (sdRootDirLength > 1)
+				{
+					strcpy(&strBuf[sdRootDirLength], "/");
+					strcpy(&strBuf[sdRootDirLength+1], highlightedFileName);
+					strBuf[sdRootDirLength+1+strlen(highlightedFileName)] = 0;
+				}
+				else
+				{
+					strcpy(&strBuf[sdRootDirLength], highlightedFileName);
+					strBuf[sdRootDirLength+strlen(highlightedFileName)] = 0;
+				}
 				if ((romLayout = get_rom_info_sd(strBuf, snesRomInfo)) == LAYOUT_UNKNOWN)
 				{
 					switch_to_menu(MID_SD_ERROR_MENU, 1);

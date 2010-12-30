@@ -27,6 +27,7 @@ extern char bg_palette[];
 extern char bg_map, bg_map_end;
 extern char obj_marker;
 extern u8 font[];
+//extern u8 vgzfile[];
 
 
 // Myth-related variables
@@ -376,6 +377,7 @@ void print_games_list()
 							(gamesList.highlighted == gamesList.firstShown + i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 			vramOffs += 0x40;
 		}
+
 	}
 	else if (sourceMedium == SOURCE_SD)
 	{
@@ -839,6 +841,7 @@ void run_game_from_sd_card_c()
 			}
 		}
 	}
+	if (sramMode == 0) sramSize = 0;
 
 	for (i = 0; i < MAX_GG_CODES * 2; i++)
 	{
@@ -1163,6 +1166,8 @@ int main()
 	int i;
 	u16 keys;
 
+	//void (*pfninflate)(DWORD, u8 *);
+
 	static DIR dir;
 	static FILINFO fileInfo;
 
@@ -1205,6 +1210,10 @@ int main()
 	clear_screen();
 	switch_to_menu(MID_MAIN_MENU, 0);
 	update_screen();
+
+	/*MAKE_RAM_FPTR(pfninflate, inflate);
+	inflate_start();
+	pfninflate(0x7F4000, vgzfile+10);*/
 
 	REG_BGCNT = 3;			// Enable BG0 and BG1
 
