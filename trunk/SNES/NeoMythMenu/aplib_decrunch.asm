@@ -8,7 +8,7 @@
 .include "hdr.asm"
 
 .bank 3 slot 0
-.section ".text_aplib"
+.section ".text_aplib" ;superfree
 
 .DEFINE APLIB_ZP_BASE 	$80
 
@@ -27,7 +27,7 @@
 .DEFINE APLIB_COUNT2 APLIB_OFFS2
 .DEFINE APLIB_NUMBYTES APLIB_GAMMA
 
-    
+
 ; In:
 ; A = source bank
 ; Y = source offset

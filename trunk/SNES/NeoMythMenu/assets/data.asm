@@ -1,15 +1,16 @@
 .include "hdr.asm"
 
 ; Put this section in bank 2 ($010000-$017fff)
-.BANK 2 SLOT 3 
+;.BANK 2 SLOT 3 
+.bank 7 slot 0
 .section ".rodata_bg" 
 
 ; The lower halves of each 64kB bank can only be accessed through the mirrors at
 ; bank+$40 and bank+$c0. That's why the base address is set to $400000 here.
-.base $40
+;.base $40
 
 bg_patterns:
-.incbin "assets/menu_bg.lzs"
+.incbin "assets/menu_bg.pat"
 bg_patterns_end:
 
 bg_map:
@@ -36,7 +37,8 @@ vgmplayer:
 ; here. I haven't figured out a way to make the assembler calculate the size automatically,
 ; so I hardcoded it. 
 ;.dsb 32768-9329,0
- .dsb 32768-15473,0
+; .dsb 32768-15473,0
+
 ; .dsb 32768-17966,0  ;15473,0
 
 .ends

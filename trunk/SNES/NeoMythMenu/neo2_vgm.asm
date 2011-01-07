@@ -146,6 +146,8 @@ play_vgm_from_sd_card:
     LDA    #$00
     STA.L  MYTH_PRAM_BIO
 
+;jsr	show_copied_data
+
 	rep		#$20
 	lda.l	highlightedFileSize
 	sta		spcDataLen

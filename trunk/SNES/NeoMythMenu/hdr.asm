@@ -63,10 +63,17 @@
 .DSB $8000,0
 .ENDIF
 
+.BANK 2 SLOT 0                  ; Defines the ROM bank and the slot it is inserted in memory.
+.ORG 0  
+.DSB $8000,0					; Fill up $010000-$017FFF
+
 .BANK 4 SLOT 0                  ; Defines the ROM bank and the slot it is inserted in memory.
 .ORG 0  
 .DSB $8000,0					; Fill up $020000-$027FFF
 
+.BANK 6 SLOT 0                  ; Defines the ROM bank and the slot it is inserted in memory.
+.ORG 0  
+.DSB $8000,0					; Fill up $030000-$037FFF
 
 .bank 1 slot 0
 .org 0

@@ -946,12 +946,17 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 
 			printxy("Playing ", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 			printxy(highlightedFileName, 10, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
-
-			printxy("Uncompressed size:", 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
-			print_dec(highlightedFileSize, 21, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-			printxy("Compressed size:", 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
-			print_dec(compressedVgmSize, 21, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-
+			i = 10;
+			if (isVgz)
+			{
+				printxy("Zipped size:", 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+				print_dec(vgzSize, 21, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+				i++;
+			}
+			printxy("Uncompressed size:", 2, i, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+			print_dec(highlightedFileSize, 21, i, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+			printxy("Compressed size:", 2, i+1, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+			print_dec(compressedVgmSize, 21, i+1, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 
 			break;
 
