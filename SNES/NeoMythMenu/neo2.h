@@ -41,6 +41,6 @@ extern void vgm_echo();
 extern void show_loading_progress();
 
 //extern void inflate_start();
-//extern void inflate(DWORD dest, u8 *src);
+extern DWORD inflate(DWORD dest, DWORD src);
 
 #endif

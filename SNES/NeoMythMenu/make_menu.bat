@@ -2,6 +2,7 @@ REM Convert graphics data
 tools\sixpack -image -target snes -format p4 -planes 4 -o assets\marker.chr assets\marker.bmp
 tools\sixpack -image -target snes -format p1 -bg 6,0 -o assets\font.chr assets\adore.bmp
 tools\sixpack -image -target snes -format p4 -opt -codec aplib -o assets\menu_bg.lzs -pack assets\menu_bg2.bmp
+tools\sixpack -image -target snes -format p4 -opt -o assets\menu_bg.pat assets\menu_bg2.bmp
 
 
 REM C -> ASM / S
@@ -81,6 +82,7 @@ REM ..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
 ..\bin\wla-65816.exe -io neo2_spc.asm neo2_spc.obj
 ..\bin\wla-65816.exe -io neo2_vgm.asm neo2_vgm.obj
 ..\bin\wla-65816.exe -io ppu.asm ppu.obj
+..\bin\wla-65816.exe -io inflate.asm inflate.obj
 ..\bin\wla-65816.exe -io pff_asm.asm pff_asm.obj
 ..\bin\wla-65816.exe -io dummy_games_list.asm dummy_games_list.obj
 ..\bin\wla-65816.exe -io cheat_db2.s cheat_db.obj
@@ -102,7 +104,7 @@ REM ..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
 ..\bin\wla-65816.exe -io aplib_decrunch.asm aplib_decrunch.obj
 
 REM OBJ -> SMC
-..\bin\wlalink.exe -dvso main.obj navigation.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj aplib_decrunch.obj neo2.obj neo2_spc.obj neo2_vgm.obj ppu.obj cheat_db.obj dummy_games_list.obj diskio.obj myth_io.obj pff_asm.obj pff.obj bg_buffer.obj sd_utils.obj common.obj u_strings.obj NEOSNES.BIN
+..\bin\wlalink.exe -dvso main.obj navigation.obj dummy_games_list.obj inflate.obj aplib_decrunch.obj neo2.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj neo2_spc.obj neo2_vgm.obj ppu.obj cheat_db.obj diskio.obj myth_io.obj pff_asm.obj pff.obj bg_buffer.obj sd_utils.obj common.obj u_strings.obj NEOSNES.BIN
 
 @echo off
 REM Delete files

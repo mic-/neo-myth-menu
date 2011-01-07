@@ -112,15 +112,15 @@ neo2_spc_puts_tag:
 	php
  	jsr.w	_wait_nmi
 	rep		#$30
-	lda		#$2163
+	lda		#$2162 ;3
 	sta.l	REG_VRAM_ADDR_L
 	ldx		#SPC_TAG_TITLE_ADDR
 	jsr		++
-	lda		#$2183
+	lda		#$2182
 	sta.l	REG_VRAM_ADDR_L
 	ldx		#SPC_TAG_GAME_ADDR
 	jsr		++
-	lda		#$21A3
+	lda		#$21A2
 	sta.l	REG_VRAM_ADDR_L
 	ldx		#SPC_TAG_ARTIST_ADDR
 	jsr		++

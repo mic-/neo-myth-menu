@@ -32,6 +32,8 @@
 
 .equ REG_BGCNT 		$212C
 
+.equ REG_CGWSEL 	$2130
+.equ REG_CGADSUB 	$2131
 .equ REG_COLDATA	$2132
 
 .equ REG_STAT77		$213E
@@ -64,6 +66,8 @@
 .equ REG_MDMAEN		$420B
 .equ REG_HDMAEN		$420C
 
+.equ REG_MEMSEL		$420D
+
 ; DMA channel 0
 .equ REG_DMAP0		$4300
 .equ REG_BBAD0		$4301
@@ -83,6 +87,16 @@
 .equ REG_DAS1L		$4315
 .equ REG_DAS1H		$4316
 .equ REG_DASB1		$4317
+
+; DMA channel 3
+.equ REG_DMAP3		$4330
+.equ REG_BBAD3		$4331
+.equ REG_A1T3L		$4332
+.equ REG_A1T3H		$4333
+.equ REG_A1B3		$4334
+.equ REG_DAS3L		$4335
+.equ REG_DAS3H		$4336
+.equ REG_DASB3		$4337
 
 ;********************************************************************************************
 

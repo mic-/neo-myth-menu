@@ -27,10 +27,10 @@ copy_ram_code:
 	sep		#$20
 	; Note: it's very important that the correct labels are used here. Look in NEOSNES.SYM if you suspect that
 	; the order of the sections involved has been changed by the linker.
-	ldy		#(neo2_spc_ram_code_end - ppu_ram_code_begin)
+	ldy		#$4000 ;(inflate_ram_code_end - ppu_ram_code_begin)
 	ldx		#0
 -:
-	lda.l	ppu_ram_code_begin,x
+	lda.l	$018000,x ;ppu_ram_code_begin,x
 	sta.l	$7e8000,x
 	inx
 	dey
@@ -225,10 +225,26 @@ CPLD_RAM:
     INX
     INX
     BNE     -
-    SEP		#$30
+    SEP		#$20
 
-    LDA     #$00                 ;
+    LDA     #$80                 ;
     STA.L   REG_DISPCNT
+    lda		#$00
+
+	; Clear VRAM
+	sta.l	REG_VRAM_ADDR_L
+	sta.l	REG_VRAM_ADDR_H
+	lda		#VRAM_WORD_ACCESS
+	sta.l	REG_VRAM_INC
+	ldx		#0
+	lda		#0
+-:
+	sta.l	REG_VRAM_DATAW1
+	sta.l	REG_VRAM_DATAW2
+	inx
+	bne		-
+	sep		#$30
+	
     STA.L   REG_MDMAEN
     STA.L   REG_HDMAEN
     STA.L   REG_NMI_TIMEN
@@ -958,7 +974,7 @@ show_debug_data:
 	
 	
 show_copied_data:
- .DEFINE SHOWCOPYADDR $500000
+ .DEFINE SHOWCOPYADDR $500320
  .DEFINE NEO2_DEBUG 1
  .IFDEF NEO2_DEBUG
  	jsr.w	_wait_nmi
@@ -2085,21 +2101,9 @@ _neo_select_menu:
 	tay
 	jsr		_neo_asic_cmd				; set cr = select menu flash
 
-;DEBUG
-;lda tcc__r1
-;sta.w asicCommands+0
-;lda tcc__r1h
-;sta.w asicCommands+2
-
 	ldx		#$00DA
 	ldy		#$0044
 	jsr		_neo_asic_cmd				; set iosr = disable game flash
-
-;DEBUG
-;lda tcc__r1
-;sta.w asicCommands+4
-;lda tcc__r1h
-;sta.w asicCommands+6
 
 	sep		#$20
 	lda		#0
@@ -2435,10 +2439,15 @@ neo2_recv_sd_psram_multi_hwaccel:
 	tay
 	sep		#$20
 	lda		_neo2_recv_sd_psram_multi_hwaccel_prbank,s	
-	sta.l	$7d0000+_nrsdpmhw_write+3
-	sta.l	$7d0000+_nrsdpmhw_write2+3
+	sta.l	$7d0000+_nrsdpmhw_writeB0+3
+	sta.l	$7d0000+_nrsdpmhw_writeB1+3
+	sta.l	$7d0000+_nrsdpmhw_writeB2+3
+	sta.l	$7d0000+_nrsdpmhw_writeB3+3
 
-	lda		#$40
+	lda		#$01
+	sta.l	REG_MEMSEL
+	
+	lda		#$C0
 	pha
 	plb
 	
@@ -2462,20 +2471,27 @@ _nrsdpmhw_sectors:
 	lda		#SDBUF_HI_LO
 	sta.l	MYTH_SDBUF_IO			; Enter 4+4 buffered mode
 	
-	ldy		#256					; words per sector
+	ldy		#128					; dwords per sector
 _nrsdpmhw_loop_inner:
-	;sep 	#$20
 	lda.w 	$6063
 	lda.w 	$6063
-_nrsdpmhw_write:
+_nrsdpmhw_writeB0:
 	sta.l 	$500000,x				; Write 8 bits to PSRAM
 	inx
-
 	lda.w 	$6063
 	lda.w 	$6063
-_nrsdpmhw_write2:
+_nrsdpmhw_writeB1:
 	sta.l 	$500000,x				; Write 8 bits to PSRAM
-
+	inx
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB2:
+	sta.l 	$500000,x				; Write 8 bits to PSRAM
+	inx
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB3:
+	sta.l 	$500000,x				; Write 8 bits to PSRAM
 	inx
 	dey
 	bne		_nrsdpmhw_loop_inner	; repeat 256 times
@@ -2492,11 +2508,12 @@ _nrsdpmhw_write2:
 
 	cpx		#0						; has proffs wrapped around (i.e. should we move to the next bank) ?
 	bne		+
-	lda.l	$7d0000+_nrsdpmhw_write+3
+	lda.l	$7d0000+_nrsdpmhw_writeB0+3
 	ina
-	sta.l	$7d0000+_nrsdpmhw_write+3
-	sta.l	$7d0000+_nrsdpmhw_write2+3
-
+	sta.l	$7d0000+_nrsdpmhw_writeB0+3
+	sta.l	$7d0000+_nrsdpmhw_writeB1+3
+	sta.l	$7d0000+_nrsdpmhw_writeB2+3
+	sta.l	$7d0000+_nrsdpmhw_writeB3+3
 +:
 
 	ply								; count
@@ -2504,6 +2521,7 @@ _nrsdpmhw_write2:
 	beq		+
 	jmp.w	_nrsdpmhw_sectors
 +:
+	rep		#$20
 	lda		#1
 	sta		tcc__r0					; TRUE
 	
@@ -2512,6 +2530,10 @@ _nrsdpmhw_return:
 	
 	;jsr.w show_copied_data
 	
+	sep		#$20
+	lda		#$00
+	sta.l	REG_MEMSEL
+
 	ply
 	plx
 	plp
@@ -2951,8 +2973,8 @@ _RUN_M01:
 
 ;.include "inflate.asm"
 
-
 ram_code_end:
+
 
 .ends
 
