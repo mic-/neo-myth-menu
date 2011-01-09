@@ -68,6 +68,7 @@
 #define GAME_MODE_SPC 32
 #define GAME_MODE_VGM 33
 #define GAME_MODE_PACKED_VGM 34
+#define GAME_MODE_ZIPPED_ROM 35
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -184,6 +185,7 @@ extern void set_printxy_clip_rect(u16 x1, u16 y1, u16 x2, u16 y2);
 extern void show_scroll_indicators();
 extern void update_game_params(int force);
 romLayout_t get_rom_info_sd(char *fname, u8 *romInfo);
+romLayout_t get_rom_info_psram(char *fname, u8 *romInfo);
 extern void run_game_from_sd_card_c();
 
 extern int strstri(char *lookFor, char *lookIn);

@@ -83,6 +83,7 @@ REM ..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
 ..\bin\wla-65816.exe -io neo2_vgm.asm neo2_vgm.obj
 ..\bin\wla-65816.exe -io ppu.asm ppu.obj
 ..\bin\wla-65816.exe -io inflate.asm inflate.obj
+..\bin\wla-65816.exe -io inflate_game.asm inflate_game.obj
 ..\bin\wla-65816.exe -io pff_asm.asm pff_asm.obj
 ..\bin\wla-65816.exe -io dummy_games_list.asm dummy_games_list.obj
 ..\bin\wla-65816.exe -io cheat_db2.s cheat_db.obj
@@ -104,7 +105,7 @@ REM ..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
 ..\bin\wla-65816.exe -io aplib_decrunch.asm aplib_decrunch.obj
 
 REM OBJ -> SMC
-..\bin\wlalink.exe -dvso main.obj navigation.obj dummy_games_list.obj inflate.obj aplib_decrunch.obj neo2.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj neo2_spc.obj neo2_vgm.obj ppu.obj cheat_db.obj diskio.obj myth_io.obj pff_asm.obj pff.obj bg_buffer.obj sd_utils.obj common.obj u_strings.obj NEOSNES.BIN
+..\bin\wlalink.exe -dvso main.obj navigation.obj dummy_games_list.obj inflate.obj inflate_game.obj aplib_decrunch.obj neo2.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj neo2_spc.obj neo2_vgm.obj ppu.obj cheat_db.obj diskio.obj myth_io.obj pff_asm.obj pff.obj bg_buffer.obj sd_utils.obj common.obj u_strings.obj NEOSNES.BIN
 
 @echo off
 REM Delete files

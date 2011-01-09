@@ -1,13 +1,13 @@
 .include "hdr.asm"
 
 ; Put this section in bank 2 ($010000-$017fff)
-;.BANK 2 SLOT 3 
-.bank 7 slot 0
+.BANK 2 SLOT 3 
+;.bank 7 slot 0
 .section ".rodata_bg" 
 
 ; The lower halves of each 64kB bank can only be accessed through the mirrors at
 ; bank+$40 and bank+$c0. That's why the base address is set to $400000 here.
-;.base $40
+.base $40
 
 bg_patterns:
 .incbin "assets/menu_bg.pat"
@@ -40,5 +40,9 @@ vgmplayer:
 ; .dsb 32768-15473,0
 
 ; .dsb 32768-17966,0  ;15473,0
+
+.dsb 32768-30144,0
+
+;.base 0
 
 .ends
