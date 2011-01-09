@@ -63,9 +63,9 @@
 .DSB $8000,0
 .ENDIF
 
-.BANK 2 SLOT 0                  ; Defines the ROM bank and the slot it is inserted in memory.
-.ORG 0  
-.DSB $8000,0					; Fill up $010000-$017FFF
+;.BANK 2 SLOT 0                  ; Defines the ROM bank and the slot it is inserted in memory.
+;.ORG 0  
+;.DSB $8000,0					; Fill up $010000-$017FFF
 
 .BANK 4 SLOT 0                  ; Defines the ROM bank and the slot it is inserted in memory.
 .ORG 0  
@@ -78,6 +78,7 @@
 .bank 1 slot 0
 .org 0
 
+.base 0
 
 .EMPTYFILL $00                  ; fill unused areas with $00, opcode for BRK.  
                                 ; BRK will crash the snes if executed.

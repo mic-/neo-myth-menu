@@ -42,5 +42,6 @@ extern void show_loading_progress();
 
 //extern void inflate_start();
 extern DWORD inflate(DWORD dest, DWORD src);
+extern DWORD inflate_game();
 
 #endif

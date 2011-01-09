@@ -1,5 +1,5 @@
 // SNES Myth Shell
-// C version 0.53
+// C version 0.54
 //
 // Mic, 2010-2011
 
@@ -589,10 +589,6 @@ void play_vgm_from_sd_card_c()
 	}
 	if ((compressVgmBuffer[0] == 'V') || (compressVgmBuffer[1] == 'g') || (compressVgmBuffer[2] == 'm'))
 	{
-		/*clear_status_window();
-		printxy("Not a valid VGM!", 3, 21, 4, 32);
-		update_screen();
-		return;*/
 		isVgz = 0;
 	}
 
@@ -768,12 +764,57 @@ void get_sram_size_mode(romLayout_t layout)
 }
 
 
+void get_rom_size(WORD sizeInMbits)
+{
+	if (sizeInMbits <= 4)
+	{
+		romSize = 4;
+	}
+	else if (sizeInMbits <= 8)
+	{
+		romSize = 8;
+	}
+	else if (sizeInMbits <= 16)
+	{
+		romSize = 9;
+	}
+	else if (sizeInMbits <= 24)
+	{
+		romSize = 0x0A;
+	}
+	else if (sizeInMbits <= 32)
+	{
+		romSize = 0x0B;
+	}
+	else if (sizeInMbits <= 32)
+	{
+		romSize = 0x0B;
+	}
+	else if (sizeInMbits <= 32)
+	{
+		romSize = 0x0B;
+	}
+	else if (sizeInMbits <= 32)
+	{
+		romSize = 0x0B;
+	}
+	else
+	{
+		// TODO: Treat this as an error?
+		romSize = 9;
+	}
+}
+
+
+
 void run_game_from_sd_card_c()
 {
 	int i,j;
 	void (*run_game)(void);
 	void (*mirror_psram)(DWORD,DWORD,DWORD);
+	DWORD (*pInflate)(void);
 	static WORD mbits, sects, bytesRead, mythprbank, prbank, proffs, recalcSector;
+	static DWORD unzippedSize;
 	static u8 *myth_pram_bio = (u8*)0xC006;
 	romLayout_t layout;
 
@@ -795,13 +836,13 @@ void run_game_from_sd_card_c()
 		strcpy(&tempString[sdRootDirLength], highlightedFileName);
 		tempString[sdRootDirLength+strlen(highlightedFileName)] = 0;
 	}
-	layout = get_rom_info_sd(tempString, snesRomInfo);
-	romRunMode = layout ^ 1;
 
 	if ((strstri(".SMC", highlightedFileName) > 0) ||
 	    (strstri(".BIN", highlightedFileName) > 0))
 	{
 		gameMode = GAME_MODE_NORMAL_ROM;
+		layout = get_rom_info_sd(tempString, snesRomInfo);
+		romRunMode = layout ^ 1;
 	}
 	else if (strstri(".SPC", highlightedFileName) > 0)
 	{
@@ -816,6 +857,10 @@ void run_game_from_sd_card_c()
 		play_vgm_from_sd_card_c();
 		return;
 	}
+	else if (strstri(".ZIP", highlightedFileName) > 0)
+	{
+		gameMode = GAME_MODE_ZIPPED_ROM;
+	}
 	else
 	{
 		clear_status_window();
@@ -824,7 +869,7 @@ void run_game_from_sd_card_c()
 		return;
 	}
 
-	if (romRunMode > 1)
+	if ((romRunMode > 1) && (gameMode == GAME_MODE_NORMAL_ROM))
 	{
 		clear_status_window();
 		printxy("Unknown ROM type!", 3, 21, 4, 32);
@@ -835,43 +880,8 @@ void run_game_from_sd_card_c()
 	mbits = highlightedFileSize >> 17;
 	sects = highlightedFileSize >> 9;
 	if ((sects & 0xFF) > 1) mbits++;
-	if (mbits <= 4)
-	{
-		romSize = 4;
-	}
-	else if (mbits <= 8)
-	{
-		romSize = 8;
-	}
-	else if (mbits <= 16)
-	{
-		romSize = 9;
-	}
-	else if (mbits <= 24)
-	{
-		romSize = 0x0A;
-	}
-	else if (mbits <= 32)
-	{
-		romSize = 0x0B;
-	}
-	else if (mbits <= 32)
-	{
-		romSize = 0x0B;
-	}
-	else if (mbits <= 32)
-	{
-		romSize = 0x0B;
-	}
-	else if (mbits <= 32)
-	{
-		romSize = 0x0B;
-	}
-	else
-	{
-		// TODO: Treat this as an error?
-		romSize = 9;
-	}
+
+	get_rom_size(mbits);
 
 	loadProgress[14] = ((mbits+1)/10)+'0';
 	loadProgress[15] = ((mbits+1)%10)+'0';
@@ -886,31 +896,11 @@ void run_game_from_sd_card_c()
 	sramSize = 0;
 	sramMode = 0;
 
-	get_sram_size_mode(layout);
-
-	calc_gg_code_addresses();
-
-	/*for (i = 0; i < MAX_GG_CODES * 2; i++)
+	if (gameMode == GAME_MODE_NORMAL_ROM)
 	{
-		if (ggCodes[i].used == CODE_TARGET_RAM)
-		{
-			anyRamCheats = 1;
-		}
-		else
-		{
-			ggCodes[i].bank &= 0x3f;
-		}
-		if (romRunMode == 1)
-		{
-			// Convert LOROM addresses to file offsets
-			if (ggCodes[i].used == CODE_TARGET_ROM)
-			{
-				ggCodes[i].offset &= 0x7fff;
-				if (ggCodes[i].bank & 1) ggCodes[i].offset |= 0x8000;
-				ggCodes[i].bank >>= 1;
-			}
-		}
-	}*/
+		get_sram_size_mode(layout);
+		calc_gg_code_addresses();
+	}
 
 	clear_status_window();
 	update_screen();
@@ -922,23 +912,31 @@ void run_game_from_sd_card_c()
 		return;
 	}
 
-	// Skip past the SMC header if present
 	recalcSector = 1;
-	if (highlightedFileSize & 0x3FF)
+	if (gameMode == GAME_MODE_NORMAL_ROM)
 	{
-		if ((lastSdError = pf_lseek(512)) != FR_OK)
+		// Skip past the SMC header if present
+		if (highlightedFileSize & 0x3FF)
 		{
-			lastSdOperation = SD_OP_SEEK;
-			switch_to_menu(MID_SD_ERROR_MENU, 0);
-			return;
+			if ((lastSdError = pf_lseek(512)) != FR_OK)
+			{
+				lastSdOperation = SD_OP_SEEK;
+				switch_to_menu(MID_SD_ERROR_MENU, 0);
+				return;
+			}
+			sects--;
+			// Skip the sector calculation on the first read after the seek
+			recalcSector = 0;
 		}
-		sects--;
-		// Skip the sector calculation on the first read after the seek
-		recalcSector = 0;
+		prbank = 0x50;
+		mythprbank = 0;
+	}
+	else
+	{
+		prbank = 0x50;
+		mythprbank = 1;
 	}
 
-	prbank = 0x50;
-	mythprbank = 0;
 	*myth_pram_bio = mythprbank;
 	proffs = 0;
 	i = mbits;
@@ -963,6 +961,11 @@ void run_game_from_sd_card_c()
 			*myth_pram_bio = mythprbank;
 		}
 		i--;
+	}
+
+	if (gameMode == GAME_MODE_ZIPPED_ROM)
+	{
+		if (highlightedFileSize & 0x1FF) sects++;
 	}
 
 	if (sects)
@@ -993,6 +996,36 @@ void run_game_from_sd_card_c()
 		}
 	}
 
+	if (gameMode == GAME_MODE_ZIPPED_ROM)
+	{
+		printxy("Unzipping..    ", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+		update_screen();
+
+		MAKE_RAM_FPTR(pInflate, inflate_game);
+		unzippedSize = pInflate();
+
+		highlightedFileSize = unzippedSize;
+		mbits = highlightedFileSize >> 17;
+		sects = highlightedFileSize >> 9;
+		if ((sects & 0xFF) > 1) mbits++;
+		get_rom_size(mbits);
+		if ((sects & 0xFF) > 1) mbits--;
+
+		layout = get_rom_info_psram(tempString, snesRomInfo);
+		romRunMode = layout ^ 1;
+		get_sram_size_mode(layout);
+		calc_gg_code_addresses();
+
+		printxy("Unzipped size:", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+		print_dec(unzippedSize, 18, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+		/*print_dec(mbits, 3, 22, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		print_dec(romSize, 10, 22, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		print_dec(romRunMode, 16, 22, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+		update_screen();
+		while (1) {}*/
+	}
+
 	// Special case for 20 Mbit ROMs: mirror the last 4 Mbit
 	if (mbits == 20)
 	{
@@ -1011,46 +1044,82 @@ void run_game_from_sd_card_c()
 	// Special case for ROMs <128 kB
 	else if (mbits == 0)
 	{
-		/*if (highlightedFileSize < 0x10000)
-		{
-			if (highlightedFileSize & 0x3FF)
-			{
-				if ((lastSdError = pf_lseek(512)) != FR_OK)
-				{
-					lastSdOperation = SD_OP_SEEK;
-					switch_to_menu(MID_SD_ERROR_MENU, 0);
-					return;
-				}
-			}
-			else
-			{
-				if ((lastSdError = pf_lseek(0)) != FR_OK)
-				{
-					lastSdOperation = SD_OP_SEEK;
-					switch_to_menu(MID_SD_ERROR_MENU, 0);
-					return;
-				}
-			}
-			recalcSector = 0;
-			for (i = 0; i < sects; i++)
-			{
-				if ((lastSdError = pf_read_sect_to_psram(prbank, proffs, recalcSector)) != FR_OK)
-				{
-					lastSdOperation = SD_OP_READ_FILE;
-					switch_to_menu(MID_SD_ERROR_MENU, 0);
-					return;
-				}
-				recalcSector = 1;
-				proffs += 512;
-				if (proffs == 0)
-				{
-					prbank++;
-				}
-			}
-		}*/
+
 	}
 
 	run_game();
+}
+
+
+
+romLayout_t get_rom_info_psram(char *fname, u8 *romInfo)
+{
+
+	romLayout_t result = LAYOUT_UNKNOWN;
+	DWORD ofs;
+	WORD bytesRead;
+	void (*psram_read)(char*, u16, u16, u16);
+	static u8 buf[0x40];
+
+	MAKE_RAM_FPTR(psram_read, neo2_myth_psram_read);
+
+	psram_read(romInfo, 0x00, 0x7fc0, 0x40);
+	// Is the checksum correct?
+	if ((((romInfo[0x1c] ^ romInfo[0x1e]) != 0xff) ||
+		((romInfo[0x1d] ^ romInfo[0x1f]) != 0xff)) &&
+		(highlightedFileSize >= 0x10000))
+	{
+		psram_read(buf, 0x00, 0xffc0, 0x40);
+		if (((buf[0x1c] ^ buf[0x1e]) != 0xff) ||
+			((buf[0x1d] ^ buf[0x1f]) != 0xff))
+		{
+			//result = LAYOUT_LOROM;
+		}
+		else
+		{
+			// HiROM
+			memcpy(romInfo, buf, 0x40);
+			result = LAYOUT_HIROM;
+		}
+	}
+	else
+	{
+		// LoROM
+	result = LAYOUT_LOROM;
+	}
+
+	// Check the RESET vector if no valid checksum was found
+	if (result == LAYOUT_UNKNOWN)
+	{
+		if (romInfo[0x3d] >= 0x80)
+		{
+			if (buf[0x3d] < 0x80)
+			{
+				result = LAYOUT_LOROM;
+			}
+		}
+		else if (buf[0x3d] >= 0x80)
+		{
+			memcpy(romInfo, buf, 0x40);
+			result = LAYOUT_HIROM;
+		}
+	}
+
+	// Check the ROM type if no (or two) valid RESET vectors were found
+	if (result == LAYOUT_UNKNOWN)
+	{
+		if (romInfo[0x15] >= 0x20)
+		{
+			result = LAYOUT_LOROM;
+		}
+		else if (buf[0x15] >= 0x20)
+		{
+			memcpy(romInfo, buf, 0x40);
+			result = LAYOUT_HIROM;
+		}
+	}
+
+	return result;
 }
 
 

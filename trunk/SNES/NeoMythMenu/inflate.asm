@@ -84,54 +84,54 @@ inflate_ram_code_begin:
 .EQU _inflate_src _inflate_dest+4
 ;
 inflate:
-  php
-  rep #$30
-  pha
-  phx
-  phy
-  stz	tcc__r0
-  stz	tcc__r1
-  lda	#2
-  sta 	tcc__r0h
-  sep #$30	; 8-bit A/X/Y
+	php
+	rep 	#$30
+	pha
+	phx
+	phy
+	stz		tcc__r0
+	stz		tcc__r1
+	lda		#2
+	sta 	tcc__r0h
+	sep 	#$30	; 8-bit A/X/Y
 
-    LDA    #$20      		; OFF A21
-    STA.L  MYTH_GBAC_ZIO
-    JSR    SET_NEOCMA  		;
-    JSR    SET_NEOCMB  		;
-    JSR    SET_NEOCMC  		; ON_NEO CARD A24 & A25 + SA16 & SA17
-    LDA    #$01
-    STA.L  MYTH_EXTM_ON  	; A25,A24 ON
+	LDA    #$20      		; OFF A21
+	STA.L  MYTH_GBAC_ZIO
+	JSR    SET_NEOCMA  		;
+	JSR    SET_NEOCMB  		;
+	JSR    SET_NEOCMC  		; ON_NEO CARD A24 & A25 + SA16 & SA17
+	LDA    #$01
+	STA.L  MYTH_EXTM_ON  	; A25,A24 ON
 	LDA    #$04       		; COPY MODE !
-    STA.L  MYTH_OPTION_IO
-    LDA    #$01       		; PSRAM WE ON !
-    STA.L  MYTH_WE_IO
-    LDA    #$F8
-    STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
-    STA.L  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
-    LDA    #$00
-    STA.L  MYTH_PRAM_BIO
-  
-  stz getBit_buffer
-  
-  lda _inflate_src,s
-  sta inputPointer
-  lda _inflate_src+1,s
-  sta inputPointer+1
-  lda _inflate_src+2,s
-  sta inputPointer+2
+	STA.L  MYTH_OPTION_IO
+	LDA    #$01       		; PSRAM WE ON !
+	STA.L  MYTH_WE_IO
+	LDA    #$F8
+	STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+	STA.L  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
+	LDA    #$00
+	STA.L  MYTH_PRAM_BIO
 
-  lda _inflate_dest,s
-  sta outputPointer
-  sta tcc__r2 ;wordOutputPointer
-  lda _inflate_dest+1,s
-  sta outputPointer+1
-  sta tcc__r2+1 ;wordOutputPointer+1
-  lda _inflate_dest+2,s
-  sta outputPointer+2
-  sta tcc__r2+2 ;wordOutputPointer+2
-  
-  ldy #0
+	stz 	getBit_buffer
+
+	lda 	_inflate_src,s
+	sta 	inputPointer
+	lda 	_inflate_src+1,s
+	sta 	inputPointer+1
+	lda 	_inflate_src+2,s
+	sta 	inputPointer+2
+
+	lda 	_inflate_dest,s
+	sta 	outputPointer
+	sta 	tcc__r2 
+	lda 	_inflate_dest+1,s
+	sta 	outputPointer+1
+	sta 	tcc__r2+1 
+	lda 	_inflate_dest+2,s
+	sta 	outputPointer+2
+	sta 	tcc__r2+2 
+
+	ldy 	#0
 
 inflate_blockLoop:
 ; Get a bit of EOF and two bits of block type
@@ -139,7 +139,7 @@ inflate_blockLoop:
 	sty	getBits_base
 	lda	#GET_3_BITS
 	jsr	getBits
-	lsr	a ;@
+	lsr	a 
 	php
 	tax
 	bne	inflateCompressedBlock
@@ -156,10 +156,9 @@ inflateStoredBlock_copyByte
 	jsr	getByte
 inflateStoreByte
 	jsr	storeByte
-	;bcc	inflateCodes_loop
-  bcs +
-  jmp.w inflateCodes_loop
-  +:
+  	bcs +
+  	jmp.w inflateCodes_loop
++:
 inflateStoredBlock_firstByte
 	inx
 	bne	inflateStoredBlock_copyByte
@@ -171,7 +170,10 @@ inflate_nextBlock
 	bcc	inflate_blockLoop
 
   rep #$20
-  lda outputPointer
+  lda	tcc__r0h
+  and	#1
+  clc	  
+  adc outputPointer ;lda outputPointer
   sec
   sbc _inflate_dest,s
   sta tcc__r0
@@ -180,10 +182,12 @@ inflate_nextBlock
   sbc _inflate_dest+2,s
   sta tcc__r1
   
+  ;lda inputPointer
+  ;sta.l pfmountbuf
   ;jsr show_copied_data
   ;sep #$30
-  
   ;-: bra -
+
   	sep		#$20
     LDA     #$00       ;
     STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
@@ -264,16 +268,14 @@ inflateDynamicBlock_decodeLength:
 ;	sec
 	adc	#1
 	cpx	#GET_7_BITS
-	;scc:adc	#7
-  bcc +
-  adc #7
-  +:
+  	bcc +
+  	adc #7
++:
 	tay
 	lda	#0
 	cpx	#GET_3_BITS
-	;scs:lda	inflateDynamicBlock_lastLength
-  bcs	+
-  lda inflateDynamicBlock_lastLength
+  	bcs	+
+  	lda inflateDynamicBlock_lastLength
   +:
 inflateDynamicBlock_verbatimLength:
 	iny
@@ -309,15 +311,13 @@ inflateCodes:
 	jsr		buildHuffmanTree
 inflateCodes_loop:
 	jsr		fetchPrimaryCode
-	;bcc		inflateStoreByte
-  bcs +
-  jmp.w inflateStoreByte
-  +:
+  	bcs +
+  	jmp.w inflateStoreByte
++:
 	tax
-	;beq		inflate_nextBlock
-  bne +
-  jmp.w inflate_nextBlock
-  +:
+  	bne +
+  	jmp.w inflate_nextBlock
++:
 ; Copy sequence from look-behind buffer
 ;	ldy	#0
 	sty	getBits_base
@@ -329,10 +329,10 @@ inflateCodes_loop:
 	bcs	inflateCodes_setSequenceLength
 	dex
 	txa
-	lsr	a ;@
+	lsr	a 
 	ror	getBits_base
 	inc	getBits_base
-	lsr	a ;@
+	lsr	a 
 	rol	getBits_base
 	jsr	getAMinus1BitsMax8
 ;	sec
@@ -347,12 +347,10 @@ inflateCodes_setSequenceLength:
 	cmp	#4
 	bcc	inflateCodes_setOffsetLowByte
 	inc	getBits_base
-	lsr	a ;@
+	lsr	a 
 	jsr	getAMinus1BitsMax8
 inflateCodes_setOffsetLowByte:
 	eor	#$ff
-  ;clc
-  ;adc outputPointer
 	sta	inflateCodes_sourcePointer
 	lda	getBits_base
 	cpx	#10
@@ -366,26 +364,59 @@ inflateCodes_setOffsetHighByte:
 	;adc	outputPointer+1
 	sta	inflateCodes_sourcePointer+1
 	
- rep #$20
- lda inflateCodes_sourcePointer
- adc outputPointer
- sta inflateCodes_sourcePointer
- cmp outputPointer
- sep #$20
- lda outputPointer+2
- bcc +
- dea
+	rep 	#$20
+ lda 	inflateCodes_sourcePointer
+ cmp  	#$FFFF
+ bne		+
+ jsr.w	fillBytes
+ bra		inflateCodes_loop
  +:
- sta inflateCodes_sourcePointer+2
+ 	clc
+ 	lda 	tcc__r0h
+ 	and 	#1
+ 	adc 	inflateCodes_sourcePointer
+;lda 	inflateCodes_sourcePointer
+ 	clc
+	adc 	outputPointer
+	sta 	inflateCodes_sourcePointer
+	cmp 	outputPointer
+	sep 	#$20
+	lda 	outputPointer+2
+	bcc 	+
+	dea
+	+:
+	sta 	inflateCodes_sourcePointer+2
  
-	jsr	copyByte
-	jsr	copyByte
-inflateCodes_copyByte:
-	jsr	copyByte
-	dec	inflateCodes_lengthMinus2
-	bne	inflateCodes_copyByte
+;	jsr	copyByte
+;	jsr	copyByte
+;inflateCodes_copyByte:
+;	jsr	copyByte
+;	dec	inflateCodes_lengthMinus2
+;	bne	inflateCodes_copyByte
+
+	rep #$30
+	ldy #0
+	lda inflateCodes_lengthMinus2
+	and #$ff
+	bne	+
+	lda #$100
+	+:
+	ina
+	ina
+	tax
+	sep #$20
+	
+	jsr.w copyBytes
+	ldy #0
+	sep #$30
+	sty inflateCodes_lengthMinus2
+	
 ;	jmp	inflateCodes_loop
-	beq	inflateCodes_loop
+;+++:
+;jsr show_copied_data
+;-: bra -
+	jmp.w	inflateCodes_loop
+
 
 buildTempHuffmanTree:
 ;	ldy	#0
@@ -505,8 +536,8 @@ fetchCode_nextBit:
 	clc
 	rts
 fetchCode_control:
-  clc
-	adc.w	nBitCode_controlOffset-1,x ;add	nBitCode_controlOffset-1,x
+    clc
+	adc.w	nBitCode_controlOffset-1,x 
 	tax
 	lda.w	codeToControlSymbol,x
 	sec
@@ -523,7 +554,7 @@ getBits:
 	jsr		getBits_loop
 getBits_normalizeLoop:
 	lsr		getBits_base
-	ror		a ;@
+	ror		a 
 	bcc		getBits_normalizeLoop
 	rts
 
@@ -535,79 +566,208 @@ getWord:
 getByte:
 	lda	#$80
 getBits_loop:
-	jsr	getBit
-	ror	a ;@
+	;jsr	getBit
+	lsr		getBit_buffer
+	bne		+
+	pha
+	lda 	[inputPointer] 
+	rep		#$20
+	inc 	inputPointer
+	sep 	#$20
+	sec
+	ror		a 
+	sta		getBit_buffer
+	pla
++:	
+	ror	a 
 	bcc	getBits_loop
 	rts
 
 ; Read one bit, return in the C flag
 getBit:
-	lsr	getBit_buffer
-	bne	getBit_return
+	lsr		getBit_buffer
+	bne		getBit_return
 	pha
-;	ldy	#0
-	lda [inputPointer] ;,y ;lda	(inputPointer),y
-	;inw	inputPointer
-  rep	#$20
-  inc inputPointer
-  sep #$20
+	;	ldy	#0
+	lda 	[inputPointer] 
+	rep		#$20
+	inc 	inputPointer
+	sep 	#$20
 	sec
-	ror	a ;@
-	sta	getBit_buffer
+	ror		a 
+	sta		getBit_buffer
 	pla
 getBit_return:
 	rts
 
 ; Copy a previously written byte
-copyByte:
-  ;lda outputPointer+2
-  ;sta inflateCodes_sourcePointer+2
-	ldy	outputPointer
-	lda	[inflateCodes_sourcePointer] ;,y ;lda	(inflateCodes_sourcePointer),y
-	ldy	#0
+;copyByte:
+;		lda	[inflateCodes_sourcePointer] 
+;		ldy	#0
 ; Write a byte
 storeByte:
-  dec tcc__r0h
-  bne +
-  xba
-  lda tcc__r1h
-  rep #$20
-  sta	[tcc__r2] 
-  sep #$20
-  lda #2
-  sta tcc__r0h
-  inc	tcc__r2 
-  inc 	tcc__r2 
-  bne	++
-  rep 	#$20
-  inc	tcc__r2+1 
-  sep 	#$20
-  bra	++
-;storeByte_return:
-;	rts
-+:
-  sta	tcc__r1h
-  rep	#$20
-  sta	[outputPointer]
-  ;xba
-  sep	#$20
-++:
-  inc 	outputPointer
-  bne	+++  ;storeByte_return
-  rep 	#$20
-  inc	outputPointer+1
-  ;inc	inflateCodes_sourcePointer+1
-  sep	#$20
- +++:
-  inc 	inflateCodes_sourcePointer
-  bne	storeByte_return
-  rep 	#$20
-  inc	inflateCodes_sourcePointer+1
-  sep	#$20
-storeByte_return:  
-  rts 	
+	  dec 	tcc__r0h
+	  bne 	+
+	  ; odd address
+	  xba
+	  ;lda	[outputPointer]
+	  lda tcc__r1h
+	  rep	#$20
+	  sta	[outputPointer]
+	  sep	#$20
+	  
+	  lda 	#2
+	  sta 	tcc__r0h
 
+	  inc 	outputPointer
+	  inc 	outputPointer
+	  bne	++
+	  rep	#$20
+	  inc	outputPointer+1
+	  sep	#$20
+++:	
+	  rts 	
+
++:
+	  ; even address
+	  ;rep	#$20
+	  ;sta	[outputPointer]
+	  ;sep	#$20
+	  sta	tcc__r1h
+storeByte_return:  
+	  rts 	
+
+
+fillBytes:
+	rep		#$20
+	clc
+	lda 	tcc__r0h
+ 	and 	#1
+ 	adc 	inflateCodes_sourcePointer	
+	adc 	outputPointer
+	sta 	inflateCodes_sourcePointer
+	cmp 	outputPointer
+	sep 	#$20
+	lda 	outputPointer+2
+	bcc 	+
+	dea
++:
+	sta 	inflateCodes_sourcePointer+2
+ 
+ 	lda		tcc__r0h
+ 	and		#1
+ 	bne		+
+ 	lda		[inflateCodes_sourcePointer]
+ 	bra		++
++:
+ 	lda		tcc__r1h
+ ++:
+ 	pha
+ 	
+	rep 	#$30
+	ldy 	#0
+	lda 	inflateCodes_lengthMinus2
+	and 	#$ff
+	bne		+
+	lda 	#$100
++:
+	ina
+	ina
+	tax
+	sep 	#$20
 	
+	pla
+	sta		tcc__r1h
+	xba
+	lda		tcc__r1h
+	
+	dec 	tcc__r0h
+	bne 	fillBytesEven
+fillBytesOdd:
+	; odd address
+	rep		#$20
+	sta		[outputPointer]
+	sep		#$20
+	inc 	outputPointer
+	inc 	outputPointer
+	bne		++
+	rep		#$20
+	inc		outputPointer+1
+	sep		#$20
+++:	
+	iny
+	dex
+	bne		fillBytesEven
+	lda		#2
+	bra		+
+	;sta		tcc__r0h
+	;ldy 	#0
+	;sep 	#$30
+	;sty 	inflateCodes_lengthMinus2
+	;rts	
+fillBytesEven:
+	;lda		[inflateCodes_sourcePointer],y 
+	; even address
+	;sta tcc__r1h
+	iny
+	dex
+	bne		fillBytesOdd
+	lda		#1
++:
+	sta		tcc__r0h
+	ldy 	#0
+	sep 	#$30
+	sty 	inflateCodes_lengthMinus2
+	rts
+	
+	
+  
+
+copyBytes:
+	rep		#$10
+	dec 	tcc__r0h
+	bne 	copyBytesEven
+copyBytesOdd:
+	lda		[inflateCodes_sourcePointer],y 
+	; odd address
+	xba
+	;lda		[outputPointer]
+	lda tcc__r1h
+	rep		#$20
+	sta		[outputPointer]
+	sep		#$20
+	inc 	outputPointer
+	inc 	outputPointer
+	bne		++
+	rep		#$20
+	inc		outputPointer+1
+	sep		#$20
+++:	
+;	sta		[outputPointer]
+	iny
+	dex
+	bne		copyBytesEven
+	lda		#2
+	sta		tcc__r0h
+	rts 	
+
+;+:
+copyBytesEven:
+	lda		[inflateCodes_sourcePointer],y 
+	; even address
+	;rep		#$20
+	;sta		[outputPointer]
+	;sep		#$20
+	sta tcc__r1h
+	
+	iny
+	dex
+	bne		copyBytesOdd
+	lda		#1
+	sta		tcc__r0h
+	rts 	
+
+	  
 
 getNPlus1Bits_mask:
 	.db	GET_1_BIT,GET_2_BITS,GET_3_BITS,GET_4_BITS,GET_5_BITS,GET_6_BITS,GET_7_BITS
@@ -647,7 +807,6 @@ codeToControlSymbol:
 
 inflate_ram_code_end:
 
-;.dsb $4900,0
 
 .ends
 
