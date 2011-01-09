@@ -90,7 +90,7 @@ tcc__start:
     
     ; copy .data section to RAM
     ldx #0
--   lda.l __startsection.data,x
+-   lda.l __startsection.data & $03FFFF,x
     sta.l __startramsectionram.data,x
     inx
     inx
