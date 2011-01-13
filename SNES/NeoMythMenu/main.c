@@ -316,6 +316,10 @@ void print_games_list()
 	u16 attrib;
 	static DIR dir;
 	char *p;
+	void (*psram_read)(char*, u16, u16, u16);
+	u16 prbank,proffs;
+	DWORD praddr;
+	static fileInfoTable_t fit;
 
 	if (sourceMedium == SOURCE_GBAC)
 	{
@@ -341,32 +345,45 @@ void print_games_list()
 		memcpy(&dir, &sdDir, sizeof(DIR));
 		highlightedIsDir = 0;
 
+		MAKE_RAM_FPTR(psram_read, neo2_myth_psram_read);
+
+		praddr = gamesList.firstShown;
+		praddr <<= 6;
+		proffs = praddr & 0xFFFF;
+		prbank = praddr >> 16;
+		prbank += 0x20;
+
 		for (i = 0; ((i < NUMBER_OF_GAMES_TO_SHOW) && (i < gamesList.count)); )
 		{
-			if (pf_readdir(&dir, &sdFileInfo) == FR_OK)
+			psram_read((char*)&fit, prbank, proffs, 64);
+			proffs += 64;
+			if (proffs == 0) prbank++;
+
+			set_printxy_clip_rect(2,0,28,10+i);
+			/*if (pf_readdir(&dir, &sdFileInfo) == FR_OK)
 			{
 				if (dir.sect != 0)
-				{
-					p = &sdFileInfo.fname[0];
+				{*/
+					p = fit.sfn; //&sdFileInfo.fname[0];
 					attrib = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE);
 					if (gamesList.highlighted == gamesList.firstShown + i)
 					{
-						strcpy(highlightedFileName, &sdFileInfo.fname[0]);
-						highlightedFileSize = sdFileInfo.fsize;
+						strcpy(highlightedFileName, fit.sfn); //&sdFileInfo.fname[0]);
+						highlightedFileSize = fit.fsize; //sdFileInfo.fsize;
 						attrib = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE);
-						if (sdFileInfo.fattrib & AM_DIR)
+						if (fit.fattrib & AM_DIR) //sdFileInfo.fattrib & AM_DIR)
 						{
 							highlightedIsDir = 1;
 						}
 #ifdef _USE_LFN
-						if (sdFileInfo.lfname[0]) p = sdFileInfo.lfname;
+						p = fit.lfn; //if (sdFileInfo.lfname[0]) p = sdFileInfo.lfname;
 #endif
 					}
 					printxy("                              ", 2, 9 + i, 0, 28);
-					if (sdFileInfo.fattrib & AM_DIR)
+					if (fit.fattrib & AM_DIR) //sdFileInfo.fattrib & AM_DIR)
 					{
 						attrib = (attrib != TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE)) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_TOS_GREEN) : attrib;
-						print_dir(&sdFileInfo.fname[0],
+						print_dir(fit.sfn, //&sdFileInfo.fname[0],
 								2, 9 + i,
 								attrib,
 								28);
@@ -380,7 +397,7 @@ void print_games_list()
 					}
 					i++;
 
-				}
+				/*}
 				else
 				{
 					break;
@@ -389,9 +406,10 @@ void print_games_list()
 			else
 			{
 				break;
-			}
+			}*/
 		}
 	}
+	set_printxy_clip_rect(2,0,28,31);
 }
 
 

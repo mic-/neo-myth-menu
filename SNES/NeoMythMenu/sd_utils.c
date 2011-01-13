@@ -4,6 +4,7 @@
 #include "pff.h"
 #include "string.h"
 #include "navigation.h"
+#include "neo2.h"
 
 
 FATFS sdFatFs;
@@ -18,7 +19,6 @@ char sdLfnBuf[80];
 
 char sdRootDir[200] = "/SNES/ROMS";
 u16 sdRootDirLength = 10;
-
 
 
 int init_sd()
@@ -48,18 +48,31 @@ int init_sd()
 }
 
 
+
 // Return the number of games stored on the SD card
 //
 u16 count_games_on_sd_card()
 {
 	u16 cnt = 0, i = 0;
 	static DIR dir;
+    u16 prbank, proffs;     // PSRAM bank/offset
+    fileInfoTable_t *buf;
+    char *fn;
+	void (*psram_write)(char*, u16, u16, u16);
+
+	MAKE_RAM_FPTR(psram_write, neo2_myth_psram_write);
 
    	if (pf_opendir(&dir, sdRootDir) != FR_OK)
    	{
 		switch_to_menu(MID_SD_ERROR_MENU, 0);
 		return 0;
 	}
+
+    // Start writing the file info table at offset 0x200000 in PSRAM
+    prbank = 0x20;
+    proffs = 0;
+
+    buf = (fileInfoTable_t*)&compressVgmBuffer[0];
 
 	while (cnt != 0xffff)
 	{
@@ -68,6 +81,48 @@ u16 count_games_on_sd_card()
 			if (dir.sect != 0)
 			{
 				cnt++;
+                fn = sdFileInfo.fname;
+#ifdef _USE_LFN
+                sdFileInfo.lfname[_MAX_LFN - 1] = 0;
+                if (sdFileInfo.lfname[0]) fn = sdFileInfo.lfname;
+#endif
+                i = strlen(fn);
+                if (i > 31) i = 31;
+                memcpy(buf->sfn, sdFileInfo.fname, 13);
+                memcpy(buf->lfn, fn, i);
+                buf->lfn[i] = 0;
+                buf->fsize = sdFileInfo.fsize;
+                buf->fattrib = sdFileInfo.fattrib;
+
+                if ((strstri(".SMC", sdFileInfo.fname) > 0) ||
+                   (strstri(".BIN", sdFileInfo.fname) > 0))
+                {
+                    buf->ftype = GAME_MODE_NORMAL_ROM;
+                }
+                else if (strstri(".SPC", sdFileInfo.fname) > 0)
+                {
+                    buf->ftype = GAME_MODE_SPC;
+                }
+                else if (strstri(".VGM", sdFileInfo.fname) > 0)
+                {
+                    buf->ftype = GAME_MODE_VGM;
+                }
+                else if (strstri(".VGZ", sdFileInfo.fname) > 0)
+                {
+                    buf->ftype = GAME_MODE_VGZ;
+                }
+                else if (strstri(".ZIP", sdFileInfo.fname) > 0)
+                {
+                    buf->ftype = GAME_MODE_ZIPPED_ROM;
+                }
+                else
+                {
+                    buf->ftype = 0;
+                }
+
+                psram_write((char*)buf, prbank, proffs, 64);
+                proffs += 64;
+                if (proffs == 0) prbank++;
 
 			} else
 			{
@@ -117,6 +172,15 @@ void read_sd_settings()
 				else if (buf[pos+11] == '1') resetType = 1;
 				else if (buf[pos+11] == '2') resetType = 2;
 			}
+
+			pos = strstri("REGION_FIX=", buf);
+			if (pos >= 0)
+			{
+				if (buf[pos+11] == '0') doRegionPatch = 0;
+				else if (buf[pos+11] == '1') doRegionPatch = 1;
+				else if (buf[pos+11] == '2') doRegionPatch = 2;
+			}
+
 		}
 	}
 }
@@ -187,7 +251,6 @@ void change_directory(char *path)
 }
 
 
-
 // Change source medium from GBAC to SD or vice versa
 //
 sourceMedium_t set_source_medium(sourceMedium_t newSource)
@@ -204,7 +267,7 @@ sourceMedium_t set_source_medium(sourceMedium_t newSource)
 		{
 			if (firstSdMount)
 			{
-				//read_sd_settings();
+				read_sd_settings();
 			}
 			printxy("Opening ", 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 			printxy(sdRootDir, 10, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
@@ -216,6 +279,7 @@ sourceMedium_t set_source_medium(sourceMedium_t newSource)
 				update_screen();
 				gamesList.count = count_games_on_sd_card();
 				gamesList.firstShown = gamesList.highlighted = 0;
+
 				MS4[0xd] = '1'; MS4[0xc] = MS4[0xb] = '0';	// Reset the "Game (001)" string
 				clear_screen();
 				switch_to_menu(MID_MAIN_MENU, 0);
@@ -244,6 +308,4 @@ sourceMedium_t set_source_medium(sourceMedium_t newSource)
 
 	return sourceMedium;
 }
-
-
 

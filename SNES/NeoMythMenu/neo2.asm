@@ -1243,6 +1243,11 @@ _ncfmp_read:
     STA.L   MYTH_GBAC_HIO
     STA.L   MYTH_GBAC_ZIO
     
+    lda.l	sourceMedium
+    beq		+
+    jsr		neo2_enable_sd
++:
+
  	plb
  	ply
  	plx
@@ -1267,21 +1272,34 @@ neo2_myth_psram_write:
 	sep		#$20
 	pha
 
-    lda     #$01
-    sta.l   MYTH_EXTM_ON   	; A25,A24 ON
+    ;lda     #$01
+    ;sta.l   MYTH_EXTM_ON   	; A25,A24 ON
+    ;lda    #GBAC_TO_PSRAM_COPY_MODE
+    ;sta.l  MYTH_OPTION_IO
+    ;lda    #$01       		; PSRAM WE ON !
+    ;sta.l  MYTH_WE_IO
+    ;lda    #$F8
+    ;sta.l  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
+	;pla
+    ;sta.l  MYTH_PRAM_BIO
 
-    lda    #GBAC_TO_PSRAM_COPY_MODE
-    sta.l  MYTH_OPTION_IO
-
-    lda    #$01       		; PSRAM WE ON !
-    sta.l  MYTH_WE_IO
-
-    lda    #$F8
-    sta.l  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
-
+	LDA    #$20      		; OFF A21
+	STA.L  MYTH_GBAC_ZIO
+	JSR    SET_NEOCMA  		;
+	JSR    SET_NEOCMB  		;
+	JSR    SET_NEOCMC  		; ON_NEO CARD A24 & A25 + SA16 & SA17
+	LDA    #$01
+	STA.L  MYTH_EXTM_ON  	; A25,A24 ON
+	LDA    #$04       		; COPY MODE !
+	STA.L  MYTH_OPTION_IO
+	LDA    #$01       		; PSRAM WE ON !
+	STA.L  MYTH_WE_IO
+	LDA    #$F8
+	STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+	STA.L  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
 	pla
-    sta.l  MYTH_PRAM_BIO
-
+	STA.L  MYTH_PRAM_BIO
+	
 	lda		12,s			; src bank
 	pha
 	plb
@@ -1309,16 +1327,32 @@ _nctmp_write:
 	dec		tcc__r4
 	bne		-
 
-	sep		#$20
-    lda     #$00       ;
-    sta.l   MYTH_WE_IO     ; PSRAM WRITE OFF
+	;sep		#$20
+    ;lda     #$00       ;
+    ;sta.l   MYTH_WE_IO     ; PSRAM WRITE OFF
+	;lda     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
+	;sta.l   MYTH_OPTION_IO
+	;lda     #$00
+	;sta.l   MYTH_EXTM_ON   ; A25,A24 OFF
 
-	lda     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
-	sta.l   MYTH_OPTION_IO
+  	sep		#$20
+    LDA     #$00       ;
+    STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
+    LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
+    STA.L   MYTH_OPTION_IO
+    LDA     #$20       		; OFF A21
+    STA.L   MYTH_GBAC_ZIO
+    JSR     SET_NEOCMD		; SET MENU
+    LDA     #$00
+    STA.L   MYTH_GBAC_LIO
+    STA.L   MYTH_GBAC_HIO
+    STA.L   MYTH_GBAC_ZIO
 
-	lda     #$00
-	sta.l   MYTH_EXTM_ON   ; A25,A24 OFF
-
+    lda.l	sourceMedium
+    beq		+
+    jsr		neo2_enable_sd
++:
+    
  	plb
  	ply
  	plx

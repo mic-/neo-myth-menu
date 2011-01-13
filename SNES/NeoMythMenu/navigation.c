@@ -493,7 +493,7 @@ void move_to_next_game()
 			gamesList.firstShown++;
 			if (sourceMedium == SOURCE_SD)
 			{
-				pf_readdir(&sdDir, &sdFileInfo);
+				//pf_readdir(&sdDir, &sdFileInfo);
 			}
 		}
 	}
@@ -522,11 +522,11 @@ void move_to_previous_game()
 			gamesList.firstShown--;
 			if (sourceMedium == SOURCE_SD)
 			{
-				pf_opendir(&sdDir, sdRootDir);
+				/*pf_opendir(&sdDir, sdRootDir);
 				for (i = 0; i < gamesList.firstShown; i++)
 				{
 					pf_readdir(&sdDir, &sdFileInfo);
-				}
+				}*/
 			}
 		}
 	}
@@ -558,12 +558,12 @@ void move_to_next_page()
 
 		if (sourceMedium == SOURCE_SD)
 		{
-			i = gamesList.firstShown - i;
+			/*i = gamesList.firstShown - i;
 			while (i > 0)
 			{
 				pf_readdir(&sdDir, &sdFileInfo);
 				i--;
-			}
+			}*/
 		}
 	}
 
@@ -592,11 +592,11 @@ void move_to_previous_page()
 
 		if (sourceMedium == SOURCE_SD)
 		{
-			pf_opendir(&sdDir, sdRootDir);
+			/*pf_opendir(&sdDir, sdRootDir);
 			for (i = 0; i < gamesList.firstShown; i++)
 			{
 				pf_readdir(&sdDir, &sdFileInfo);
-			}
+			}*/
 		}
 	}
 
@@ -1015,7 +1015,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 		case MID_SD_ERROR_MENU:
 			keypress_handler = sd_error_menu_process_keypress;
 			print_meta_string(MS_SD_ERROR_MENU_INSTRUCTIONS);
-#if 0
+#if 1
 			printxy("SD card error", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 
 			printxy(sdOpErrorStrings[lastSdOperation], 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
@@ -1042,6 +1042,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			print_hex(num_sectors>>8, 15, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 			print_hex(num_sectors, 17, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 #else
+			// DEBUG
 			printxy(sdOpErrorStrings[lastSdOperation], 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 			printxy(sdFrStrings[lastSdError], 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 			p = (u8*)&sdDir;
@@ -1325,7 +1326,10 @@ void extended_run_menu_process_keypress(u16 keys)
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_ROM_INFO)
 		{
-			switch_to_menu(MID_ROM_INFO_MENU, 0);
+			if (!highlightedIsDir)
+			{
+				switch_to_menu(MID_ROM_INFO_MENU, 0);
+			}
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_SD_INFO)
 		{
