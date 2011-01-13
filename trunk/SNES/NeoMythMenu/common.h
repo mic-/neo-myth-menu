@@ -69,6 +69,8 @@
 #define GAME_MODE_VGM 33
 #define GAME_MODE_PACKED_VGM 34
 #define GAME_MODE_ZIPPED_ROM 35
+#define GAME_MODE_VGZ 36
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -90,6 +92,16 @@ typedef struct
 	u16 firstShown;
 	u16 highlighted;
 } itemList_t;
+
+
+typedef struct
+{
+    char sfn[13];
+    char lfn[32];
+    DWORD fsize;
+    BYTE fattrib;
+    BYTE ftype;
+} fileInfoTable_t;
 
 
 typedef struct
@@ -116,7 +128,7 @@ typedef enum
 
 typedef enum
 {
-	SOURCE_GBAC,
+	SOURCE_GBAC = 0,
 	SOURCE_SD
 } sourceMedium_t;
 
