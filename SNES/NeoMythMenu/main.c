@@ -315,6 +315,7 @@ void print_games_list()
 	u16 vramOffs = 0x0244;
 	u16 attrib;
 	static DIR dir;
+	char *p;
 
 	if (sourceMedium == SOURCE_GBAC)
 	{
@@ -346,6 +347,7 @@ void print_games_list()
 			{
 				if (dir.sect != 0)
 				{
+					p = &sdFileInfo.fname[0];
 					attrib = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE);
 					if (gamesList.highlighted == gamesList.firstShown + i)
 					{
@@ -356,8 +358,11 @@ void print_games_list()
 						{
 							highlightedIsDir = 1;
 						}
+#ifdef _USE_LFN
+						if (sdFileInfo.lfname[0]) p = sdFileInfo.lfname;
+#endif
 					}
-					printxy("            ", 2, 9 + i, 0, 28);
+					printxy("                              ", 2, 9 + i, 0, 28);
 					if (sdFileInfo.fattrib & AM_DIR)
 					{
 						attrib = (attrib != TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE)) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_TOS_GREEN) : attrib;
@@ -368,7 +373,7 @@ void print_games_list()
 					}
 					else
 					{
-						printxy(&sdFileInfo.fname[0],
+						printxy(p,  //&sdFileInfo.fname[0],
 								2, 9 + i,
 								attrib,
 								28);

@@ -736,12 +736,14 @@ void run_highlighted_game()
 
 extern DWORD pffbcs;
 extern WORD pffclst;
+extern unsigned char pfmountbuf[36];
 
 void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 {
 	int i;
 	DWORD ofs;
 	u8 y;
+	u8 *p;
 	WORD bytesRead;
 	static char strBuf[128];
 	cheat_t const *cheats;
@@ -1013,7 +1015,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 		case MID_SD_ERROR_MENU:
 			keypress_handler = sd_error_menu_process_keypress;
 			print_meta_string(MS_SD_ERROR_MENU_INSTRUCTIONS);
-
+#if 0
 			printxy("SD card error", 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 
 			printxy(sdOpErrorStrings[lastSdOperation], 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
@@ -1031,14 +1033,28 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			}
 
 			printxy("Type:", 2, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
-			print_hex(cardType>>8, 8, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
-			print_hex(cardType, 10, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(pffclst>>8, 8, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(pffclst, 10, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 
 			printxy("Sectors:", 2, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 			print_hex(num_sectors>>24, 11, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 			print_hex(num_sectors>>16, 13, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 			print_hex(num_sectors>>8, 15, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 			print_hex(num_sectors, 17, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+#else
+			printxy(sdOpErrorStrings[lastSdOperation], 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			printxy(sdFrStrings[lastSdError], 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			p = (u8*)&sdDir;
+			for (i = 0; i < 32; i++)
+			{
+				print_hex(*p, 2 + ((i&7)<<1), 10 + (i>>3), TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+				p++;
+			}
+			for (i = 0; i < 8; i++)
+			{
+				print_hex(sdDir.fn[i], 2+i+i, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+			}
+#endif
 
 			break;
 

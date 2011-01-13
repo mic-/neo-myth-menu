@@ -51,11 +51,15 @@
 
 #define _FS_RPATH 1
 
-//#define _USE_LFN  1
+#define _USE_LFN  1
 
 #define _MAX_LFN 64
 
 #define _DF1S 0
+#define IsDBCS1(c)	0
+#define IsDBCS2(c)	0
+#define IsUpper(c)	(((c)>='A')&&((c)<='Z'))
+#define IsLower(c)	(((c)>='a')&&((c)<='z'))
 
 /* End of configuration options. Do not change followings without care.     */
 /*--------------------------------------------------------------------------*/

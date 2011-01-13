@@ -30,6 +30,7 @@ int init_sd()
 
 #ifdef _USE_LFN
 	sdFileInfo.lfname = sdLfnBuf;
+	sdFileInfo.lfsize = 80;
 #endif
 
 	diskio_init();
@@ -79,6 +80,45 @@ u16 count_games_on_sd_card()
 	}
 
 	return cnt;
+}
+
+
+void read_sd_settings()
+{
+	char *buf = (char*)&compressVgmBuffer[0];
+	WORD bytesRead;
+	int pos, i;
+
+	if (pf_open("/SNES/SETTINGS.TXT") == FR_OK)
+	{
+		if (pf_read(buf, 256, &bytesRead) == FR_OK)
+		{
+			buf[256] = 0;
+
+			pos = strstri("START_DIR=", buf);
+			if (pos >= 0)
+			{
+				pos += 10;
+				for (i = 0; i < 200; i++)
+				{
+					if ((i + pos) >= 256) break;
+					if (buf[i + pos] == 10 || buf[i + pos] == 13) break;
+					sdRootDir[i] = buf[i + pos];
+				}
+				if ((i > 0) && (sdRootDir[i-1] == '/')) i--;
+				sdRootDir[i] = 0;
+				sdRootDirLength = i;
+			}
+
+			pos = strstri("RESET_MODE=", buf);
+			if (pos >= 0)
+			{
+				if (buf[pos+11] == '0') resetType = 0;
+				else if (buf[pos+11] == '1') resetType = 1;
+				else if (buf[pos+11] == '2') resetType = 2;
+			}
+		}
+	}
 }
 
 
@@ -152,6 +192,8 @@ void change_directory(char *path)
 //
 sourceMedium_t set_source_medium(sourceMedium_t newSource)
 {
+	static int firstSdMount = 1;
+
 	if (newSource == SOURCE_SD)
 	{
 		lastSdOperation = SD_OP_MOUNT;
@@ -160,6 +202,10 @@ sourceMedium_t set_source_medium(sourceMedium_t newSource)
 		update_screen();
 		if ((lastSdError = init_sd()) == FR_OK)
 		{
+			if (firstSdMount)
+			{
+				//read_sd_settings();
+			}
 			printxy("Opening ", 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 			printxy(sdRootDir, 10, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 			update_screen();
@@ -173,6 +219,7 @@ sourceMedium_t set_source_medium(sourceMedium_t newSource)
 				MS4[0xd] = '1'; MS4[0xc] = MS4[0xb] = '0';	// Reset the "Game (001)" string
 				clear_screen();
 				switch_to_menu(MID_MAIN_MENU, 0);
+				firstSdMount = 0;
 			}
 			else
 			{
