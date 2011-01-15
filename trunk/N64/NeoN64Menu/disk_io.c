@@ -462,10 +462,7 @@ inline int sdReadStartMulti( unsigned int addr )
     return 1;
 }
 
-inline inline int sdReadMultiBlocks(BYTE* buff,BYTE count)
-{
-	return (DISK_IO_MODE == 0) ? neo2_recv_sd_multi(buff,count) : neo2_recv_sd_multi2(buff,count);
-}
+#define sdReadMultiBlocks(_BUFF,_COUNT) ((DISK_IO_MODE == 0) ? neo2_recv_sd_multi(_BUFF,_COUNT) : neo2_recv_sd_multi2(_BUFF,_COUNT))
 
 /*
 int sdReadMultiBlocks( BYTE *buff, BYTE count )
