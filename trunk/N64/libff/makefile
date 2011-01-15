@@ -7,11 +7,12 @@ RM = rm -rf
 libff.a_OBJS = ff.o diskio.o option/ccsbcs.o
 
 INCS = -I. -I$(ROOTDIR)/include
-FLAGS = -march=vr4300 -mtune=vr4300 -O2 -G0 -Wall -g -D_GCC_LIMITS_H_ $(INCS)
+FLAGS = -march=vr4300 -mtune=vr4300 -fomit-frame-pointer -O2 -G0 -Wall -g -D_GCC_LIMITS_H_ $(INCS)
 
 all: $(libff.a_OBJS) libff.a
 
 %.a: $(libff.a_OBJS)
+	#$(CC) $(LINKFLAGS) $(CFLAGS) -march=vr4300 -mtune=vr4300 -fomit-frame-pointer -O2 -S ff.c
 	$(RM) $@
 	$(AR) cru $@ $($@_OBJS)
 	$(RANLIB) $@

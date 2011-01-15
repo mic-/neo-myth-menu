@@ -320,7 +320,7 @@ FRESULT sync (	/* FR_OK: successful, FR_DISK_ERR: failed */
 /*-----------------------------------------------------------------------*/
 
 
-DWORD get_fat (	/* 0xFFFFFFFF:Disk error, 1:Interal error, Else:Cluster status */
+static DWORD get_fat (	/* 0xFFFFFFFF:Disk error, 1:Interal error, Else:Cluster status */
 	FATFS *fs,	/* File system object */
 	DWORD clst	/* Cluster# to get the link information */
 )
@@ -524,7 +524,7 @@ DWORD create_chain (	/* 0:No free cluster, 1:Internal error, 0xFFFFFFFF:Disk err
 /*-----------------------------------------------------------------------*/
 
 
-DWORD clust2sect (	/* !=0: Sector number, 0: Failed - invalid cluster# */
+inline DWORD clust2sect (	/* !=0: Sector number, 0: Failed - invalid cluster# */
 	FATFS *fs,		/* File system object */
 	DWORD clst		/* Cluster# to be converted */
 )
@@ -1786,7 +1786,7 @@ FRESULT f_read (
 
 	for ( ;  btr;									/* Repeat until all data transferred */
 		rbuff += rcnt, fp->fptr += rcnt, *br += rcnt, btr -= rcnt) {
-		if ((fp->fptr % SS(fp->fs)) == 0) {			/* On the sector boundary? */
+		if ((fp->fptr & (SS(fp->fs)-1)) == 0) {			/* On the sector boundary? */
 			if (fp->csect >= fp->fs->csize) {		/* On the cluster boundary? */
 				clst = (fp->fptr == 0) ?			/* On the top of the file? */
 					fp->org_clust : get_fat(fp->fs, fp->curr_clust);
@@ -1833,7 +1833,7 @@ FRESULT f_read (
 			fp->dsect = sect;
 			fp->csect++;							/* Next sector address in the cluster */
 		}
-		rcnt = SS(fp->fs) - (fp->fptr % SS(fp->fs));	/* Get partial sector data from sector buffer */
+		rcnt = SS(fp->fs) - (fp->fptr & (SS(fp->fs)-1));	/* Get partial sector data from sector buffer */
 		if (rcnt > btr) rcnt = btr;
 #if _FS_TINY
 		if (move_window(fp->fs, fp->dsect))			/* Move sector window */
@@ -1847,6 +1847,113 @@ FRESULT f_read (
 	LEAVE_FF(fp->fs, FR_OK);
 }
 
+
+
+/*-----------------------------------------------------------------------*/
+/* Dummy read                                                  			*/
+/*-----------------------------------------------------------------------*/
+
+FRESULT f_read_dummy (
+	FIL *fp, 		 
+	UINT btr,		 
+	UINT *br		 
+)
+{
+	DWORD clst, sect, remain;
+	UINT rcnt, cc;
+	INT bound_a;
+
+	asm("\tmfc0 $8,$12\n\tla $9,~1\n\tand $8,$9\n\tmtc0 $8,$12\n\tnop":::"$8","$9");
+
+	*br = 0;
+
+	remain = fp->fsize - fp->fptr;
+	if (btr > remain) btr = (UINT)remain; 
+
+	for ( ;  btr;									 
+		 fp->fptr += rcnt, *br += rcnt, btr -= rcnt) 
+		{
+			bound_a = (fp->fptr & (SS(fp->fs)-1));
+
+			if ( bound_a == 0) 
+			{			 
+				if (fp->csect >= fp->fs->csize) 
+				{ 
+					clst = (fp->fptr == 0) ? fp->org_clust : get_fat(fp->fs, fp->curr_clust);
+
+					if (clst <= 1)
+					{
+						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+					 	ABORT(fp->fs, FR_INT_ERR);
+					}
+					else if (clst == 0xFFFFFFFF)
+					{
+						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+						ABORT(fp->fs, FR_DISK_ERR);
+					}
+
+					fp->curr_clust = clst;				 
+					fp->csect = 0;						 
+				}
+
+				sect = clust2sect(fp->fs, fp->curr_clust); 
+
+				if (!sect)
+				{
+					asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+					ABORT(fp->fs, FR_INT_ERR);
+				}
+
+				sect += fp->csect;
+				cc = btr / SS(fp->fs);
+
+				if (cc) 
+				{								 
+					if (fp->csect + cc > fp->fs->csize)	 
+						cc = fp->fs->csize - fp->csect;
+
+					if (disk_read(fp->fs->drive, NULL , sect, (BYTE)cc) != RES_OK)
+					{
+						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+						ABORT(fp->fs, FR_DISK_ERR);
+					}
+
+					fp->csect += (BYTE)cc;				 
+					rcnt = SS(fp->fs) * cc;				 
+					continue;
+				}
+#if !_FS_TINY
+#if !_FS_READONLY
+				if (fp->flag & FA__DIRTY)
+				{
+					if (disk_write(fp->fs->drive, fp->buf, fp->dsect, 1) != RES_OK)
+					{
+						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+						ABORT(fp->fs, FR_DISK_ERR);
+					}
+
+					fp->flag &= ~FA__DIRTY;
+				}
+#endif
+				if (fp->dsect != sect)
+				{
+					if (disk_read(fp->fs->drive, fp->buf, sect, 1) != RES_OK)
+					{
+						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+						ABORT(fp->fs, FR_DISK_ERR);
+					}
+				}
+#endif
+				fp->dsect = sect;
+				fp->csect++;							 
+			}
+			rcnt = SS(fp->fs) - bound_a;	 
+			if (rcnt > btr) rcnt = btr;
+	}
+
+	asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+	LEAVE_FF(fp->fs, FR_OK);
+}
 
 
 
