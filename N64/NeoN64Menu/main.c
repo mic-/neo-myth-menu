@@ -89,7 +89,7 @@ u64 back_flags;                         /* 0xAA550mno - m = brwsr, n = bopt, o =
 
 struct selEntry {
     u32 valid;                          /* 0 = invalid, ~0 = valid */
-    u32 type;                           /* 128 = directory, 0xFF = N64 game */
+    u32 type;                           /* 64 = compressed , 128 = directory, 0xFF = N64 game */
     u32 swap;                           /* 0 = no swap, 1 = byte swap, 2 = word swap, 3 = long swap */
     u32 pad;
     u8 options[8];                      /* menu entry options */
@@ -101,7 +101,8 @@ typedef struct selEntry selEntry_t;
 
 selEntry_t __attribute__((aligned(16))) gTable[1024];
 
-
+extern u32 PSRAM_ADDR;
+extern int DISK_IO_MODE;
 extern unsigned short cardType;         /* b0 = block access, b1 = V2 and/or HC, b15 = funky read timing */
 extern unsigned int num_sectors;        /* number of sectors on SD card (or 0) */
 extern unsigned char *sd_csd;           /* card specific data */
@@ -345,46 +346,86 @@ int wait_confirm(void)
     }
 }
 
-void progress_screen(char *str1, char *str2, int frac, int total, int bfill)
+static void progress_screen(char *str1, char *str2, int frac, int total, int bfill)
 {
-    display_context_t dcon;
-    char temp[40];
+    static display_context_t dcon;
+    static char temp[40];
 
     // get next buffer to draw in
     dcon = lockVideo(1);
-    graphics_fill_screen(dcon, 0);
-
-    if (loading && (bfill == 4))
+   
+    if ((str1 != NULL) || (str2 != NULL) || (bfill != -1))
     {
-        drawImage(dcon, loading, loading_w, loading_h);
-    }
-    else if ((bfill < 3) && (pattern[bfill] != NULL))
-    {
-        rdp_sync(SYNC_PIPE);
-        rdp_set_default_clipping();
-        rdp_enable_texture_copy();
-        rdp_attach_display(dcon);
-        // Draw pattern
-        rdp_sync(SYNC_PIPE);
-        rdp_load_texture(0, 0, MIRROR_DISABLED, pattern[bfill]);
-        for (int j=0; j<240; j+=pattern[bfill]->height)
-            for (int i=0; i<320; i+=pattern[bfill]->width)
-                rdp_draw_sprite(0, i, j);
-        rdp_detach_display();
-    }
+		graphics_fill_screen(dcon, 0);
 
-    graphics_set_color(gTextColors.sel_game, 0);
-    printText(dcon, str1, 20 - strlen(str1)/2, 3);
+        if (loading && (bfill == 4))
+            drawImage(dcon, loading, loading_w, loading_h);
+        else if ((bfill < 3) && (pattern[bfill] != NULL))
+        {
+            rdp_sync(SYNC_PIPE);
+            rdp_set_default_clipping();
+            rdp_enable_texture_copy();
+            rdp_attach_display(dcon);
+            // Draw pattern
+            rdp_sync(SYNC_PIPE);
+            rdp_load_texture(0, 0, MIRROR_DISABLED, pattern[bfill]);
+            for (int j=0; j<240; j+=pattern[bfill]->height)
+                for (int i=0; i<320; i+=pattern[bfill]->width)
+                    rdp_draw_sprite(0, i, j);
+            rdp_detach_display();
+        }
 
-    graphics_set_color(gTextColors.usel_game, 0);
-    strncpy(temp, str2, 34);
-    temp[34] = 0;
-    printText(dcon, temp, 20-strlen(temp)/2, 5);
-    for (int ix=34, iy=6; ix<strlen(str2); ix+=34, iy++)
-    {
-        strncpy(temp, &str2[ix], 34);
+        graphics_set_color(gTextColors.sel_game, 0);
+        printText(dcon, str1, 20 - strlen(str1)/2, 3);
+
+        graphics_set_color(gTextColors.usel_game, 0);
+        strncpy(temp, str2, 34);
         temp[34] = 0;
-        printText(dcon, temp, 20-strlen(temp)/2, iy);
+        printText(dcon, temp, 20-strlen(temp)/2, 5);
+        for (int ix=34, iy=6; ix<strlen(str2); ix+=34, iy++)
+        {
+            strncpy(temp, &str2[ix], 34);
+            temp[34] = 0;
+            printText(dcon, temp, 20-strlen(temp)/2, iy);
+        }
+
+        // show display
+        unlockVideo(dcon);
+
+        // get next buffer to draw in
+        dcon = lockVideo(1);
+        graphics_fill_screen(dcon, 0);
+
+        if (loading && (bfill == 4))
+            drawImage(dcon, loading, loading_w, loading_h);
+        else if ((bfill < 3) && (pattern[bfill] != NULL))
+        {
+            rdp_sync(SYNC_PIPE);
+            rdp_set_default_clipping();
+            rdp_enable_texture_copy();
+            rdp_attach_display(dcon);
+            // Draw pattern
+            rdp_sync(SYNC_PIPE);
+            rdp_load_texture(0, 0, MIRROR_DISABLED, pattern[bfill]);
+            for (int j=0; j<240; j+=pattern[bfill]->height)
+                for (int i=0; i<320; i+=pattern[bfill]->width)
+                    rdp_draw_sprite(0, i, j);
+            rdp_detach_display();
+        }
+
+        graphics_set_color(gTextColors.sel_game, 0);
+        printText(dcon, str1, 20 - strlen(str1)/2, 3);
+
+        graphics_set_color(gTextColors.usel_game, 0);
+        strncpy(temp, str2, 34);
+        temp[34] = 0;
+        printText(dcon, temp, 20-strlen(temp)/2, 5);
+        for (int ix=34, iy=6; ix<strlen(str2); ix+=34, iy++)
+        {
+            strncpy(temp, &str2[ix], 34);
+            temp[34] = 0;
+            printText(dcon, temp, 20-strlen(temp)/2, iy);
+        }
     }
 
     if (frac)
@@ -1021,14 +1062,16 @@ void copyGF2Psram(int bselect, int bfill)
     delay(30);
 }
 
-/* Copy data from file to gba psram */
-void copySD2Psram(int bselect, int bfill)
+/* Our new fast copy routine (works with native binaries only)*/
+void fastCopySD2Psram(int bselect,int bfill)
 {
     FIL lSDFile;
     UINT ts;
     u32 romsize, gamelen, copylen;
     XCHAR fpath[1280];
     char temp[256];
+
+	DISK_IO_MODE = 0;
 
     // load rom info if not already loaded
     if (gTable[bselect].type == 127)
@@ -1060,12 +1103,130 @@ void copySD2Psram(int bselect, int bfill)
     else
         copylen = gamelen;
 
+	DISK_IO_MODE = 1;
+	PSRAM_ADDR = 0;
+	
+	progress_screen("Loading", temp, 0, 100, bfill);
+
+	if(( ((copylen) & 1) != 0 ) )//make sure that sectors count will be an even number to avoid single block reads
+		DISK_IO_MODE = 0;
+
+    if(DISK_IO_MODE == 1)
+	{
+		for(int ic=0; ic<copylen; ic+=ONCE_SIZE)
+		{
+		    progress_screen(NULL,NULL, 100*ic/gamelen, 100,-1);
+		    f_read_dummy(&lSDFile,ONCE_SIZE, &ts);
+		}
+	}
+	else
+	{
+		for(int ic=0; ic<copylen; ic+=ONCE_SIZE)
+		{
+		    progress_screen(NULL,NULL, 100*ic/gamelen, 100,-1);
+		    f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
+			neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
+		}
+	}
+
+    if (gamelen <= (16*1024*1024))
+    {
+        f_close(&lSDFile);
+        progress_screen(NULL,NULL,100,100,-1);
+        delay(5);
+        return;
+    }
+
+    // change the psram offset and copy the rest
+    neo_psram_offset(copylen/(32*1024));
+	
+	if((DISK_IO_MODE == 1) && ( ((gamelen-copylen) & 1) != 0 ) )//make sure that sectors count will be an even number to avoid single block reads
+		DISK_IO_MODE = 0;
+
+	PSRAM_ADDR = 0;
+
+    if(DISK_IO_MODE == 1)
+	{
+		const int target = (gamelen-copylen);
+		for(int ic=0; ic<target; ic+=ONCE_SIZE)
+		{
+		    progress_screen(NULL,NULL,100*(copylen+ic)/gamelen,100,-1);
+		    f_read_dummy(&lSDFile,ONCE_SIZE, &ts);
+		}
+	}
+	else
+	{
+		const int target = (gamelen-copylen);
+		for(int ic=0; ic<target; ic+=ONCE_SIZE)
+		{
+		    progress_screen(NULL,NULL,100*(copylen+ic)/gamelen,100,-1);
+		    f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
+			neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
+		}
+	}
+
+    neo_psram_offset(0);
+
+    f_close(&lSDFile);
+    progress_screen(NULL,NULL,100,100,-1);
+    delay(5);
+}
+
+/* Copy data from file to gba psram */
+void copySD2Psram(int bselect, int bfill)
+{
+    FIL lSDFile;
+    UINT ts;
+    u32 romsize, gamelen, copylen;
+    XCHAR fpath[1280];
+    char temp[256];
+
+	DISK_IO_MODE = 0;
+
+    // load rom info if not already loaded
+    if (gTable[bselect].type == 127)
+        get_sd_info(bselect);
+
+	if(gTable[bselect].swap == 0)
+	{
+		fastCopySD2Psram(bselect,bfill);
+		return;
+	}
+
+    romsize = (gTable[bselect].options[3]<<8) | gTable[bselect].options[4];
+    // for SD card file, romsize is number of Mbits in rom
+    gamelen = romsize*128*1024;
+
+    strcpy(temp, gTable[bselect].name);
+
+    c2wstrcpy(fpath, path);
+    if (path[strlen(path)-1] != '/')
+        c2wstrcat(fpath, "/");
+
+    c2wstrcat(fpath, gTable[bselect].name);
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    {
+        char temp[1536];
+        // couldn't open file
+        w2cstrcpy(temp, fpath);
+        debugText("Couldn't open file: ", 2, 2, 0);
+        debugText(temp, 22, 2, 180);
+        return;
+    }
+
+    if (gamelen > (16*1024*1024))
+        copylen = 16*1024*1024;
+    else
+        copylen = gamelen;
+
+	progress_screen("Loading", temp, 0, 100, bfill);
+
     // copy the rom from file to ram, then ram to psram
     for(int ic=0; ic<copylen; ic+=ONCE_SIZE)
     {
-        progress_screen("Loading", temp, 100*ic/gamelen, 100, bfill);
-        // read file to buffer
-        f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
+        progress_screen(NULL,NULL, 100*ic/gamelen, 100,-1);
+       	f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
+
         // now check if it needs to be byte-swapped
         switch (gTable[bselect].swap)
         {
@@ -1094,15 +1255,15 @@ void copySD2Psram(int bselect, int bfill)
             }
             break;
         }
-        // copy to psram
-        neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
+
+		neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
     }
 
     if (gamelen <= (16*1024*1024))
     {
         f_close(&lSDFile);
-        progress_screen("Loading", temp, 100, 100, bfill);
-        delay(30);
+        progress_screen(NULL,NULL,100,100,-1);
+        delay(5);
         return;
     }
 
@@ -1110,10 +1271,12 @@ void copySD2Psram(int bselect, int bfill)
     neo_psram_offset(copylen/(32*1024));
 
     for(int ic=0; ic<(gamelen-copylen); ic+=ONCE_SIZE)
-    {
-        progress_screen("Loading", temp, 100*(copylen+ic)/gamelen, 100, bfill);
+    {		
+		progress_screen(NULL,NULL, 100*(copylen+ic)/gamelen, 100,-1);
+
         // read file to buffer
         f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
+
         // now check if it needs to be byte-swapped
         switch (gTable[bselect].swap)
         {
@@ -1142,14 +1305,15 @@ void copySD2Psram(int bselect, int bfill)
             }
             break;
         }
+
         // copy to psram
-        neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
+       	neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
     }
     neo_psram_offset(0);
 
     f_close(&lSDFile);
-    progress_screen("Loading", temp, 100, 100, bfill);
-    delay(30);
+	progress_screen(NULL,NULL,100,100,-1);
+    delay(5);
 }
 
 int selectGBASlot(int sel, u8 *blk, int stype, int bfill)
@@ -1727,6 +1891,7 @@ int main(void)
     }
     neo_select_game();
 
+
 #ifdef RUN_FROM_U2
     // check for boot rom in menu
    neo_select_menu();                  // enable menu flash in cart space
@@ -1741,16 +1906,29 @@ int main(void)
     bmax = getSDInfo(-1);               // get root directory of sd card
     if (bmax)
     {
+		int load_ex_menu = 0;
         FIL lSDFile;
         XCHAR fpath[32];
 
         check_fast();                   // let SD read at full speed if allowed
 
         strcpy(path, "/menu/n64/");
-        strcpy(gTable[0].name, "NEON64SD.v64");
+        strcpy(gTable[0].name, "NEON64SD.z64");
         c2wstrcpy(fpath, path);
         c2wstrcat(fpath, gTable[0].name);
-        if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+
+		load_ex_menu = (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK);
+
+		if(load_ex_menu == 0)
+		{
+		    strcpy(path, "/menu/n64/");
+		    strcpy(gTable[0].name, "NEON64SD.v64");
+		    c2wstrcpy(fpath, path);
+		    c2wstrcat(fpath, gTable[0].name);
+			load_ex_menu = (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK);
+		}
+
+        if(load_ex_menu)
         {
             gTable[0].valid = 1;
             gTable[0].type = 127;

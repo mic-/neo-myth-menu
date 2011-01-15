@@ -63,6 +63,7 @@ extern unsigned int sd_speed;
 extern unsigned int fast_flag;
 
 extern int get_cic(unsigned char *buffer);
+u32 PSRAM_ADDR = 0;
 void neo2_cycle_sd(void);
 
 inline void bus_delay(int cnt)
@@ -283,7 +284,6 @@ void neo_copyfrom_menu(void *dest, int fstart, int len)
 void neo_copyto_psram(void *src, int pstart, int len)
 {
     neo_select_psram();                 // psram enabled and write-enabled
-
 	neo_xferto_psram(src,pstart,len);
 }
 
@@ -605,11 +605,22 @@ void neo2_pre_sd(void)
     if (!sd_speed && fast_flag)
     {
         // set the PI for myth sd
+        PI_BSD_DOM1_LAT_REG = 0x00000000;
+        PI_BSD_DOM1_RLS_REG = 0x00000000;
+        PI_BSD_DOM1_PWD_REG = 0x00000003;
+        PI_BSD_DOM1_PGS_REG = 0x00000000;
+    }
+
+/*
+    if (!sd_speed && fast_flag)
+    {
+        // set the PI for myth sd
         PI_BSD_DOM1_LAT_REG = 0x00000003; // fasest safe speed = 3/2/3/7
         PI_BSD_DOM1_RLS_REG = 0x00000002;
         PI_BSD_DOM1_PWD_REG = 0x00000003;
         PI_BSD_DOM1_PGS_REG = 0x00000007;
     }
+*/
 }
 
 void neo2_post_sd(void)
