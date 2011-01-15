@@ -8,7 +8,7 @@ N64TOOL = $(ROOTDIR)/bin/n64tool
 HEADERNAME = header
 LINK_FLAGS = -G0 -L$(ROOTDIR)/lib -L$(ROOTDIR)/mips64-elf/lib -lff -ldragon -lc -lm -ldragonsys -lnosys -Tn64ld.x
 PROG_NAME = NEON64SD
-CFLAGS = -std=gnu99 -march=vr4300 -mtune=vr4300 -O1 -G0 -Wall -I$(ROOTDIR)/include -I$(ROOTDIR)/mips64-elf/include -DRUN_FROM_SD
+CFLAGS = -std=gnu99 -march=vr4300 -mtune=vr4300 -fomit-frame-pointer -O2 -G0 -Wall -I$(ROOTDIR)/include -I$(ROOTDIR)/mips64-elf/include -DRUN_FROM_SD
 CFLAGS += -DSTBI_NO_STDIO -DSTBI_NO_HDR
 ASFLAGS = -mtune=vr4300 -march=vr4300
 CC = $(GCCN64PREFIX)gcc
@@ -20,6 +20,8 @@ OBJS = main.o neo_2_asm.o neo_2.o utility.o disk_io.o ram_io.o stb_image.o ../Ne
 
 $(PROG_NAME).v64: $(PROG_NAME).dfs $(PROG_NAME).elf
 	$(OBJCOPY) $(PROG_NAME).elf $(PROG_NAME).bin -O binary
+	#$(CC) $(LINKFLAGS) $(CFLAGS) -march=vr4300 -mtune=vr4300 -O3 -fomit-frame-pointer  -S disk_io.c
+
 	rm -f $(PROG_NAME).v64
 	$(N64TOOL) -b -l 1280K -t "N64 Myth Menu (SD)" -h $(HEADERPATH)/$(HEADERNAME) -o $(PROG_NAME).v64 $(PROG_NAME).bin -s 1M $(PROG_NAME).dfs
 	$(CHKSUM64PATH) $(PROG_NAME).v64
