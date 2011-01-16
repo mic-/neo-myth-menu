@@ -909,6 +909,8 @@ int getSDInfo(int entry)
         fno.lfname = (XCHAR*)lfnbuf;
         fno.lfsize = 255;
         fno.lfname[0] = (XCHAR)0;
+		fno.fname[0] = '\0';
+
         if ((fres = f_readdir(&dir, &fno)))
         {
             //char temp[40];
@@ -916,6 +918,7 @@ int getSDInfo(int entry)
             //debugText(temp, 7, 2, 180);
             break;                      /* no more entries in directory (or some other error) */
         }
+
         if (!fno.fname[0])
         {
             //debugText("No more entries in directory", 6, 2, 180);
@@ -930,32 +933,45 @@ int getSDInfo(int entry)
 
         if (fno.fattrib & AM_DIR)
         {
-            if (!wstrcmp(privateName, fno.lfname)) /*skip "menu" */
-                continue;
+            if(fno.lfname[0])
+			{
+				if( (wstrcmp(privateName,fno.lfname) == 0) )
+					continue;
+
+                w2cstrcpy(gTable[max].name, fno.lfname);
+			}
+            else
+			{
+				/*Skip checking for length to allow prefixes/etc : menu , menu_ , menu_1234567 , menu_abcd..*/
+				if( (memcmp(fno.fname,"menu",4) == 0 ) /*&& (strlen(fno.fname) == 4)*/ )
+					continue;
+
+				strcpy(gTable[max].name, fno.fname);
+			}
 
             gTable[max].valid = 1;
             gTable[max].type = 128;     // directory entry
-            if (fno.lfname[0])
-                w2cstrcpy(gTable[max].name, fno.lfname);
-            else
-                strcpy(gTable[max].name, fno.fname);
         }
         else
-        {
+        {	
+			u8* options = gTable[max].options;
+
             gTable[max].valid = 1;
             gTable[max].type = 127;     // unknown
-            gTable[max].options[0] = 0xFF;
-            gTable[max].options[1] = 0;
-            gTable[max].options[2] = 0;
-            gTable[max].options[3] = (fno.fsize / (128*1024)) >> 8;
-            gTable[max].options[4] = (fno.fsize / (128*1024)) & 0xFF;
-            gTable[max].options[5] = 0;
-            gTable[max].options[6] = 2;
-            gTable[max].options[7] = 0;
+            options[0] = 0xFF;
+            options[1] = 0;
+            options[2] = 0;
+            options[3] = (fno.fsize / (128*1024)) >> 8;
+            options[4] = (fno.fsize / (128*1024)) & 0xFF;
+            options[5] = 0;
+            options[6] = 2;
+            options[7] = 0;
+
             if (fno.lfname[0])
                 w2cstrcpy(gTable[max].name, fno.lfname);
             else
                 strcpy(gTable[max].name, fno.fname);
+
             memset(gTable[max].rom, 0, 0x20);
 
             //get_sd_info(max); // slows directory load
@@ -1832,11 +1848,11 @@ int main(void)
 #endif
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v2.0 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v2.1 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v2.0 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v2.1 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v2.0 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v2.1 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";
@@ -1921,6 +1937,7 @@ int main(void)
 
 		if(load_ex_menu == 0)
 		{
+			memset(&lSDFile,0,sizeof(FIL));
 		    strcpy(path, "/menu/n64/");
 		    strcpy(gTable[0].name, "NEON64SD.v64");
 		    c2wstrcpy(fpath, path);
