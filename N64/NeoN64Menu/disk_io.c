@@ -24,6 +24,8 @@ extern int neo2_recv_sd_multi(unsigned char *buf, int count);
 extern int neo2_recv_sd_multi_psram_no_ds(unsigned char *buf, int count);
 extern int neo2_recv_sd_psram_ds1(unsigned char *buf, int count);
 
+static int (*sdReadMultiBlocks)(unsigned char *buf, int count) = neo2_recv_sd_multi;
+
 extern void neo2_pre_sd(void);
 extern void neo2_post_sd(void);
 extern void debugText(char *msg, int x, int y, int d);
@@ -38,9 +40,9 @@ unsigned char __attribute__((aligned(16))) sec_cache[CACHE_SIZE*512 + 8];
 unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads */
 unsigned char sd_csd[R2_LEN];
 static int respTime = RESP_TIME_R;
-int DISK_IO_MODE = 0;
-extern int DAT_SWAP;
-extern u32 PSRAM_ADDR;
+//int DISK_IO_MODE = 0;
+//extern int DAT_SWAP;
+//extern u32 PSRAM_ADDR;
 /*
 +  Polynomial = 0x89 (2^7 + 2^3 + 1)
 +  width      = 7 bit
@@ -85,6 +87,27 @@ static const unsigned char __attribute__((aligned(16))) crc7_table[256] =
 /*-----------------------------------------------------------------------*/
 /*                             support code                              */
 /*-----------------------------------------------------------------------*/
+
+void disk_io_set_mode(int mode,int dat_swap)
+{
+	extern u32 PSRAM_ADDR;
+
+	PSRAM_ADDR = 0;
+
+	if(mode == 0)
+	{
+		sdReadMultiBlocks = neo2_recv_sd_multi;
+		return;
+	}
+	else
+	{
+		switch(dat_swap)
+		{
+			case 0: sdReadMultiBlocks = neo2_recv_sd_multi_psram_no_ds; break;
+			case 1: sdReadMultiBlocks = neo2_recv_sd_psram_ds1; break;
+		}
+	}
+}
 
 inline void sd_delay(int cnt)
 {
@@ -465,6 +488,7 @@ inline int sdReadStartMulti( unsigned int addr )
     return 1;
 }
 
+/*
 inline int sdReadMultiBlocks(BYTE* buff,BYTE count)
 {
 	if(DISK_IO_MODE == 0)
@@ -479,7 +503,7 @@ inline int sdReadMultiBlocks(BYTE* buff,BYTE count)
 	}
 
 	return neo2_recv_sd_multi(buff,count);
-}
+}*/
 
 /*
 int sdReadMultiBlocks( BYTE *buff, BYTE count )
@@ -676,7 +700,7 @@ int sdInit(void)
     unsigned short rca;
     unsigned char resp[R2_LEN];         // R2 is largest response
 
-	DISK_IO_MODE = 0;
+	disk_io_set_mode(0,0);
 
     respTime = RESP_TIME_R;
 

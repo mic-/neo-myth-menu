@@ -101,9 +101,6 @@ typedef struct selEntry selEntry_t;
 
 selEntry_t __attribute__((aligned(16))) gTable[1024];
 
-extern int DAT_SWAP;
-extern u32 PSRAM_ADDR;
-extern int DISK_IO_MODE;
 extern unsigned short cardType;         /* b0 = block access, b1 = V2 and/or HC, b15 = funky read timing */
 extern unsigned int num_sectors;        /* number of sectors on SD card (or 0) */
 extern unsigned char *sd_csd;           /* card specific data */
@@ -124,6 +121,7 @@ extern sprite_t *loadImageDFS(char *fname, int *w, int *h);
 extern sprite_t *loadImageSD(char *fname, int *w, int *h);
 extern void drawImage(display_context_t dcon, sprite_t *sprites, int w, int h);
 
+extern void disk_io_set_mode(int mode,int dat_swap);
 extern void neo2_enable_sd(void);
 extern void neo2_disable_sd(void);
 extern DSTATUS MMC_disk_initialize(void);
@@ -1089,7 +1087,7 @@ void fastCopySD2Psram(int bselect,int bfill)
     char temp[256];
 	const int read = 256 * 1024;
 
-	DISK_IO_MODE = 0;
+	disk_io_set_mode(0,0);
 
     // load rom info if not already loaded
     if (gTable[bselect].type == 127)
@@ -1121,9 +1119,7 @@ void fastCopySD2Psram(int bselect,int bfill)
     else
         copylen = gamelen;
 
-	DISK_IO_MODE = 1;
-	PSRAM_ADDR = 0;
-	DAT_SWAP = gTable[bselect].swap;
+	disk_io_set_mode(1,gTable[bselect].swap);
 
 	progress_screen("Loading", temp, 0, 100, bfill);
 
@@ -1146,8 +1142,7 @@ void fastCopySD2Psram(int bselect,int bfill)
     // change the psram offset and copy the rest
     neo_psram_offset(copylen/(32*1024));
 
-
-	PSRAM_ADDR = 0;
+	disk_io_set_mode(1,gTable[bselect].swap);//will reset psram addr
 
 	{
 		const int target = (gamelen-copylen);
@@ -1174,7 +1169,7 @@ void copySD2Psram(int bselect, int bfill)
     XCHAR fpath[1280];
     char temp[256];
 
-	DISK_IO_MODE = 0;
+	disk_io_set_mode(0,0);
 
     // load rom info if not already loaded
     if (gTable[bselect].type == 127)
@@ -1903,6 +1898,7 @@ int main(void)
         FIL lSDFile;
         XCHAR fpath[32];
 
+		disk_io_set_mode(0,0);
         check_fast();                   // let SD read at full speed if allowed
 
         strcpy(path, "/menu/n64/");
@@ -1962,6 +1958,7 @@ int main(void)
     bmax = getSDInfo(-1);
     if (bmax)
     {
+		disk_io_set_mode(0,0);
         check_fast();                   // let SD read at full speed if allowed
 
         // try for images on the SD card
