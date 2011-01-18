@@ -101,6 +101,7 @@ typedef struct selEntry selEntry_t;
 
 selEntry_t __attribute__((aligned(16))) gTable[1024];
 
+extern int DAT_SWAP;
 extern u32 PSRAM_ADDR;
 extern int DISK_IO_MODE;
 extern unsigned short cardType;         /* b0 = block access, b1 = V2 and/or HC, b15 = funky read timing */
@@ -1086,6 +1087,7 @@ void fastCopySD2Psram(int bselect,int bfill)
     u32 romsize, gamelen, copylen;
     XCHAR fpath[1280];
     char temp[256];
+	const int read = 256 * 1024;
 
 	DISK_IO_MODE = 0;
 
@@ -1121,27 +1123,15 @@ void fastCopySD2Psram(int bselect,int bfill)
 
 	DISK_IO_MODE = 1;
 	PSRAM_ADDR = 0;
-	
+	DAT_SWAP = gTable[bselect].swap;
+
 	progress_screen("Loading", temp, 0, 100, bfill);
 
-	if(( ((copylen) & 1) != 0 ) )//make sure that sectors count will be an even number to avoid single block reads
-		DISK_IO_MODE = 0;
-
-    if(DISK_IO_MODE == 1)
 	{
-		for(int ic=0; ic<copylen; ic+=ONCE_SIZE)
+		for(int ic=0; ic<copylen; ic+=read)
 		{
 		    progress_screen(NULL,NULL, 100*ic/gamelen, 100,-1);
-		    f_read_dummy(&lSDFile,ONCE_SIZE, &ts);
-		}
-	}
-	else
-	{
-		for(int ic=0; ic<copylen; ic+=ONCE_SIZE)
-		{
-		    progress_screen(NULL,NULL, 100*ic/gamelen, 100,-1);
-		    f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
-			neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
+		    f_read_dummy(&lSDFile,read,&ts);
 		}
 	}
 
@@ -1155,29 +1145,16 @@ void fastCopySD2Psram(int bselect,int bfill)
 
     // change the psram offset and copy the rest
     neo_psram_offset(copylen/(32*1024));
-	
-	if((DISK_IO_MODE == 1) && ( ((gamelen-copylen) & 1) != 0 ) )//make sure that sectors count will be an even number to avoid single block reads
-		DISK_IO_MODE = 0;
+
 
 	PSRAM_ADDR = 0;
 
-    if(DISK_IO_MODE == 1)
 	{
 		const int target = (gamelen-copylen);
-		for(int ic=0; ic<target; ic+=ONCE_SIZE)
+		for(int ic=0; ic<target; ic+=read)
 		{
 		    progress_screen(NULL,NULL,100*(copylen+ic)/gamelen,100,-1);
-		    f_read_dummy(&lSDFile,ONCE_SIZE, &ts);
-		}
-	}
-	else
-	{
-		const int target = (gamelen-copylen);
-		for(int ic=0; ic<target; ic+=ONCE_SIZE)
-		{
-		    progress_screen(NULL,NULL,100*(copylen+ic)/gamelen,100,-1);
-		    f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
-			neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
+		    f_read_dummy(&lSDFile,read,&ts);
 		}
 	}
 
@@ -1203,7 +1180,7 @@ void copySD2Psram(int bselect, int bfill)
     if (gTable[bselect].type == 127)
         get_sd_info(bselect);
 
-	if(gTable[bselect].swap == 0)
+	if((gTable[bselect].swap == 0) || (gTable[bselect].swap == 1) )
 	{
 		fastCopySD2Psram(bselect,bfill);
 		return;

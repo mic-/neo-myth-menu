@@ -64,6 +64,8 @@ extern unsigned int fast_flag;
 
 extern int get_cic(unsigned char *buffer);
 u32 PSRAM_ADDR = 0;
+int DAT_SWAP = 0;
+
 void neo2_cycle_sd(void);
 
 inline void bus_delay(int cnt)
