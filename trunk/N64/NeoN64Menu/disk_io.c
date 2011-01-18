@@ -21,7 +21,9 @@ typedef volatile unsigned int vu32;
 //#define DEBUG_RESP
 
 extern int neo2_recv_sd_multi(unsigned char *buf, int count);
-extern int neo2_recv_sd_multi2(unsigned char *buf, int count);
+extern int neo2_recv_sd_multi_psram_no_ds(unsigned char *buf, int count);
+extern int neo2_recv_sd_psram_ds1(unsigned char *buf, int count);
+
 extern void neo2_pre_sd(void);
 extern void neo2_post_sd(void);
 extern void debugText(char *msg, int x, int y, int d);
@@ -37,6 +39,7 @@ unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads *
 unsigned char sd_csd[R2_LEN];
 static int respTime = RESP_TIME_R;
 int DISK_IO_MODE = 0;
+extern int DAT_SWAP;
 extern u32 PSRAM_ADDR;
 /*
 +  Polynomial = 0x89 (2^7 + 2^3 + 1)
@@ -462,7 +465,21 @@ inline int sdReadStartMulti( unsigned int addr )
     return 1;
 }
 
-#define sdReadMultiBlocks(_BUFF,_COUNT) ((DISK_IO_MODE == 0) ? neo2_recv_sd_multi(_BUFF,_COUNT) : neo2_recv_sd_multi2(_BUFF,_COUNT))
+inline int sdReadMultiBlocks(BYTE* buff,BYTE count)
+{
+	if(DISK_IO_MODE == 0)
+		return neo2_recv_sd_multi(buff,count);
+	else
+	{
+		switch(DAT_SWAP)
+		{
+			case 0: return neo2_recv_sd_multi_psram_no_ds(buff,count);
+			case 1: return neo2_recv_sd_psram_ds1(buff,count);
+		}
+	}
+
+	return neo2_recv_sd_multi(buff,count);
+}
 
 /*
 int sdReadMultiBlocks( BYTE *buff, BYTE count )

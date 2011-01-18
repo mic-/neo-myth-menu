@@ -3,23 +3,16 @@
 
 .section .text
 
-.align 2 /*.align 3*/
+.align 4
+.set nomips16
 .set push
 .set noreorder
 .set noat
 
-.global neo2_recv_sd_multi2
-.ent    neo2_recv_sd_multi2
-		neo2_recv_sd_multi2:
-
-		/*
-		our custom f_read function does this alredy when DISKIOMODE == 1
-		mfc0 $8,$12
-		la $9,~1
-		and $8,$9
-		mtc0 $8,$12
-		nop
-		*/
+/*BEGIN neo2_recv_sd_multi_psram_no_ds */
+.global neo2_recv_sd_multi_psram_no_ds
+.ent    neo2_recv_sd_multi_psram_no_ds
+		neo2_recv_sd_multi_psram_no_ds:
 
 		la $14,PSRAM_ADDR			/*PSRAM rel offs*/
 		lw $14,0($14)
@@ -29,46 +22,31 @@
 		addiu $sp,$sp,-4
 		sw $17,0($sp)
 
-		/*
-			The reason that we're using regs to store
-			those masks is because we would have to use a temp register
-			and load the mask to the top16 bits for each case.
-
-			The reason those masks aren't used in some instructions such as : andi $6,$6,0xF000
-			is because :
-			{
-				andi $6,$6,0xF000 => Immediate : $6 = $6 & 0x0000f000...
-
-				But :
-				lui $reg,0xf000
-				and $6,$6,$reg =>  $6 = $6 & $reg { $reg => 0xf0000000 }
-			}
-		*/
-
 		lui $24,0xF000				/*mask = f000 0000*/
 		lui $25,0x0F00				/*mask = 0f00 0000*/
 		lui $10,0x00F0				/*mask = 00f0 0000*/
 		lui $17,0x000F				/*mask = 000f 0000*/
 		lui $1,0xb000				/*$at = psram base ; b000 0000*/
 
-		oloop2:
+		neo2_recv_sd_multi_psram_no_ds_oloop:
 		lui $11,0x0001				/* $11 = timeout = 64 * 1024*/
 
-		tloop2:
+		neo2_recv_sd_multi_psram_no_ds_tloop:
 		lw $2,($15)					/* rdMmcDatBit4*/
 		andi $2,$2,0x0100			/* eqv of (data>>8)&0x01*/
-		beq $2,$0,getsect2			/* start bit detected*/
+		beq $2,$0,neo2_recv_sd_multi_psram_no_ds_get_sect			/* start bit detected*/
 		nop
 		addiu $11,$11,-1
-		bne $11,$0,tloop2			/* not timed out*/
+		bne $11,$0,neo2_recv_sd_multi_psram_no_ds_tloop			/* not timed out*/
 		nop
-		beq $11,$0,___exit2			/* timeout*/
+		beq $11,$0,neo2_recv_sd_multi_psram_no_ds_exit		/* timeout*/
 		ori $2,$0,0					/* res = FALSE*/
 
-		getsect2:
+		neo2_recv_sd_multi_psram_no_ds_get_sect:
 		ori $13,$0,128				/* $13 = long count*/
 
-		gsloop2:
+		neo2_recv_sd_multi_psram_no_ds_gsloop:
+
 		lw $2,($15)					/* rdMmcDatBit4 => -a-- -a--*/
 		sll $2,$2,4					/* a--- a---*/
 
@@ -112,7 +90,7 @@
 		lbu $8,0($1)				/*dl bus*/
 		addiu $13,$13,-1			/*dec long_cnt*/
 		
-		bne $13,$0,gsloop2
+		bne $13,$0,neo2_recv_sd_multi_psram_no_ds_gsloop
 		addiu $14,$14,4				/*inc psram offs*/
 
 		lw $2,($15)					/* rdMmcDatBit4 - just toss checksum bytes */
@@ -135,32 +113,154 @@
 		lw $2,($15)					/* rdMmcDatBit4 - clock out end bit*/
 
 		addiu $12,$12,-1			/* count--*/
-		bne $12,$0,oloop2			/* next sector*/
+		bne $12,$0,neo2_recv_sd_multi_psram_no_ds_oloop	/* next sector*/
 		nop
 
 		ori $2,$0,1					/* res = TRUE*/
 
-	___exit2:
+		neo2_recv_sd_multi_psram_no_ds_exit:
 		lw $17,0($sp)
 		addiu $sp,$sp,4
 
 		la $8,PSRAM_ADDR
 		sw $14,0($8)
 
-	/*
-	our custom f_read function does this alredy when DISKIOMODE == 1
-	mfc0 $8,$12
-	ori $8,1
-	mtc0 $8,$12
-	*/
+	jr $ra
+	nop
+
+.end neo2_recv_sd_multi_psram_no_ds
+/*END neo2_recv_sd_multi_psram_no_ds */
+
+/*BEGIN neo2_recv_sd_psram_ds1 */
+.global neo2_recv_sd_psram_ds1
+.ent    neo2_recv_sd_psram_ds1
+		neo2_recv_sd_psram_ds1:
+
+		la $14,PSRAM_ADDR			/*PSRAM rel offs*/
+		lw $14,0($14)
+		la $15,0xB30E6060			/* $15 = 0xB30E6060*/
+		ori $12,$5,0				/* $12 = count*/
+
+		addiu $sp,$sp,-4
+		sw $17,0($sp)
+
+		lui $24,0xF000				/*mask = f000 0000*/
+		lui $25,0x0F00				/*mask = 0f00 0000*/
+		lui $10,0x00F0				/*mask = 00f0 0000*/
+		lui $17,0x000F				/*mask = 000f 0000*/
+		lui $1,0xb000				/*$at = psram base ; b000 0000*/
+
+		neo2_recv_sd_psram_ds1_oloop:
+		lui $11,0x0001				/* $11 = timeout = 64 * 1024*/
+
+		neo2_recv_sd_psram_ds1_tloop:
+		lw $2,($15)					/* rdMmcDatBit4*/
+		andi $2,$2,0x0100			/* eqv of (data>>8)&0x01*/
+		beq $2,$0,neo2_recv_sd_psram_ds1_get_sect			/* start bit detected*/
+		nop
+		addiu $11,$11,-1
+		bne $11,$0,neo2_recv_sd_psram_ds1_tloop			/* not timed out*/
+		nop
+		beq $11,$0,neo2_recv_sd_psram_ds1_exit		/* timeout*/
+		ori $2,$0,0					/* res = FALSE*/
+
+		neo2_recv_sd_psram_ds1_get_sect:
+		ori $13,$0,128				/* $13 = long count*/
+
+		neo2_recv_sd_psram_ds1_gsloop:
+
+		/*
+			0xaabbccdd => 0xbbaaddcc
+		*/
+
+		lw $4,($15)					/* rdMmcDatBit4 => -c-- -c--*/
+		lw $5,($15)					/* rdMmcDatBit4 => -d-- -d--*/
+
+		lw $2,($15)					/* rdMmcDatBit4 => -a-- -a--*/
+		sll $2,$2,4					/* a--- a---*/
+
+		lw $3,($15)					/* rdMmcDatBit4 => -b-- -b--*/
+		and $2,$2,$24				/* a000 0000*/
+		and $3,$3,$25				/* 0b00 0000*/
+
+		or $11,$3,$2				/* $11 = ab00 0000*/
+		srl $4,$4,4					/* --c- --c-*/
+
+		and $4,$4,$10				/* 00c0 0000*/
+		srl $5,$5,8					/* ---d ---d*/
+		or $11,$11,$4				/* $11 = abc0 0000*/
+
+		lw $8,($15)					/* rdMmcDatBit4 => -g-- -g--*/
+		lw $9,($15)					/* rdMmcDatBit4 => -h-- -h--*/
+
+		lw $6,($15)					/* rdMmcDatBit4 => -e-- -e--*/
+		and $5,$5,$17				/* 000d 0000*/
+		sll $6,$6,4					/* e--- e---*/
+		or $11,$11,$5				/* $11 = abcd 0000*/
+
+		lw $7,($15)					/* rdMmcDatBit4 => -f-- -f--*/
+		andi $6,$6,0xF000			/* 0000 e000*/
+		or $11,$11,$6				/* $11 = abcd e000*/
+		and $7,$7,0x0F00			/* 0000 0f00*/
+
+		or $11,$11,$7				/* $11 = abcd ef00*/
+		srl $8,$8,4					/* --g- --g-*/
+
+		andi $8,$8,0x00F0			/* 0000 00g0*/
+		or $11,$11,$8				/* $11 = abcd efg0*/
+
+		srl $9,$9,8					/* ---h ---h*/
+		andi $9,$9,0x000F			/* 0000 000h*/
+		or $11,$11,$9				/* $11 = abcd efgh*/
+
+		addu $9,$1,$14				/*psram base + rel*/
+		sw $11,0($9)				/*save sector data*/
+		lbu $8,0($1)				/*dl bus*/
+		addiu $13,$13,-1			/*dec long_cnt*/
+
+		bne $13,$0,neo2_recv_sd_psram_ds1_gsloop
+		addiu $14,$14,4				/*inc psram offs*/
+
+		lw $2,($15)					/* rdMmcDatBit4 - just toss checksum bytes */
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+		lw $2,($15)					/* rdMmcDatBit4*/
+
+		lw $2,($15)					/* rdMmcDatBit4 - clock out end bit*/
+
+		addiu $12,$12,-1			/* count--*/
+		bne $12,$0,neo2_recv_sd_psram_ds1_oloop	/* next sector*/
+		nop
+
+		ori $2,$0,1					/* res = TRUE*/
+
+		neo2_recv_sd_psram_ds1_exit:
+		lw $17,0($sp)
+		addiu $sp,$sp,4
+
+		la $8,PSRAM_ADDR
+		sw $14,0($8)
 
 	jr $ra
 	nop
 
-.end neo2_recv_sd_multi2
-
+.end neo2_recv_sd_psram_ds1
+/*END neo2_recv_sd_psram_ds1 */
 
 /**************************/
+
 .global neo2_recv_sd_multi
 .ent    neo2_recv_sd_multi
 		neo2_recv_sd_multi:
@@ -175,28 +275,10 @@
 		ori $14,$4,0		      /* $14 = buf*/
 		ori $12,$5,0		      /* $12 = count*/
 
-		/*
-			The reason that we're using regs to store
-			those masks is because we would have to use a temp register
-			and load the mask to the top16 bits for each case.
-
-			The reason those masks aren't used in some instructions such as : andi $6,$6,0xF000
-			is because :
-			{
-				andi $6,$6,0xF000 => Immediate : $6 = $6 & 0x0000f000...
-
-				But :
-				lui $reg,0xf000
-				and $6,$6,$reg =>  $6 = $6 & $reg { $reg => 0xf0000000 }
-			}
-		*/
-
-		addiu $sp,$sp,-4
-		sw $17,0($sp)
 		lui $24,0xF000
 		lui $25,0x0F00
 		lui $10,0x00F0
-		lui $17,0x000F
+		lui $1,0x000F
 		
 		oloop:
 		lui $11,0x0001		    /* $11 = timeout = 64 * 1024*/
@@ -237,7 +319,7 @@
 		or $11,$11,$4		     /* $11 = abc0 0000*/
 
 		lw $6,($15)		       /* rdMmcDatBit4 => -e-- -e--*/
-		and $5,$5,$17		     /* 000d 0000*/
+		and $5,$5,$1		     /* 000d 0000*/
 		/*ori $10,$0,0xF000*/		 /* $10 = mask = 0x0000F000*/
 		sll $6,$6,4		       /* e--- e---*/
 		or $11,$11,$5		     /* $11 = abcd 0000*/
@@ -294,8 +376,6 @@
 		ori $2,$0,1		       /* res = TRUE*/
 
 	___exit:
-		lw $17,0($sp)
-		addiu $sp,$sp,4
 
 	mfc0 $8,$12
 	ori $8,1
