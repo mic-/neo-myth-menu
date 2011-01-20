@@ -933,8 +933,16 @@ neo_copyto_psram:
         bsr     _neo_select_psram       /* select flash cart PSRAM (write-enabled) */
         move.w  #0xFFFF,DAT_SWAP(a1)    /* disable byte swap function */
 
+        move.l  8(sp),d0                /* pstart */
+        andi.l  #0xF00000,d0            /* closest 1MB */
+        bsr     _neo_set_fbank          /* set the flash space bank registers */
+        move.l  #0x100000,d0
+        bsr     _neo_set_fsize          /* set the flash space bank size to 1MB */
+
         movea.l 4(sp),a0                /* src */
-        movea.l 8(sp),a1                /* pstart */
+        move.l  8(sp),d1                /* pstart */
+        andi.l  #0x0FFFFE,d1            /* offset inside flash space (bank was set to closest 1MB) */
+        movea.l d1,a1
         move.l  12(sp),d0               /* len */
         lsr.l   #1,d0                   /* # words to copy */
         subq.w  #1,d0
@@ -958,13 +966,14 @@ neo_copyfrom_psram:
         bsr     _neo_select_psram       /* select flash cart PSRAM (write-enabled) */
 
         move.l  8(sp),d0                /* pstart */
+        andi.l  #0xF00000,d0            /* closest 1MB */
         bsr     _neo_set_fbank          /* set the flash space bank registers */
         move.l  #0x100000,d0
         bsr     _neo_set_fsize          /* set the flash space bank size to 1MB */
 
         movea.l 4(sp),a1                /* dest */
         move.l  8(sp),d1                /* pstart */
-        andi.l  #0x01FFFE,d1            /* offset inside flash space (bank was set to closest 128KB) */
+        andi.l  #0x0FFFFE,d1            /* offset inside flash space (bank was set to closest 1MB) */
         movea.l d1,a0
         move.l  12(sp),d0               /* len */
         lsr.l   #1,d0                   /* # words to copy */
@@ -1211,11 +1220,14 @@ neo2_recv_sd:
 neo2_recv_sd_multi:
         movem.l d2-d3,-(sp)
         lea     0xA10000,a1
+        move.w  #0x0087,GBAC_LIO(a1)
+
+        tst.w   gDirectRead
+        bne.w   multi_sd_to_myth_psram
+
         movea.l 12(sp),a0               /* buf */
         move.l  16(sp),d3               /* count */
         subq.w  #1,d3
-
-        move.w  #0x0087,GBAC_LIO(a1)
 0:
         move.w  #1023,d0
 1:
@@ -1279,6 +1291,97 @@ neo2_recv_sd_multi:
         movem.l (sp)+,d2-d3
         moveq   #0,d0                   /* FALSE */
         rts
+
+multi_sd_to_myth_psram:
+        move.l  12(sp),d0               /* buf = pstart + offset */
+        move.w  #20,d1
+        lsr.l   d1,d0                   /* bank = pstart / 1MB  */
+        move.w  d0,PRAM_BIO(a1)         /* set the neo myth psram bank register */
+
+        move.l  12(sp),d0               /* buf */
+        andi.l  #0x0FFFFE,d0            /* offset inside sram space (bank was set to closest 1MB) */
+        ori.l   #0x200000,d0            /* sram space access */
+        movea.l d0,a0
+        move.l  16(sp),d3               /* count */
+        subq.w  #1,d3
+0:
+        move.w  #1023,d0
+1:
+        moveq   #1,d1
+        and.w   0x6060.w,d1
+        dbeq    d0,1b
+        bne.w   9f                      /* timeout */
+
+        moveq   #127,d0
+2:
+        move.w  0x6060.w,d1
+        moveq   #15,d2
+        and.w   0x6060.w,d2
+        lsl.b   #4,d1
+        or.b    d2,d1                   /* first byte */
+        moveq   #15,d2
+        and.w   0x6060.w,d2
+        lsl.w   #4,d1
+        or.b    d2,d1
+        moveq   #15,d2
+        and.w   0x6060.w,d2
+        lsl.w   #4,d1
+        or.b    d2,d1                   /* second byte */
+
+        move.w  d1,(a0)+
+
+        move.w  0x6060.w,d1
+        moveq   #15,d2
+        and.w   0x6060.w,d2
+        lsl.b   #4,d1
+        or.b    d2,d1                   /* first byte */
+        moveq   #15,d2
+        and.w   0x6060.w,d2
+        lsl.w   #4,d1
+        or.b    d2,d1
+        moveq   #15,d2
+        and.w   0x6060.w,d2
+        lsl.w   #4,d1
+        or.b    d2,d1                   /* second byte */
+
+        move.w  d1,(a0)+
+
+        dbra    d0,2b
+
+        /* throw away CRC */
+        move.w  0x6060.w,d1
+        move.w  0x6060.w,d2
+        move.w  0x6060.w,d1
+        move.w  0x6060.w,d2
+        move.w  0x6060.w,d1
+        move.w  0x6060.w,d2
+        move.w  0x6060.w,d1
+        move.w  0x6060.w,d2
+        move.w  0x6060.w,d1
+        move.w  0x6060.w,d2
+        move.w  0x6060.w,d1
+        move.w  0x6060.w,d2
+        move.w  0x6060.w,d1
+        move.w  0x6060.w,d2
+        move.w  0x6060.w,d1
+        move.w  0x6060.w,d2
+
+        move.w  0x6060.w,d1             /* end bit */
+
+        dbra    d3,0b
+
+        move.w  #0x0080,GBAC_LIO(a1)
+|        move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
+        movem.l (sp)+,d2-d3
+        moveq   #1,d0                   /* TRUE */
+        rts
+9:
+        move.w  #0x0080,GBAC_LIO(a1)
+|        move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
+        movem.l (sp)+,d2-d3
+        moveq   #0,d0                   /* FALSE */
+        rts
+
 
 neo_mode:
         .word   0

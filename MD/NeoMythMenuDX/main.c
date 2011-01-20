@@ -168,9 +168,9 @@ static short int gSRAMgrServiceStatus = SMGR_STATUS_NULL;
 static short int gSRAMgrServiceMode = 0x0000;
 
 #ifndef RUN_IN_PSRAM
-static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.5";
+static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.6";
 #else
-static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.5";
+static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.6";
 #endif
 
 #define MB (0x20000)
@@ -264,6 +264,8 @@ short int gSRAMSize;                    /* size of sram in 8KB units */
 short int gYM2413 = 0x0001;             /* 0x0000 = YM2413 disabled, 0x0001 = YM2413 enabled */
 short int gImportIPS = 0;
 static int gLastEntryIndex = -1;
+
+short int gDirectRead = 0;
 
 /* arrays */
 const char *gEmptyLine = "                                      ";
@@ -793,6 +795,17 @@ inline void neo_copy_sd(unsigned char *dest, int fstart, int len)
     f_read_zip(&gSDFile, dest, len, &ts);
     ints_off();     /* disable interrupts */
 }
+
+inline void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
+{
+    UINT ts;
+    ints_on();     /* enable interrupts */
+    gDirectRead = 1;
+    f_read_zip(&gSDFile, (unsigned char *)pstart, len, &ts);
+    gDirectRead = 0;
+    ints_off();     /* disable interrupts */
+}
+
 
 inline void delay(int count)
 {
@@ -2026,7 +2039,8 @@ void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(u
     for (iy=0; iy<length; iy+=XFER_SIZE)
     {
         // fetch data data from source
-        (src)(buffer, soffset + iy + (gFileType ? 512 : 0), XFER_SIZE);
+        if (src)
+            (src)(buffer, soffset + iy + (gFileType ? 512 : 0), XFER_SIZE);
         switch (gFileType)
         {
             case 1:
@@ -2279,12 +2293,9 @@ void importIPS(int index)
     fsize = gSDFile.fsize;
     fsize -= 3; //adjust for eof marker
 
-    ints_on();
     //skip "PATCH"
     neo_copy_sd(in,0,5);
     fbr = 5;
-
-    UTIL_SetMemorySafe((char *)in,'0',6); in[5] = '\0';
 
     while(fbr < fsize)
     {
@@ -2292,14 +2303,12 @@ void importIPS(int index)
 
         neo_copy_sd(in,0,3);
         fbr += 3;
-        addr = (unsigned int)in[2];
-        addr += (unsigned int)in[1] << 8;
-        addr += (unsigned int)in[0] << 16;
+        addr = ((unsigned int)in[0] << 16) | ((unsigned int)in[1] << 8) | (unsigned int)in[2];
 
         neo_copy_sd(in,0,2);
         fbr += 2;
-        len = (unsigned int)in[1];
-        len += (unsigned int)in[0] << 8;
+        len = ((unsigned int)in[0] << 8) | (unsigned int)in[1];
+
         if (len)
         {
             nb = len;
@@ -2309,19 +2318,16 @@ void importIPS(int index)
                 nb++;
                 ix = 1;
 
-                ints_off();
                 if (gPSRAM) neo_copyfrom_myth_psram(buffer, addr, 2);
                 else neo_copyfrom_psram(buffer, addr, 2);
             }
             if (nb & 1)
             {
-                ints_off();
                 if (gPSRAM) neo_copyfrom_myth_psram(&buffer[nb-1], addr+nb-1, 2);
                 else neo_copyfrom_psram(&buffer[nb-1], addr+nb-1, 2);
                 nb++;
             }
 
-            ints_on();
             neo_copy_sd(&buffer[ix], 0, len);
             fbr += len;
         }
@@ -2329,8 +2335,8 @@ void importIPS(int index)
         {
             neo_copy_sd(in,0,2);
             fbr += 2;
-            len = (unsigned int)in[1];
-            len += (unsigned int)in[0] << 8;
+            len = ((unsigned int)in[0] << 8) | (unsigned int)in[1];
+
             nb = len;
             if (addr & 1)
             {
@@ -2338,29 +2344,25 @@ void importIPS(int index)
                 nb++;
                 ix = 1;
 
-                ints_off();
                 if (gPSRAM) neo_copyfrom_myth_psram(buffer, addr, 2);
                 else neo_copyfrom_psram(buffer, addr, 2);
             }
             if (nb & 1)
             {
-                ints_off();
                 if (gPSRAM) neo_copyfrom_myth_psram(&buffer[nb-1], addr+nb-1, 2);
                 else neo_copyfrom_psram(&buffer[nb-1], addr+nb-1, 2);
                 nb++;
             }
 
-            ints_on();
             neo_copy_sd(in,0,1);
             fbr += 1;
             utility_memset(&buffer[ix], in[0], len);
         }
 
-        if((addr+len-1) < gSelectionSize)
+        if((addr+nb-1) < gSelectionSize)
         {
-            if ((addr & 0x00F00000) == ((addr+len-1) & 0x00F00000))
+            if ((addr & 0x00F00000) == ((addr+nb-1) & 0x00F00000))
             {
-                ints_off();
                 // doesn't cross 1MB boundary, copy all at once
                 if (gPSRAM) neo_copyto_myth_psram(buffer, addr, nb);
                 else neo_copyto_psram(buffer, addr, nb);
@@ -2369,12 +2371,10 @@ void importIPS(int index)
             {
                 unsigned int len1 = ((addr & 0x00F00000) + 0x00100000) - addr;
 
-                ints_off();
                 // crosses 1MB boundary, copy up to 1MB boundary
                 if (gPSRAM) neo_copyto_myth_psram(buffer, addr, len1);
                 else neo_copyto_psram(buffer, addr, len1);
 
-                ints_off();
                 // copy the rest after the boundary
                 if (gPSRAM) neo_copyto_myth_psram(&buffer[len1], addr+len1, nb-len1);
                 else neo_copyto_psram(&buffer[len1], addr+len1, nb-len1);
@@ -2384,7 +2384,7 @@ void importIPS(int index)
 
     ints_on();
     setStatusMessage("Importing patch...OK");
-
+    delay(60);
     clearStatusMessage();
 }
 
@@ -4210,7 +4210,10 @@ void do_options(void)
                         else
                         {
                             // copy file to myth psram
-                            copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
+                            if (gFileType)
+                                copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
+                            else
+                                copyGame(&neo_sd_to_myth_psram, 0, pstart, 0, fsize, "Loading ", temp);
                         }
 
                         // check for raw S&K
@@ -4653,7 +4656,10 @@ void run_rom(int reset_mode)
             else
             {
                 // copy file to myth psram
-                copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
+                if (gFileType)
+                    copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
+                else
+                    copyGame(&neo_sd_to_myth_psram, 0, pstart, 0, fsize, "Loading ", temp);
             }
 
             // check for raw S&K
