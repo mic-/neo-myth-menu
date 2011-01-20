@@ -1395,14 +1395,14 @@ multi_sd_to_myth_psram:
 
         lea     0xA10000,a1
         move.w  #0x0080,GBAC_LIO(a1)
-|        move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
+        move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
         movem.l (sp)+,d2-d3
         moveq   #1,d0                   /* TRUE */
         rts
 9:
         lea     0xA10000,a1
         move.w  #0x0080,GBAC_LIO(a1)
-|        move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
+        move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
         movem.l (sp)+,d2-d3
         moveq   #0,d0                   /* FALSE */
         rts
