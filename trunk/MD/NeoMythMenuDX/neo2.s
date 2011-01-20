@@ -1164,53 +1164,64 @@ neo2_post_sd:
 neo2_recv_sd:
         move.l  d2,-(sp)
         lea     0xA10000,a1
-        movea.l 8(sp),a0                /* buf */
-
         move.w  #0x0087,GBAC_LIO(a1)
+
+        movea.l 8(sp),a0                /* buf */
+        lea     0x6060.w,a1
+
         moveq   #127,d0
 1:
-        move.w  0x6060.w,d1
+        move.w  (a1),d1
+        moveq   #15,d2
+        and.w   (a1),d2
         lsl.b   #4,d1
-        move.w  0x6060.w,d2
-        andi.w  #0x000F,d2
         or.b    d2,d1                   /* sector byte */
         move.b  d1,(a0)+
 
-        move.w  0x6060.w,d1
+        move.w  (a1),d1
+        moveq   #15,d2
+        and.w   (a1),d2
         lsl.b   #4,d1
-        move.w  0x6060.w,d2
-        andi.w  #0x000F,d2
         or.b    d2,d1                   /* sector byte */
         move.b  d1,(a0)+
 
-        move.w  0x6060.w,d1
+        move.w  (a1),d1
+        moveq   #15,d2
+        and.w   (a1),d2
         lsl.b   #4,d1
-        move.w  0x6060.w,d2
-        andi.w  #0x000F,d2
         or.b    d2,d1                   /* sector byte */
         move.b  d1,(a0)+
 
-        move.w  0x6060.w,d1
+        move.w  (a1),d1
+        moveq   #15,d2
+        and.w   (a1),d2
         lsl.b   #4,d1
-        move.w  0x6060.w,d2
-        andi.w  #0x000F,d2
         or.b    d2,d1                   /* sector byte */
         move.b  d1,(a0)+
 
         dbra    d0,1b
 
-        moveq   #7,d0
-2:
-        move.w  0x6060.w,d1
-        lsl.b   #4,d1
-        move.w  0x6060.w,d2
-        andi.w  #0x000F,d2
-        or.b    d2,d1
-|       move.b  d1,(a0)+                /* CRC byte */
-        dbra    d0,2b
+        /* throw away CRC */
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
 
-        move.w  0x6060.w,d1             /* end bit */
+        move.w  (a1),d1                 /* end bit */
 
+        lea     0xA10000,a1
         move.w  #0x0080,GBAC_LIO(a1)
         move.l  (sp)+,d2
         rts
@@ -1226,67 +1237,78 @@ neo2_recv_sd_multi:
         bne.w   multi_sd_to_myth_psram
 
         movea.l 12(sp),a0               /* buf */
+        lea     0x6060.w,a1
         move.l  16(sp),d3               /* count */
         subq.w  #1,d3
 0:
         move.w  #1023,d0
 1:
         moveq   #1,d1
-        and.w   0x6060.w,d1
+        and.w   (a1),d1
         dbeq    d0,1b
         bne.b   9f                      /* timeout */
 
         moveq   #127,d0
 2:
-        move.w  0x6060.w,d1
+        move.w  (a1),d1
+        moveq   #15,d2
+        and.w   (a1),d2
         lsl.b   #4,d1
-        move.w  0x6060.w,d2
-        andi.w  #0x000F,d2
         or.b    d2,d1                   /* sector byte */
         move.b  d1,(a0)+
 
-        move.w  0x6060.w,d1
+        move.w  (a1),d1
+        moveq   #15,d2
+        and.w   (a1),d2
         lsl.b   #4,d1
-        move.w  0x6060.w,d2
-        andi.w  #0x000F,d2
         or.b    d2,d1                   /* sector byte */
         move.b  d1,(a0)+
 
-        move.w  0x6060.w,d1
+        move.w  (a1),d1
+        moveq   #15,d2
+        and.w   (a1),d2
         lsl.b   #4,d1
-        move.w  0x6060.w,d2
-        andi.w  #0x000F,d2
         or.b    d2,d1                   /* sector byte */
         move.b  d1,(a0)+
 
-        move.w  0x6060.w,d1
+        move.w  (a1),d1
+        moveq   #15,d2
+        and.w   (a1),d2
         lsl.b   #4,d1
-        move.w  0x6060.w,d2
-        andi.w  #0x000F,d2
         or.b    d2,d1                   /* sector byte */
         move.b  d1,(a0)+
 
         dbra    d0,2b
 
-        moveq   #7,d0
-3:
-        move.w  0x6060.w,d1
-        lsl.b   #4,d1
-        move.w  0x6060.w,d2
-        andi.w  #0x000F,d2
-        or.b    d2,d1
-|       move.b  d1,(a0)+                /* CRC byte */
-        dbra    d0,3b
+        /* throw away CRC */
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
 
-        move.w  0x6060.w,d1             /* end bit */
+        move.w  (a1),d1             /* end bit */
 
         dbra    d3,0b
 
+        lea     0xA10000,a1
         move.w  #0x0080,GBAC_LIO(a1)
         movem.l (sp)+,d2-d3
         moveq   #1,d0                   /* TRUE */
         rts
 9:
+        lea     0xA10000,a1
         move.w  #0x0080,GBAC_LIO(a1)
         movem.l (sp)+,d2-d3
         moveq   #0,d0                   /* FALSE */
@@ -1302,45 +1324,46 @@ multi_sd_to_myth_psram:
         andi.l  #0x0FFFFE,d0            /* offset inside sram space (bank was set to closest 1MB) */
         ori.l   #0x200000,d0            /* sram space access */
         movea.l d0,a0
+        lea     0x6060.w,a1
         move.l  16(sp),d3               /* count */
         subq.w  #1,d3
 0:
         move.w  #1023,d0
 1:
         moveq   #1,d1
-        and.w   0x6060.w,d1
+        and.w   (a1),d1
         dbeq    d0,1b
         bne.w   9f                      /* timeout */
 
         moveq   #127,d0
 2:
-        move.w  0x6060.w,d1
+        move.w  (a1),d1
         moveq   #15,d2
-        and.w   0x6060.w,d2
+        and.w   (a1),d2
         lsl.b   #4,d1
         or.b    d2,d1                   /* first byte */
         moveq   #15,d2
-        and.w   0x6060.w,d2
+        and.w   (a1),d2
         lsl.w   #4,d1
         or.b    d2,d1
         moveq   #15,d2
-        and.w   0x6060.w,d2
+        and.w   (a1),d2
         lsl.w   #4,d1
         or.b    d2,d1                   /* second byte */
 
         move.w  d1,(a0)+
 
-        move.w  0x6060.w,d1
+        move.w  (a1),d1
         moveq   #15,d2
-        and.w   0x6060.w,d2
+        and.w   (a1),d2
         lsl.b   #4,d1
         or.b    d2,d1                   /* first byte */
         moveq   #15,d2
-        and.w   0x6060.w,d2
+        and.w   (a1),d2
         lsl.w   #4,d1
         or.b    d2,d1
         moveq   #15,d2
-        and.w   0x6060.w,d2
+        and.w   (a1),d2
         lsl.w   #4,d1
         or.b    d2,d1                   /* second byte */
 
@@ -1349,33 +1372,35 @@ multi_sd_to_myth_psram:
         dbra    d0,2b
 
         /* throw away CRC */
-        move.w  0x6060.w,d1
-        move.w  0x6060.w,d2
-        move.w  0x6060.w,d1
-        move.w  0x6060.w,d2
-        move.w  0x6060.w,d1
-        move.w  0x6060.w,d2
-        move.w  0x6060.w,d1
-        move.w  0x6060.w,d2
-        move.w  0x6060.w,d1
-        move.w  0x6060.w,d2
-        move.w  0x6060.w,d1
-        move.w  0x6060.w,d2
-        move.w  0x6060.w,d1
-        move.w  0x6060.w,d2
-        move.w  0x6060.w,d1
-        move.w  0x6060.w,d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
+        move.w  (a1),d1
+        move.w  (a1),d2
 
-        move.w  0x6060.w,d1             /* end bit */
+        move.w  (a1),d1             /* end bit */
 
         dbra    d3,0b
 
+        lea     0xA10000,a1
         move.w  #0x0080,GBAC_LIO(a1)
 |        move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
         movem.l (sp)+,d2-d3
         moveq   #1,d0                   /* TRUE */
         rts
 9:
+        lea     0xA10000,a1
         move.w  #0x0080,GBAC_LIO(a1)
 |        move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
         movem.l (sp)+,d2-d3
