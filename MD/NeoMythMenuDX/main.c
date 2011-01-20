@@ -2040,36 +2040,38 @@ void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(u
     {
         // fetch data data from source
         if (src)
-            (src)(buffer, soffset + iy + (gFileType ? 512 : 0), XFER_SIZE);
-        switch (gFileType)
         {
-            case 1:
-                // SMD LSB first
-                for (ix=0; ix<8192; ix++)
-                {
-                    buffer[XFER_SIZE + ix*2 + 1] = buffer[ix];
-                    buffer[XFER_SIZE + ix*2 + 0] = buffer[8192 + ix];
-                }
-                break;
-            case 2:
-                // SMD MSB first
-                for (ix=0; ix<8192; ix++)
-                {
-                    buffer[XFER_SIZE + ix*2 + 0] = buffer[ix];
-                    buffer[XFER_SIZE + ix*2 + 1] = buffer[8192 + ix];
-                }
-                break;
+            (src)(buffer, soffset + iy + (gFileType ? 512 : 0), XFER_SIZE);
+            switch (gFileType)
+            {
+                case 1:
+                    // SMD LSB first
+                    for (ix=0; ix<8192; ix++)
+                    {
+                        buffer[XFER_SIZE + ix*2 + 1] = buffer[ix];
+                        buffer[XFER_SIZE + ix*2 + 0] = buffer[8192 + ix];
+                    }
+                    break;
+                case 2:
+                    // SMD MSB first
+                    for (ix=0; ix<8192; ix++)
+                    {
+                        buffer[XFER_SIZE + ix*2 + 0] = buffer[ix];
+                        buffer[XFER_SIZE + ix*2 + 1] = buffer[8192 + ix];
+                    }
+                    break;
+            }
         }
         // store data to destination
         (dst)(&buffer[gFileType ? XFER_SIZE : 0], doffset + iy, XFER_SIZE);
         update_progress(str1, str2, iy, length);
     }
-    if ((length == 0x200000) && (dst == &neo_copyto_myth_psram))
+    if ((length == 0x200000) && ((dst == &neo_copyto_myth_psram) || (dst == &neo_sd_to_myth_psram)))
     {
-    // clear past end of rom for S&K
-    utility_memset(buffer, 0x00, XFER_SIZE);
-    for (iy=length; iy<(length + 0x020000); iy+=XFER_SIZE)
-        (dst)(buffer, doffset + iy, XFER_SIZE);
+        // clear past end of rom for S&K
+        utility_memset(buffer, 0x00, XFER_SIZE);
+        for (iy=length; iy<(length + 0x020000); iy+=XFER_SIZE)
+            neo_copyto_myth_psram(buffer, doffset + iy, XFER_SIZE);
     }
 }
 
