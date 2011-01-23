@@ -1304,6 +1304,14 @@ _sdInit_loop_end:
 	rep		#$20
 	bne		_sdInit_failed
 
+  ;SEND_MMC_CMD 6,$80FFFF01			; Set high-speed mode
+  ;RECV_MMC_CMD_RESP diskioResp,R1_LEN,1
+  ;ldx #512
+  ;-:
+  ;jsr		rdMmcDatBit
+  ;dex
+  ;bne -
+  
 	plx
 	lda		#1
 	sta		tcc__r0						; return TRUE
@@ -2100,6 +2108,11 @@ disk_readsect_psram_asm:
 	lda		tcc__r9h
 	pha
 
+	lda.l	useGbacPsram
+	beq		+
+	jsr		_neo_select_psram
++:
+
 	; read sector
 	jsr		neo2_pre_sd
 	jsr		_disk_readrsp_calc_sector		
@@ -2152,6 +2165,10 @@ disk_readsect_psram_asm:
 	lda		#RES_OK
 _disk_readrsp_return:
 	sta		tcc__r0
+	lda.l	useGbacPsram
+	beq		+
+	jsr		_neo_select_menu
++:
 	pla
 	sta		tcc__r9h
 	pla
@@ -2205,12 +2222,21 @@ disk_read_psram_multi_asm:
 	phx
 	phy
 
+;jsr show_copied_data
+;-: bra -
+
+	lda.l	useGbacPsram
+	beq		+
+	jsr		_neo_select_psram
++:
 	jsr		neo2_pre_sd
 	jsr		_disk_readprm_calc_sector
 	lda		tcc__r1h
 	pha
 	lda		tcc__r1
 	pha
+jml	aaaaa+$de0000	; Jump to Myth PSRAM
+aaaaa:	
 	jsr		sdReadStartMulti			; sdReadStartMulti(sector << ((cardType & 1) ? 0 : 9))
 	lda		tcc__r0
 	bne		+
@@ -2221,6 +2247,10 @@ disk_read_psram_multi_asm:
 	; read failed
 	pla
 	pla
+	lda.l	useGbacPsram
+	beq		+++
+	jsr		_neo_select_menu
++++:	
 	jsr		neo2_post_sd
 	lda		#RES_ERROR
 	sta		tcc__r0
@@ -2249,6 +2279,10 @@ jsr.w jsr_r10
 	pla
 	pla
 	pla
+	lda.l	useGbacPsram
+	beq		+++
+	jsr		_neo_select_menu
++++:	
 	jsr		neo2_post_sd
 	lda		#RES_ERROR
 	sta		tcc__r0
@@ -2294,6 +2328,10 @@ jsr.w jsr_r10
 	; read failed
 	pla
 	pla
+	lda.l	useGbacPsram
+	beq		+++
+	jsr		_neo_select_menu
++++:	
 	jsr		neo2_post_sd
 	lda		#RES_ERROR
 	sta		tcc__r0
@@ -2322,6 +2360,10 @@ jsr.w jsr_r10
 	pla
 	pla
 	pla
+	lda.l	useGbacPsram
+	beq		+++
+	jsr		_neo_select_menu
++++:	
 	jsr		neo2_post_sd
 	lda		#RES_ERROR
 	sta		tcc__r0
@@ -2340,7 +2382,13 @@ jsr.w jsr_r10
 	pla
 
 _disk_readprm_return:
+jml bbbbb+$7d0000
+bbbbb:
 	jsr		sdReadStopMulti
+	lda.l	useGbacPsram
+	beq		+++
+	jsr		_neo_select_menu
++++:	
 	jsr		neo2_post_sd
 	lda		#RES_OK
 	sta		tcc__r0

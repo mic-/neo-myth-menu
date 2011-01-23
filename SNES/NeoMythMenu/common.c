@@ -17,6 +17,9 @@ u16 gbaCardAlphabeticalIdx[500];
 
 itemList_t gamesList;
 
+u16 hasGbacPsram = 0;
+u16 useGbacPsram = 0;
+
 u8 doRegionPatch = 0;		// Should we scan the game for region checks and patch them?
 
 u8 snesRomInfo[0x40];		// 64-byte info block read from the ROM
@@ -43,7 +46,7 @@ char MS4[] = "\xff\x15\x02\x02 Game (001)";
 //
 const char * const metaStrings[] =
 {
-    "\xff\x03\x01\x07 Shell v 0.54\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2011 WWW.NEOFLASH.COM     ",
+    "\xff\x03\x01\x07 Shell v 0.55\xff\x02\x01\x03 NEO POWER SNES MYTH CARD (A)\xff\x1a\x04\x05\x22 2011 WWW.NEOFLASH.COM     ",
 	"\xff\x01\xfe\x0f\x0a\x68\x69\x6A\x20\x71\x72\x73\x20\x7a\x7b\x7c\x83\x84\x85\xfe\x10\x0a\x6b\x6c\x6d\x20\x74\x75\x76\x20\x7d\x7e\x7f\x86\x87\x88xfe\x11\x0a\x6e\x6f\x70\x20\x77\x78\x79\x20\x80\x81\x82\x89\x8a\x8b\xfe\x17\x06\x06\xff\x04                             ",
 	MS2,
 	MS3,

@@ -21,6 +21,7 @@
 
 // Offset a function pointer so that it points to a copy of the function in RAM
 #define MAKE_RAM_FPTR(fptr, fun) fptr = fun & 0x7fff; add_full_pointer((void**)&fptr, RAM_CODE_BANK-1, RAM_CODE_OFFSET)
+#define MAKE_PSRAM_FPTR(fptr, fun) fptr = fun & 0x7fff; add_full_pointer((void**)&fptr, 0xdf-1, RAM_CODE_OFFSET)
 
 
 // Maximum number of Game Genie codes allowed
@@ -154,6 +155,7 @@ extern u8 freeCodeSlots;
 extern u8 snesRomInfo[0x40];
 extern u8 doRegionPatch;
 extern u8 resetType;
+extern u16 hasGbacPsram,useGbacPsram;
 extern oamEntry_t marker;
 extern sourceMedium_t sourceMedium;
 extern char loadProgress[];
