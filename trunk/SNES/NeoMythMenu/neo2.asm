@@ -974,7 +974,7 @@ show_debug_data:
 	
 	
 show_copied_data:
- .DEFINE SHOWCOPYADDR $500000 ;7FF8
+ .DEFINE SHOWCOPYADDR $500140 ;7FF8
  .DEFINE NEO2_DEBUG 1
  .IFDEF NEO2_DEBUG
  	jsr.w	_wait_nmi
@@ -986,9 +986,9 @@ show_copied_data:
 	sep	#$20
 	ldx	#0
 -:
-rep #$20
+;rep #$20
 	lda.l	SHOWCOPYADDR,x
-sep #$20
+;sep #$20
 	lsr	a
 	lsr	a
 	lsr	a
@@ -1003,9 +1003,9 @@ sep #$20
 	sta.l	REG_VRAM_DATAW1
 	lda	#8
 	sta.l	REG_VRAM_DATAW2
-rep #$20
+;rep #$20
 	lda.l	SHOWCOPYADDR,x
-sep #$20
+;sep #$20
 	and	#15
 	clc
 	adc	#'0'
@@ -2178,6 +2178,111 @@ _neo_select_menu:
 	rts
 
 
+
+_neo_select_psram:
+	sep		#$20
+	rep		#$10
+	phx
+	phy
+
+	lda		#0
+	sta.l	MYTH_OPTION_IO				; set mode 0
+	lda		#$20
+	sta.l	MYTH_GBAC_ZIO				; A21 off
+
+	ldx		#$00E2
+	ldy		#$1500
+	jsr		_neo_asic_cmd				
+	
+	ldx		#$0037
+	rep		#$20
+	lda.l 	neo_mode					; enable/disable SD card interface
+	ora		#$2203
+	tay
+	jsr		_neo_asic_cmd				; set cr = select menu flash
+
+	ldx		#$00DA
+	ldy		#$AF44
+	jsr		_neo_asic_cmd				; set iosr = disable game flash
+
+	ldx		#$00C4 ;00EE
+	ldy		#$0000 ;0630
+	jsr		_neo_asic_cmd				
+
+	sep		#$20
+	lda		#0
+	sta.l	MYTH_GBAC_LIO				; clear low bank select reg
+	sta.l	MYTH_GBAC_HIO				; clear high bank select reg	
+	
+	rep		#$30
+	ply
+	plx
+	rts
+
+
+; Does the GBAC have PSRAM of its own (e.g. Neo2 Pro)?
+neo2_check_gbac_psram:
+    php
+    rep     #$30
+    phx
+    phy
+
+    jsr     _neo_select_psram
+    sep		#$20
+   	lda    	#$F8
+    sta.l  	MYTH_PRAM_ZIO	; PSRAM 8M SIZE
+	LDA    	#GBAC_TO_PSRAM_COPY_MODE
+	STA.L  	MYTH_OPTION_IO
+	lda 	#1
+	sta.l 	MYTH_WE_IO
+	lda		#10
+	sta.l	MYTH_PRAM_BIO
+	
+    rep     #$20
+
+    ; Calculate the beginning of the Fibonacci series
+    ldx     #0
+    ldy     #8
+    lda     #1
+    sta.l   $400000
+    sta.l   $400000+2        
+-:
+    lda.l   $400000,x
+    clc
+    adc.l   $400000+2,x
+    inx
+    inx
+    sta.l   $400000+2,x
+    dey     
+    bne     -
+
+    ; The 4th and 8th entries in the series should be 3 and 21
+    ldx     #0
+    lda.l   $400000+6
+    cmp     #3
+    bne     +
+    lda.l   $400000+14
+    cmp     #21
+    bne     +
+    ldx     #1
++:
+    txa
+    sta.l   hasGbacPsram
+
+	sep		#$20
+	lda 	#0
+	sta.l 	MYTH_WE_IO
+	lda		#0
+	sta.l	MYTH_PRAM_BIO
+    jsr     _neo_select_menu
+    jsr		neo2_post_sd
+    rep     #$30    
+    ply
+    plx
+    plp
+    rtl
+    
+    
 ; void neo2_enable_sd(void);
 neo2_enable_sd:
 	sei								; disable interrupts
@@ -2206,18 +2311,18 @@ neo2_disable_sd:
 neo2_pre_sd:
 	sei						; disable interrupts
 	sep		#$20
-	lda		#$87 ;80
+	lda		#$87 
 	sta.l	MYTH_GBAC_LIO
 
-    lda    #$F8
-    sta.l  MYTH_PRAM_ZIO
-	LDA    #GBAC_TO_PSRAM_COPY_MODE
-	STA.L  MYTH_OPTION_IO
-	LDA    #$F8
-	STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+    lda    	#$F8
+    sta.l  	MYTH_PRAM_ZIO	; PSRAM 8M SIZE
+	LDA    	#GBAC_TO_PSRAM_COPY_MODE
+	STA.L  	MYTH_OPTION_IO
+	LDA    	#$F8
+	STA.L  	MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
 
-	lda #1
-	sta.l MYTH_WE_IO
+	lda 	#1
+	sta.l 	MYTH_WE_IO
 
 	rep		#$20
 	rts
@@ -2229,13 +2334,13 @@ neo2_post_sd:
 	lda		#0
 	sta.l	MYTH_GBAC_LIO
 
-	LDA    #0
-	STA.L  MYTH_OPTION_IO
-	LDA    #$0
-	STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+	LDA    	#0
+	STA.L  	MYTH_OPTION_IO
+	LDA    	#$0
+	STA.L  	MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
 
-	lda #0
-	sta.l MYTH_WE_IO
+	lda 	#0
+	sta.l 	MYTH_WE_IO
 	
 	rep		#$20
 	rts
@@ -2369,6 +2474,7 @@ _nrsdp_write:
 	
 
 
+
 ; void neo2_recv_sd_psram_multi(WORD prbank, WORD proffs, WORD count)
 ;
 .EQU _neo2_recv_sd_psram_multi_save_regs 6
@@ -2477,8 +2583,11 @@ _nrsdpm_return:
 	plx
 	plp
 	rts
+
+;nop	
 	
-	
+
+.DEFINE RECV_SD_OFS $DE0000
 
 ; void neo2_recv_sd_psram_multi_hwaccel(WORD prbank, WORD proffs, WORD count)
 ;
@@ -2494,17 +2603,25 @@ neo2_recv_sd_psram_multi_hwaccel:
 	phy
 	phb
 
+;jsr show_copied_data
+;-: bra -
+
 	lda		_neo2_recv_sd_psram_multi_hwaccel_proffs,s
 	tax
 	lda		_neo2_recv_sd_psram_multi_hwaccel_count,s
 	tay
 	sep		#$20
-	lda		_neo2_recv_sd_psram_multi_hwaccel_prbank,s	
-	sta.l	$7d0000+_nrsdpmhw_writeB0+3
-	sta.l	$7d0000+_nrsdpmhw_writeB1+3
-	sta.l	$7d0000+_nrsdpmhw_writeB2+3
-	sta.l	$7d0000+_nrsdpmhw_writeB3+3
-
+	lda		#$AD					; $AD = LDA Abs
+	xba
+	lda		_neo2_recv_sd_psram_multi_hwaccel_prbank,s
+	rep #$20
+	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB0+3
+	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB1+3
+	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB2+3
+	eor		#$4500  				; Set high byte = $E8 = INX
+	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB3+3
+	sep		#$20
+	
 	lda		#$01
 	sta.l	REG_MEMSEL
 	
@@ -2536,24 +2653,28 @@ _nrsdpmhw_sectors:
 _nrsdpmhw_loop_inner:
 	lda.w 	$6063
 	lda.w 	$6063
+; NOTE: THIS LABEL MUST BE LOCATED ON AN ODD ADDRESS
 _nrsdpmhw_writeB0:
 	sta.l 	$500000,x				; Write 8 bits to PSRAM
-	inx
+	;inx
 	lda.w 	$6063
 	lda.w 	$6063
 _nrsdpmhw_writeB1:
-	sta.l 	$500000,x				; Write 8 bits to PSRAM
-	inx
+	sta.l 	$500001,x				; Write 8 bits to PSRAM
+	;inx
 	lda.w 	$6063
 	lda.w 	$6063
 _nrsdpmhw_writeB2:
-	sta.l 	$500000,x				; Write 8 bits to PSRAM
-	inx
+	sta.l 	$500002,x				; Write 8 bits to PSRAM
+	;inx
 	lda.w 	$6063
 	lda.w 	$6063
 _nrsdpmhw_writeB3:
-	sta.l 	$500000,x				; Write 8 bits to PSRAM
+	sta.l 	$500003,x				; Write 8 bits to PSRAM
 	inx
+inx
+inx
+inx
 	dey
 	bne		_nrsdpmhw_loop_inner	; repeat 256 times
 
@@ -2569,12 +2690,16 @@ _nrsdpmhw_writeB3:
 
 	cpx		#0						; has proffs wrapped around (i.e. should we move to the next bank) ?
 	bne		+
-	lda.l	$7d0000+_nrsdpmhw_writeB0+3
+rep #$20
+	lda.l	RECV_SD_OFS+_nrsdpmhw_writeB0+3
 	ina
-	sta.l	$7d0000+_nrsdpmhw_writeB0+3
-	sta.l	$7d0000+_nrsdpmhw_writeB1+3
-	sta.l	$7d0000+_nrsdpmhw_writeB2+3
-	sta.l	$7d0000+_nrsdpmhw_writeB3+3
+	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB0+3
+	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB1+3
+	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB2+3
+	lda.l	RECV_SD_OFS+_nrsdpmhw_writeB3+3
+	ina
+	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB3+3
+sep #$20
 +:
 
 	ply								; count
@@ -2638,30 +2763,36 @@ jsr_r10:
  
 
 run_game_from_sd_card:
-	jsl	clear_status_window
-	jsl	update_screen
+	jsl		clear_status_window
+	jsl		update_screen
 
-	sep	#$20
+	sep		#$20
 
-	lda	#$7e
+	lda		#$7e
 	pha
 	plb
 
 	lda.l	romAddressPins
-	sta	tcc__r2h
+	sta		tcc__r2h
 
-	LDA    #$20      	; OFF A21
-	STA.L  MYTH_GBAC_ZIO
-	JSR    SET_NEOCMA  	;
-	JSR    SET_NEOCMB  	;
-	JSR    SET_NEOCMC  	; ON_NEO CARD A24 & A25 + SA16 & SA17
+	lda.l	useGbacPsram
+	bne		+
+	LDA    	#$20      	; OFF A21
+	STA.L  	MYTH_GBAC_ZIO
+	JSR    	SET_NEOCMA  	;
+	JSR    	SET_NEOCMB  	;
+	JSR    	SET_NEOCMC  	; ON_NEO CARD A24 & A25 + SA16 & SA17
 
 	LDA.L   romAddressPins+1
 	STA.L   MYTH_GBAC_HIO	; SET AH25,AH25
 
 	LDA     #$01
 	STA.L   MYTH_EXTM_ON   ; A25,A24 ON
-
+	bra		++
++:
+	jsr.w	_neo_select_psram
+	sep		#$20
+++:
 
 	;                    4M    4M    4M  4M~8M
 	MOV_SD_PSRAM_SETUP $04, $3C, $3035, $04, $00
@@ -2845,13 +2976,15 @@ MOV_SD_PSRAM_DONE:
 ;-------------------------------------------------------------------------------
 ;neo gba card menu ,swap back to power on mode
 
+	lda.l	useGbacPsram
+	bne		+
 	 LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
 	 STA.L   MYTH_OPTION_IO
 
 	 LDA     #$20       	; OFF A21
 	 STA.L   MYTH_GBAC_ZIO
 	 JSR     SET_NEOCMD	; SET MENU
-
++:
 	 LDA     #$00
 	 STA.L   MYTH_GBAC_LIO
 	 STA.L   MYTH_GBAC_HIO

@@ -1,5 +1,5 @@
 // SNES Myth Shell
-// C version 0.54
+// C version 0.55
 //
 // Mic, 2010-2011
 
@@ -35,7 +35,7 @@ u16 romAddressPins;
 u8 gameMode;
 u8 romSize, romRunMode, sramSize, sramBank, sramMode;
 u8 extDsp, extSram;
-u16 neo_mode;
+u16 neo_mode = 0;
 
 
 sortOrder_t sortOrder = SORT_LOGICALLY;
@@ -435,6 +435,7 @@ void print_hw_card_rev()
 	{
 		printxy("CPLD ID:", 20, 3, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 32);
 		print_hex(cpID, 28, 3, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+		//print_hex(useGbacPsram, 16, 24, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	}
 
 }
@@ -553,6 +554,7 @@ void run_secondary_cart_c()
 void unzip_vgz()
 {
 	DWORD (*pInflate)(DWORD, DWORD);
+	void (*psram_write)(char*, u16, u16, u16);
 	DWORD deflatedDataAddr;
 	DWORD unzippedSize;
 	WORD i;
@@ -572,7 +574,11 @@ void unzip_vgz()
 	printxy("Unzipping..  ", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
 	update_screen();
 	MAKE_RAM_FPTR(pInflate, inflate);
+	MAKE_RAM_FPTR(psram_write, neo2_myth_psram_write);
+
+	psram_write((char*)0x7E9000, 0x0F, 0x9000, 0x3000);
 	unzippedSize = pInflate(0x500000, deflatedDataAddr);
+
 	printxy("Uncompressed size:", 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
 	print_dec(unzippedSize, 21, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 	vgzSize = highlightedFileSize;
@@ -809,17 +815,21 @@ void get_rom_size(WORD sizeInMbits)
 	{
 		romSize = 0x0B;
 	}
-	else if (sizeInMbits <= 32)
+	else if (sizeInMbits <= 40)
 	{
-		romSize = 0x0B;
+		romSize = 0x0C;
 	}
-	else if (sizeInMbits <= 32)
+	else if (sizeInMbits <= 48)
 	{
-		romSize = 0x0B;
+		romSize = 0x0D;
 	}
-	else if (sizeInMbits <= 32)
+	else if (sizeInMbits <= 64)
 	{
-		romSize = 0x0B;
+		romSize = 0x0E;
+	}
+	else if (sizeInMbits <= 96)
+	{
+		romSize = 0x0E;
 	}
 	else
 	{
@@ -836,6 +846,7 @@ void run_game_from_sd_card_c()
 	void (*run_game)(void);
 	void (*mirror_psram)(DWORD,DWORD,DWORD);
 	DWORD (*pInflate)(void);
+	void (*psram_write)(char*, u16, u16, u16);
 	static WORD mbits, sects, bytesRead, mythprbank, prbank, proffs, recalcSector;
 	static DWORD unzippedSize;
 	static u8 *myth_pram_bio = (u8*)0xC006;
@@ -846,6 +857,8 @@ void run_game_from_sd_card_c()
 		change_directory(highlightedFileName);
 		return;
 	}
+
+	MAKE_RAM_FPTR(psram_write, neo2_myth_psram_write);
 
 	strcpy(tempString, sdRootDir);
 	if (sdRootDirLength > 1)
@@ -960,12 +973,20 @@ void run_game_from_sd_card_c()
 		mythprbank = 1;
 	}
 
-	*myth_pram_bio = mythprbank;
+	if (gameMode == GAME_MODE_ZIPPED_ROM)
+	{
+		if (highlightedFileSize & 0x1FF) sects++;
+	}
+
 	proffs = 0;
 	i = mbits;
+	// Copy some of the code from neo2.asm / diskio_asm.inc to PSRAM
+	psram_write((char*)0x7E9000, (mythprbank<<4)|0x0F, 0x9000, 0x3000);
+	*myth_pram_bio = mythprbank;
 	while (i)
 	{
 		show_loading_progress();
+
 
 		if ((lastSdError = pf_read_1mbit_to_psram_asm(prbank, proffs, mythprbank, recalcSector)) != FR_OK)
 		{
@@ -981,14 +1002,10 @@ void run_game_from_sd_card_c()
 		{
 			prbank = 0x50;
 			mythprbank++;
+			if (sects) psram_write((char*)0x7E9000, (mythprbank<<4)|0x0F, 0x9000, 0x2800);
 			*myth_pram_bio = mythprbank;
 		}
 		i--;
-	}
-
-	if (gameMode == GAME_MODE_ZIPPED_ROM)
-	{
-		if (highlightedFileSize & 0x1FF) sects++;
 	}
 
 	if (sects)
@@ -1023,6 +1040,8 @@ void run_game_from_sd_card_c()
 	{
 		printxy("Unzipping..    ", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
 		update_screen();
+
+		//psram_write((char*)0x7E9000, 0x1F, 0x9000, 0x3000);
 
 		MAKE_RAM_FPTR(pInflate, inflate_game);
 		unzippedSize = pInflate();
@@ -1378,6 +1397,7 @@ int main()
 	u16 keys;
 
 	DWORD (*pfninflate)(DWORD, DWORD);
+	void (*check_gbac_psram)();
 
 	static DIR dir;
 	static FILINFO fileInfo;
@@ -1405,6 +1425,10 @@ int main()
 	cardModel = *(u8*)0x00fff0;
 
 	copy_ram_code();
+
+	/*MAKE_RAM_FPTR(check_gbac_psram, neo2_check_gbac_psram);
+	check_gbac_psram();
+	useGbacPsram = hasGbacPsram;*/
 
 	REG_DISPCNT = 0x80;				// Turn screen off
 

@@ -383,9 +383,18 @@ _pr1pa_no_recalc:
 	lda		#1
 	sta		_pf_read_1mbit_to_psram_asm_recalcsector,s
 
+;	lda		_pf_read_1mbit_to_psram_asm_prbank,s
+;	cmp		#$5F
+;	bne		+
+;	jmp.w	_pr1pa_read_single_sector
+;+:
+
 	lda		_pf_read_1mbit_to_psram_asm_prbank,s
 	cmp		#$5F
-	bne		+
+	bcc		+
+	lda		_pf_read_1mbit_to_psram_asm_proffs,s
+	cmp		#$8000
+	bcc		+
 	jmp.w	_pr1pa_read_single_sector
 +:
 	
@@ -420,18 +429,36 @@ _pr1pa_no_recalc:
 	lda		_pf_read_1mbit_to_psram_asm_prbank,s
 	adc		tcc__r0h
 	sta		tcc__r0h
-	cmp		#$60
+	cmp		#$5F ;60
 	bcc		+
 	; Take the number of overshooting sectors plus one, and subtract that from remSectInClust
-	lda		tcc__r0
-	.rept 9
-	lsr		a
-	.endr
-	ina
-	sta		tcc__r1
-	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
+;	lda		tcc__r0
+;	.rept 9
+;	lsr		a
+;	.endr
+;	ina
+;	sta		tcc__r1
+;	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
+;	sec
+;	sbc		tcc__r1
+;	bpl		++
+;	jmp.w	_pr1pa_read_single_sector
+
 	sec
-	sbc		tcc__r1
+	lda		tcc__r0
+	sbc		#$8000
+	sta		tcc__r0
+	lda		tcc__r0h
+	sbc		#$5F
+  bmi +
+	sta		tcc__r0h
+	.rept 9
+	lsr		tcc__r0h
+	ror		tcc__r0
+	.endr
+	sec
+	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
+	sbc		tcc__r0
 	bpl		++
 	jmp.w	_pr1pa_read_single_sector
 ++:
@@ -454,7 +481,7 @@ _pr1pa_no_recalc:
 	pha
 	lda		_pf_read_1mbit_to_psram_asm_prbank+8,s
 	pha
-	jsl 	$7d0000+disk_read_psram_multi_asm
+	jsl 	$7d0000+disk_read_psram_multi_asm  ;7d
 	pla
 	pla
 	pla
@@ -532,6 +559,7 @@ _pr1pa_no_recalc:
 	sta		tcc__r0h
 	sta		_pf_read_1mbit_to_psram_asm_prbank,s
 
+.IFDEF PFF_CHECK_WRAP
 	; Did we wrap around a 1 MByte PSRAM boundary?
 	cmp		#$60
 	bne		+
@@ -541,9 +569,32 @@ _pr1pa_no_recalc:
 	lda		_pf_read_1mbit_to_psram_asm_mythprbank,s
 	ina
 	sta		_pf_read_1mbit_to_psram_asm_mythprbank,s
+	
+	;psram_write((char*)0x7E9000, (mythprbank<<4)|0x0F, 0x9000, 0x2800);
+	rep		#$20
+	pea.w	$2800
+	pea.w	$9000
+	lda		_pf_read_1mbit_to_psram_asm_mythprbank,s
+	asl		a
+	asl		a
+	asl		a
+	asl		a
+	ora		#$0F
+	pha
+	pea.w	$007E
+	pea.w	$9000
+	jsl		neo2_myth_psram_write
+	pla
+	pla
+	pla
+	pla
+	pla
+	sep		#$20
+	lda		_pf_read_1mbit_to_psram_asm_mythprbank,s
 	sta.l	MYTH_PRAM_BIO
 	rep		#$20
 +:
+.ENDIF
 	jmp		_pr1pa_while_numSects_next
 
 _pr1pa_read_single_sector:
@@ -632,6 +683,7 @@ _pr1pa_while_numSects_next:
 
 	stz		tcc__r0			; FR_OK
 _pr1pa_return:
+
 	ply
 	plx
 	plp

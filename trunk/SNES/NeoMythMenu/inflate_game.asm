@@ -44,6 +44,7 @@
 .EQU inflateCodes_primaryCodes       inflate_zp+14  ; 1 byte
 
 ;.EQU wordOutputPointer               inflate_zp+16  ; 3 bytes
+;.EQU getBit_rem						inflate_zp+16
 
 ; Argument values for getBits
 .EQU GET_1_BIT                       $81
@@ -88,44 +89,50 @@ inflate_game:
 	phy
 	;stz		tcc__r0
 	;stz		tcc__r1
-	lda		#2
-	sta 	tcc__r0h
 	sep 	#$30	; 8-bit A/X/Y
 
-	LDA    #$20      		; OFF A21
-	STA.L  MYTH_GBAC_ZIO
-	JSR    SET_NEOCMA  		;
-	JSR    SET_NEOCMB  		;
-	JSR    SET_NEOCMC  		; ON_NEO CARD A24 & A25 + SA16 & SA17
-	LDA    #$01
-	STA.L  MYTH_EXTM_ON  	; A25,A24 ON
-	LDA    #$04       		; COPY MODE !
-	STA.L  MYTH_OPTION_IO
-	LDA    #$01       		; PSRAM WE ON !
-	STA.L  MYTH_WE_IO
-	LDA    #$F8
-	STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
-	;LDA	   #$F0
-	STA.L  MYTH_PRAM_ZIO  	; PSRAM    16M SIZE
-	LDA    #$01
-	STA.L  MYTH_PRAM_BIO
+;	LDA    #$20      		; OFF A21
+;	STA.L  MYTH_GBAC_ZIO
+;	JSR    SET_NEOCMA  		;
+;	JSR    SET_NEOCMB  		;
+;	JSR    SET_NEOCMC  		; ON_NEO CARD A24 & A25 + SA16 & SA17
+;	;LDA    #$01
+;	;STA.L  MYTH_EXTM_ON  	; A25,A24 ON
+;	LDA    #$01       		; 
+;	STA.L  MYTH_OPTION_IO
+;	LDA    #$01       		; PSRAM WE ON !
+;	STA.L  MYTH_WE_IO
+;	;LDA    #$F8
+;	;STA.L  MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+;	LDA    #$F0
+;	STA.L  MYTH_PRAM_ZIO  	; PSRAM    16M SIZE
+;	LDA    #$00
+;	STA.L  MYTH_PRAM_BIO
 
+	jsr.w _neo_select_psram
+	sep 	#$30
+    lda    	#$F0
+    sta.l  	MYTH_PRAM_ZIO	; PSRAM 16M SIZE
+	LDA    	#1 
+	STA.L  	MYTH_OPTION_IO
+	lda 	#1
+	sta.l 	MYTH_WE_IO
+	LDA    	#$00
+	STA.L  	MYTH_PRAM_BIO
+	
 	stz 	getBit_buffer
 
-	lda		#$50
-	sta		inputPointer+2
-	lda		#$50
-	sta		outputPointer+2
-	sta		tcc__r2+2
+	lda		#2
+	sta 	tcc__r0h
 
-	;stz		tcc__r3			; input PRAM bank
-	;stz		tcc__r3+1		; output PRAM bank
-	;stz		tcc__r3h
+	lda		#$D0
+	sta		inputPointer+2
+	lda		#$40 
+	sta		outputPointer+2
 
 	rep		#$20
 	stz		inputPointer
 	stz		outputPointer
-	stz		tcc__r2
 	
 	; Compressed bitstream starts at offset $1e + sizeof(filename) + sizeof(extra_field)
 	lda.l	INPUT_BASE+$1a		; filename length
@@ -135,7 +142,8 @@ inflate_game:
 	clc
 	adc		#$1e
 	sta		inputPointer
-	
+
+ 	
 	sep		#$20
 	lda.l	INPUT_BASE+8		; compression type
 	cmp		#8			; deflate
@@ -193,9 +201,15 @@ inflate_game_not_smc:
 
  lda		#0
  sta.l	MYTH_PRAM_BIO
+ 
+ 	lda		#$01
+	sta.l	REG_MEMSEL
+	
 	ldy 	#0
 	ldx		#0
-	
+
+jml $DE0000+inflate_game_blockLoop	; Jump to this code in PSRAM
+
 inflate_game_blockLoop:
 ; Get a bit of EOF and two bits of block type
 ;	ldy	#0
@@ -205,8 +219,11 @@ inflate_game_blockLoop:
 	lsr		a 
 	php
 	tax
-	bne		inflateGameCompressedBlock
-
+	;bne		inflateGameCompressedBlock
+	beq	+
+	jmp.w	inflateGameCompressedBlock
+	+:
+	
 ; Copy uncompressed block
 ;	ldy	#0
 	sty		getBit_buffer
@@ -218,7 +235,29 @@ inflate_game_blockLoop:
 inflateGameStoredBlock_copyByte
 	jsr		game_getByte
 inflateGameStoreByte
-	jsr		storeByte
+	;jsr		storeByte
+
+	dec 	tcc__r0h
+	bne 	+
+	  ; odd address
+	xba
+	lda 	tcc__r1h
+	rep	#$20
+	  sta	[outputPointer]
+	sep	#$20
+	lda 	#2
+	sta 	tcc__r0h
+	inc 	outputPointer
+	  inc 	outputPointer
+	  bne	++
+	  rep	#$20
+	  inc	outputPointer+1
+	  sep	#$20
+ +:
+;	  ; even address
+    sta	tcc__r1h
+++:
+
   	bcs 	+
   	jmp.w 	inflateGameCodes_loop
 +:
@@ -242,11 +281,21 @@ inflate_game_nextBlock
   	lda 	outputPointer+2
   	and 	#$FF
   	sec
-  	sbc 	#$50
+  	sbc 	#$40 ;50
   	sta 	tcc__r1
  
-	jsr.w	inflate_remove_smc_header
+ 	;jsr.w show_copied_data
+ 	;-: bra -
+
+jml $7D0000+ccccc		; Jump to this code in WRAM
+ccccc:
  	
+	jsr.w	inflate_remove_smc_header
+
+	sep		#$20
+ 	lda		#$00
+	sta.l	REG_MEMSEL
+
 inflate_game_return:  
 	sep		#$20
 	LDA     #$00       ;
@@ -423,15 +472,13 @@ inflateGameCodes_setOffsetHighByte:
 	
 	rep 	#$20
  	lda 	inflateCodes_sourcePointer
+ 	sta		tcc__r2
  	cmp  	#$FFFF
  	bne		+
- 	jsr.w	fillBytes
- 	bra		inflateGameCodes_loop
+ 	jsr.w	fillBytes16bit
+ 	bra		game_after_copy_fill ;inflateGameCodes_loop
  +:
- 	clc
- 	lda 	tcc__r0h
- 	and 	#1
- 	adc 	inflateCodes_sourcePointer
+	lda 	inflateCodes_sourcePointer
  	clc
 	adc 	outputPointer
 	sta 	inflateCodes_sourcePointer
@@ -455,18 +502,20 @@ inflateGameCodes_setOffsetHighByte:
 	tax
 	sep 	#$20
 	
-	jsr.w 	copyBytes
+	jsr.w 	copyBytes16bit
+game_after_copy_fill:
+	rep		#$30
+	tya
+	clc
+	adc		outputPointer
+	sta 	outputPointer	
 	ldy 	#0
 	sep 	#$30
+	bcc 	+
+	inc 	outputPointer+2
++:
 	sty 	inflateCodes_lengthMinus2
 	
-
-;	jsr		game_copyByte
-;	jsr		game_copyByte
-;inflateGameCodes_copyByte:
-;	jsr		game_copyByte
-;	dec		inflateCodes_lengthMinus2
-;	bne		inflateGameCodes_copyByte
 
 ;rep #$20
 ;lda outputPointer
@@ -519,7 +568,6 @@ game_buildHuffmanTree:
 ; Clear nBitCode_totalCount, nBitCode_literalCount, nBitCode_controlCount
 	tya
 ;	lda	#0
-	;sta:rne	nBitCode_clearFrom,y+
 -:
   	sta.w	nBitCode_clearFrom,y
   	iny
@@ -578,7 +626,27 @@ game_fetchCode:
 ;	ldy	#0
 	tya
 game_fetchCode_nextBit:
-	jsr		game_getBit
+	;jsr		game_getBit
+
+	lsr		getBit_buffer
+	bne		++
++:
+	pha
+ 	lda 	[inputPointer]
+	;rep		#$20
+	inc 	inputPointer
+	;sep 	#$20
+	bne		+
+	rep		#$20
+	inc		inputPointer+1
+	sep		#$20
++:
+	sec
+	ror		a 
+	sta		getBit_buffer
+	pla
+++:
+
 	rol		a 
 	inx
  	sec
@@ -601,6 +669,8 @@ game_fetchCode_control:
 	sec
 	rts
 
+
+
 ; Read A minus 1 bits, but no more than 8
 game_getAMinus1BitsMax8:
 	rol		getBits_base
@@ -609,35 +679,20 @@ game_getAMinus1BitsMax8:
 	bcs		game_getByte
 	lda.w	getNPlus1Bits_mask-2,x
 game_getBits:
-	jsr		game_getBits_loop
-game_getBits_normalizeLoop:
+	;jsr		game_getBits_loop
+	lsr		getBit_buffer
+	beq		+
+	ror		a 
+	bcc		game_getBits ;_loop
+	;bra game_getBits_normalizeLoop ;rts
+-:
 	lsr		getBits_base
 	ror		a 
-	bcc		game_getBits_normalizeLoop
+	bcc		-
 	rts
-
-
-; Read 16 bits
-game_getWord:
-	jsr		game_getByte
-	tax
-; Read 8 bits
-game_getByte:
-	lda		#$80
-game_getBits_loop:
-	;jsr		game_getBit
-
-	lsr		getBit_buffer
-	bne		++
++:	
 	pha
-	lda		#1
-	sta.l	MYTH_PRAM_BIO
-	;nop
 	lda 	[inputPointer]
- xba
- lda		#0
- sta.l	MYTH_PRAM_BIO
- xba	
 	rep		#$20
 	inc 	inputPointer
 	sep 	#$20
@@ -649,7 +704,92 @@ game_getBits_loop:
 	sta		getBit_buffer
 	pla
 ++:
+	ror		a 
+	bcc		game_getBits ;_loop
+	;rts	
+game_getBits_normalizeLoop:
+	lsr		getBits_base
+	ror		a 
+	bcc		game_getBits_normalizeLoop
+	rts
 
+
+	
+	
+
+; Read 16 bits
+game_getWord:
+	jsr		game_getByte
+	tax
+; Read 8 bits
+game_getByte:
+	lda		#$80
+;game_getByte_loop:
+	.rept 8
+	lsr		getBit_buffer
+	beq		+
+	ror		a 
+	.endr
+;	bcc		game_getBits_loop
+	rts
++:
+-:
+;	bne		++
+	pha
+	;lda		#1
+	;sta.l	MYTH_PRAM_BIO
+	lda 	[inputPointer]
+ 	;xba
+ 	;lda		#0
+ 	;sta.l	MYTH_PRAM_BIO
+ 	;xba	
+	rep		#$20
+	inc 	inputPointer
+	sep 	#$20
+	bne		+
+	inc		inputPointer+2
++:
+	sec
+	ror		a 
+	sta		getBit_buffer
+	pla
+++:
+	ror		a 
+	bcc		game_getByte_loop
+	rts
+game_getByte_loop:
+	lsr		getBit_buffer
+	ror		a 
+	bcc		game_getByte_loop
+	rts
+	
+game_getBits_loop:
+	lsr		getBit_buffer
+	beq		+
+	ror		a 
+	bcc		game_getBits_loop
+	rts
++:	
+;	bne		++
+	pha
+	;lda		#1
+	;sta.l	MYTH_PRAM_BIO
+	lda 	[inputPointer]
+ 	;xba
+ 	;lda		#0
+ 	;sta.l	MYTH_PRAM_BIO
+ 	;xba	
+	rep		#$20
+	inc 	inputPointer
+	sep 	#$20
+	bne		+
+	inc		inputPointer+2
++:
+	sec
+	ror		a 
+	sta		getBit_buffer
+	pla
+++:
 	ror		a 
 	bcc		game_getBits_loop
 	rts
@@ -658,16 +798,17 @@ game_getBits_loop:
 ; Read one bit, return in the C flag
 game_getBit:
 	lsr		getBit_buffer
-	bne		game_getBit_return
+	beq		+
+	rts
++:
 	pha
-	lda		#1
-	sta.l	MYTH_PRAM_BIO
-	;nop
+	;lda		#1
+	;sta.l	MYTH_PRAM_BIO
  	lda 	[inputPointer]
- xba
- lda		#0
- sta.l	MYTH_PRAM_BIO
- xba	
+	;xba
+	;lda		#0
+ 	;sta.l	MYTH_PRAM_BIO
+ 	;xba	
 	rep		#$20
 	inc 	inputPointer
 	sep 	#$20
@@ -688,12 +829,9 @@ inflate_remove_smc_header:
  	lda		tcc__r0
  	and		#512
  	beq		++
- 	lda		#512
- 	sta.w	remove_smc+1
  	sep		#$20
- 	lda		#$50
- 	sta.w	remove_smc+3
- 	sta.w	remove_smc+7
+ 	lda		#$40 ;50
+ 	sta		tcc__r0h
  	rep		#$20
  	ldx		#0
  	ldy		tcc__r1
@@ -703,20 +841,23 @@ inflate_remove_smc_header:
  	beq		+
  	iny
  +:
- remove_smc:
- 	lda.l	$500000,x
- 	sta.l	$500000,x
- 	inx
- 	inx
- 	bne		remove_smc
- 	lda		#0
- 	sta.w	remove_smc+1
+ -:
+ 	phb
  	sep		#$20
- 	inc.w	remove_smc+3
- 	inc.w	remove_smc+7
+ 	lda		tcc__r0h
+ 	inc		tcc__r0h
+ 	pha
+ 	plb
  	rep		#$20
- 	dey
+ remove_smc:
+ 	lda.w	$0200,x  ;lda.l	$500000,x
+ 	sta.w	$0000,x  ;sta.l	$500000,x
+ 	inx
+ 	inx
  	bne		remove_smc
+ 	plb
+ 	dey
+ 	bne		- ;remove_smc
 ++:
 	rts
 	

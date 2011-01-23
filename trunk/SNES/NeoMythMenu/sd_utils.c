@@ -144,7 +144,7 @@ void read_sd_settings()
 	WORD bytesRead;
 	int pos, i;
 
-	if (pf_open("/SNES/SETTINGS.TXT") == FR_OK)
+	if (pf_open("/MENU/SNES/SETTINGS.TXT") == FR_OK)
 	{
 		if (pf_read(buf, 256, &bytesRead) == FR_OK)
 		{
