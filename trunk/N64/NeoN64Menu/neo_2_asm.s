@@ -19,8 +19,24 @@
 		la $15,0xB30E6060			/* $15 = 0xB30E6060*/
 		ori $12,$5,0				/* $12 = count*/
 
-		addiu $sp,$sp,-4
-		sw $17,0($sp)
+		addiu $sp,$sp,-(8 * 4)
+		sw $16,0($sp)
+		sw $17,4($sp)
+		sw $18,8($sp)
+		sw $19,12($sp)
+		sw $20,16($sp)
+		sw $21,20($sp)
+		sw $22,24($sp)
+		sw $23,28($sp)
+
+		addi $16,$0,0x04			/*shift/inc addr by 4*/
+		addi $22,$0,0x08			/*shift by 8*/
+		addi $23,$0,-1				/*dec by 1*/
+
+		ori $18,$0,0xf000			/*mask = 0000 f000*/
+		ori $19,$0,0x0f00			/*mask = 0000 0f00*/
+		ori $20,$0,0x00f0			/*mask = 0000 00f0*/
+		ori $21,$0,0x000f			/*mask = 0000 000f*/
 
 		lui $24,0xF000				/*mask = f000 0000*/
 		lui $25,0x0F00				/*mask = 0f00 0000*/
@@ -30,25 +46,26 @@
 
 		neo2_recv_sd_multi_psram_no_ds_oloop:
 		lui $11,0x0001				/* $11 = timeout = 64 * 1024*/
+		addi $8,$0,0x0100
+		addi $9,$0,0x01
 
 		neo2_recv_sd_multi_psram_no_ds_tloop:
 		lw $2,($15)					/* rdMmcDatBit4*/
-		andi $2,$2,0x0100			/* eqv of (data>>8)&0x01*/
+		and $2,$2,$8				/* eqv of (data>>8)&0x01*/
 		beq $2,$0,neo2_recv_sd_multi_psram_no_ds_get_sect			/* start bit detected*/
 		nop
-		addiu $11,$11,-1
 		bne $11,$0,neo2_recv_sd_multi_psram_no_ds_tloop			/* not timed out*/
-		nop
+		addu $11,$11,$9
 		beq $11,$0,neo2_recv_sd_multi_psram_no_ds_exit		/* timeout*/
-		ori $2,$0,0					/* res = FALSE*/
+		addu $2,$0,$0					/* res = FALSE*/
 
 		neo2_recv_sd_multi_psram_no_ds_get_sect:
-		ori $13,$0,128				/* $13 = long count*/
+		addi $13,$0,128				/* $13 = long count*/
 
 		neo2_recv_sd_multi_psram_no_ds_gsloop:
 
 		lw $2,($15)					/* rdMmcDatBit4 => -a-- -a--*/
-		sll $2,$2,4					/* a--- a---*/
+		sll $2,$2,$16				/* a--- a---*/
 
 		lw $3,($15)					/* rdMmcDatBit4 => -b-- -b--*/
 		and $2,$2,$24				/* a000 0000*/
@@ -56,42 +73,42 @@
 
 		lw $4,($15)					/* rdMmcDatBit4 => -c-- -c--*/
 		or $11,$3,$2				/* $11 = ab00 0000*/
-		srl $4,$4,4					/* --c- --c-*/
+		srl $4,$4,$16				/* --c- --c-*/
 
 		lw $5,($15)					/* rdMmcDatBit4 => -d-- -d--*/
 		and $4,$4,$10				/* 00c0 0000*/
-		srl $5,$5,8					/* ---d ---d*/
+		srl $5,$5,$22				/* ---d ---d*/
 		or $11,$11,$4				/* $11 = abc0 0000*/
 
 		lw $6,($15)					/* rdMmcDatBit4 => -e-- -e--*/
 		and $5,$5,$17				/* 000d 0000*/
-		sll $6,$6,4					/* e--- e---*/
+		sll $6,$6,$16				/* e--- e---*/
 		or $11,$11,$5				/* $11 = abcd 0000*/
 
 		lw $7,($15)					/* rdMmcDatBit4 => -f-- -f--*/
-		andi $6,$6,0xF000			/* 0000 e000*/
+		and $6,$6,$18				/* 0000 e000*/
 		or $11,$11,$6				/* $11 = abcd e000*/
-		and $7,$7,0x0F00			/* 0000 0f00*/
+		and $7,$7,$19				/* 0000 0f00*/
 
 		lw $8,($15)					/* rdMmcDatBit4 => -g-- -g--*/
 		or $11,$11,$7				/* $11 = abcd ef00*/
-		srl $8,$8,4					/* --g- --g-*/
+		srl $8,$8,$16				/* --g- --g-*/
 
 		lw $9,($15)					/* rdMmcDatBit4 => -h-- -h--*/
-		andi $8,$8,0x00F0			/* 0000 00g0*/
+		and $8,$8,$20				/* 0000 00g0*/
 		or $11,$11,$8				/* $11 = abcd efg0*/
 
-		srl $9,$9,8					/* ---h ---h*/
-		andi $9,$9,0x000F			/* 0000 000h*/
+		srl $9,$9,$22				/* ---h ---h*/
+		and $9,$9,$21				/* 0000 000h*/
 		or $11,$11,$9				/* $11 = abcd efgh*/
 
 		addu $9,$1,$14				/*psram base + rel*/
 		sw $11,0($9)				/*save sector data*/
 		lbu $8,0($1)				/*dl bus*/
-		addiu $13,$13,-1			/*dec long_cnt*/
+		addu $13,$13,$23			/*dec long_cnt*/
 		
 		bne $13,$0,neo2_recv_sd_multi_psram_no_ds_gsloop
-		addiu $14,$14,4				/*inc psram offs*/
+		addu $14,$14,$16				/*inc psram offs*/
 
 		lw $2,($15)					/* rdMmcDatBit4 - just toss checksum bytes */
 		lw $2,($15)					/* rdMmcDatBit4*/
@@ -110,17 +127,22 @@
 		lw $2,($15)					/* rdMmcDatBit4*/
 		lw $2,($15)					/* rdMmcDatBit4*/
 
+		addu $12,$12,$23			/* count--*/
+		bne $12,$0,neo2_recv_sd_multi_psram_no_ds_oloop	/* next sector*/
 		lw $2,($15)					/* rdMmcDatBit4 - clock out end bit*/
 
-		addiu $12,$12,-1			/* count--*/
-		bne $12,$0,neo2_recv_sd_multi_psram_no_ds_oloop	/* next sector*/
-		nop
-
-		ori $2,$0,1					/* res = TRUE*/
+		addi $2,$0,1					/* res = TRUE*/
 
 		neo2_recv_sd_multi_psram_no_ds_exit:
-		lw $17,0($sp)
-		addiu $sp,$sp,4
+		lw $16,0($sp)
+		lw $17,4($sp)
+		lw $18,8($sp)
+		lw $19,12($sp)
+		lw $20,16($sp)
+		lw $21,20($sp)
+		lw $22,24($sp)
+		lw $23,28($sp)
+		addiu $sp,$sp,(8 * 4)
 
 		la $8,PSRAM_ADDR
 		sw $14,0($8)

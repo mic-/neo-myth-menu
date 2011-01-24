@@ -855,12 +855,6 @@ DRESULT MMC_disk_read (
 {
     unsigned int ix;
 
-#if 0
-    char temp[40];
-    sprintf(temp, "%d:%d > %x", (int)sector, count, (unsigned int)buff);
-    debugPrint(temp);
-#endif
-
     if (count == 1)
     {
         ix = sector & (CACHE_SIZE - 1);    // really simple hash
@@ -888,25 +882,6 @@ DRESULT MMC_disk_read (
     }
     else
     {
-#if 0
-        for (ix=0; ix<count; ix++)
-        {
-            neo2_pre_sd();
-            if (!sdReadSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
-            {
-                // read failed, retry once
-                if (!sdReadSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
-                {
-                    // read failed
-                    neo2_post_sd();
-                    //debugPrint("Read failed!");
-                    return RES_ERROR;
-                }
-            }
-            neo2_post_sd();
-            memcpy((void *)((unsigned int)buff + ix*512), sec_buf, 512);
-        }
-#else
         neo2_pre_sd();
         if (!sdReadStartMulti(sector << ((cardType & 1) ? 0 : 9)))
         {
@@ -946,38 +921,61 @@ DRESULT MMC_disk_read (
         }
         sdReadStopMulti();
         neo2_post_sd();
-#endif
     }
-
-#if 0
-    // print entire sector and crc
-    {
-        char *hex = "0123456789ABCDEF";
-        char temp[44];
-        int i, j;
-        unsigned char *d = (unsigned char *)buff;
-
-        gCursorY = 0;
-        for (j=0; j<26; j++)
-        {
-            for (i=0; i<20; i++, d++)
-            {
-                temp[i*2] = hex[*d>>4];
-                temp[i*2+1] = hex[*d&15];
-            }
-            temp[i*2] = 0;
-            gCursorX = 0;
-            gCursorY++;
-            if (gCursorY > 27)
-                gCursorY = 0;
-            put_str(temp, 0);
-        }
-        delay(1200);
-    }
-#endif
 
     return RES_OK;
 }
+
+DRESULT MMC_disk_read_multi(BYTE* buff,DWORD sector,UINT count)
+{
+	neo2_pre_sd();
+
+    {
+		sector <<= ((cardType & 1) ? 0 : 9);
+
+        if (!sdReadStartMulti(sector))
+        {
+            // read failed, retry once
+            if (!sdReadStartMulti(sector))
+            {
+                // start multiple sector read failed
+                neo2_post_sd();
+                //debugPrint("Read failed!");
+                return RES_ERROR;
+            }
+            if (!sdReadMultiBlocks(buff,count))
+            {
+                // read failed
+                neo2_post_sd();
+                //debugPrint("Read failed!");
+                return RES_ERROR;
+            }
+        }
+        else if (!sdReadMultiBlocks(buff,count))
+        {
+            // read failed, retry once
+            if (!sdReadStartMulti(sector))
+            {
+                // start multiple sector read failed
+                neo2_post_sd();
+                //debugPrint("Read failed!");
+                return RES_ERROR;
+            }
+            if (!sdReadMultiBlocks(buff,count))
+            {
+                // read failed
+                neo2_post_sd();
+                //debugPrint("Read failed!");
+                return RES_ERROR;
+            }
+        }
+   		 sdReadStopMulti();
+    }
+
+    neo2_post_sd();
+    return RES_OK;
+}
+
 
 /*-----------------------------------------------------------------------*/
 /* Write Sector(s)                                                       */
