@@ -16,6 +16,7 @@ extern DRESULT RAM_disk_ioctl (BYTE ctrl, void *buff);
 extern DSTATUS MMC_disk_initialize (void);
 extern DSTATUS MMC_disk_status (void);
 extern DRESULT MMC_disk_read (BYTE *buff, DWORD sector, BYTE count);
+extern DRESULT MMC_disk_read_multi (BYTE *buff, DWORD sector, UINT count);
 extern DRESULT MMC_disk_write (const BYTE *buff, DWORD sector, BYTE count);
 extern DRESULT MMC_disk_ioctl (BYTE ctrl, void *buff);
 
@@ -59,6 +60,16 @@ DSTATUS disk_status (
 
 /*-----------------------------------------------------------------------*/
 /* Read Sector(s)                                                        */
+
+DRESULT disk_read_multi (
+	BYTE drv,		 
+	BYTE *buff,		 
+	DWORD sector,	 
+	UINT count		 
+)
+{
+	return MMC_disk_read_multi(buff, sector, count);
+}
 
 DRESULT disk_read (
 	BYTE drv,		/* Physical drive nmuber (0..) */
