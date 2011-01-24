@@ -1318,6 +1318,7 @@ void get_fileinfo (		/* No return code */
 	char *p;
 
 
+
 	p = fno->fname;
 	if (dj->sect) {
 		dir = dj->dir;
@@ -1861,6 +1862,8 @@ FRESULT f_read_dummy (
 {
 	DWORD clst, sect, remain;
 	UINT rcnt, cc;
+	UINT sector_base = 0xffffffff;
+	UINT sector_count = 0;
 	INT bound_a;
 
 	asm("\tmfc0 $8,$12\n\tla $9,~1\n\tand $8,$9\n\tmtc0 $8,$12\n\tnop":::"$8","$9");
@@ -1908,16 +1911,15 @@ FRESULT f_read_dummy (
 				cc = btr / SS(fp->fs);
 
 				if (cc) 
-				{								 
+				{	
 					if (fp->csect + cc > fp->fs->csize)	 
 						cc = fp->fs->csize - fp->csect;
-
-					if (disk_read(fp->fs->drive, NULL , sect, (BYTE)cc) != RES_OK)
-					{
-						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
-						ABORT(fp->fs, FR_DISK_ERR);
-					}
-
+	
+					if(sector_base == 0xffffffff)
+						sector_base = sect;
+		
+					sector_count += cc;
+		 
 					fp->csect += (BYTE)cc;				 
 					rcnt = SS(fp->fs) * cc;				 
 					continue;
@@ -1949,6 +1951,23 @@ FRESULT f_read_dummy (
 			}
 			rcnt = SS(fp->fs) - bound_a;	 
 			if (rcnt > btr) rcnt = btr;
+	}
+
+	if(sector_count == 1)
+	{
+		if (disk_read(fp->fs->drive, NULL ,sector_base,(BYTE)sector_count) != RES_OK)
+		{
+			asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+			ABORT(fp->fs, FR_DISK_ERR);
+		}
+	}	
+	else if(sector_count != 0)
+	{
+		if (disk_read_multi(fp->fs->drive, NULL ,sector_base,sector_count) != RES_OK)
+		{
+			asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+			ABORT(fp->fs, FR_DISK_ERR);
+		}
 	}
 
 	asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
@@ -2604,6 +2623,7 @@ FRESULT f_mkdir (
 	res = follow_path(&dj, path);			/* Follow the file path */
 	if (res == FR_OK) res = FR_EXIST;		/* Any file or directory is already existing */
 	if (_FS_RPATH && res == FR_NO_FILE && (dj.fn[NS] & NS_DOT))
+
 		res = FR_INVALID_NAME;
 	if (res != FR_NO_FILE)					/* Any error occured */
 		LEAVE_FF(dj.fs, res);
