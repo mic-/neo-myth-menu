@@ -38,6 +38,7 @@ unsigned int sd_speed;
 unsigned int sec_tags[CACHE_SIZE];
 unsigned char __attribute__((aligned(16))) sec_cache[CACHE_SIZE*512 + 8];
 unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads */
+unsigned char __attribute__((aligned(16))) resp_buf[32];
 unsigned char sd_csd[R2_LEN];
 static int respTime = RESP_TIME_R;
 //int DISK_IO_MODE = 0;
@@ -208,8 +209,7 @@ inline unsigned int rdMmcCmdBit()
     return (data>>12) & 1;
 }
 
-// 1 to 8 bits please
-
+/*
 inline unsigned char rdMmcCmdBits( int num )
 {
     register unsigned char byte = 0;
@@ -218,14 +218,29 @@ inline unsigned char rdMmcCmdBits( int num )
         byte = (byte << 1) | rdMmcCmdBit();
 
     return byte;
-}
+}*/
 
 inline unsigned char rdMmcCmdByte()
 {
     register unsigned char byte;
 
-    byte = /*(byte << 1) | */rdMmcCmdBit();
+    byte = rdMmcCmdBit();
     byte = (byte << 1) | rdMmcCmdBit();
+    byte = (byte << 1) | rdMmcCmdBit();
+    byte = (byte << 1) | rdMmcCmdBit();
+    byte = (byte << 1) | rdMmcCmdBit();
+    byte = (byte << 1) | rdMmcCmdBit();
+    byte = (byte << 1) | rdMmcCmdBit();
+    byte = (byte << 1) | rdMmcCmdBit();
+
+    return byte;
+}
+
+inline unsigned char rdMmcCmdByte7()
+{
+    register unsigned char byte;
+
+    byte = rdMmcCmdBit();
     byte = (byte << 1) | rdMmcCmdBit();
     byte = (byte << 1) | rdMmcCmdBit();
     byte = (byte << 1) | rdMmcCmdBit();
@@ -403,17 +418,17 @@ inline void sendMmcCmd( unsigned char cmd, unsigned int arg )
 
 int recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
 {
-    unsigned int i, j;
-    unsigned char *r = resp;
+    register unsigned int i;
+    register unsigned char* r = resp;
 
     for (i=0; i<respTime; i++)
     {
         // wait on start bit
         if(rdMmcCmdBit()==0)
         {
-            *r++ = rdMmcCmdBits(7);
-            len--;
-            for(j=0; j<len; j++)
+            *r++ = rdMmcCmdByte7();//rdMmcCmdBits(7);
+            
+            while(--len)
                 *r++ = rdMmcCmdByte();
 
             if (cflag)
@@ -433,8 +448,8 @@ int recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
 
 int sdReadSingleBlock( unsigned char *buf, unsigned int addr )
 {
-    int i = 8*1024;
-    unsigned char resp[R1_LEN];
+   // int i = 8*1024;
+	register unsigned char* resp = resp_buf;
 
     debugMmcPrint("Read starting");
 
@@ -445,6 +460,7 @@ int sdReadSingleBlock( unsigned char *buf, unsigned int addr )
             return 0;
     }
 
+#if 0
     while ((rdMmcDatBit4()&1) != 0)
     {
         if (i-- <= 0)
@@ -453,7 +469,7 @@ int sdReadSingleBlock( unsigned char *buf, unsigned int addr )
             return 0;               // timeout on start bit
         }
     }
-#if 1
+
     for (i=0; i<SD_CRC_SIZE; i++)
         buf[i] = rdMmcDatByte4();
 
@@ -464,7 +480,7 @@ int sdReadSingleBlock( unsigned char *buf, unsigned int addr )
     // Clock out end bit
     rdMmcDatBit4();
 #else
-    neo2_recv_sd(buf);
+    neo2_recv_sd_multi(buf,1);
 #endif
     wrMmcCmdByte(0xFF);                 // 8 cycles to complete the operation so clock can halt
 
@@ -474,7 +490,7 @@ int sdReadSingleBlock( unsigned char *buf, unsigned int addr )
 
 inline int sdReadStartMulti( unsigned int addr )
 {
-    unsigned char resp[R1_LEN];
+	register unsigned char* resp = resp_buf;
 
     debugMmcPrint("Read starting");
 
@@ -544,7 +560,7 @@ int sdReadMultiBlocks( BYTE *buff, BYTE count )
 
 inline int sdReadStopMulti( void )
 {
-    unsigned char resp[R1_LEN];
+	register unsigned char* resp = resp_buf;
 
     debugMmcPrint("Read stopping");
 
@@ -950,8 +966,13 @@ DRESULT MMC_disk_read_multi(BYTE* buff,DWORD sector,UINT count)
                 //debugPrint("Read failed!");
                 return RES_ERROR;
             }
+			
+			sdReadStopMulti();
+			neo2_post_sd();
+			return RES_OK;
         }
-        else if (!sdReadMultiBlocks(buff,count))
+        
+		if (!sdReadMultiBlocks(buff,count))
         {
             // read failed, retry once
             if (!sdReadStartMulti(sector))
