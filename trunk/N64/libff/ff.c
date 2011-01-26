@@ -1319,6 +1319,7 @@ void get_fileinfo (		/* No return code */
 
 
 
+
 	p = fno->fname;
 	if (dj->sect) {
 		dir = dj->dir;
@@ -1866,7 +1867,7 @@ FRESULT f_read_dummy (
 	UINT sector_count = 0;
 	INT bound_a;
 
-	asm("\tmfc0 $8,$12\n\tla $9,~1\n\tand $8,$9\n\tmtc0 $8,$12\n\tnop":::"$8","$9");
+	asm("\tmfc0 $8,$12\n\taddi $9,$0,-2\n\tand $8,$9\n\tmtc0 $8,$12\n\t":::"$8","$9");
 
 	*br = 0;
 
@@ -1886,12 +1887,12 @@ FRESULT f_read_dummy (
 
 					if (clst <= 1)
 					{
-						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\t":::"$8");
 					 	ABORT(fp->fs, FR_INT_ERR);
 					}
 					else if (clst == 0xFFFFFFFF)
 					{
-						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\t":::"$8");
 						ABORT(fp->fs, FR_DISK_ERR);
 					}
 
@@ -1903,7 +1904,7 @@ FRESULT f_read_dummy (
 
 				if (!sect)
 				{
-					asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+					asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\t":::"$8");
 					ABORT(fp->fs, FR_INT_ERR);
 				}
 
@@ -1912,12 +1913,8 @@ FRESULT f_read_dummy (
 
 				if (cc) 
 				{	
-					if (fp->csect + cc > fp->fs->csize)	 
-						cc = fp->fs->csize - fp->csect;
-	
-					if(sector_base == 0xffffffff)
-						sector_base = sect;
-		
+					cc = (fp->csect + cc > fp->fs->csize) ? fp->fs->csize - fp->csect : cc;
+					sector_base = (sector_base == 0xffffffff) ? sect : sector_base;
 					sector_count += cc;
 		 
 					fp->csect += (BYTE)cc;				 
@@ -1930,7 +1927,7 @@ FRESULT f_read_dummy (
 				{
 					if (disk_write(fp->fs->drive, fp->buf, fp->dsect, 1) != RES_OK)
 					{
-						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\t":::"$8");
 						ABORT(fp->fs, FR_DISK_ERR);
 					}
 
@@ -1941,7 +1938,7 @@ FRESULT f_read_dummy (
 				{
 					if (disk_read(fp->fs->drive, fp->buf, sect, 1) != RES_OK)
 					{
-						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\t":::"$8");
 						ABORT(fp->fs, FR_DISK_ERR);
 					}
 				}
@@ -1953,24 +1950,16 @@ FRESULT f_read_dummy (
 			if (rcnt > btr) rcnt = btr;
 	}
 
-	if(sector_count == 1)
-	{
-		if (disk_read(fp->fs->drive, NULL ,sector_base,(BYTE)sector_count) != RES_OK)
-		{
-			asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
-			ABORT(fp->fs, FR_DISK_ERR);
-		}
-	}	
-	else if(sector_count != 0)
+	if(sector_count != 0)
 	{
 		if (disk_read_multi(fp->fs->drive, NULL ,sector_base,sector_count) != RES_OK)
 		{
-			asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+			asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\t":::"$8");
 			ABORT(fp->fs, FR_DISK_ERR);
 		}
 	}
 
-	asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\tnop":::"$8");
+	asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\t":::"$8");
 	LEAVE_FF(fp->fs, FR_OK);
 }
 
