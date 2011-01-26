@@ -1407,6 +1407,18 @@ multi_sd_to_myth_psram:
         moveq   #0,d0                   /* FALSE */
         rts
 
+|void neo_memcpy16(void* src,const void* dst,int len);
+	.global neo_memcpy16
+	neo_memcpy16:
+		movem.l 4(sp),a0-a1
+		move.l  12(sp),d0
+		lsr #1,d0
+		bra 1f
+	0:
+		move.w (a1)+,(a0)+
+	1:
+		dbra d0,0b
+	rts
 
 neo_mode:
         .word   0
