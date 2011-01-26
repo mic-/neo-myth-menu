@@ -1,24 +1,21 @@
-/*This attempts to optimize memory functions used by lib ff..*/
-/*extra files/libff/optimize/genesis/memory.s*/
+|TODO : word versions
         .text
         .align 2
 
 |int mem_cmp (const void* dst, const void* src, int cnt)
         .global mem_cmp
 mem_cmp:
-		movea.l 4(sp),a0
-		movea.l 8(sp),a1
+		movem.l 4(sp),a0-a1
 		move.l  12(sp),d1
 		moveq   #0,d0
 0:
-		tst.l   d1
-        ble.b   1f
-
-		subq.l  #1,d1
+		dbra d1,1f
+		bra 2f
+1:
 		move.b  (a0)+,d0
 		sub.b   (a1)+,d0
         beq.b   0b
-1:
+2:
         ext.w   d0
         ext.l   d0
 		rts
@@ -43,8 +40,7 @@ chk_chr:
         .global mem_set
 mem_set:
 		movea.l 4(sp),a0
-		move.l  8(sp),d0
-		move.l  12(sp),d1
+		movem.l 8(sp),d0-d1
 		bra.b   2f
 1:
 		move.b  d0,(a0)+
@@ -55,8 +51,7 @@ mem_set:
 | void mem_cpy(void* dst, const void* src, int cnt)
         .global mem_cpy
 mem_cpy:
-		movea.l 4(sp),a0
-		movea.l 8(sp),a1
+		movem.l 4(sp),a0-a1
 		move.l  12(sp),d0
 		bra.b   2f
 1:
@@ -64,3 +59,4 @@ mem_cpy:
 2:
 		dbra    d0,1b
 		rts
+
