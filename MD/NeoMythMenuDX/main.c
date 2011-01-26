@@ -801,7 +801,7 @@ inline void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
     UINT ts;
     ints_on();     /* enable interrupts */
     gDirectRead = 1;
-    f_read_zip(&gSDFile, (unsigned char *)pstart, len, &ts);
+    f_read_direct(&gSDFile, (unsigned char *)pstart, len, &ts);
     gDirectRead = 0;
     ints_off();     /* disable interrupts */
 }
@@ -1301,8 +1301,10 @@ void get_sd_directory(int entry)
     DIR dir;
     FILINFO fno;
     int ix;
-
+	WCHAR menu_dir[6];
+	
     gSdDetected = 0;
+	utility_c2wstrcpy(menu_dir,"menu");
 
     gMaxEntry = 0;
     if (entry == -1)
@@ -1401,12 +1403,22 @@ void get_sd_directory(int entry)
 
         if (fno.fattrib & AM_DIR)
         {
-            gSelections[gMaxEntry].type = 128; // directory entry
             if (fno.lfname[0])
-                utility_wstrcpy(gSelections[gMaxEntry].name, fno.lfname);
-            else
-                utility_c2wstrcpy(gSelections[gMaxEntry].name, fno.fname);
+			{
+				if(utility_wstrcmp(fno.lfname,menu_dir) == 0)
+					continue;
 
+                utility_wstrcpy(gSelections[gMaxEntry].name, fno.lfname);
+			}
+            else
+			{
+				if(utility_memcmp(fno.fname,"menu",4) == 0)
+					continue;
+
+                utility_c2wstrcpy(gSelections[gMaxEntry].name, fno.fname);
+			}
+
+            gSelections[gMaxEntry].type = 128; // directory entry
             //w2cstrcpy((char*)buffer, fno.lfname);
             //printToScreen(fno.fname, 1, gMaxEntry % 28, 0);
             //printToScreen((char*)buffer, 14, gMaxEntry % 28, 0);
@@ -4212,7 +4224,7 @@ void do_options(void)
                         else
                         {
                             // copy file to myth psram
-                            if (gFileType)
+                            if (gFileType || (runmode == 0x27))
                                 copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
                             else
                                 copyGame(&neo_sd_to_myth_psram, 0, pstart, 0, fsize, "Loading ", temp);
@@ -4658,7 +4670,7 @@ void run_rom(int reset_mode)
             else
             {
                 // copy file to myth psram
-                if (gFileType)
+                if (gFileType || (runmode == 0x27))
                     copyGame(&neo_copyto_myth_psram, &neo_copy_sd, pstart, 0, fsize, "Loading ", temp);
                 else
                     copyGame(&neo_sd_to_myth_psram, 0, pstart, 0, fsize, "Loading ", temp);

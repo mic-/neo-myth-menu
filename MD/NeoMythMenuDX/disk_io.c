@@ -45,6 +45,42 @@ unsigned char sd_csd[R2_LEN];
 
 #define INIT_RETRIES (64)
 
+static const unsigned char __attribute__((aligned(16))) crc7_table[256] =//makes zero diff...unfortunately :(
+{
+    0x00, 0x09, 0x12, 0x1b, 0x24, 0x2d, 0x36, 0x3f,
+    0x48, 0x41, 0x5a, 0x53, 0x6c, 0x65, 0x7e, 0x77,
+    0x19, 0x10, 0x0b, 0x02, 0x3d, 0x34, 0x2f, 0x26,
+    0x51, 0x58, 0x43, 0x4a, 0x75, 0x7c, 0x67, 0x6e,
+    0x32, 0x3b, 0x20, 0x29, 0x16, 0x1f, 0x04, 0x0d,
+    0x7a, 0x73, 0x68, 0x61, 0x5e, 0x57, 0x4c, 0x45,
+    0x2b, 0x22, 0x39, 0x30, 0x0f, 0x06, 0x1d, 0x14,
+    0x63, 0x6a, 0x71, 0x78, 0x47, 0x4e, 0x55, 0x5c,
+    0x64, 0x6d, 0x76, 0x7f, 0x40, 0x49, 0x52, 0x5b,
+    0x2c, 0x25, 0x3e, 0x37, 0x08, 0x01, 0x1a, 0x13,
+    0x7d, 0x74, 0x6f, 0x66, 0x59, 0x50, 0x4b, 0x42,
+    0x35, 0x3c, 0x27, 0x2e, 0x11, 0x18, 0x03, 0x0a,
+    0x56, 0x5f, 0x44, 0x4d, 0x72, 0x7b, 0x60, 0x69,
+    0x1e, 0x17, 0x0c, 0x05, 0x3a, 0x33, 0x28, 0x21,
+    0x4f, 0x46, 0x5d, 0x54, 0x6b, 0x62, 0x79, 0x70,
+    0x07, 0x0e, 0x15, 0x1c, 0x23, 0x2a, 0x31, 0x38,
+    0x41, 0x48, 0x53, 0x5a, 0x65, 0x6c, 0x77, 0x7e,
+    0x09, 0x00, 0x1b, 0x12, 0x2d, 0x24, 0x3f, 0x36,
+    0x58, 0x51, 0x4a, 0x43, 0x7c, 0x75, 0x6e, 0x67,
+    0x10, 0x19, 0x02, 0x0b, 0x34, 0x3d, 0x26, 0x2f,
+    0x73, 0x7a, 0x61, 0x68, 0x57, 0x5e, 0x45, 0x4c,
+    0x3b, 0x32, 0x29, 0x20, 0x1f, 0x16, 0x0d, 0x04,
+    0x6a, 0x63, 0x78, 0x71, 0x4e, 0x47, 0x5c, 0x55,
+    0x22, 0x2b, 0x30, 0x39, 0x06, 0x0f, 0x14, 0x1d,
+    0x25, 0x2c, 0x37, 0x3e, 0x01, 0x08, 0x13, 0x1a,
+    0x6d, 0x64, 0x7f, 0x76, 0x49, 0x40, 0x5b, 0x52,
+    0x3c, 0x35, 0x2e, 0x27, 0x18, 0x11, 0x0a, 0x03,
+    0x74, 0x7d, 0x66, 0x6f, 0x50, 0x59, 0x42, 0x4b,
+    0x17, 0x1e, 0x05, 0x0c, 0x33, 0x3a, 0x21, 0x28,
+    0x5f, 0x56, 0x4d, 0x44, 0x7b, 0x72, 0x69, 0x60,
+    0x0e, 0x07, 0x1c, 0x15, 0x2a, 0x23, 0x38, 0x31,
+    0x46, 0x4f, 0x54, 0x5d, 0x62, 0x6b, 0x70, 0x79
+};
+
 /*-----------------------------------------------------------------------*/
 /*                             support code                              */
 /*-----------------------------------------------------------------------*/
@@ -74,9 +110,29 @@ void wrMmcCmdBit( unsigned int bit )
 void wrMmcCmdByte( unsigned int byte ) __attribute__ ((section (".data")));
 void wrMmcCmdByte( unsigned int byte )
 {
-    int i;
-    for( i = 0; i < 8 ; i++ )
-        wrMmcCmdBit( (byte>>(7-i)) & 1 );
+	register unsigned short data;
+    register unsigned int base =
+        //( 1<<24 ) |        // always 1 (set in GBAC_LIO)
+        ( 1<<19 ) |            // clk enable
+        ( 1<<18 ) |            // cs remap
+        ( 1<<17 ) |            // cmd remap
+        ( 1<<16 ) |            // d1-d3 remap
+        ( 1<<15 ) |            // d0 remap
+        ( 1<<14 ) |            // cs value (active high)
+        ( 1<<12 ) |            // d3 value
+        ( 1<<11 ) |            // d2 value
+        ( 1<<10 ) |            // d1 value
+        ( 1<<9 );            // d0 value
+	register unsigned int addr;
+
+	addr = base | (((byte >> 7) & 1) << 13); data = *(vu16*)(addr);
+	addr = base | (((byte >> 6) & 1) << 13); data = *(vu16*)(addr);
+	addr = base | (((byte >> 5) & 1) << 13); data = *(vu16*)(addr);
+	addr = base | (((byte >> 4) & 1) << 13); data = *(vu16*)(addr);
+	addr = base | (((byte >> 3) & 1) << 13); data = *(vu16*)(addr);
+	addr = base | (((byte >> 2) & 1) << 13); data = *(vu16*)(addr);
+	addr = base | (((byte >> 1) & 1) << 13); data = *(vu16*)(addr);
+	addr = base | (((byte) & 1) << 13); data = *(vu16*)(addr);
 }
 
 #if 1
@@ -103,9 +159,29 @@ void wrMmcDatBit( unsigned int bit )
 void wrMmcDatByte( unsigned int byte ) __attribute__ ((section (".data")));
 void wrMmcDatByte( unsigned int byte )
 {
-    int i;
-    for( i = 0; i < 8 ; i++ )
-        wrMmcDatBit( (byte>>(7-i)) & 1 );
+	register unsigned short data;
+    register unsigned int base =
+        //( 1<<24 ) |        // always 1 (set in GBAC_LIO)
+        ( 1<<19 ) |            // clk enable
+        ( 1<<18 ) |            // cs remap
+        ( 1<<17 ) |            // cmd remap
+        ( 1<<16 ) |            // d1-d3 remap
+        ( 1<<15 ) |            // d0 remap
+        ( 1<<14 ) |            // cs value (active high)
+        ( 1<<13 ) |            // cmd value
+        ( 1<<12 ) |            // d3 value
+        ( 1<<11 ) |            // d2 value
+        ( 1<<10 );            // d1 value
+	register unsigned int addr;
+
+	addr = base | (((byte >> 7) & 1) << 9); data = *(vu16*)(addr);
+	addr = base | (((byte >> 6) & 1) << 9); data = *(vu16*)(addr);
+	addr = base | (((byte >> 5) & 1) << 9); data = *(vu16*)(addr);
+	addr = base | (((byte >> 4) & 1) << 9); data = *(vu16*)(addr);
+	addr = base | (((byte >> 3) & 1) << 9); data = *(vu16*)(addr);
+	addr = base | (((byte >> 2) & 1) << 9); data = *(vu16*)(addr);
+	addr = base | (((byte >> 1) & 1) << 9); data = *(vu16*)(addr);
+	addr = base | (((byte) & 1) << 9); data = *(vu16*)(addr);
 }
 #endif
 
@@ -131,22 +207,71 @@ unsigned int rdMmcCmdBit()
     return (data>>4) & 1;
 }
 
-// 1 to 8 bits please
-
-unsigned char rdMmcCmdBits( int num ) __attribute__ ((section (".data")));
-unsigned char rdMmcCmdBits( int num )
-{
-    int i;
-    unsigned char byte = 0;
-    for( i = 0; i < num ; i++ )
-        byte = ( byte << 1) | rdMmcCmdBit();
-    return byte;
-}
-
 unsigned char rdMmcCmdByte() __attribute__ ((section (".data")));
 unsigned char rdMmcCmdByte()
 {
-    return rdMmcCmdBits( 8 );
+	register unsigned short data;
+	register unsigned char byte;
+	register unsigned char shift = 4; //move to reg
+	register unsigned char bit_mask = 1; //move to reg
+	register unsigned int addr =
+        //( 1<<24 ) |        // always 1 (set in GBAC_LIO)
+        ( 1<<19 ) |            // clk enable
+        ( 1<<18 ) |            // cs remap
+        ( 1<<17 ) |            // cmd remap
+        ( 1<<16 ) |            // d1-d3 remap
+        ( 1<<15 ) |            // d0 remap
+        ( 1<<14 ) |            // cs value (active high)
+        ( 1<<13 ) |            // cmd value
+        ( 1<<12 ) |            // d3
+        ( 1<<11 ) |            // d2
+        ( 1<<10 ) |            // d1
+        ( 1<<9 ) |            // d0
+        ( 1<<7 );            // cmd input mode
+
+    data = *(vu16*)(addr); data >>= shift; byte = data & bit_mask; 
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+
+	return byte;
+}
+
+unsigned char rdMmcCmdByte7() __attribute__ ((section (".data")));
+unsigned char rdMmcCmdByte7()
+{
+	register unsigned short data;
+	register unsigned char byte;
+	register unsigned char shift = 4; //move to reg
+	register unsigned char bit_mask = 1; //move to reg
+	register unsigned int addr =
+        //( 1<<24 ) |        // always 1 (set in GBAC_LIO)
+        ( 1<<19 ) |            // clk enable
+        ( 1<<18 ) |            // cs remap
+        ( 1<<17 ) |            // cmd remap
+        ( 1<<16 ) |            // d1-d3 remap
+        ( 1<<15 ) |            // d0 remap
+        ( 1<<14 ) |            // cs value (active high)
+        ( 1<<13 ) |            // cmd value
+        ( 1<<12 ) |            // d3
+        ( 1<<11 ) |            // d2
+        ( 1<<10 ) |            // d1
+        ( 1<<9 ) |            // d0
+        ( 1<<7 );            // cmd input mode
+
+    data = *(vu16*)(addr); data >>= shift; byte = data & bit_mask; 
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data >>= shift; byte = (byte << bit_mask) | (data & bit_mask);
+
+	return byte;
 }
 
 unsigned int rdMmcDatBit() __attribute__ ((section (".data")));
@@ -226,8 +351,26 @@ void wrMmcDatByte4( unsigned char val )
 unsigned char rdMmcDatByte4() __attribute__ ((section (".data")));
 unsigned char rdMmcDatByte4()
 {
-    unsigned char byte = rdMmcDatBit4();
-    byte = ( byte << 4) | rdMmcDatBit4();
+	register unsigned short data;
+	register unsigned char byte;
+	register unsigned int addr =
+        //( 1<<24 ) |        // always 1 (set in GBAC_LIO)
+        ( 1<<19 ) |            // clk enable
+        ( 1<<18 ) |            // cs remap
+        ( 1<<17 ) |            // cmd remap
+        //( 1<<16 ) |        // d1-d3 remap
+        //( 1<<15 ) |        // d0 remap
+        ( 1<<14 ) |            // cs value (active high)
+        ( 1<<13 ) |            // cmd value
+        //( 1<<12 ) |        // d3
+        //( 1<<11 ) |        // d2
+        //( 1<<10 ) |        // d1
+        //( 1<<9 ) |        // d0
+        ( 1<<6 ) |            // d3-d1 input (only needed in 4 bit mode)
+        ( 1<<5);            // d0 input
+
+	data = *(vu16*)(addr); byte = (data&0xf) << 4;
+	data = *(vu16*)(addr); byte |= (data&0xf);
     return byte;
 }
 
@@ -236,11 +379,36 @@ unsigned char rdMmcDatByte4()
 unsigned char rdMmcDatByte() __attribute__ ((section (".data")));
 unsigned char rdMmcDatByte()
 {
-    int i;
-    unsigned char byte = 0;
-    for( i = 0; i < 8 ; i++ )
-        byte = ( byte << 1) | rdMmcDatBit();
-    return byte;
+	register unsigned short data;
+	register unsigned char byte;
+	register unsigned char n_mask = 1; //move to reg
+	register unsigned char bit_mask = 1; //move to reg
+    register unsigned int addr =
+        //( 1<<24 ) |        // always 1 (set in GBAC_LIO)
+        ( 1<<19 ) |            // clk enable
+        ( 1<<18 ) |            // cs remap
+        ( 1<<17 ) |            // cmd remap
+        ( 1<<16 ) |            // d1-d3 remap
+        //( 1<<15 ) |        // d0 remap
+        ( 1<<14 ) |            // cs value (active high)
+        ( 1<<13 ) |            // cmd value
+        ( 1<<12 ) |            // d3
+        ( 1<<11 ) |            // d2
+        ( 1<<10 ) |            // d1
+        //( 1<<9 ) |        // d0
+        //( 1<<6 ) |        // d3-d1 input (only needed in 4 bit mode)
+        ( 1<<5);            // d0 input
+
+    data = *(vu16*)(addr); data = data & n_mask; byte = data & bit_mask; 
+    data = *(vu16*)(addr); data = data & n_mask; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data = data & n_mask; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data = data & n_mask; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data = data & n_mask; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data = data & n_mask; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data = data & n_mask; byte = (byte << bit_mask) | (data & bit_mask);
+    data = *(vu16*)(addr); data = data & n_mask; byte = (byte << bit_mask) | (data & bit_mask);
+
+	return byte;
 }
 
 /*
@@ -249,25 +417,19 @@ unsigned char rdMmcDatByte()
  */
 
 unsigned char crc7 (unsigned char *buf) __attribute__ ((section (".data")));
-unsigned char crc7 (unsigned char *buf)
+unsigned char crc7 (unsigned char *buf)//doesn't make a single difference :(
 {
-    int i;
-    unsigned int r4 = 0x80808080;
-    unsigned char crc = 0;
-    unsigned char c = 0;
+    register unsigned char crc = 0;
 
-    i = 5 * 8;
-    do {
-        if (r4 & 0x80) c = *buf++;
-        crc = crc << 1;
+    crc = crc7_table[(crc) ^ buf[0]];
+    crc = crc7_table[(crc << 1) ^ buf[1]];
+    crc = crc7_table[(crc << 1) ^ buf[2]];
+    crc = crc7_table[(crc << 1) ^ buf[3]];
+    crc = crc7_table[(crc << 1) ^ buf[4]];
 
-        if (crc & 0x80) crc ^= 9;
-        if (c & (r4>>24)) crc ^= 9;
-        r4 = (r4 >> 1) | (r4 << 31);
-      } while (--i > 0);
-
-  return crc;
+    return crc;
 }
+
 
 #ifdef DEBUG_RESP
 void debugMmcResp( unsigned char cmd, unsigned char *resp ) __attribute__ ((section (".data")));
@@ -350,17 +512,17 @@ void sendMmcCmd( unsigned char cmd, unsigned int arg )
 BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag ) __attribute__ ((section (".data")));
 BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
 {
-    unsigned int i, j;
-    unsigned char *r = resp;
+    register unsigned int i;//, j;
+    register unsigned char *r = resp;
 
     for (i=0; i<1024; i++)
     {
         // wait on start bit
         if(rdMmcCmdBit()==0)
         {
-            *r++ = rdMmcCmdBits(7);
-            len--;
-            for(j=0; j<len; j++)
+            *r++ = rdMmcCmdByte7();//rdMmcCmdBits(7);
+			
+			while(--len)
                 *r++ = rdMmcCmdByte();
 
             if (cflag)
@@ -385,16 +547,20 @@ BOOL sdReadSingleBlock( unsigned char *buf, unsigned int addr )
 
     sendMmcCmd(17, addr);                // READ_SINGLE_BLOCK
     if (!(cardType & 0x8000))
+	{
         if (!recvMmcCmdResp(resp, R1_LEN, 0) || (resp[0] != 17))
             return FALSE;
+	}
 
     while ((rdMmcDatBit4()&1) != 0)
+	{
         if (i-- <= 0)
         {
             debugMmcPrint("Timeout");
             return FALSE;                // timeout on start bit
         }
-#if 0
+	}
+#if 1
     for (i=0; i<512; i++)
         buf[i] = rdMmcDatByte4();
 
@@ -437,8 +603,10 @@ BOOL sdReadStopMulti( void )
 
     sendMmcCmd(12, 0);                  // STOP_TRANSMISSION
     if (!(cardType & 0x8000))
+	{
         if (!recvMmcCmdResp(resp, R1_LEN, 0) || (resp[0] != 12))
             return FALSE;
+	}
 
     return TRUE;
 }
@@ -733,6 +901,57 @@ DSTATUS MMC_disk_status (void)
 /* Read Sector(s)                                                        */
 /*-----------------------------------------------------------------------*/
 
+DRESULT MMC_disk_read_multi (BYTE *buff, DWORD sector, UINT count) __attribute__ ((section (".data")));
+DRESULT MMC_disk_read_multi (
+    BYTE *buff,           
+    DWORD sector,       
+    UINT count            
+)
+{
+	sector <<= ((cardType & 1) ? 0 : 9);
+	neo2_pre_sd();
+
+ 	if (!sdReadStartMulti(sector))
+	{
+		if (!sdReadStartMulti(sector))
+		{
+			neo2_post_sd();
+			return RES_ERROR;
+		}
+
+		if (!neo2_recv_sd_multi(buff, count))
+		{
+			neo2_post_sd();
+			return RES_ERROR;
+		}
+
+		sdReadStopMulti();
+		neo2_post_sd();
+		return RES_OK;
+	}
+
+	if (!neo2_recv_sd_multi(buff, count))
+    {
+		if (!sdReadStartMulti(sector))
+		{
+			neo2_post_sd();
+			return RES_ERROR;
+		}
+
+		if (!neo2_recv_sd_multi(buff, count))
+		{
+			neo2_post_sd();
+			return RES_ERROR;
+		}
+    }
+
+	sdReadStopMulti();
+	neo2_post_sd();
+	return RES_OK;
+}
+
+extern void neo_memcpy16(void* src,const void* dst,int len);
+
 DRESULT MMC_disk_read (BYTE *buff, DWORD sector, BYTE count) __attribute__ ((section (".data")));
 DRESULT MMC_disk_read (
     BYTE *buff,            /* Data buffer to store read data */
@@ -770,7 +989,7 @@ DRESULT MMC_disk_read (
             neo2_post_sd();
             sec_tags[ix] = sector;
         }
-        memcpy(buff, &sec_cache[ix*512], 512);
+        neo_memcpy16(buff, &sec_cache[ix<<9], 512);
     }
     else
     {
