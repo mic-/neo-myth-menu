@@ -1,0 +1,12 @@
+NAME=code_dump
+RM=rm
+CXX=gcc
+LD=-Wall -lbfd -pedantic -O3
+SRC=code_dump.c mips/mips-dis.c
+
+all:
+	$(CXX) $(SRC) $(LD) -o $(NAME)
+
+clean:
+	$(RM) $(NAME)
+
