@@ -76,7 +76,7 @@ inline void bus_delay(int cnt)
 
 inline void hw_delay() //#define hw_delay() asm("\nlbu $15,(0xB0000000)\n") --same thing ..
 {
-	bus_delay(384);
+    bus_delay(384);
 }
 
 #define _neo_asic_op(cmd) *(vu32 *)(0xB2000000 | (cmd<<1))
@@ -286,7 +286,7 @@ void neo_copyfrom_menu(void *dest, int fstart, int len)
 void neo_copyto_psram(void *src, int pstart, int len)
 {
     neo_select_psram();                 // psram enabled and write-enabled
-	neo_xferto_psram(src,pstart,len);
+    neo_xferto_psram(src,pstart,len);
 }
 
 void neo_copyfrom_psram(void *dest, int pstart, int len)
@@ -794,7 +794,7 @@ void simulate_pif_boot(u32 cic_chip)
     vu64 *gGPR = (vu64 *)0xA0300000;
 
     /* Clear XBUS/Flush/Freeze */
-    ((vu32 *)0xA4100000)[3] = 0x15; 
+    ((vu32 *)0xA4100000)[3] = 0x15;
 
     // clear some OS globals for cleaner boot
     *(vu32*)0xA000030C = 0;             // cold boot
@@ -1106,7 +1106,7 @@ void neo_run_game(u8 *option, int reset)
     romcic  = (option[6]<<16) + option[6];
     rommode = (option[7]<<16) + option[7];
 
-    if ((romsize && 0xFFFF) > 0x000F)
+    if ((romsize & 0xFFFF) > 0x000F)
     {
         // romsize is number of Mbits in rom
         gamelen = (romsize & 0xFFFF)*128*1024;
@@ -1169,7 +1169,7 @@ void neo_run_psram(u8 *option, int reset)
     romcic  = (option[6]<<16) + option[6];
     rommode = (option[7]<<16) + option[7];
 
-    if ((romsize && 0xFFFF) > 0x000F)
+    if ((romsize & 0xFFFF) > 0x000F)
     {
         // romsize is number of Mbits in rom
         gamelen = (romsize & 0xFFFF)*128*1024;
