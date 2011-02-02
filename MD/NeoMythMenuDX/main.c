@@ -801,7 +801,7 @@ inline void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
     UINT ts;
     ints_on();     /* enable interrupts */
     gDirectRead = 1;
-    f_read_zip(&gSDFile, (unsigned char *)pstart, len, &ts);
+    f_read_direct(&gSDFile, (unsigned char *)pstart, len, &ts);
     gDirectRead = 0;
     ints_off();     /* disable interrupts */
 }
