@@ -180,7 +180,7 @@ static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.6";
 
 /* Menu entry definitions */
 #define PAGE_ENTRIES 15                 /* number of entries to show per screen page */
-#define MAX_ENTRIES 401                 /* maximum number of menu entries in flash or per directory on SD card */
+#define MAX_ENTRIES 301                 /* maximum number of menu entries in flash or per directory on SD card */
 // note - the current flash menu can only fit 639 entries from 0xB000 to 0xFFE0
 
 struct menuEntry {
@@ -1270,7 +1270,8 @@ void get_sd_info(int entry)
         if((jump[0]!=0)&&((jump[3]==0x88)||(jump[3]==0x90)||(jump[3]==0x91)||(utility_memcmp(rom_hdr+0x20,"MARS",4)==0)))
         {
             gSelections[entry].type = 1; // 32X
-            gSelections[entry].run = 3;
+            if (gSelections[entry].run < 4)
+                gSelections[entry].run = 3;
         }
         else
         {
@@ -4080,7 +4081,7 @@ void do_options(void)
                     bsize = gSRAMSize * 8192;
                     runmode = gSelections[gCurEntry].run;
                     if ((runmode & 0x1F) < 7)
-                        runmode = gSRAMType ? 5 : !bsize ? 6 : (gSelections[gCurEntry].type == 1) ? 3 : (fsize > 0x200200) ? 2 : 1;
+                        runmode = gSRAMType ? 5 : (fsize > 0x400200) ? 4 : !bsize ? 6 : (gSelections[gCurEntry].type == 1) ? 3 : (fsize > 0x200200) ? 2 : 1;
                     ints_off();     /* disable interrupts */
                     // Run selected rom
                     if ((gSelections[gCurEntry].type == 2) || (runmode == 7))
@@ -4156,7 +4157,7 @@ void do_options(void)
 
                     fsize = gSDFile.fsize;
                     if ((runmode & 0x1F) < 7)
-                        runmode = gSRAMType ? 5 : !bsize ? 6 : (gSelections[gCurEntry].type == 1) ? 3 : (fsize > 0x200200) ? 2 : 1;
+                        runmode = gSRAMType ? 5 : (fsize > 0x400200) ? 4 : !bsize ? 6 : (gSelections[gCurEntry].type == 1) ? 3 : (fsize > 0x200200) ? 2 : 1;
 
                     if (gFileType)
                         f_read_zip(&gSDFile, buffer, 0x200, &ts);
