@@ -733,6 +733,57 @@ DSTATUS MMC_disk_status (void)
 /* Read Sector(s)                                                        */
 /*-----------------------------------------------------------------------*/
 
+DRESULT MMC_disk_read_multi (BYTE *buff, DWORD sector, UINT count) __attribute__ ((section (".data")));
+DRESULT MMC_disk_read_multi (
+    BYTE *buff,           
+    DWORD sector,       
+    UINT count            
+)
+{
+        sector <<= ((cardType & 1) ? 0 : 9);
+        neo2_pre_sd();
+
+        if (!sdReadStartMulti(sector))
+        {
+                if (!sdReadStartMulti(sector))
+                {
+                        neo2_post_sd();
+                        return RES_ERROR;
+                }
+
+                if (!neo2_recv_sd_multi(buff, count))
+                {
+                        neo2_post_sd();
+                        return RES_ERROR;
+                }
+
+                sdReadStopMulti();
+                neo2_post_sd();
+                return RES_OK;
+        }
+
+        if (!neo2_recv_sd_multi(buff, count))
+    {
+                if (!sdReadStartMulti(sector))
+                {
+                        neo2_post_sd();
+                        return RES_ERROR;
+                }
+
+                if (!neo2_recv_sd_multi(buff, count))
+                {
+                        neo2_post_sd();
+                        return RES_ERROR;
+                }
+    }
+
+        sdReadStopMulti();
+        neo2_post_sd();
+        return RES_OK;
+}
+
+
+
 DRESULT MMC_disk_read (BYTE *buff, DWORD sector, BYTE count) __attribute__ ((section (".data")));
 DRESULT MMC_disk_read (
     BYTE *buff,            /* Data buffer to store read data */
