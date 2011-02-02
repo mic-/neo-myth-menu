@@ -1314,6 +1314,7 @@ FRESULT create_name (
 static
 void get_fileinfo (		/* No return code */
 	DIR *dj,			/* Pointer to the directory object */
+
 	FILINFO *fno	 	/* Pointer to the file information to be filled */
 )
 {
@@ -1763,6 +1764,94 @@ FRESULT f_open (
 /*-----------------------------------------------------------------------*/
 /* Read File                                                             */
 /*-----------------------------------------------------------------------*/
+
+FRESULT f_read_direct(
+	FIL *fp, 		 
+	void *buff,		 
+	UINT btr,		 
+	UINT *br		 
+)
+{
+	DWORD clst, sect, remain;
+	UINT rcnt, cc;
+	UINT sector_base = 0xffffffff;
+	UINT sector_count = 0;
+	INT bound_a;
+
+	*br = 0;
+
+	remain = fp->fsize - fp->fptr;
+	if (btr > remain) btr = (UINT)remain; 
+
+	for ( ;  btr;									 
+		 fp->fptr += rcnt, *br += rcnt, btr -= rcnt) 
+		{
+			bound_a = (fp->fptr & (SS(fp->fs)-1));
+
+			if ( bound_a == 0) 
+			{			 
+				if (fp->csect >= fp->fs->csize) 
+				{ 
+					clst = (fp->fptr == 0) ? fp->org_clust : get_fat(fp->fs, fp->curr_clust);
+
+					if (clst <= 1){ABORT(fp->fs, FR_INT_ERR);}
+					else if (clst == 0xFFFFFFFF) { ABORT(fp->fs, FR_DISK_ERR); }
+						
+					fp->curr_clust = clst;				 
+					fp->csect = 0;						 
+				}
+
+				sect = clust2sect(fp->fs, fp->curr_clust); 
+
+				if (!sect)
+					ABORT(fp->fs, FR_INT_ERR);
+
+				sect += fp->csect;
+				cc = btr / SS(fp->fs);
+
+				if (cc) 
+				{	
+					cc = (fp->csect + cc > fp->fs->csize) ? fp->fs->csize - fp->csect : cc;
+					sector_base = (sector_base == 0xffffffff) ? sect : sector_base;
+					sector_count += cc;
+		 
+					fp->csect += (BYTE)cc;				 
+					rcnt = SS(fp->fs) * cc;				 
+					continue;
+				}
+#if !_FS_TINY
+#if !_FS_READONLY
+				if (fp->flag & FA__DIRTY)
+				{
+					if (disk_write(fp->fs->drive, fp->buf, fp->dsect, 1) != RES_OK)
+						ABORT(fp->fs, FR_DISK_ERR);
+
+					fp->flag &= ~FA__DIRTY;
+				}
+#endif
+				if (fp->dsect != sect)
+				{
+					if (disk_read(fp->fs->drive, fp->buf, sect, 1) != RES_OK)
+						ABORT(fp->fs, FR_DISK_ERR);
+				}
+#endif
+				fp->dsect = sect;
+				fp->csect++;							 
+			}
+			rcnt = SS(fp->fs) - bound_a;	 
+			if (rcnt > btr) rcnt = btr;
+	}
+
+	if(sector_count != 0)
+	{
+		if (disk_read_multi(fp->fs->drive,buff,sector_base,sector_count) != RES_OK)
+			ABORT(fp->fs, FR_DISK_ERR);
+	}
+
+	LEAVE_FF(fp->fs, FR_OK);
+}
+
+
 
 FRESULT f_read (
 	FIL *fp, 		/* Pointer to the file object */

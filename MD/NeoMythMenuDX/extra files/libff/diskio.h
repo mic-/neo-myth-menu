@@ -30,6 +30,7 @@ BOOL assign_drives (int argc, char *argv[]);
 DSTATUS disk_initialize (BYTE);
 DSTATUS disk_status (BYTE);
 DRESULT disk_read (BYTE, BYTE*, DWORD, BYTE);
+DRESULT disk_read_multi (BYTE, BYTE*, DWORD, UINT);
 #if	_READONLY == 0
 DRESULT disk_write (BYTE, const BYTE*, DWORD, BYTE);
 #endif
