@@ -11,7 +11,7 @@ extern DSTATUS ROM_disk_initialize (void);
 extern DSTATUS ROM_disk_status (void);
 extern DRESULT ROM_disk_read (BYTE *buff, DWORD sector, BYTE count);
 extern DRESULT ROM_disk_ioctl (BYTE ctrl, void *buff);
-
+extern DRESULT MMC_disk_read_multi (BYTE *buff, DWORD sector, UINT count);
 extern DSTATUS MMC_disk_initialize (void);
 extern DSTATUS MMC_disk_status (void);
 extern DRESULT MMC_disk_read (BYTE *buff, DWORD sector, BYTE count);
@@ -58,6 +58,17 @@ DSTATUS disk_status (
 
 /*-----------------------------------------------------------------------*/
 /* Read Sector(s)                                                        */
+
+DRESULT disk_read_multi (
+        BYTE drv,               /* Physical drive nmuber (0..) */
+        BYTE *buff,             /* Data buffer to store read data */
+        DWORD sector,   /* Sector address (LBA) */
+        UINT count              /* Number of sectors to read (1..255) */
+)
+{
+	return MMC_disk_read_multi(buff, sector, count);
+}
+
 
 DRESULT disk_read (
 	BYTE drv,		/* Physical drive nmuber (0..) */
