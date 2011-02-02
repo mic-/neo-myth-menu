@@ -573,6 +573,8 @@ _neo_set_sram:
         move.w  d2,d0
 |        beq.b   8f
         bsr     _neo_asic_cmd           /* set sram bank offset */
+        move.w  #0x0000,GBAC_LIO(a1)    /* clear low bank select reg */
+        move.w  #0x0000,GBAC_HIO(a1)    /* clear high bank select reg */
 8:
         move.l  (sp)+,d2
 10:
@@ -678,8 +680,8 @@ neo_check_cpld:
         lea     0xA10000,a1
         move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
 
-    /* get CPLD version */
-    moveq   #3,d0
+        /* get CPLD version */
+        moveq   #3,d0
         move.w  #0x00FF,CPLD_ID(a1)
         cmpi.b  #0x63,0x300002
         bne.b   0f
@@ -689,9 +691,9 @@ neo_check_cpld:
 0:
         move.w  #0x0000,CPLD_ID(a1)
 
-    move.w  d0,-(sp)
+        move.w  d0,-(sp)
         bsr     _neo_select_menu
-    move.w  (sp)+,d0
+        move.w  (sp)+,d0
         rts
 
 
@@ -859,6 +861,9 @@ neo_run_myth_psram:
         bclr    #5,d0
         bne.b   9f                      /* EBIOS or MA-Homebrew */
 
+        move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
+        move.w  #0x0000,GBAC_ZIO(a1)    /* clear bank size reg */
+
         move.l  4(sp),d0                /* psize */
         bsr     _neo_set_myth_psize     /* set the Neo Myth PSRAM bank size */
         move.l  8(sp),d0                /* bbank */
@@ -875,7 +880,7 @@ neo_run_myth_psram:
 1:
         move.w  d0,OPTION_IO(a1)        /* set run mode for game */
 
-        move.w  #0x00FF,RST_SEL(a1)     /* 0x0001 = , 0x0004 = , 0x00FF = */
+        move.w  #0x0001,RST_SEL(a1)     /* 0x0001 = , 0x0004 = , 0x00FF = */
         move.w  gWriteMode,WE_IO(a1)    /* 0x0000 = write protected, 0x0002 = write enabled */
         move.w  gResetMode,RST_IO(a1)   /* 0x0000 = reset to menu, 0x00FF = reset to game */
         move.w  gGameMode,RUN_IO(a1)    /* 0x0000 = menu mode, 0x00FF = game mode */
