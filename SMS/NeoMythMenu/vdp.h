@@ -14,6 +14,20 @@ enum
 	CMD_CRAM_WRITE = 0xC0,	// Writes to the VDP data port will go to CRAM
 };
 
+enum
+{
+	REG_MODE_CTRL_1 = 0,
+	REG_MODE_CTRL_2,
+	REG_NAME_TABLE_ADDR,
+	REG_COLOR_TABLE_ADDR,
+	REG_BG_PATTERN_ADDR,
+	REG_SAT_ADDR,
+	REG_SPR_PATTERN_ADDR,
+	REG_OVERSCAN_COLOR,
+	REG_HSCROLL,
+	REG_VSCROLL,
+	REG_LINE_COUNT,
+};
 
 
 void vdp_set_reg(BYTE rn, BYTE val);
