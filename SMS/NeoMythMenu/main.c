@@ -13,6 +13,10 @@ void mute_psg()
 }
 
 
+/*
+ * Expand the 1-bit font and write to VRAM at
+ * address 0000
+ */
 void load_font()
 {
     WORD i;
@@ -55,61 +59,122 @@ void puts(const char *str, BYTE x, BYTE y, BYTE attributes)
 
 void puts_game_list()
 {
-	BYTE *gameList;
+	BYTE *p = (BYTE*)gbacGameList;
 	BYTE row, shown;
-
-#ifdef EMULATOR
-	gameList = (char*)&dummyGameList[0];
-#else
-	gameList = (char*)0xB000;
-#endif
 
 	vdp_wait_vblank();
 
 	shown = 0;
 	row = 3;
-	gameList += games.firstShown << 5;
+	p += games.firstShown << 5;
 	// Loop until we've shown the desired number of games, or
 	// there are no more games in the list
-	while ((*gameList != 0xFF) && (shown < GAMES_TO_SHOW) &&
-	       ((shown + games.firstShown) < games.size))
+	while ((*p != 0xFF) && (shown < NUMBER_OF_GAMES_TO_SHOW) &&
+	       ((shown + games.firstShown) < games.count))
 	{
 		if (games.highlighted == shown + games.firstShown)
-			puts(&gameList[8], 1, row, 4);	// the palette bit is bit 2 of the attribute
+			puts(&p[8], 1, row, 4);	// the palette bit is bit 2 of the attribute
 		else
-			puts(&gameList[8], 1, row, 0);
+			puts(&p[8], 1, row, 0);
 		row++;
 		shown++;
-		gameList += 0x20;
+		p += 0x20;
 	}
 }
 
 
-// Count the number of games on the GBA card, and initialize the games struct
-void count_games_on_gbac()
+/*
+ * Move to the next entry in the games list
+ */
+void move_to_next_game()
 {
-	BYTE *gameList;
-#ifdef EMULATOR
-	gameList = (char*)&dummyGameList[0];
-#else
-	gameList = (BYTE*)0xB000;
-#endif
-
-	games.size = 0;
-	while (*gameList != 0xFF)
+	if (++games.highlighted >= games.count)
 	{
-		gameList += 0x20;
-		games.size++;
+		games.highlighted--;
+	}
+	else
+	{
+		// Check if the games list needs to be scrolled
+		if ((games.firstShown + ((NUMBER_OF_GAMES_TO_SHOW >> 1) - 1) < games.highlighted) &&
+			(games.firstShown + NUMBER_OF_GAMES_TO_SHOW < games.count))
+		{
+			games.firstShown++;
+		}
 	}
 
-	games.firstShown = 0;
-	games.highlighted = 0;
+	puts_game_list();
 }
+
+
+/*
+ * Move to the previous entry in the games list
+ */
+void move_to_previous_game()
+{
+	if (games.highlighted)
+	{
+		games.highlighted--;
+
+		// Check if the games list needs to be scrolled
+		if ((games.firstShown) &&
+			(games.firstShown + ((NUMBER_OF_GAMES_TO_SHOW >> 1) - 1) >= games.highlighted))
+		{
+			games.firstShown--;
+		}
+	}
+
+	puts_game_list();
+}
+
+
+
+/*
+ * Count the number of games on the GBA card
+ */
+WORD count_games_on_gbac()
+{
+	BYTE *p = (BYTE*)gbacGameList;
+	WORD count = 0;
+
+	while (*p != 0xFF)
+	{
+		p += 0x20;
+		count++;
+	}
+
+	return count;
+}
+
+
+/*
+ * Check if the machine we're running on is a
+ * Japanese one or Rest Of World
+ *
+ * NOTE: Not yet tested. The JoyCtrl value might not be correct
+ */
+BYTE check_sms_region()
+{
+	JoyCtrl = 0xF5;
+	if ((JoyPort2 & 0xC0) == 0xC0)
+		return EXPORTED;
+	return JAPANESE;
+}
+
+
 
 
 void main()
 {
+	BYTE temp;
+
     Frame1 = 1;
+
+    mute_psg();
+
+	games.count = count_games_on_gbac();
+	games.firstShown = games.highlighted = 0;
+
+	region = check_sms_region();
 
     load_font();
 
@@ -117,17 +182,34 @@ void main()
 
     setup_vdp();
 
-    mute_psg();
-
     vdp_set_cram_addr(0x0000);
     VdpData = 0; 	// color 0
-    VdpData = 0x2A; // color 1
+    VdpData = 0x25; // color 1 (blue)
 	vdp_set_cram_addr(0x0010);
 	VdpData = 0;	// color 16
-	VdpData = 0x3F;	// color 17
+	VdpData = 0x3F;	// color 17 (white)
 
-	count_games_on_gbac();
 	puts_game_list();
 
-    while (1) {}
+	keys = keysRepeat = 0;
+
+    while (1)
+    {
+		// All keys for joy1
+		temp = (JoyPort1 & 0x3F) ^ 0x3F;
+
+		// Only those that were pressed since the last time
+		// we checked
+		keys = temp & ~keysRepeat;
+		keysRepeat = temp;
+
+		if (keys & KEY_UP)
+		{
+			move_to_previous_game();
+		}
+		else if (keys & KEY_DOWN)
+		{
+			move_to_next_game();
+		}
+	}
 }

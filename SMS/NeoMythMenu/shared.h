@@ -3,22 +3,24 @@
 
 #include <z80/types.h>
 
-#define GAMES_TO_SHOW 9
+#define NUMBER_OF_GAMES_TO_SHOW 9
 
 typedef struct
 {
 	WORD firstShown;
 	WORD highlighted;
-	WORD size;
+	WORD count;
 } FileList;
 
 
-extern int foo, bar;
 extern FileList games;
-
+extern BYTE region;
+extern BYTE keys,keysRepeat;
 
 #ifdef EMULATOR
 extern const char dummyGameList[];
 #endif
+
+extern const BYTE *gbacGameList;
 
 #endif
