@@ -4,7 +4,7 @@ RM = rm -rf
 PADTRIM = tools/bin16k
 HEX2BIN = tools/hex2bin
 
-CFLAGS = -mz80 --data-loc 0xC000 -DEMULATOR
+CFLAGS = -mz80 --data-loc 0xC001 -DEMULATOR
 
 BANK0OBJS = vdp.rel font.rel crt0.rel
 SHARED = shared.rel

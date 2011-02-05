@@ -76,12 +76,31 @@ __sfr __at 0xDC JoyPort1; /* in only */
 __sfr __at 0xDD JoyPort2; /* in only */
 
 /*
+ * YM2413 Ports
+ *
+ * FMDetect
+ * b0 = r/w - returns what was written if FM chip present
+ * b1-b2 = 00 if FM chip present
+ *
+ * Note, you can only read FMDetect if you turn off the IO (Joystick)
+ * ports by setting b2 of MemCtrl.
+ */
+__sfr __at 0xF0 FMAddr; /* out only */
+__sfr __at 0xF1 FMData; /* out only */
+__sfr __at 0xF2 FMDetect; /* in/out */
+
+/*
  * CodeMasters Frame Page Number
  * CodeMasters' mapper is fixed from 0x0000 to 0x7FFF, and has one bank
  * at 0x8000 to 0xBFFF. Write a byte to 0x8000 to set the page of the
  * bank.
  */
 #define CMFrmCtrl (*(volatile BYTE *)(0x8000))
+
+/*
+ * BIOS shadow variable for MemCtrl
+ */
+#define MemCtrlShdw (*(volatile BYTE *)(0xC000))
 
 /*
  * 3D Glasses Control Byte
