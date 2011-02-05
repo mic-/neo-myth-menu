@@ -31,7 +31,7 @@ __sfr __at 0x3F JoyCtrl; /* out only */
  * Vertical and Horizontal Count from VDP
  */
 __sfr __at 0x7E VdpVCnt; /* in only */
-__sfr __at 0x7E VdpHCnt; /* in only */
+__sfr __at 0x7F VdpHCnt; /* in only */
 
 /*
  * PSG Control Port
