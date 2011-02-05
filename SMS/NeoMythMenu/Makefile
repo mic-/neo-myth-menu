@@ -1,5 +1,5 @@
-CC = sdcc
-AS = sdasz80
+CC = $(SMSDEV)sdcc
+AS = $(SMSDEV)sdasz80
 RM = rm -rf
 PADTRIM = tools/bin16k
 HEX2BIN = tools/hex2bin
