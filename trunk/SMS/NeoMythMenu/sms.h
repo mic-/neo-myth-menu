@@ -68,21 +68,40 @@ __sfr __at 0xBF VdpStat; /* in only */
  * b2 = P2 TR / S1
  * b3 = P2 S2
  * b4 = /RESET
- * b5 =
+ * b5 = 1 = SMS/SMS2/GG, 0 = MD PBC
  * b6 = P1 TH - Light Gun Sync
  * b7 = P2 TH - Light Gun Sync
  */
 __sfr __at 0xDC JoyPort1; /* in only */
 __sfr __at 0xDD JoyPort2; /* in only */
 
+/*
+ * CodeMasters Frame Page Number
+ * CodeMasters' mapper is fixed from 0x0000 to 0x7FFF, and has one bank
+ * at 0x8000 to 0xBFFF. Write a byte to 0x8000 to set the page of the
+ * bank.
+ */
+#define CMFrmCtrl (*(volatile BYTE *)(0x8000))
+
+/*
+ * 3D Glasses Control Byte
+ * Write a byte to switch which lens is currently closed. The control
+ * reg mirrors at 0xFFF9, 0xFFFA, and 0xFFFB. It is shadowed in the
+ * ram at 0xDFF8 to 0xDFFB.
+ *
+ * b0 = lens close select - if set, one lens close; if clr, the other
+ */
+#define ThreeDCtrl (*(volatile BYTE *)(0xFFF8))
 
 /*
  * Frame 2 Control Byte
  * Write a byte to set how frame 2 is handled. The value is shadowed
  * in ram at 0xDFFC.
  *
- * b3 = 1 = SaveRAM in frame 2, 0 = ROM in frame 2
+ * b0-b1 = page shift (00 for normal operation)
  * b2 = SRAM page (0 or 1) if SRAM mapped to frame 2
+ * b3 = 1 = SaveRAM in frame 2, 0 = ROM in frame 2
+ * b4 = 1 = SRAM write protected
  */
 #define Frm2Ctrl (*(volatile BYTE *)(0xFFFC))
 
@@ -118,19 +137,19 @@ __sfr __at 0xDD JoyPort2; /* in only */
  */
 enum
 {
-	JAPANESE,
-	EXPORTED
+    JAPANESE,
+    EXPORTED
 };
 
 
 enum
 {
-	KEY_UP = 1,
-	KEY_DOWN = 2,
-	KEY_LEFT = 4,
-	KEY_RIGHT = 8,
-	KEY_A = 16,
-	KEY_B = 32,
+    KEY_UP = 1,
+    KEY_DOWN = 2,
+    KEY_LEFT = 4,
+    KEY_RIGHT = 8,
+    KEY_A = 16,
+    KEY_B = 32,
 };
 
 

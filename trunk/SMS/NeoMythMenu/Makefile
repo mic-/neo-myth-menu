@@ -1,9 +1,5 @@
-#NOTE:Export SMSDEV with directory separator at the end
-#(You've got to export it if you don't have an sdcc .dep installed or if you haven't placed the compiler's executable to 
-#your local usr dir)
-
-CC = $(SMSDEV)sdcc
-AS = $(SMSDEV)sdasz80
+CC = sdcc
+AS = sdasz80
 RM = rm -rf
 PADTRIM = tools/bin16k
 HEX2BIN = tools/hex2bin

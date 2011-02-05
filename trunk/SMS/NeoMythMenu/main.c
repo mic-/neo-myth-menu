@@ -59,27 +59,27 @@ void puts(const char *str, BYTE x, BYTE y, BYTE attributes)
 
 void puts_game_list()
 {
-	BYTE *p = (BYTE*)gbacGameList;
-	BYTE row, shown;
+    BYTE *p = (BYTE*)gbacGameList;
+    BYTE row, shown;
 
-	vdp_wait_vblank();
+    vdp_wait_vblank();
 
-	shown = 0;
-	row = 3;
-	p += games.firstShown << 5;
-	// Loop until we've shown the desired number of games, or
-	// there are no more games in the list
-	while ((*p != 0xFF) && (shown < NUMBER_OF_GAMES_TO_SHOW) &&
-	       ((shown + games.firstShown) < games.count))
-	{
-		if (games.highlighted == shown + games.firstShown)
-			puts(&p[8], 1, row, 4);	// the palette bit is bit 2 of the attribute
-		else
-			puts(&p[8], 1, row, 0);
-		row++;
-		shown++;
-		p += 0x20;
-	}
+    shown = 0;
+    row = 3;
+    p += games.firstShown << 5;
+    // Loop until we've shown the desired number of games, or
+    // there are no more games in the list
+    while ((*p != 0xFF) && (shown < NUMBER_OF_GAMES_TO_SHOW) &&
+           ((shown + games.firstShown) < games.count))
+    {
+        if (games.highlighted == shown + games.firstShown)
+            puts(&p[8], 1, row, 4); // the palette bit is bit 2 of the attribute
+        else
+            puts(&p[8], 1, row, 0);
+        row++;
+        shown++;
+        p += 0x20;
+    }
 }
 
 
@@ -88,21 +88,21 @@ void puts_game_list()
  */
 void move_to_next_game()
 {
-	if (++games.highlighted >= games.count)
-	{
-		games.highlighted--;
-	}
-	else
-	{
-		// Check if the games list needs to be scrolled
-		if ((games.firstShown + ((NUMBER_OF_GAMES_TO_SHOW >> 1) - 1) < games.highlighted) &&
-			(games.firstShown + NUMBER_OF_GAMES_TO_SHOW < games.count))
-		{
-			games.firstShown++;
-		}
-	}
+    if (++games.highlighted >= games.count)
+    {
+        games.highlighted--;
+    }
+    else
+    {
+        // Check if the games list needs to be scrolled
+        if ((games.firstShown + ((NUMBER_OF_GAMES_TO_SHOW >> 1) - 1) < games.highlighted) &&
+            (games.firstShown + NUMBER_OF_GAMES_TO_SHOW < games.count))
+        {
+            games.firstShown++;
+        }
+    }
 
-	puts_game_list();
+    puts_game_list();
 }
 
 
@@ -111,19 +111,19 @@ void move_to_next_game()
  */
 void move_to_previous_game()
 {
-	if (games.highlighted)
-	{
-		games.highlighted--;
+    if (games.highlighted)
+    {
+        games.highlighted--;
 
-		// Check if the games list needs to be scrolled
-		if ((games.firstShown) &&
-			(games.firstShown + ((NUMBER_OF_GAMES_TO_SHOW >> 1) - 1) >= games.highlighted))
-		{
-			games.firstShown--;
-		}
-	}
+        // Check if the games list needs to be scrolled
+        if ((games.firstShown) &&
+            (games.firstShown + ((NUMBER_OF_GAMES_TO_SHOW >> 1) - 1) >= games.highlighted))
+        {
+            games.firstShown--;
+        }
+    }
 
-	puts_game_list();
+    puts_game_list();
 }
 
 
@@ -133,48 +133,51 @@ void move_to_previous_game()
  */
 WORD count_games_on_gbac()
 {
-	BYTE *p = (BYTE*)gbacGameList;
-	WORD count = 0;
+    BYTE *p = (BYTE*)gbacGameList;
+    WORD count = 0;
 
-	while (*p != 0xFF)
-	{
-		p += 0x20;
-		count++;
-	}
+    while (*p != 0xFF)
+    {
+        p += 0x20;
+        count++;
+    }
 
-	return count;
+    return count;
 }
 
 
 /*
- * Check if the machine we're running on is a
- * Japanese one or Rest Of World
+ * Check if the machine is Domestic (Japanese) or Exported (elsewhere)
  *
- * NOTE: Not yet tested. The JoyCtrl value might not be correct
+ * Set P1 TH and P2 TH as outputs and their levels high (for MD PBC
+ * compatibility), then read back P1 TH and P2 TH. If they are the same
+ * as written, the console is exported, else domestic.
+ *
+ * Note: This leaves TH for both ports as outputs and set high... which
+ * is what we want for using MD pads on the SMS. Using a light gun would
+ * require changing the appropriate TH back to an input.
  */
 BYTE check_sms_region()
 {
-	JoyCtrl = 0xF5;
-	if ((JoyPort2 & 0xC0) == 0xC0)
-		return EXPORTED;
-	return JAPANESE;
+    JoyCtrl = 0xF5; // set P1 TH and P2 TH as output and levels high
+    if ((JoyPort2 & 0xC0) == 0xC0)
+        return EXPORTED;
+    return JAPANESE;
 }
-
-
 
 
 void main()
 {
-	BYTE temp;
+    BYTE temp;
 
     Frame1 = 1;
 
     mute_psg();
 
-	games.count = count_games_on_gbac();
-	games.firstShown = games.highlighted = 0;
+    games.count = count_games_on_gbac();
+    games.firstShown = games.highlighted = 0;
 
-	region = check_sms_region();
+    region = check_sms_region();
 
     load_font();
 
@@ -183,33 +186,33 @@ void main()
     setup_vdp();
 
     vdp_set_cram_addr(0x0000);
-    VdpData = 0; 	// color 0
+    VdpData = 0;    // color 0
     VdpData = 0x25; // color 1 (blue)
-	vdp_set_cram_addr(0x0010);
-	VdpData = 0;	// color 16
-	VdpData = 0x3F;	// color 17 (white)
+    vdp_set_cram_addr(0x0010);
+    VdpData = 0;    // color 16
+    VdpData = 0x3F; // color 17 (white)
 
-	puts_game_list();
+    puts_game_list();
 
-	keys = keysRepeat = 0;
+    keys = keysRepeat = 0;
 
     while (1)
     {
-		// All keys for joy1
-		temp = (JoyPort1 & 0x3F) ^ 0x3F;
+        // All keys for joy1
+        temp = (JoyPort1 & 0x3F) ^ 0x3F;
 
-		// Only those that were pressed since the last time
-		// we checked
-		keys = temp & ~keysRepeat;
-		keysRepeat = temp;
+        // Only those that were pressed since the last time
+        // we checked
+        keys = temp & ~keysRepeat;
+        keysRepeat = temp;
 
-		if (keys & KEY_UP)
-		{
-			move_to_previous_game();
-		}
-		else if (keys & KEY_DOWN)
-		{
-			move_to_next_game();
-		}
-	}
+        if (keys & KEY_UP)
+        {
+            move_to_previous_game();
+        }
+        else if (keys & KEY_DOWN)
+        {
+            move_to_next_game();
+        }
+    }
 }
