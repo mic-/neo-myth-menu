@@ -112,4 +112,26 @@ __sfr __at 0xDD JoyPort2; /* in only */
         __endasm
 
 
+/*
+ * Enums for SMS regions
+ * EXPORTED == Rest Of World (US/Europe/..)
+ */
+enum
+{
+	JAPANESE,
+	EXPORTED
+};
+
+
+enum
+{
+	KEY_UP = 1,
+	KEY_DOWN = 2,
+	KEY_LEFT = 4,
+	KEY_RIGHT = 8,
+	KEY_A = 16,
+	KEY_B = 32,
+};
+
+
 #endif

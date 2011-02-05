@@ -3,9 +3,9 @@
 #include "shared.h"
 
 
-int foo, bar = 3;
 FileList games;
-
+BYTE region;
+BYTE keys,keysRepeat;
 
 // For testing purposes
 #ifdef EMULATOR
@@ -18,7 +18,12 @@ const char dummyGameList[] =
 
 	0x00,0x02,0x41,0x00,0x00,0x00,0x0A,0x0B,
     'A', 'l', 'e', 'x', ' ', 'K', 'i', 'd',
-    'd', ' ', ' ', '.', ' ', ' ', ' ', ' ',
+    'd', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
+    ' ', ' ', ' ', ' ', ' ', ' ', ' ', 0,
+
+	0x00,0x02,0x41,0x00,0x00,0x00,0x0A,0x0B,
+    'S', 'o', 'n', 'i', 'c', ' ', '1', ' ',
+    ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ',
     ' ', ' ', ' ', ' ', ' ', ' ', ' ', 0,
 
 	0xFF,0x02,0x41,0x00,0x00,0x00,0x0A,0x0B,
@@ -26,5 +31,11 @@ const char dummyGameList[] =
     'd', ' ', ' ', '.', ' ', ' ', ' ', ' ',
     ' ', ' ', ' ', ' ', ' ', ' ', ' ', 0
 };
+
+const BYTE *gbacGameList = (char*)&dummyGameList[0];
+#else
+const BYTE *gbacGameList = (const BYTE*)0xB000;
 #endif
+
+
 
