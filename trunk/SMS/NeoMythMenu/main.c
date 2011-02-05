@@ -53,21 +53,81 @@ void puts(const char *str, BYTE x, BYTE y, BYTE attributes)
 }
 
 
+void puts_game_list()
+{
+	BYTE *gameList;
+	BYTE row, shown;
+
+#ifdef EMULATOR
+	gameList = (char*)&dummyGameList[0];
+#else
+	gameList = (char*)0xB000;
+#endif
+
+	vdp_wait_vblank();
+
+	shown = 0;
+	row = 3;
+	gameList += games.firstShown << 5;
+	// Loop until we've shown the desired number of games, or
+	// there are no more games in the list
+	while ((*gameList != 0xFF) && (shown < GAMES_TO_SHOW) &&
+	       ((shown + games.firstShown) < games.size))
+	{
+		if (games.highlighted == shown + games.firstShown)
+			puts(&gameList[8], 1, row, 4);	// the palette bit is bit 2 of the attribute
+		else
+			puts(&gameList[8], 1, row, 0);
+		row++;
+		shown++;
+		gameList += 0x20;
+	}
+}
+
+
+// Count the number of games on the GBA card, and initialize the games struct
+void count_games_on_gbac()
+{
+	BYTE *gameList;
+#ifdef EMULATOR
+	gameList = (char*)&dummyGameList[0];
+#else
+	gameList = (BYTE*)0xB000;
+#endif
+
+	games.size = 0;
+	while (*gameList != 0xFF)
+	{
+		gameList += 0x20;
+		games.size++;
+	}
+
+	games.firstShown = 0;
+	games.highlighted = 0;
+}
+
+
 void main()
 {
     Frame1 = 1;
 
     load_font();
 
-    puts("NeoSmsMenu", 11, 8, 0);
+    puts("NeoSmsMenu", 11, 1, 4);
 
     setup_vdp();
 
     mute_psg();
 
     vdp_set_cram_addr(0x0000);
-    VdpData = 0; // color 0
-    VdpData = 0x3F; // color 1
+    VdpData = 0; 	// color 0
+    VdpData = 0x2A; // color 1
+	vdp_set_cram_addr(0x0010);
+	VdpData = 0;	// color 16
+	VdpData = 0x3F;	// color 17
+
+	count_games_on_gbac();
+	puts_game_list();
 
     while (1) {}
 }

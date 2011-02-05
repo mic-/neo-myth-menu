@@ -38,3 +38,10 @@ void vdp_copy_to_vram(WORD dest, BYTE *src, WORD len)
     }
 }
 
+
+void vdp_wait_vblank()
+{
+	while (!(VdpCtrl & 0x80)) {}
+}
+
+
