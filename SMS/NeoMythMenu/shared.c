@@ -7,6 +7,9 @@ FileList games;
 BYTE region;
 BYTE keys,keysRepeat;
 
+// Extra "virtual" registers for assembly routines
+BYTE vregs[16];
+
 // For testing purposes
 #ifdef EMULATOR
 const char dummyGameList[] =

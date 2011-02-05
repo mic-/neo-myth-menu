@@ -161,6 +161,9 @@ enum
 };
 
 
+/*
+ * Enums for joypad keys
+ */
 enum
 {
     KEY_UP = 1,
