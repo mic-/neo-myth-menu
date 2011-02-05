@@ -13,7 +13,7 @@
 ;  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 ;  GNU General Public License for more details.
 ;
-;  You should have received a copy of the GNU General Public License 
+;  You should have received a copy of the GNU General Public License
 ;  along with this library; see the file COPYING. If not, write to the
 ;  Free Software Foundation, 51 Franklin Street, Fifth Floor, Boston,
 ;   MA 02110-1301, USA.
@@ -27,64 +27,76 @@
 ;--------------------------------------------------------------------------
 
         .module crt0
-       	.globl	_main
+        .globl  _main
 
-	.area	_HEADER (ABS)
-	;; Reset vector
-	.org 	0
-	jp	init
+        .area   _HEADER (ABS)
+        ;; Reset vector
+        .org    0
+        di
+        im      1
+        jp      init
 
-	.org	0x08
-	reti
-	.org	0x10
-	reti
-	.org	0x18
-	reti
-	.org	0x20
-	reti
-	.org	0x28
-	reti
-	.org	0x30
-	reti
-	.org	0x38
-	reti
-	.org	0x66
-	retn
+        ;; Restart vectors
+        .org    0x08
+        ret
+        .org    0x10
+        ret
+        .org    0x18
+        ret
+        .org    0x20
+        ret
+        .org    0x28
+        ret
+        .org    0x30
+        ret
 
-	.org	0x100
+        ;; Interrupt vector
+        .org    0x38
+        push    af
+        in      a,(0xBF) ;; clears int and gives vdp status
+        pop     af
+        ei
+        ret
+
+        ;; NMI vector (Pause pressed)
+        .org    0x66
+        retn
+
+        .org    0x100
 init:
-	;; Stack at the top of memory.
-	ld	sp,#0xdff0  ;;0xffff
+        ;; Stack at the top of memory minus shadow frame control bytes
+        ld      sp,#0xdff0
 
         ;; Initialise global variables
         call    gsinit
-	call	_main
-	jp	_exit
+        ;; Call main entry point
+        call    _main
+        jp      _exit
 
-	;; Ordering of segments for the linker.
-	.area	_HOME
-	.area	_CODE
+        ;; Ordering of segments for the linker.
+        .area   _HOME
+        .area   _CODE
         .area   _GSINIT
         .area   _GSFINAL
 
-	.area	_DATA
-	.area	_BSEG
+        .area   _DATA
+        .area   _BSEG
         .area   _BSS
         .area   _HEAP
 
         .area   _CODE
 __clock::
-	ld	a,#2
+        ld      a,#2
         rst     0x08
-	ret
+        ret
 
 _exit::
-	;; Exit - special code to the emulator
-	ld	a,#0
+        ;; Exit - special code to the emulator
+        ld      a,#0
         rst     0x08
 1$:
-	halt
-	jr	1$
+        halt
+        jr      1$
 
         .area   _GSINIT
 gsinit::
