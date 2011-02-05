@@ -73,9 +73,9 @@ void puts_game_list()
            ((shown + games.firstShown) < games.count))
     {
         if (games.highlighted == shown + games.firstShown)
-            puts(&p[8], 1, row, 4); // the palette bit is bit 2 of the attribute
+            puts(&p[8], 1, row, PALETTE1); // the palette bit is bit 2 of the attribute
         else
-            puts(&p[8], 1, row, 0);
+            puts(&p[8], 1, row, PALETTE0);
         row++;
         shown++;
         p += 0x20;
@@ -181,7 +181,7 @@ void main()
 
     load_font();
 
-    puts("NeoSmsMenu", 11, 1, 4);
+    puts("NeoSmsMenu", 11, 1, PALETTE1);
 
     setup_vdp();
 

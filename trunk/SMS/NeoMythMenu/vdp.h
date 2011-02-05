@@ -6,6 +6,9 @@
 #include "sms.h"
 
 
+/*
+ * Settings for VdpCtrl
+ */
 enum
 {
 	CMD_VRAM_READ = 0,
@@ -14,6 +17,10 @@ enum
 	CMD_CRAM_WRITE = 0xC0,	// Writes to the VDP data port will go to CRAM
 };
 
+
+/*
+ * VDP register enumerators
+ */
 enum
 {
 	REG_MODE_CTRL_1 = 0,
@@ -27,6 +34,19 @@ enum
 	REG_HSCROLL,
 	REG_VSCROLL,
 	REG_LINE_COUNT,
+};
+
+
+/*
+ * Tile attributes
+ */
+enum
+{
+	PALETTE0 = 0,
+	FLIP_HORIZ = 1,
+	FLIP_VERT = 2,
+	PALETTE1 = 4,
+	BG_OVER_SPRITES = 8,
 };
 
 
