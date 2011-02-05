@@ -38,5 +38,6 @@ void vdp_set_cram_addr(WORD addr);
 
 void vdp_copy_to_vram(WORD dest, BYTE *src, WORD len);
 
+void vdp_wait_vblank();
 
 #endif
