@@ -225,41 +225,14 @@ void main()
     temp = 0;
     while (temp != PAD_START)
     {
-        temp = pad_get_3button(0);
+        //temp = pad1_get_2button();
+        //temp = pad2_get_2button();
+        temp = pad1_get_3button();
+        //temp = pad2_get_3button();
         if (temp & PAD_START)
-            puts("S", 1, 0, 4);
+            puts("S", 11, 0, 4);
         else
-            puts(" ", 1, 0, 4);
-        if (temp & PAD_A)
-            puts("A", 2, 0, 4);
-        else
-            puts(" ", 2, 0, 4);
-        if (temp & PAD_C)
-            puts("C", 3, 0, 4);
-        else
-            puts(" ", 3, 0, 4);
-        if (temp & PAD_B)
-            puts("B", 4, 0, 4);
-        else
-            puts(" ", 4, 0, 4);
-        if (temp & PAD_RIGHT)
-            puts("R", 5, 0, 4);
-        else
-            puts(" ", 5, 0, 4);
-        if (temp & PAD_LEFT)
-            puts("L", 6, 0, 4);
-        else
-            puts(" ", 6, 0, 4);
-        if (temp & PAD_DOWN)
-            puts("D", 7, 0, 4);
-        else
-            puts(" ", 7, 0, 4);
-        if (temp & PAD_UP)
-            puts("U", 8, 0, 4);
-        else
-            puts(" ", 8, 0, 4);
-
-        temp = pad_get_3button(1);
+            puts(" ", 11, 0, 4);
         if (temp & PAD_A)
             puts("A", 12, 0, 4);
         else
@@ -299,8 +272,8 @@ void main()
     temp = 0;
     while (temp != PAD_MODE)
     {
-        temp = pad_get_6button(0);
-        //temp = pad_get_6button(1);
+        temp = pad1_get_6button();
+        //temp = pad2_get_6button();
         if (temp & PAD_MODE)
             puts("M", 7, 0, 4);
         else
@@ -357,7 +330,7 @@ void main()
 
     while (1)
     {
-        temp = pad_get_2button(0);
+        temp = pad1_get_2button();
 
         // Only those that were pressed since the last time
         pad = temp & ~padLast;
