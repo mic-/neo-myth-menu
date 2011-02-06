@@ -5,6 +5,12 @@
 #include "font.h"
 
 #define MENU_VERSION_STRING "0.10"
+
+/*
+ * Use the plain single-colored background instead of the pattered one.
+ * If you remove this define you should also modify the Makefile to
+ * link against font2.rel instead of font.rel.
+ */
 #define PLAIN_BG
 
 
