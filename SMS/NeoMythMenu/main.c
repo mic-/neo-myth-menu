@@ -62,7 +62,7 @@ void setup_vdp()
     vdp_set_reg(REG_VSCROLL, 0x00);         // ...
     vdp_set_reg(REG_NAME_TABLE_ADDR, 0x07); // Nametable at 0x1800
     vdp_set_reg(REG_OVERSCAN_COLOR, 0);
-    vdp_set_reg(REG_BG_PATTERN_ADDR, 0x07); // Needed for the SMS1 VDP, ignored for later versions
+    vdp_set_reg(REG_BG_PATTERN_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_COLOR_TABLE_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_LINE_COUNT, 0xFF);      // Line ints off
 
@@ -210,6 +210,9 @@ void main()
     games.firstShown = games.highlighted = 0;
 
     region = check_sms_region();
+
+	// Make sure the display is off before we write to VRAM
+	vdp_set_reg(REG_MODE_CTRL_2, 0xA0);
 
     load_font();
 
