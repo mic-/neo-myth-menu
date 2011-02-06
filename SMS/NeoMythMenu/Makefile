@@ -6,7 +6,7 @@ HEX2BIN = tools/hex2bin
 
 CFLAGS = -mz80 --data-loc 0xC001 -DEMULATOR
 
-BANK0OBJS = vdp.rel pad.rel font.rel crt0.rel
+BANK0OBJS = vdp.rel pad.rel font.rel neo2.rel crt0.rel
 SHARED = shared.rel
 
 all: $(BANK0OBJS) $(SHARED) bank1.bin menu.sms
