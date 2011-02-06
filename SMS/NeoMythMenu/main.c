@@ -58,6 +58,21 @@ void load_font()
 }
 
 
+/*
+ * Initializes the Sprite Attribute Table
+ */
+void init_sat()
+{
+	BYTE i;
+
+	vdp_set_vram_addr(0x2800);
+
+	// Initialize the Y-coordinates. Place all sprites outside
+	// of the visible area
+	for (i = 0; i < 0x40; i++) VdpData = 240;
+}
+
+
 void setup_vdp()
 {
     disable_ints();
@@ -70,13 +85,15 @@ void setup_vdp()
     vdp_set_reg(REG_BG_PATTERN_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_COLOR_TABLE_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_LINE_COUNT, 0xFF);      // Line ints off
+    vdp_set_reg(REG_SAT_ADDR, 0x51);		// Sprite attribute table at 0x2800
 
-    vdp_set_cram_addr(0x0010);
-    VdpData = 1;    // color 16 (maroon)
-    VdpData = 1;    // color 17 (maroon)
-    VdpData = 1;    // color 18 (maroon)
-    vdp_set_cram_addr(0x0017);
-    VdpData = 0x3F; // color 23 (white)
+	vdp_set_color(16, 1, 0, 0);				// Color 16 (maroon)
+	vdp_set_color(17, 1, 0, 0);				// Color 17 (maroon)
+	vdp_set_color(18, 1, 0, 0);				// Color 18 (maroon)
+	vdp_set_color(23, 3, 3, 3);				// Color 23 (white)
+
+	init_sat();
+
     enable_ints();
 }
 
