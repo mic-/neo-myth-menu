@@ -5,6 +5,7 @@
 #include "font.h"
 
 #define MENU_VERSION_STRING "0.10"
+#define PLAIN_BG
 
 
 void disable_ints(void) __naked
@@ -47,11 +48,18 @@ void load_font()
 
     for (i = 0; i < 960; i++)
     {
+#ifdef PLAIN_BG
+		b = font[i] ^ 0xFF;
+		VdpData = b;
+		VdpData = 0;
+		VdpData = 0;
+#else
         b = font[i+i];		// Bitplane 0
         VdpData = b;
         c = font[i+i+1];	// Bitplane 1
         VdpData = c;
         VdpData = b & c;
+#endif
         VdpData = 0;
     }
     enable_ints;
@@ -87,10 +95,17 @@ void setup_vdp()
     vdp_set_reg(REG_LINE_COUNT, 0xFF);      // Line ints off
     vdp_set_reg(REG_SAT_ADDR, 0x51);		// Sprite attribute table at 0x2800
 
+#ifdef PLAIN_BG
+	vdp_set_color(0, 0, 0, 0);
+	vdp_set_color(1, 3, 3, 3);
+	vdp_set_color(16, 0, 0, 2);
+	vdp_set_color(17, 3, 3, 3);
+#else
 	vdp_set_color(16, 1, 0, 0);				// Color 16 (maroon)
 	vdp_set_color(17, 1, 0, 0);				// Color 17 (maroon)
 	vdp_set_color(18, 1, 0, 0);				// Color 18 (maroon)
 	vdp_set_color(23, 3, 3, 3);				// Color 23 (white)
+#endif
 
 	init_sat();
 
@@ -261,7 +276,12 @@ void main()
 
     load_font();
 
+#ifdef PLAIN_BG
+	puts("Neo SMS Menu", 10, 1, PALETTE0);
+	puts("(c) NeoTeam 2011", 8, 2, PALETTE0);
+#else
 	bank1_dispatcher(TASK_LOAD_BG);
+#endif
 
 	// Print software (menu) and firmware versions
 	puts("SW ", 24, 21, PALETTE0);
