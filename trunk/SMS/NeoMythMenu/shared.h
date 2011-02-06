@@ -13,6 +13,13 @@ typedef struct
 } FileList;
 
 
+
+enum
+{
+	TASK_LOAD_BG,
+};
+
+
 extern FileList games;
 extern BYTE region;
 extern BYTE pad, padLast;
