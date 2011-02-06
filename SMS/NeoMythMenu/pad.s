@@ -1,30 +1,25 @@
 
         .area   _CODE
 
-;; BYTE pad_get_2button(BYTE port);
-;; Reads buttons from the indicated SMS pad.
-;; In: port = 0 = joystick 1, 1 = joystick 2
+;; BYTE pad1_get_2button(void);
+;; Reads buttons from the SMS pad in port 1.
 ;; Out: 0  0  S2 S1 R  L  D  U
 
-        .globl  _pad_get_2button
-_pad_get_2button:
-        push    ix
-        ld      ix,#0
-        add     ix,sp       ; ix = frame pointer
-
-        xor     a,a         ; clear a
-        or      a,4(ix)     ; test port index
-        jr      nz,_read22  ; read port 2
-
+        .globl  _pad1_get_2button
+_pad1_get_2button:
         in      a,(0xDC)    ; -  -  s2 s1 r  l  d  u
-        and     a,#0x3F
+        and     a,#0x3F     ; 0  0  s2 s1 r  l  d  u
         xor     a,#0x3F     ; 0  0  S2 S1 R  L  D  U
 
         ld      l,a         ; return value
-        pop     ix
         ret
 
-_read22:
+;; BYTE pad2_get_2button(void);
+;; Reads buttons from the SMS pad in port 2.
+;; Out: 0  0  S2 S1 R  L  D  U
+
+        .globl  _pad2_get_2button
+_pad2_get_2button:
         in      a,(0xDC)    ; d  u  -  -  -  -  -  -
         and     a,#0xC0     ; d  u  0  0  0  0  0  0
         rlca                ; u  0  0  0  0  0  0  d
@@ -38,24 +33,14 @@ _read22:
         xor     a,#0x3F     ; 0  0  S2 S1 R  L  D  U
 
         ld      l,a         ; return value
-        pop     ix
         ret
 
-;; BYTE pad_get_3button(BYTE port);
-;; Reads buttons from the indicated MD 3-button pad.
-;; In: port = 0 = joystick 1, 1 = joystick 2
+;; BYTE pad1_get_3button(void);
+;; Reads buttons from the MD 3-button pad in port 1.
 ;; Out: S A C B R L D U
 
-        .globl  _pad_get_3button
-_pad_get_3button:
-        push    ix
-        ld      ix,#0
-        add     ix,sp       ; ix = frame pointer
-
-        xor     a,a         ; clear a
-        or      a,4(ix)     ; test port index
-        jr      nz,_read32  ; read port 2
-
+        .globl  _pad1_get_3button
+_pad1_get_3button:
         ld      a,#0xD5     ; P1 TH = 0
         out     (0x3F),a
         nop
@@ -76,10 +61,14 @@ _pad_get_3button:
         xor     a,#0xFF     ; S A C B R L D U
 
         ld      l,a         ; return value
-        pop     ix
         ret
 
-_read32:
+;; BYTE pad2_get_3button(void);
+;; Reads buttons from the MD 3-button pad in port 2.
+;; Out: S A C B R L D U
+
+        .globl  _pad2_get_3button
+_pad2_get_3button:
         ld      a,#0x75     ; P2 TH = 0
         out     (0x3F),a
         nop
@@ -110,7 +99,6 @@ _read32:
         xor     a,#0xFF     ; S A C B R L D U
 
         ld      l,a         ; return value
-        pop     ix
         ret
 
 ; do phase for pad for 6-button protocol
@@ -125,31 +113,12 @@ _pad1_phase:
         nop
         ret
 
-_pad2_phase:
-        ld      a,#0x75     ; P1 TH = 0
-        out     (0x3F),a
-        nop
-        nop
-        ld      a,#0xF5     ; P1 TH = 1
-        out     (0x3F),a
-        nop
-        ret
-
-;; WORD pad_get_6button(BYTE port);
-;; Reads buttons from the indicated MD 6-button pad.
-;; In: port = 0 = joystick 1, 1 = joystick 2
+;; WORD pad1_get_6button(void);
+;; Reads buttons from the MD 6-button pad in port 1.
 ;; Out: 0 0 0 0 M X Y Z S A C B R L D U
 
-        .globl  _pad_get_6button
-_pad_get_6button:
-        push    ix
-        ld      ix,#0
-        add     ix,sp       ; ix = frame pointer
-
-        xor     a,a         ; clear a
-        or      a,4(ix)     ; test port index
-        jr      nz,_read62  ; read port 2
-
+        .globl  _pad1_get_6button
+_pad1_get_6button:
         ; phase 1
         ; - - s a 0 0 d u   - - c b r l d u
         call    _pad1_phase
@@ -188,10 +157,24 @@ _pad_get_6button:
         xor     a,#0xFF     ; S A C B R L D U
 
         ld      l,a         ; low return value
-        pop     ix
         ret
 
-_read62:
+_pad2_phase:
+        ld      a,#0x75     ; P1 TH = 0
+        out     (0x3F),a
+        nop
+        nop
+        ld      a,#0xF5     ; P1 TH = 1
+        out     (0x3F),a
+        nop
+        ret
+
+;; WORD pad2_get_6button(void);
+;; Reads buttons from the MD 6-button pad in port 2.
+;; Out: 0 0 0 0 M X Y Z S A C B R L D U
+
+        .globl  _pad2_get_6button
+_pad2_get_6button:
         ; phase 1
         ; - - s a 0 0 d u   - - c b r l d u
         call    _pad2_phase
@@ -248,11 +231,15 @@ _read62:
         xor     a,#0xFF     ; S A C B R L D U
 
         ld      l,a         ; low return value
-        pop     ix
         ret
 
-        .globl  _pad_get_mouse
-_pad_get_mouse:
+        .globl  _pad1_get_mouse
+_pad1_get_mouse:
+        ld      hl,#0
+        ret
+
+        .globl  _pad2_get_mouse
+_pad2_get_mouse:
         ld      hl,#0
         ret
 

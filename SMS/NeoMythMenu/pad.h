@@ -25,10 +25,15 @@ enum
 };
 
 
-BYTE pad_get_2button(BYTE port);
-BYTE pad_get_3button(BYTE port);
-WORD pad_get_6button(BYTE port);
-WORD pad_get_mouse(BYTE port);
+BYTE pad1_get_2button(void);
+BYTE pad1_get_3button(void);
+WORD pad1_get_6button(void);
+WORD pad1_get_mouse(void);
+
+BYTE pad2_get_2button(void);
+BYTE pad2_get_3button(void);
+WORD pad2_get_6button(void);
+WORD pad2_get_mouse(void);
 
 
 #endif
