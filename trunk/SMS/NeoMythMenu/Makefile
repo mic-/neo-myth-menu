@@ -6,7 +6,7 @@ HEX2BIN = tools/hex2bin
 
 CFLAGS = -mz80 --data-loc 0xC001 -DEMULATOR
 
-BANK0OBJS = vdp.rel font.rel crt0.rel
+BANK0OBJS = vdp.rel pad.rel font.rel crt0.rel
 SHARED = shared.rel
 
 all: $(BANK0OBJS) $(SHARED) bank1.bin menu.sms
@@ -33,4 +33,4 @@ menu.sms:
 
 
 clean:
-	$(RM) menu.sms bank1.bin bank_1.bin bank0.bin main.asm vdp.asm shared.asm bank1.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
+	$(RM) menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map

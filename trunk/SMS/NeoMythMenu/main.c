@@ -1,7 +1,25 @@
 #include "sms.h"
 #include "vdp.h"
+#include "pad.h"
 #include "shared.h"
 #include "font.h"
+
+
+void disable_ints(void) __naked
+{
+    __asm
+    di
+    ret
+    __endasm;
+}
+
+void enable_ints(void) __naked
+{
+    __asm
+    ei
+    ret
+    __endasm;
+}
 
 
 void mute_psg()
@@ -21,6 +39,7 @@ void load_font()
 {
     WORD i;
 
+    disable_ints;
     vdp_set_vram_addr(0x0000);
 
     for (i = 0; i < 960; i++)
@@ -30,30 +49,43 @@ void load_font()
         VdpData = 0;        // ...
         VdpData = 0;        // ...
     }
+    enable_ints;
 }
 
 
 void setup_vdp()
 {
-    vdp_set_reg(REG_MODE_CTRL_1, 0x04);     // Set mode 4
-    vdp_set_reg(REG_MODE_CTRL_2, 0xE0);     // Screen on, VBlank int on
+    disable_ints();
+    vdp_set_reg(REG_MODE_CTRL_1, 0x04);     // Set mode 4, Line ints off
+    vdp_set_reg(REG_MODE_CTRL_2, 0xE0);     // Screen on, Frame ints on
     vdp_set_reg(REG_HSCROLL, 0x00);         // Reset scrolling
     vdp_set_reg(REG_VSCROLL, 0x00);         // ...
     vdp_set_reg(REG_NAME_TABLE_ADDR, 0x07); // Nametable at 0x1800
     vdp_set_reg(REG_OVERSCAN_COLOR, 0);
     vdp_set_reg(REG_BG_PATTERN_ADDR, 0x07); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_COLOR_TABLE_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
+    vdp_set_reg(REG_LINE_COUNT, 0xFF);      // Line ints off
+
+    vdp_set_cram_addr(0x0000);
+    VdpData = 0;    // color 0
+    VdpData = 0x25; // color 1 (blue)
+    vdp_set_cram_addr(0x0010);
+    VdpData = 0;    // color 16
+    VdpData = 0x3F; // color 17 (white)
+    enable_ints();
 }
 
 
 void puts(const char *str, BYTE x, BYTE y, BYTE attributes)
 {
+    disable_ints();
     vdp_set_vram_addr(0x1800 + x + x + (y << 6));
     while (*str)
     {
         VdpData = (*str++) - ' ';
         VdpData = (attributes << 1);
     }
+    enable_ints();
 }
 
 
@@ -185,34 +217,99 @@ void main()
 
     setup_vdp();
 
-    vdp_set_cram_addr(0x0000);
-    VdpData = 0;    // color 0
-    VdpData = 0x25; // color 1 (blue)
-    vdp_set_cram_addr(0x0010);
-    VdpData = 0;    // color 16
-    VdpData = 0x3F; // color 17 (white)
-
     puts_game_list();
 
-    keys = keysRepeat = 0;
+    pad = padLast = 0;
+
+#if 1
+    temp = 0;
+    while (temp != PAD_START)
+    {
+        temp = pad_get_3button(0);
+        if (temp & PAD_START)
+            puts("S", 1, 0, 4);
+        else
+            puts(" ", 1, 0, 4);
+        if (temp & PAD_A)
+            puts("A", 2, 0, 4);
+        else
+            puts(" ", 2, 0, 4);
+        if (temp & PAD_C)
+            puts("C", 3, 0, 4);
+        else
+            puts(" ", 3, 0, 4);
+        if (temp & PAD_B)
+            puts("B", 4, 0, 4);
+        else
+            puts(" ", 4, 0, 4);
+        if (temp & PAD_RIGHT)
+            puts("R", 5, 0, 4);
+        else
+            puts(" ", 5, 0, 4);
+        if (temp & PAD_LEFT)
+            puts("L", 6, 0, 4);
+        else
+            puts(" ", 6, 0, 4);
+        if (temp & PAD_DOWN)
+            puts("D", 7, 0, 4);
+        else
+            puts(" ", 7, 0, 4);
+        if (temp & PAD_UP)
+            puts("U", 8, 0, 4);
+        else
+            puts(" ", 8, 0, 4);
+
+        temp = pad_get_3button(1);
+        if (temp & PAD_A)
+            puts("A", 12, 0, 4);
+        else
+            puts(" ", 12, 0, 4);
+        if (temp & PAD_C)
+            puts("C", 13, 0, 4);
+        else
+            puts(" ", 13, 0, 4);
+        if (temp & PAD_B)
+            puts("B", 14, 0, 4);
+        else
+            puts(" ", 14, 0, 4);
+        if (temp & PAD_RIGHT)
+            puts("R", 15, 0, 4);
+        else
+            puts(" ", 15, 0, 4);
+        if (temp & PAD_LEFT)
+            puts("L", 16, 0, 4);
+        else
+            puts(" ", 16, 0, 4);
+        if (temp & PAD_DOWN)
+            puts("D", 17, 0, 4);
+        else
+            puts(" ", 17, 0, 4);
+        if (temp & PAD_UP)
+            puts("U", 18, 0, 4);
+        else
+            puts(" ", 18, 0, 4);
+
+        vdp_wait_vblank();
+    }
+#endif
 
     while (1)
     {
-        // All keys for joy1
-        temp = (JoyPort1 & 0x3F) ^ 0x3F;
+        temp = pad_get_2button(0);
 
         // Only those that were pressed since the last time
-        // we checked
-        keys = temp & ~keysRepeat;
-        keysRepeat = temp;
+        pad = temp & ~padLast;
+        padLast = temp;
 
-        if (keys & KEY_UP)
+        if (pad & PAD_UP)
         {
             move_to_previous_game();
         }
-        else if (keys & KEY_DOWN)
+        else if (pad & PAD_DOWN)
         {
             move_to_next_game();
         }
+
+        vdp_wait_vblank();
     }
 }
