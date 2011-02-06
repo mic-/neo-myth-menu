@@ -4,6 +4,8 @@
 #include "shared.h"
 #include "font.h"
 
+#define MENU_VERSION_STRING "0.10"
+
 
 void disable_ints(void) __naked
 {
@@ -32,22 +34,25 @@ void mute_psg()
 
 
 /*
- * Expand the 1-bit font and write to VRAM at
+ * Expand the 2-bit font and write to VRAM at
  * address 0000
  */
 void load_font()
 {
     WORD i;
+	BYTE b,c;
 
     disable_ints;
     vdp_set_vram_addr(0x0000);
 
     for (i = 0; i < 960; i++)
     {
-        VdpData = font[i] ^ 0xFF;
-        VdpData = 0;        // Fill in the empty bitplanes
-        VdpData = 0;        // ...
-        VdpData = 0;        // ...
+        b = font[i+i];		// Bitplane 0
+        VdpData = b;
+        c = font[i+i+1];	// Bitplane 1
+        VdpData = c;
+        VdpData = b & c;
+        VdpData = 0;
     }
     enable_ints;
 }
@@ -66,12 +71,12 @@ void setup_vdp()
     vdp_set_reg(REG_COLOR_TABLE_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_LINE_COUNT, 0xFF);      // Line ints off
 
-    vdp_set_cram_addr(0x0000);
-    VdpData = 0;    // color 0
-    VdpData = 0x25; // color 1 (blue)
     vdp_set_cram_addr(0x0010);
-    VdpData = 0;    // color 16
-    VdpData = 0x3F; // color 17 (white)
+    VdpData = 1;    // color 16 (maroon)
+    VdpData = 1;    // color 17 (maroon)
+    VdpData = 1;    // color 18 (maroon)
+    vdp_set_cram_addr(0x0017);
+    VdpData = 0x3F; // color 23 (white)
     enable_ints();
 }
 
@@ -89,6 +94,23 @@ void puts(const char *str, BYTE x, BYTE y, BYTE attributes)
 }
 
 
+/*
+ * Same as puts, but allows the caller to specify a maximum
+ * number of chars to print.
+ */
+void putsn(const char *str, BYTE x, BYTE y, BYTE attributes, BYTE maxChars)
+{
+    disable_ints();
+    vdp_set_vram_addr(0x1800 + x + x + (y << 6));
+    while ((*str) && maxChars--)
+    {
+        VdpData = (*str++) - ' ';
+        VdpData = (attributes << 1);
+    }
+    enable_ints();
+}
+
+
 void puts_game_list()
 {
     BYTE *p = (BYTE*)gbacGameList;
@@ -96,8 +118,13 @@ void puts_game_list()
 
     vdp_wait_vblank();
 
+	// Print the current directory name
+	// TODO: Handle this properly when SD support has been
+	//       implemented
+	puts("/", 1, 5, PALETTE0);
+
     shown = 0;
-    row = 3;
+    row = 7;
     p += games.firstShown << 5;
     // Loop until we've shown the desired number of games, or
     // there are no more games in the list
@@ -105,9 +132,9 @@ void puts_game_list()
            ((shown + games.firstShown) < games.count))
     {
         if (games.highlighted == shown + games.firstShown)
-            puts(&p[8], 1, row, PALETTE1); // the palette bit is bit 2 of the attribute
+            putsn(&p[8], 1, row, PALETTE1, 22); // the palette bit is bit 2 of the attribute
         else
-            puts(&p[8], 1, row, PALETTE0);
+            putsn(&p[8], 1, row, PALETTE0, 22);
         row++;
         shown++;
         p += 0x20;
@@ -201,6 +228,7 @@ BYTE check_sms_region()
 void main()
 {
     BYTE temp;
+	void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
 
     Frame1 = 1;
 
@@ -216,7 +244,16 @@ void main()
 
     load_font();
 
-    puts("NeoSmsMenu", 11, 1, PALETTE1);
+	bank1_dispatcher(TASK_LOAD_BG);
+
+	// Print software (menu) and firmware versions
+	puts("SW ", 24, 21, PALETTE0);
+	puts(MENU_VERSION_STRING, 27, 21, PALETTE0);
+	puts("FW ", 24, 22, PALETTE0);
+	puts("1.00", 27, 22, PALETTE0);		// TODO: read version from CPLD
+
+    puts("[I]  Run", 1, 21, PALETTE0);
+    puts("[II] More options", 1, 22, PALETTE0);
 
     setup_vdp();
 
