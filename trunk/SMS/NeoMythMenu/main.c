@@ -221,7 +221,7 @@ void main()
 
     pad = padLast = 0;
 
-#if 1
+#if 0
     temp = 0;
     while (temp != PAD_START)
     {
@@ -290,6 +290,68 @@ void main()
             puts(" ", 18, 0, 4);
 
         vdp_wait_vblank();
+    }
+#endif
+#if 0
+    {
+    WORD temp;
+
+    temp = 0;
+    while (temp != PAD_MODE)
+    {
+        temp = pad_get_6button(0);
+        //temp = pad_get_6button(1);
+        if (temp & PAD_MODE)
+            puts("M", 7, 0, 4);
+        else
+            puts(" ", 7, 0, 4);
+        if (temp & PAD_X)
+            puts("X", 8, 0, 4);
+        else
+            puts(" ", 8, 0, 4);
+        if (temp & PAD_Y)
+            puts("Y", 9, 0, 4);
+        else
+            puts(" ", 9, 0, 4);
+        if (temp & PAD_Z)
+            puts("Z", 10, 0, 4);
+        else
+            puts(" ", 10, 0, 4);
+        if (temp & PAD_START)
+            puts("S", 11, 0, 4);
+        else
+            puts(" ", 11, 0, 4);
+        if (temp & PAD_A)
+            puts("A", 12, 0, 4);
+        else
+            puts(" ", 12, 0, 4);
+        if (temp & PAD_C)
+            puts("C", 13, 0, 4);
+        else
+            puts(" ", 13, 0, 4);
+        if (temp & PAD_B)
+            puts("B", 14, 0, 4);
+        else
+            puts(" ", 14, 0, 4);
+        if (temp & PAD_RIGHT)
+            puts("R", 15, 0, 4);
+        else
+            puts(" ", 15, 0, 4);
+        if (temp & PAD_LEFT)
+            puts("L", 16, 0, 4);
+        else
+            puts(" ", 16, 0, 4);
+        if (temp & PAD_DOWN)
+            puts("D", 17, 0, 4);
+        else
+            puts(" ", 17, 0, 4);
+        if (temp & PAD_UP)
+            puts("U", 18, 0, 4);
+        else
+            puts(" ", 18, 0, 4);
+
+        vdp_wait_vblank();
+    }
     }
 #endif
 

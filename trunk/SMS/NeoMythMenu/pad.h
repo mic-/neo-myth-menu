@@ -21,7 +21,7 @@ enum
     PAD_Z       = 256,
     PAD_Y       = 512,
     PAD_X       = 1024,
-    PAD_M       = 2048
+    PAD_MODE    = 2048
 };
 
 
