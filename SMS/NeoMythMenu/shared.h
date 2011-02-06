@@ -7,15 +7,15 @@
 
 typedef struct
 {
-	WORD firstShown;
-	WORD highlighted;
-	WORD count;
+    WORD firstShown;
+    WORD highlighted;
+    WORD count;
 } FileList;
 
 
 extern FileList games;
 extern BYTE region;
-extern BYTE keys,keysRepeat;
+extern BYTE pad, padLast;
 
 #ifdef EMULATOR
 extern const char dummyGameList[];

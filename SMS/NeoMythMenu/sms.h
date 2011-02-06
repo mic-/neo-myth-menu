@@ -16,14 +16,14 @@ __sfr __at 0x3E MemCtrl; /* out only */
 
 /*
  * Joystick Control Port
- * b0 = P1 TH Direction (1 = in, 0 = out)
- * b1 = P1 TR Direction
- * b2 = P2 TH Direction
- * b3 = P2 TR Direction
- * b4 = P1 TH Output Level
- * b5 = P1 TR Output Level
- * b6 = P2 TH Output Level
- * b7 = P2 TR Output Level
+ * b0 = P1 TR Direction (1 = in, 0 = out)
+ * b1 = P1 TH Direction
+ * b2 = P2 TR Direction
+ * b3 = P2 TH Direction
+ * b4 = P1 TR Output Level
+ * b5 = P1 TH Output Level
+ * b6 = P2 TR Output Level
+ * b7 = P2 TH Output Level
  */
 __sfr __at 0x3F JoyCtrl; /* out only */
 
@@ -135,20 +135,6 @@ __sfr __at 0xF2 FMDetect; /* in/out */
 #define Frame1 (*(volatile BYTE *)(0xFFFE))
 #define Frame2 (*(volatile BYTE *)(0xFFFF))
 
-/*
- * Inline assembly macros
- */
-
-#define disable_ints    \
-        __asm           \
-        di              \
-        __endasm
-
-#define enable_ints     \
-        __asm           \
-        ei              \
-        __endasm
-
 
 /*
  * Enums for SMS regions
@@ -158,20 +144,6 @@ enum
 {
     JAPANESE,
     EXPORTED
-};
-
-
-/*
- * Enums for joypad keys
- */
-enum
-{
-    KEY_UP = 1,
-    KEY_DOWN = 2,
-    KEY_LEFT = 4,
-    KEY_RIGHT = 8,
-    KEY_A = 16,
-    KEY_B = 32,
 };
 
 
