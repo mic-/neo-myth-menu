@@ -1,10 +1,12 @@
+#include "util.h"
 #include "sms.h"
 #include "vdp.h"
 #include "pad.h"
 #include "shared.h"
 #include "font.h"
 
-#define MENU_VERSION_STRING "0.10"
+
+#define MENU_VERSION_STRING "0.11"
 
 /*
  * Use the plain single-colored background instead of the pattered one.
@@ -12,24 +14,6 @@
  * link against font2.rel instead of font.rel.
  */
 #define PLAIN_BG
-
-
-void disable_ints(void) __naked
-{
-    __asm
-    di
-    ret
-    __endasm;
-}
-
-void enable_ints(void) __naked
-{
-    __asm
-    ei
-    ret
-    __endasm;
-}
-
 
 void mute_psg()
 {
@@ -117,37 +101,6 @@ void setup_vdp()
 
     enable_ints();
 }
-
-
-void puts(const char *str, BYTE x, BYTE y, BYTE attributes)
-{
-    disable_ints();
-    vdp_set_vram_addr(0x1800 + x + x + (y << 6));
-    while (*str)
-    {
-        VdpData = (*str++) - ' ';
-        VdpData = (attributes << 1);
-    }
-    enable_ints();
-}
-
-
-/*
- * Same as puts, but allows the caller to specify a maximum
- * number of chars to print.
- */
-void putsn(const char *str, BYTE x, BYTE y, BYTE attributes, BYTE maxChars)
-{
-    disable_ints();
-    vdp_set_vram_addr(0x1800 + x + x + (y << 6));
-    while ((*str) && maxChars--)
-    {
-        VdpData = (*str++) - ' ';
-        VdpData = (attributes << 1);
-    }
-    enable_ints();
-}
-
 
 void puts_game_list()
 {
@@ -262,6 +215,11 @@ BYTE check_sms_region()
     return JAPANESE;
 }
 
+void vdp_set_vram_addr2(WORD addr)
+{
+    VdpCtrl = (addr & 0xFF);
+    VdpCtrl = (addr >> 8) | CMD_VRAM_WRITE;
+}
 
 void main()
 {
@@ -431,3 +389,4 @@ void main()
         vdp_wait_vblank();
     }
 }
+
