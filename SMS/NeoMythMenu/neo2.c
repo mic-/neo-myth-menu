@@ -40,7 +40,7 @@ void neo2_asic_cmd(BYTE cmd, WORD data)
     neo2_asic_unlock();
 
     Neo2FlashBankLo = cmd;
-    Frame1 = (cmd >> 13) & 7;
-    dummy = *(volatile BYTE *)(0x4000 | ((cmd & 0x1FFF) << 1));
+    Frame1 = (data >> 13) & 7;
+    dummy = *(volatile BYTE *)(0x4000 | ((data & 0x1FFF) << 1));
 }
 
