@@ -21,7 +21,7 @@ bank0.bin:
 	$(HEX2BIN) main.ihx
 	$(PADTRIM) main.bin bank0.bin
 	$(MAP2H) main.map vdp.h pad.h
-	
+
 bank1.bin:
 	$(CC) $(CFLAGS) --no-std-crt0 --code-loc 0x4000 bank1.c $(SHARED)
 	$(HEX2BIN) bank1.ihx
