@@ -52,7 +52,7 @@ enum
 
 void vdp_set_reg(BYTE rn, BYTE val);
 
-void vdp_set_vram_addr(WORD addr);
+extern void vdp_set_vram_addr(WORD addr);
 
 void vdp_set_cram_addr(WORD addr);
 

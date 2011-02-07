@@ -8,11 +8,11 @@ void vdp_set_reg(BYTE rn, BYTE val)
 }
 
 
-void vdp_set_vram_addr(WORD addr)
+/*void vdp_set_vram_addr(WORD addr)
 {
     VdpCtrl = (addr & 0xFF);
     VdpCtrl = (addr >> 8) | CMD_VRAM_WRITE;
-}
+}*/
 
 
 void vdp_set_cram_addr(WORD addr)

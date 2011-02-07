@@ -7,7 +7,7 @@ MAP2H = tools/map2h
 
 CFLAGS = -mz80 --data-loc 0xC001 -DEMULATOR
 
-BANK0OBJS = vdp.rel pad.rel font.rel neo2.rel crt0.rel
+BANK0OBJS = vdp_asm.rel vdp.rel util.rel pad.rel font.rel neo2.rel crt0.rel
 SHARED = shared.rel
 
 all: tools/map2h $(BANK0OBJS) $(SHARED) bank0.bin bank1.bin menu.sms
