@@ -31,7 +31,6 @@ void mute_psg()
 void load_font()
 {
     WORD i;
-    BYTE b,c;
 
     disable_ints;
     vdp_set_vram_addr(0x0000);
@@ -39,11 +38,13 @@ void load_font()
     for (i = 0; i < 960; i++)
     {
 #ifdef PLAIN_BG
+        BYTE b;
         b = font[i] ^ 0xFF;
         VdpData = b;
         VdpData = 0;
         VdpData = 0;
 #else
+        BYTE b,c;
         b = font[i+i];      // Bitplane 0
         VdpData = b;
         c = font[i+i+1];    // Bitplane 1
