@@ -5,15 +5,15 @@
 #include <stdint.h>
 
 
-#define Neo2FlashBankLo 	(*(volatile BYTE *)0xBFC0)
-#define Neo2FlashBankSize 	(*(volatile BYTE *)0xBFC1)
-#define Neo2SramBank 		(*(volatile BYTE *)0xBFC2)
-#define Neo2FlashBankHi 	(*(volatile BYTE *)0xBFC3)
+#define Neo2FlashBankLo     (*(volatile BYTE *)0xBFC0)
+#define Neo2FlashBankSize   (*(volatile BYTE *)0xBFC1)
+#define Neo2SramBank        (*(volatile BYTE *)0xBFC2)
+#define Neo2FlashBankHi     (*(volatile BYTE *)0xBFC3)
 
 
 /*
  * Peform a Neo2 ASIC command
  */
-extern void neo2_asic_cmd(uint32_t cmd);
+extern void neo2_asic_cmd(BYTE cmd, WORD data);
 
 #endif
