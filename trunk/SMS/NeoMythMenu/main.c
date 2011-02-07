@@ -47,7 +47,7 @@ void mute_psg()
 void load_font()
 {
     WORD i;
-	BYTE b,c;
+    BYTE b,c;
 
     disable_ints;
     vdp_set_vram_addr(0x0000);
@@ -55,14 +55,14 @@ void load_font()
     for (i = 0; i < 960; i++)
     {
 #ifdef PLAIN_BG
-		b = font[i] ^ 0xFF;
-		VdpData = b;
-		VdpData = 0;
-		VdpData = 0;
-#else
-        b = font[i+i];		// Bitplane 0
+        b = font[i] ^ 0xFF;
         VdpData = b;
-        c = font[i+i+1];	// Bitplane 1
+        VdpData = 0;
+        VdpData = 0;
+#else
+        b = font[i+i];      // Bitplane 0
+        VdpData = b;
+        c = font[i+i+1];    // Bitplane 1
         VdpData = c;
         VdpData = b & c;
 #endif
@@ -77,13 +77,13 @@ void load_font()
  */
 void init_sat()
 {
-	BYTE i;
+    BYTE i;
 
-	vdp_set_vram_addr(0x2800);
+    vdp_set_vram_addr(0x2800);
 
-	// Initialize the Y-coordinates. Place all sprites outside
-	// of the visible area
-	for (i = 0; i < 0x40; i++) VdpData = 240;
+    // Initialize the Y-coordinates. Place all sprites outside
+    // of the visible area
+    for (i = 0; i < 0x40; i++) VdpData = 240;
 }
 
 
@@ -99,21 +99,21 @@ void setup_vdp()
     vdp_set_reg(REG_BG_PATTERN_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_COLOR_TABLE_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_LINE_COUNT, 0xFF);      // Line ints off
-    vdp_set_reg(REG_SAT_ADDR, 0x51);		// Sprite attribute table at 0x2800
+    vdp_set_reg(REG_SAT_ADDR, 0x51);        // Sprite attribute table at 0x2800
 
 #ifdef PLAIN_BG
-	vdp_set_color(0, 0, 0, 0);
-	vdp_set_color(1, 3, 3, 3);
-	vdp_set_color(16, 0, 0, 2);
-	vdp_set_color(17, 3, 3, 3);
+    vdp_set_color(0, 0, 0, 0);
+    vdp_set_color(1, 3, 3, 3);
+    vdp_set_color(16, 0, 0, 2);
+    vdp_set_color(17, 3, 3, 3);
 #else
-	vdp_set_color(16, 1, 0, 0);				// Color 16 (maroon)
-	vdp_set_color(17, 1, 0, 0);				// Color 17 (maroon)
-	vdp_set_color(18, 1, 0, 0);				// Color 18 (maroon)
-	vdp_set_color(23, 3, 3, 3);				// Color 23 (white)
+    vdp_set_color(16, 1, 0, 0);             // Color 16 (maroon)
+    vdp_set_color(17, 1, 0, 0);             // Color 17 (maroon)
+    vdp_set_color(18, 1, 0, 0);             // Color 18 (maroon)
+    vdp_set_color(23, 3, 3, 3);             // Color 23 (white)
 #endif
 
-	init_sat();
+    init_sat();
 
     enable_ints();
 }
@@ -156,10 +156,10 @@ void puts_game_list()
 
     vdp_wait_vblank();
 
-	// Print the current directory name
-	// TODO: Handle this properly when SD support has been
-	//       implemented
-	puts("/", 1, 5, PALETTE0);
+    // Print the current directory name
+    // TODO: Handle this properly when SD support has been
+    //       implemented
+    puts("/", 1, 5, PALETTE0);
 
     shown = 0;
     row = 7;
@@ -266,7 +266,7 @@ BYTE check_sms_region()
 void main()
 {
     BYTE temp;
-	void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
+    void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
 
     Frame1 = 1;
 
@@ -277,23 +277,23 @@ void main()
 
     region = check_sms_region();
 
-	// Make sure the display is off before we write to VRAM
-	vdp_set_reg(REG_MODE_CTRL_2, 0xA0);
+    // Make sure the display is off before we write to VRAM
+    vdp_set_reg(REG_MODE_CTRL_2, 0xA0);
 
     load_font();
 
 #ifdef PLAIN_BG
-	puts("Neo SMS Menu", 10, 1, PALETTE0);
-	puts("(c) NeoTeam 2011", 8, 2, PALETTE0);
+    puts("Neo SMS Menu", 10, 1, PALETTE0);
+    puts("(c) NeoTeam 2011", 8, 2, PALETTE0);
 #else
-	bank1_dispatcher(TASK_LOAD_BG);
+    bank1_dispatcher(TASK_LOAD_BG);
 #endif
 
-	// Print software (menu) and firmware versions
-	puts("SW ", 24, 21, PALETTE0);
-	puts(MENU_VERSION_STRING, 27, 21, PALETTE0);
-	puts("FW ", 24, 22, PALETTE0);
-	puts("1.00", 27, 22, PALETTE0);		// TODO: read version from CPLD
+    // Print software (menu) and firmware versions
+    puts("SW ", 24, 21, PALETTE0);
+    puts(MENU_VERSION_STRING, 27, 21, PALETTE0);
+    puts("FW ", 24, 22, PALETTE0);
+    puts("1.00", 27, 22, PALETTE0);     // TODO: read version from CPLD
 
     puts("[I]  Run", 1, 21, PALETTE0);
     puts("[II] More options", 1, 22, PALETTE0);
