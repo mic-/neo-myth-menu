@@ -215,12 +215,6 @@ BYTE check_sms_region()
     return JAPANESE;
 }
 
-void vdp_set_vram_addr2(WORD addr)
-{
-    VdpCtrl = (addr & 0xFF);
-    VdpCtrl = (addr >> 8) | CMD_VRAM_WRITE;
-}
-
 void main()
 {
     BYTE temp;
