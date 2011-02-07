@@ -60,6 +60,8 @@ void vdp_copy_to_vram(WORD dest, BYTE *src, WORD len);
 
 void vdp_set_color(BYTE cnum, BYTE red, BYTE green, BYTE blue);
 
+void vdp_copy_to_cram(WORD dest, BYTE *src, BYTE len);
+
 void vdp_wait_vblank();
 
 #endif

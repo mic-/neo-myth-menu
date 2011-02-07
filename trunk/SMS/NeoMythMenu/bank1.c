@@ -1,6 +1,7 @@
 #include "sms.h"
 #include "shared.h"
 #include "vdp.h"
+#include "main_map.h"
 
 void bank1_load_bg();
 
@@ -231,7 +232,5 @@ void bank1_load_bg()
 	}
 
 	// Load the palette
-	VdpCtrl = 0;
-	VdpCtrl = CMD_CRAM_WRITE;
-	for (i = 0; i < 8; i++) VdpData = menu_pal[i];
+	pfn_vdp_copy_to_cram(0, menu_pal, 8);
 }

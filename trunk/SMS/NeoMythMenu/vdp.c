@@ -40,6 +40,17 @@ void vdp_set_color(BYTE cnum, BYTE red, BYTE green, BYTE blue)
 }
 
 
+void vdp_copy_to_cram(WORD dest, BYTE *src, BYTE len)
+{
+	vdp_set_cram_addr(dest);
+
+    while (len--)
+    {
+        VdpData = *src++;
+    }
+}
+
+
 void vdp_wait_vblank()
 {
     while (!(VdpCtrl & 0x80)) {}
