@@ -43,5 +43,5 @@ enum
  * Peform a Neo2 ASIC command
  */
 extern void neo2_asic_cmd(BYTE cmd, WORD data);
-
+extern void neo2_check_card();
 #endif
