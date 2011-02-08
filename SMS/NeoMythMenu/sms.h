@@ -67,8 +67,8 @@ __sfr __at 0xBF VdpStat; /* in only */
  * b1 = P2 RIGHT
  * b2 = P2 TR / S1
  * b3 = P2 S2
- * b4 = /RESET
- * b5 = 1 = SMS/SMS2/GG, 0 = MD PBC
+ * b4 = /RESET (SMS only, 1 on all others)
+ * b5 = CONT line of cart, 1 = SMS/SMS2/GG, 0 = MD PBC
  * b6 = P1 TH - Light Gun Sync
  * b7 = P2 TH - Light Gun Sync
  */
@@ -91,11 +91,14 @@ __sfr __at 0xF2 FMDetect; /* in/out */
 
 /*
  * CodeMasters Frame Page Number
- * CodeMasters' mapper is fixed from 0x0000 to 0x7FFF, and has one bank
- * at 0x8000 to 0xBFFF. Write a byte to 0x8000 to set the page of the
- * bank.
+ * CodeMasters' mapper uses three 16KB banks at 0x0000, 0x4000, and 0x8000.
+ * Write a byte to the first byte of the bank to set the page of the bank.
+ *
+ * Note, most CodeMasters games only used the third bank.
  */
-#define CMFrmCtrl (*(volatile BYTE *)(0x8000))
+#define CMFrm0Ctrl (*(volatile BYTE *)(0x0000))
+#define CMFrm1Ctrl (*(volatile BYTE *)(0x4000))
+#define CMFrm2Ctrl (*(volatile BYTE *)(0x8000))
 
 /*
  * BIOS shadow variable for MemCtrl
@@ -108,7 +111,7 @@ __sfr __at 0xF2 FMDetect; /* in/out */
  * reg mirrors at 0xFFF9, 0xFFFA, and 0xFFFB. It is shadowed in the
  * ram at 0xDFF8 to 0xDFFB.
  *
- * b0 = lens close select - if set, one lens close; if clr, the other
+ * b0 = lens close select - 1 = right closed, 0 = left closed
  */
 #define ThreeDCtrl (*(volatile BYTE *)(0xFFF8))
 
@@ -117,10 +120,16 @@ __sfr __at 0xF2 FMDetect; /* in/out */
  * Write a byte to set how frame 2 is handled. The value is shadowed
  * in ram at 0xDFFC.
  *
- * b0-b1 = page shift (00 for normal operation)
- * b2 = SRAM page (0 or 1) if SRAM mapped to frame 2
- * b3 = 1 = SaveRAM in frame 2, 0 = ROM in frame 2
- * b4 = 1 = SRAM write protected
+ * b0-b1 = page shift (00 for normal operation, unused by games)
+ * b2 = cart RAM bank, 0 = first 16KB, 1 = second 16KB (only if RAM mapped to frame 2!)
+ * b3 = 1 = cart RAM mapped at 0x8000 (frame 2), 0 = ROM at 0x8000
+ * b4 = 1 = cart RAM mapped at 0xC000 (disable int RAM using MemCtrl first!), int RAM at 0xC000
+ * b5-b6 = reserved
+ * b7 = ROM WE, 0 = development ROM write protected, 1 = write enabled (unused by games)
+ *
+ * Note, setting b4-2 = 111 sets 0x8000-0xBFFF to cart RAM second 16KB,
+ * and 0xC000-0xFFFF to cart RAM first 16KB, all at the same time for a
+ * total of 32KB of RAM addressable by the CPU.
  */
 #define Frm2Ctrl (*(volatile BYTE *)(0xFFFC))
 
