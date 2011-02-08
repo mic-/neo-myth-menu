@@ -2,7 +2,7 @@
 	map2h - A tool for use with SDCC
 	Mic, 2011
 
-	Extracts symbol information from map files and creates an .h file pair
+	Extracts symbol information from map files and creates an .h file
     with function pointers for easy inter-bank calls
 */
 
@@ -26,6 +26,7 @@ int blockDepth;
 int lineNum = 0;
 int column = 0;
 int inMultiComment = 0;
+
 
 bool is_whitespace(char c)
 {
@@ -130,12 +131,13 @@ void check_for_func_decl(string s)
     {
         inMultiComment = 1;
     }
-    else if ( (find_word(s, "static") == string::npos) &&
+    else if ( (find_word(s, "static") == string::npos) &&		// We're not interested in lines that contains any of these words
               (find_word(s, "#define") == string::npos) &&
               (find_word(s, "typedef") == string::npos) &&
               (blockDepth == 0) )
     {
         i = 0;
+        // Skip past the "extern" qualifier if one is found
         if (find_word(s, "extern") != string::npos) i = find_word(s, "extern") + 6;
 
         // find the beginning of the first word that makes up the type
@@ -211,7 +213,6 @@ void get_symbol_address(string s)
     for (i = 0; i < funcNames.size(); i++)
     {
         string sym =  "_" + funcNames[i];
-        //printf("%s\n", sym.data());
         if (find_word(s, sym.data()) != string::npos)
         {
             j = find_word(s, sym.data());
