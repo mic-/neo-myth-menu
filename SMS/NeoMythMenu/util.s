@@ -17,36 +17,37 @@
 	.globl _puts_asm
 	_puts_asm:
 	di
-		push ix		
-		ld ix,#0	;;ix=sp
-		add ix,sp	;;..
+	push		ix	
+	push		bc	
+		ld		ix,#2		;;ix=sp
+		add		ix,sp		;;..
 
-		ld l,2 + 5(ix)	;;lo(hl)
-		ld h,2 + 6(ix) 	;;hi(hl)
+		ld		l,2 + 5(ix)	;;lo(hl)
+		ld		h,2 + 6(ix)	;;hi(hl)
 
-		push hl		;;save
-		call _vdp_set_vram_addr 
-		pop hl		;;restore
+		push		hl			;;save
+			call	_vdp_set_vram_addr 
+		pop			hl			;;restore
 
-		ld l,2 + 2(ix)	;;str
-		ld h,2 + 3(ix)	;;..
-		ld b,2 + 4(ix)	;;attrs
-		sla b			;;<<=1
+		ld		l,2 + 2(ix)	;;str
+		ld		h,2 + 3(ix)	;;..
+		ld		b,2 + 4(ix)	;;attrs
+		sla		b			;;<<=1
 
-	_puts_asm_output:
-		ld a,(hl)		;;*str
-		or a			;;z-tst
-		jr z,_puts_asm_output_done	;;zero
-		sub a,#0x20		;;-=' '
-		out (#0xbe),a	;;w
-		ld a,b			;;attr
-		out (#0xbe),a	;;w
-		inc hl			;;++str
-		jr _puts_asm_output	;;busy
+	puts_asm_output:
+		ld		a,(hl)		;;*str
+		or		a			;;z-tst
+		jp		z,puts_asm_output_done	;;zero
+		sub		a,#0x20		;;-=' '
+		out		(#0xbe),a	;;w
+		ld		a,b			;;attr
+		out		(#0xbe),a	;;w
+		inc		hl			;;++str
+		jp		puts_asm_output	;;busy
 
-	_puts_asm_output_done:
-
-	pop ix
+	puts_asm_output_done:
+	pop		bc
+	pop		ix
 	ei
 	ret
 
@@ -54,65 +55,249 @@
 	.globl _putsn_asm
 	_putsn_asm:
 	di
-		push ix
-		ld ix,#0	;;ix=sp
-		add ix,sp	;;..
+	push		ix
+	push		bc
+		ld		ix,#2	;;ix=sp
+		add		ix,sp	;;..
 
-		ld l,2 + 6(ix)	;;lo(hl)
-		ld h,2 + 7(ix) 	;;hi(hl)
+		ld		l,2 + 6(ix)		;;lo(hl)
+		ld		h,2 + 7(ix) 	;;hi(hl)
 
-		push hl		;;save
-		call _vdp_set_vram_addr 
-		pop hl		;;restore
+		push		hl		;;save
+			call	_vdp_set_vram_addr 
+		pop			hl		;;restore
 
-		ld l,2 + 2(ix)	;;str
-		ld h,2 + 3(ix)	;;..
-		ld b,2 + 4(ix)	;;attrs
-		ld c,2 + 5(ix)	;;max
-		sla b			;;<<=1
+		ld		l,2 + 2(ix)	;;str
+		ld		h,2 + 3(ix)	;;..
+		ld		b,2 + 4(ix)	;;attrs
+		ld		c,2 + 5(ix)	;;max
+		sla		b			;;<<=1
 	
-	_putsn_asm_output:
-		or c			;;z-tst
-		jr z,_puts_asm_output_done	;;zero
-		ld a,(hl)		;;*str
-		or a			;;z-tst
-		jr z,_puts_asm_output_done	;;zero
-		sub a,#0x20		;;-=' '
-		out (#0xbe),a	;;w
-		ld a,b			;;attr
-		out (#0xbe),a	;;w
-		inc hl			;;++str
-		dec c			;;--left
-		jr _puts_asm_output	;;busy
+		;;Quick test for zero-length ---will save 4 cycles/iteration later
+		or		c						;;z-tst
+		jp		z,puts_asm_output_done	;;zero
 
-	_putsn_asm_output_done:
+	putsn_asm_output:
+		ld		a,(hl)		;;*str
+		sub		a,#0x20		;;-=' '
+		out		(#0xbe),a	;;w
+		ld		a,b			;;attr
+		out		(#0xbe),a	;;w
+		inc		hl			;;++str
+		dec		c			;;--left
+		jp		p,puts_asm_output	;;zero
 
-	pop ix
+	putsn_asm_output_done:
+	pop			bc
+	pop			ix
 	ei
 	ret
 
-	;BYTE strlen_asm(const BYTE* str)
+	;;void strcpy_asm(BYTE* dst,const BYTE* src);
+	.globl _strcpy_asm
+	_strcpy_asm:
+	push			ix
+		push		de
+			ld		ix,#6					;;2 + stack depth * sizeof word
+			add		ix,sp					;;+=sp
+			ld		l,(ix)					;;dst
+			ld		h,1(ix)					;;...
+			ld		e,2(ix)					;;src
+			ld		d,3(ix)					;;...
+
+		strcpy_asm_loop:
+			ld			a,(de)				;;*src
+			or			a					;;ztst
+			jp			z,strcpy_asm_done	;;zr
+			ld			(hl),a				;;*dst=*src
+			inc			hl					;;++dst
+			inc			de					;;++src
+			jp			strcpy_asm_loop		;;loop
+
+		strcpy_asm_done:
+			ld			(hl),#0x00			;;null-terminate
+		pop			de
+	pop				ix		
+	ret
+
+	;;void strncpy_asm(BYTE* dst,const BYTE* src,BYTE cnt);
+	.globl _strncpy_asm
+	_strncpy_asm:
+	push				ix
+		push			de
+			push		bc
+				ld		ix,#8					;;2 + stack depth * sizeof word
+				add		ix,sp					;;+=sp
+				ld		e,(ix)					;;dst
+				ld		d,1(ix)					;;...
+				ld		l,2(ix)					;;src
+				ld		h,3(ix)					;;...
+				ld		b,4(ix)					;;cnt
+
+				;;		check if zero to avoid wrapping bc in ldir
+				or		b						;;tst len
+				jp		z,strncpy_asm_done		;;zr
+				xor		c						;;z(c)
+
+				;;de = dst,hl = src,bc = count
+				;;while(bc--)*(de++) = *(hl++)
+	 			ldir							;;21cycles * iterations(->bc)
+
+			strncpy_asm_done:					;;even if len == 0 null terminate string
+				ex			de,hl				;;de = hl,hl = de
+				ld			(hl),#0x00			;;null-terminate
+			pop			bc
+		pop				de
+	pop					ix		
+	ret
+
+	;;void strcat_asm(BYTE* dst,const BYTE* src);
+	.globl _strcat_asm
+	_strcat_asm:
+	push			ix
+		push		de
+			ld		ix,#6					;;2 + stack depth * sizeof word
+			add		ix,sp					;;+=sp
+			ld		l,(ix)					;;dst
+			ld		h,1(ix)					;;...
+			ld		e,2(ix)					;;src
+			ld		d,3(ix)					;;...
+
+		strcat_asm_z_loop:					;;find zero in dst
+			ld			a,(hl)
+			or			a
+			jp			z,strcat_asm_loop
+			inc			hl
+			jp			strcat_asm_z_loop
+
+		strcat_asm_loop:
+			ld			a,(de)				;;*src
+			or			a					;;ztst
+			jp			z,strcat_asm_done	;;zr
+			ld			(hl),a				;;*dst=*src
+			inc			hl					;;++dst
+			inc			de					;;++src
+			jp			strcat_asm_loop		;;loop
+
+		strcat_asm_done:
+			ld			(hl),#0x00			;;null-terminate
+		pop			de
+	pop				ix		
+	ret
+
+	;;void strncat_asm(BYTE* dst,const BYTE* src,BYTE cnt);
+	.globl _strncat_asm
+	_strncat_asm:
+	push				ix
+		push			de
+			push		bc
+				ld		ix,#8					;;2 + stack depth * sizeof word
+				add		ix,sp					;;+=sp
+				ld		l,(ix)					;;dst
+				ld		h,1(ix)					;;...
+				ld		e,2(ix)					;;src
+				ld		d,3(ix)					;;...
+				ld		b,4(ix)					;;cnt
+
+				;;		check if zero to avoid wrapping bc in ldir
+				or		b
+				jp		z,strncat_asm_done
+				xor		c
+
+			strncat_asm_z_loop:					;;find zero in dst
+				ld			a,(hl)
+				or			a
+				jp			z,strncat_asm_loop
+				inc			hl
+				jp			strncat_asm_z_loop
+
+			strncat_asm_loop:
+				ex			de,hl
+				ldir		
+				ex			de,hl
+
+			strncat_asm_done:
+				ld			(hl),#0x00			;;null-terminate
+			pop				bc
+		pop					de
+	pop						ix		
+	ret
+
+	;;extern const char* get_file_extension_asm(const BYTE* src)
+	.globl _get_file_extension_asm
+	_get_file_extension_asm:
+	push			ix										;;save										;;save	
+			ld		ix,#4									;;2 + stack depth * sizeof word
+			add		ix,sp									;;+=sp
+			ld		l,(ix)									;;src
+			ld		h,1(ix)									;;...
+							
+			get_file_extension_asm_loop:					;;Will only look for a single dot (for now)
+			ld		a,(hl)
+			or		a
+			jp		z,get_file_extension_asm_nothing_found
+			sub		a,#0x2e									;;-='.'
+			jp		z,get_file_extension_asm_found_dot
+			inc		hl
+			jp		get_file_extension_asm_loop
+
+			get_file_extension_asm_nothing_found:
+			xor		h
+			xor		l
+			jp		get_file_extension_asm_done
+
+			get_file_extension_asm_found_dot:
+			inc		hl										;;move over dot
+
+			get_file_extension_asm_done:
+	pop				ix									;;restore
+	ret
+
+	;;BYTE strlen_asm(const BYTE* str)
 	.globl _strlen_asm
 	_strlen_asm:
 	
-	push ix		;;save
-	ld ix,#4	;;rel addr in stack
-	add ix,sp	;;+=sp
-	ld l,(ix)	;;lo(hl)
-	ld h,1(ix)	;;hi(hl)
-	xor a		;;z(A)
+	push		ix		;;save
+		ld		ix,#4	;;rel addr in stack
+		add		ix,sp	;;+=sp
+		ld		l,(ix)	;;lo(hl)
+		ld		h,1(ix)	;;hi(hl)
+		xor		a		;;z(A)
 
 	strlen_asm_loop:
-	ld b,(hl)	;;*str
-	or b		;;ztst
-	jr z,strlen_asm_done
-	inc hl		;;++str
-	inc a		;;++r
-	jr strlen_asm_loop
+		ld		b,(hl)	;;*str
+		or		b		;;ztst
+		jp		z,strlen_asm_done
+		inc		hl		;;++str
+		inc		a		;;++r
+		jp		strlen_asm_loop
 
 	strlen_asm_done:
-	ld l,a		;;l = res
-	pop ix		;;restore
+		ld		l,a		;;l = res
+		xor		h
+	pop			ix		;;restore
+	ret
+
+	;;TODO : strcmp_asm
+
+	;;void memcpy_asm(BYTE* dst,const BYTE* src,WORD size);
+	.globl _memcpy_asm
+	_memcpy_asm:	
+	push				ix
+		push			de
+			push		bc
+				ld		ix,#8					;;2 + stack depth * sizeof word
+				add		ix,sp					;;+=sp
+				ld		e,(ix)					;;dst
+				ld		d,1(ix)					;;...
+				ld		l,2(ix)					;;src
+				ld		h,3(ix)					;;...
+				ld		c,4(ix)					;;cnt
+				ld		b,5(ix)					;;...
+				ldir							;;write all (21cycles/iter)
+			pop			bc
+		pop				de
+	pop					ix		
 	ret
 
 
