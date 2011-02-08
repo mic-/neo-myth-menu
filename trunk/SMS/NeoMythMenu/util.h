@@ -11,6 +11,12 @@ extern void putsn_asm(const char *str,BYTE attributes,BYTE max_chars,WORD vram_a
 extern void disable_ints(void);
 extern void enable_ints(void);
 
-extern BYTE strlen_asm(const BYTE* str);
+extern BYTE strlen_asm(const char* str);
+extern void strcpy_asm(char* dst,const char* src);
+extern void strncpy_asm(char* dst,const char* src,BYTE cnt);
+extern void strcat_asm(char* dst,const char* src);
+extern void strncat_asm(char* dst,const char* src,BYTE cnt);
+extern const char* get_file_extension_asm(const char* src);
+extern void memcpy_asm(char* dst,const char* src,WORD size);
 #endif
 

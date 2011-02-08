@@ -216,9 +216,43 @@ BYTE check_sms_region()
     return JAPANESE;
 }
 
+#if 0
+void test_strings()
+{
+	static char buf[32];
+	static char filename[8];
+	const char* ext;
+
+	strcpy_asm(buf,"/games/");
+	strcat_asm(buf,"game");
+	strcat_asm(buf,".sms");
+	puts(buf,8,1,PALETTE0);
+
+	strncpy_asm(buf,"/games/",7);
+	strncat_asm(buf,"game2",5);
+	strncat_asm(buf,".sms",4);
+	puts(buf,8,2,PALETTE0);
+	
+	strcpy_asm(filename,"game.sms");
+	strcpy_asm(buf,"File ext is :");
+
+	ext = get_file_extension_asm(filename);
+
+	if(ext)
+		strcat_asm(buf,ext);
+	else
+		strcat_asm(buf,"Not found");
+
+	puts(buf,8,3,PALETTE0);
+
+	while(1){}
+}
+#endif
+
 void main()
 {
     BYTE temp;
+
     void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
 
     Frame1 = 1;
@@ -252,6 +286,10 @@ void main()
     puts("[II] More options", 1, 22, PALETTE0);
 
     setup_vdp();
+
+	#if 0
+	test_strings();
+	#endif
 
     puts_game_list();
 
