@@ -10,7 +10,7 @@ CFLAGS = -mz80 --data-loc 0xC001 -DEMULATOR
 BANK0OBJS = vdp_asm.rel vdp.rel util.rel pad.rel font.rel neo2.rel crt0.rel
 SHARED = shared.rel
 
-all: tools/map2h tools/bin16k tools/hex2bin $(BANK0OBJS) $(SHARED) bank0.bin bank1.bin menu.sms
+all: tools/map2h tools/bin16k tools/hex2bin $(BANK0OBJS) $(SHARED) sramcode.bin bank0.bin bank1.bin menu.sms
 
 tools/map2h:
 	g++ -o tools/map2h -lstdc++ tools/map2h.cpp
@@ -21,6 +21,13 @@ tools/bin16k:
 tools/hex2bin:
 	gcc tools/hex2bin.c -o tools/hex2bin
 
+sramcode.bin:
+	$(AS) -o diskio_asm.s
+	$(CC) $(CFLAGS) --no-std-crt0 --code-loc 0x8000 diskio_asm.rel $(SHARED)
+	$(HEX2BIN) diskio_asm.ihx
+	$(PADTRIM) diskio_asm.bin sramcode.bin
+	$(RM) diskio_asm.bin diskio_asm.ihx *.noi *.lnk *.rst
+	
 bank0.bin:
 	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3000 --no-std-crt0 main.c $(BANK0OBJS) $(SHARED)
 	$(HEX2BIN) main.ihx
@@ -35,7 +42,7 @@ bank1.bin:
 
 menu.sms:
 	cat bank0.bin bank_1.bin > menu.sms
-	$(RM) bank0.bin bank_1.bin main.bin main.ihx *.noi *.lnk *.rst *.sym
+	$(RM) bank0.bin bank_1.bin main.bin sramcode.bin main.ihx *.noi *.lnk *.rst *.sym *.rel
 
 %.rel: %.c
 	$(CC) $(CFLAGS) -c $<

@@ -10,6 +10,12 @@ BYTE pad, padLast;
 // Extra "virtual" registers for assembly routines
 BYTE vregs[16];
 
+BYTE diskioPacket[7];
+BYTE diskioResp[17];
+BYTE diskioTemp[8];
+BYTE sd_csd[17];
+WORD cardType;
+
 // For testing purposes
 #ifdef EMULATOR
 const char dummyGameList[] =
