@@ -145,6 +145,14 @@ __sfr __at 0xF2 FMDetect; /* in/out */
 #define Frame2 (*(volatile BYTE *)(0xFFFF))
 
 
+
+/*
+ * Bitmasks for MemCtrl
+ */
+#define ENABLE_INTERNAL_RAM		0x00
+#define DISABLE_INTERNAL_RAM 	0x10
+
+
 /*
  * Enums for SMS regions
  * EXPORTED == Rest Of World (US/Europe/..)
@@ -154,6 +162,16 @@ enum
     JAPANESE,
     EXPORTED
 };
+
+
+/*
+ * Bitmasks for Frm2Ctrl
+ */
+#define SRAM_PAGE0				0x00
+#define SRAM_PAGE1				0x04
+#define FRAME2_AS_ROM			0x00
+#define FRAME2_AS_SRAM			0x08
+
 
 
 #endif

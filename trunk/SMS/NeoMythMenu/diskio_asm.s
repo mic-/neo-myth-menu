@@ -199,7 +199,7 @@ rdMmcCmdBits:
 	srl   a
 	srl   a
 	srl   a
-	rlc   c		; c = (c << 1) | rdMmcCmdBit()
+	rl    c		; c = (c << 1) | rdMmcCmdBit()
 	djnz  1$
 	ld    a,c
 	ret
@@ -259,7 +259,7 @@ rdMmcDatByte:
 1$:
 	call  rdMmcDatBit
 	srl   a
-	rlc   c			; c = (c << 1) | rdMmcDatBit()
+	rl    c			; c = (c << 1) | rdMmcDatBit()
 	djnz  1$
 	ld    a,c
 	ret
@@ -312,10 +312,10 @@ crc7:
         ld      c,a
 4$:
         srl     0(ix)           ; r0 = (r0 >> 1) | (r0 << 31);
-        rrc     3(ix)
-        rrc     2(ix)
-        rrc     1(ix)
-        rrc     0(ix) 
+        rr      3(ix)
+        rr      2(ix)
+        rr      1(ix)
+        rr      0(ix) 
         
         djnz    1$
         ld      a,c
@@ -787,6 +787,8 @@ sdInit_failed:
 ;**********************************************************************************************
 
 ;; STUBS ;;
+
+.globl neo2_disable_sd
 
 neo2_disable_sd:
 neo2_recv_sd:

@@ -48,7 +48,7 @@ void neo2_asic_cmd(BYTE cmd, WORD data)
 
 
 void neo2_check_card()
-{	
+{
 	volatile BYTE dummy;
 
 	// CALL     SET_NEO_SW
@@ -111,7 +111,7 @@ CMD_37M:
 */
 	Neo2FlashBankLo = 0x37;
 	Frame1 = 0x01;
-	dummy = *(volatile BYTE *)0x6A00;
+	dummy = *(volatile BYTE *)0x4006;
 
 	neo2_asic_unlock();
 /*
@@ -177,14 +177,14 @@ CMD_EE:
 	/*
         LD      A,(04003H)
         LD      (0C00DH),A
-     */ 
+     */
 	dummy = *(volatile BYTE*)0x4003;
 	*(volatile BYTE*)0xc00d = dummy;
 
 	/*
         LD      A,0FFH
         LD      (04000H),A
-        LD      (04001H),A	
+        LD      (04001H),A
 	*/
 	CMFrm1Ctrl = 0xff;
 	*(volatile BYTE*)0x4001 = 0xff;
@@ -215,12 +215,12 @@ CMD_ID:
 	*/
 	Neo2FlashBankLo = 0x90;
 	Frame1 = 0x01;
-	dummy = *(volatile BYTE *)0x6400;
+	dummy = *(volatile BYTE *)0x6A00;
 
 /*
         LD       A,088H      ;
         LD       (0FFFCH),A   ; SET RAM ON
-                              
+
         LD       HL,08000H
         LD       A,(HL)
         CP       034H
@@ -268,7 +268,7 @@ CMD_ID:
 	/*
         LD       HL,0C000H   ;
         LD       (HL),A       ;
-     
+
         LD       A,000H       ;
         LD       (0FFFCH),A    ; SET RAM FFF
 
@@ -297,7 +297,7 @@ CMD_ID:
 	*/
 	Neo2FlashBankLo = 0x90;
 	Frame1 = 0x01;
-	dummy = *(volatile BYTE *)0x6400;
+	dummy = *(volatile BYTE *)0x6A00;
 
 	/*
 SET_NEO_SWX:
