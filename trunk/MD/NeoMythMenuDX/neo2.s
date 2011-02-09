@@ -859,7 +859,7 @@ neo_run_myth_psram:
 
         move.l  16(sp),d0               /* run */
         bclr    #5,d0
-        bne.b   9f                      /* EBIOS or MA-Homebrew */
+        bne.w   9f                      /* EBIOS or MA-Homebrew */
 
         move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
         move.w  #0x0000,GBAC_ZIO(a1)    /* clear bank size reg */
@@ -879,7 +879,19 @@ neo_run_myth_psram:
         move.l  #0xFF03FF03,0x1CC.w
 1:
         move.w  d0,OPTION_IO(a1)        /* set run mode for game */
-
+        cmpi.w  #4,d0
+        bne.b   2f
+        /* init SSF2 Mapper */
+        lea     0xA130F1,a0
+        move.b  #0,(a0)
+        move.b  #1,2(a0)
+        move.b  #2,4(a0)
+        move.b  #3,6(a0)
+        move.b  #4,8(a0)
+        move.b  #5,10(a0)
+        move.b  #6,12(a0)
+        move.b  #7,14(a0)
+2:
         move.w  #0x0001,RST_SEL(a1)     /* 0x0001 = , 0x0004 = , 0x00FF = */
         move.w  gWriteMode,WE_IO(a1)    /* 0x0000 = write protected, 0x0002 = write enabled */
         move.w  gResetMode,RST_IO(a1)   /* 0x0000 = reset to menu, 0x00FF = reset to game */

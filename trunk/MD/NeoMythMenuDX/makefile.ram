@@ -16,7 +16,7 @@ CCFLAGS := $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -fshort-wchar
 Z80FLAGS := -vb2
 ASFLAGS := -m68000 --register-prefix-optional --defsym RUN_IN_PSRAM=1
 LIBS := -L$(GENDEV)/m68k/lib -L$(GENDEV)/m68k/sdk/lib -lff -lc -lgcc
-LINKFLAGS := -T $(GENDEV)/m68k/lib/md-neo-ram.ld
+LINKFLAGS := -T $(GENDEV)/m68k/lib/md-neo-ram.ld -Wl,-Map=output.map
 BUILD := build_ram
 TARGET := MDEBIOS.BIN
 

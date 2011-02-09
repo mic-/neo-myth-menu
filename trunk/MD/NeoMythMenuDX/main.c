@@ -168,9 +168,9 @@ static short int gSRAMgrServiceStatus = SMGR_STATUS_NULL;
 static short int gSRAMgrServiceMode = 0x0000;
 
 #ifndef RUN_IN_PSRAM
-static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.6";
+static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.7";
 #else
-static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.6";
+static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.7";
 #endif
 
 #define MB (0x20000)
@@ -180,7 +180,7 @@ static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.6";
 
 /* Menu entry definitions */
 #define PAGE_ENTRIES 15                 /* number of entries to show per screen page */
-#define MAX_ENTRIES 301                 /* maximum number of menu entries in flash or per directory on SD card */
+#define MAX_ENTRIES 257                 /* maximum number of menu entries in flash or per directory on SD card */
 // note - the current flash menu can only fit 639 entries from 0xB000 to 0xFFE0
 
 struct menuEntry {
@@ -268,10 +268,10 @@ static int gLastEntryIndex = -1;
 short int gDirectRead = 0;
 
 /* arrays */
-const char *gEmptyLine = "                                      ";
-const char *gFEmptyLine = "\x7C                                    \x7C";
-const char *gLine  = "\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82";
-const char *gFBottomLine = "\x86\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x83";
+const char gEmptyLine[] = "                                      ";
+const char gFEmptyLine[] = "\x7C                                    \x7C";
+const char gLine[]  = "\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82";
+const char gFBottomLine[] = "\x86\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x83";
 
 char gSRAMSizeStr[8];
 char gSRAMBankStr[8];
@@ -890,6 +890,13 @@ void get_menu_flash(void)
             gSelections[gMaxEntry].type = 2; // SMS
             gSelections[gMaxEntry].run = 0x13; // run mode = SMS + FM
         }
+        utility_strcpy(extension, &p->meName[utility_strlen(p->meName) - 3]);
+        if (!utility_memcmp(extension, ".SG", 3) || !utility_memcmp(extension, ".sg", 3))
+        {
+            // SG-1000 ROM extension
+            gSelections[gMaxEntry].type = 2; // SMS
+            gSelections[gMaxEntry].run = 0x12; // run mode = SMS
+        }
 
         // next entry
         gMaxEntry++;
@@ -1189,6 +1196,14 @@ void get_sd_info(int entry)
         // SMS ROM header or file extension
         gSelections[entry].type = 2; // SMS
         gSelections[entry].run = 0x13; // run mode = SMS + FM
+        return;
+    }
+    utility_w2cstrcpy(extension, &gSelections[entry].name[utility_wstrlen(gSelections[entry].name) - 3]);
+    if (!utility_memcmp(extension, ".SG", 3) || !utility_memcmp(extension, ".sg", 3))
+    {
+        // SG-1000 ROM extension
+        gSelections[entry].type = 2; // SMS
+        gSelections[entry].run = 0x12; // run mode = SMS
         return;
     }
 
@@ -5229,7 +5244,7 @@ int main(void)
 {
     int ix;
 //    char temp[44];                      /* keep in sync with RTC print below! */
-    mm_init();
+    //mm_init();
 
 #ifndef RUN_IN_PSRAM
     init_hardware();                    /* set hardware to a consistent state, clears vram and loads the font */
@@ -5237,10 +5252,10 @@ int main(void)
 #else
     gCardOkay = 0;                      /* have Neo Flash card - duh! */
 #endif
-    gCpldVers = neo_check_cpld();   /* get CPLD version */
+    gCpldVers = neo_check_cpld();       /* get CPLD version */
     gCardType = *(short int *)0x00FFF0; /* get flash card type from menu flash */
 
-    ints_on();                          /* allow interrupts */
+    //ints_on();                          /* allow interrupts */
 
     // set long file name pointers
     for (ix=0; ix<MAX_ENTRIES; ix++)
