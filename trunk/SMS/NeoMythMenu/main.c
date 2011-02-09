@@ -80,7 +80,7 @@ void setup_vdp()
     vdp_set_reg(REG_HSCROLL, 0x00);         // Reset scrolling
     vdp_set_reg(REG_VSCROLL, 0x00);         // ...
     vdp_set_reg(REG_NAME_TABLE_ADDR, 0x07); // Nametable at 0x1800
-    vdp_set_reg(REG_OVERSCAN_COLOR, 0);
+    vdp_set_reg(REG_OVERSCAN_COLOR, 7);
     vdp_set_reg(REG_BG_PATTERN_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_COLOR_TABLE_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_LINE_COUNT, 0xFF);      // Line ints off
@@ -232,7 +232,7 @@ void test_strings()
 	strncat_asm(buf,"game2",5);
 	strncat_asm(buf,".sms",4);
 	puts(buf,8,2,PALETTE0);
-	
+
 	strcpy_asm(filename,"game.sms");
 	strcpy_asm(buf,"File ext is :");
 

@@ -4,13 +4,15 @@ RM = rm -rf
 PADTRIM = tools/bin16k
 HEX2BIN = tools/hex2bin
 MAP2H = tools/map2h
+SMSHDR = tools/smshdr
 
 CFLAGS = -mz80 --data-loc 0xC001 -DEMULATOR
 
 BANK0OBJS = vdp_asm.rel vdp.rel util.rel pad.rel font.rel neo2.rel crt0.rel
 SHARED = shared.rel
 
-all: tools/map2h tools/bin16k tools/hex2bin $(BANK0OBJS) $(SHARED) sramcode.bin bank0.bin bank1.bin menu.sms
+all: tools/map2h tools/bin16k tools/hex2bin tools/smshdr $(BANK0OBJS) $(SHARED) sramcode.bin bank0.bin bank1.bin menu.sms
+
 
 tools/map2h:
 	g++ -o tools/map2h -lstdc++ tools/map2h.cpp
@@ -20,6 +22,10 @@ tools/bin16k:
 
 tools/hex2bin:
 	gcc tools/hex2bin.c -o tools/hex2bin
+
+tools/smshdr:
+	gcc tools/smshdr.c -o tools/smshdr
+
 
 sramcode.bin:
 	$(AS) -o diskio_asm.s
@@ -41,7 +47,8 @@ bank1.bin:
 	$(RM) bank1.bin bank1.ihx *.noi *.lnk *.rst
 
 menu.sms:
-	cat bank0.bin bank_1.bin > menu.sms
+	cat bank0.bin bank_1.bin bank0.bin bank0.bin > menu.sms
+	$(SMSHDR) menu.sms
 	$(RM) bank0.bin bank_1.bin main.bin sramcode.bin main.ihx *.noi *.lnk *.rst *.sym *.rel
 
 %.rel: %.c
@@ -52,4 +59,4 @@ menu.sms:
 
 
 clean:
-	$(RM) tools/map2h tools/bin16k tools/hex2bin main_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
+	$(RM) tools/map2h tools/bin16k tools/hex2bin tools/smshdr main_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
