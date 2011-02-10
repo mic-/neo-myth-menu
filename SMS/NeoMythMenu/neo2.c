@@ -45,9 +45,7 @@ void neo2_asic_cmd(BYTE cmd, WORD data)
     dummy = *(volatile BYTE *)(0x4000 | ((data & 0x1FFF) << 1));
 }
 
-
-
-void neo2_check_card()
+BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 {
 	volatile BYTE dummy;
 
@@ -228,7 +226,7 @@ CMD_ID:
 */
 	Frm2Ctrl = 0x88;
 
-	if(!(CMFrm2Ctrl - 0x34))
+	if((CMFrm2Ctrl == 0x34))		//Check signature
 	{
 		/*
         INC      HL
@@ -236,8 +234,8 @@ CMD_ID:
         CP       016H
         JR       NZ,Z107
         */
-		if ( !((*(volatile BYTE *)(0x8001)) - 0x16) )
-			goto loc_z107;
+		if ( ((*(volatile BYTE *)(0x8001)) != 0x16)  )
+			return 0;
 
 		/*
         INC      HL
@@ -246,8 +244,8 @@ CMD_ID:
         JR       NZ,Z107
 		*/
 
-		if ( !((*(volatile BYTE *)(0x8002)) - 0x96) )
-			goto loc_z107;
+		if ( ((*(volatile BYTE *)(0x8002)) != 0x96) )
+			return 0;
 
 		/*
         INC      HL
@@ -259,11 +257,11 @@ CMD_ID:
         LD       A,01H
 		*/
 
-		if ( !((*(volatile BYTE *)(0x8003)) - 0x24) )
-			goto loc_z107;
+		if ( ((*(volatile BYTE *)(0x8003)) != 0x24) )
+			return 0;
 	}
-
-	loc_z107:
+	else
+		return 0;			//no signature
 
 	/*
         LD       HL,0C000H   ;
@@ -311,5 +309,7 @@ SET_NEO_SWX:
 	Neo2FlashBankLo = 0x00;
 	Neo2FlashBankSize = 0x00;
 	Neo2Frame0We = 0x00;
+
+	return 1;
 }
 
