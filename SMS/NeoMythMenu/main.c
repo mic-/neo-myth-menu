@@ -75,12 +75,15 @@ void init_sat()
 void setup_vdp()
 {
     disable_ints();
+
+    init_sat();
+
     vdp_set_reg(REG_MODE_CTRL_1, 0x04);     // Set mode 4, Line ints off
     vdp_set_reg(REG_MODE_CTRL_2, 0xE0);     // Screen on, Frame ints on
     vdp_set_reg(REG_HSCROLL, 0x00);         // Reset scrolling
     vdp_set_reg(REG_VSCROLL, 0x00);         // ...
     vdp_set_reg(REG_NAME_TABLE_ADDR, 0x07); // Nametable at 0x1800
-    vdp_set_reg(REG_OVERSCAN_COLOR, 7);
+    vdp_set_reg(REG_OVERSCAN_COLOR, 0x10);
     vdp_set_reg(REG_BG_PATTERN_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_COLOR_TABLE_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_LINE_COUNT, 0xFF);      // Line ints off
@@ -98,10 +101,9 @@ void setup_vdp()
     vdp_set_color(23, 3, 3, 3);             // Color 23 (white)
 #endif
 
-    init_sat();
-
     enable_ints();
 }
+
 
 void puts_game_list()
 {
@@ -216,6 +218,7 @@ BYTE check_sms_region()
     return JAPANESE;
 }
 
+
 #if 0
 void test_strings()
 {
@@ -249,13 +252,19 @@ void test_strings()
 }
 #endif
 
+
 void main()
 {
     BYTE temp;
 
     void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
 
+	MemCtrl = 0xA8;
+
     Frame1 = 1;
+
+	Frm2Ctrl = FRAME2_AS_ROM;
+	Frame2 = 2;
 
     mute_psg();
 

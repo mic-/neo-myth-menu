@@ -60,7 +60,13 @@ MYTH_NEO2_RD_DAT4 = 0
 .globl _diskioTemp
 .globl _cardType
 .globl _sd_csd
+.globl _numSectors
+.globl _sec_tags
+.globl _sec_last
 
+
+; Exported functions
+.globl _disk_initialize
 
 ;**********************************************************************************************
 
@@ -786,11 +792,193 @@ sdInit_failed:
 
 ;**********************************************************************************************
 
+
+; DSTATUS disk_initialize (void)
+_disk_initialize:
+        push    af
+        push    bc
+        push    de
+        push    ix
+
+	call	neo2_enable_sd
+
+	    ; Invalidate all chache entries (sec_tags[i] = 0xFFFFFFFF)
+        ld      a,#0xFF
+        ld      b,#DISKIO_CACHE_SIZE*4
+        ld      de,#_sec_tags
+1$:
+        ld      (de),a
+        inc     de
+        djnz    1$
+
+        ld      (_sec_last+0),a
+        ld      (_sec_last+1),a
+        ld      (_sec_last+2),a
+        ld      (_sec_last+3),a
+
+        ld      a,(_cardType+1)
+        and     a,#0x80
+        ld      (_cardType+1),a         ; keep funky flag
+	
+	call	neo2_pre_sd
+
+	call	sdInit
+        and     a,a                      ; if (!sdInit()) cardType = 0xFFFF
+        jr      z,2$
+        ld      a,#0xFF
+        ld      (_cardType+0),a
+        ld      (_cardType+1),a
+2$:
+	call	neo2_post_sd
+	
+        ld      a,(_sd_csd+1)
+        and     a,#0xC0
+        jp      nz,3$
+
+        ; CSD type 1 - version 1.x cards, and version 2.x standard capacity
+        ;
+        ;    C_Size      - 12 bits - [73:62]
+        ;    C_Size_Mult -  3 bits - [49:47]
+        ;    Read_Bl_Len -  4 bits - [83:80]
+        ;
+        ;    Capacity (bytes) = (C_Size + 1) * ( 2 ^ (C_Size_Mult + 2)) * (2 ^ Read_Bl_Len)	
+	
+        ld      a,(_sd_csd+9)
+        rlc     a
+        rlc     a
+        and     a,#3  
+        ld      c,a                 ; (sd_csd[9] >> 6) & 3
+        ld      a,(_sd_csd+8)
+        ld      b,#0
+        sla     a
+        rl      b
+        sla     a
+        rl      b                   ; sd_csd[8] << 2
+        or      a,c
+        ld      c,a
+        ld      a,(_sd_csd+7)
+        and     a,#3
+        or      a,b
+        ld      b,a
+        inc     bc                  ; bc = C_Size+1
+          
+        ld      a,(_sd_csd+11)
+        rlc     a
+        and     a,#1                ; (sd_csd[11] >> 7) & 1
+        ld      e,a
+        ld      a,(_sd_csd+10)
+        and     a,#3
+        sla     a                   ; (sd_csd[10] & 3) << 1
+        or      a,e
+        ld      e,a                 ; e = C_Size_Mult
+
+        ld      a,(_sd_csd+6)
+        and     a,#0x0F
+        add     a,e                 ; Read_Bl_Len
+        add     a,#2                ; a = Read_Bl_Len + C_Size_Mult + 2
+
+        ; de:bc <<= a
+        ld      de,#0
+4$:
+        cp      a,#0
+        jr      z,5$
+        sla     c
+        rl      b
+        rl      e
+        rl      d
+        dec     a
+        jp      4$
+5$:
+           
+        ; de:bc /= 512
+        ld      c,b
+        ld      b,e
+        ld      e,d
+        srl     e
+        rr      b
+        rr      c
+
+        ld      a,c
+        ld      (_numSectors+0),a
+        ld      a,b
+        ld      (_numSectors+1),a
+	ld      a,e
+        ld      (_numSectors+2),a
+        ld      a,#0
+        ld      (_numSectors+3),a
+
+        jp      6$
+3$:	
+        ; CSD type 2 - version 2.x high capacity
+        ;
+        ;    C_Size      - 22 bits - [69:48]
+        ;
+        ;    Capacity (bytes) = (C_Size + 1) * 1024 * 512
+        ld      a,(_sd_csd+8)
+        and     a,#0x3F
+        ld      (_numSectors+3),a       ; store the values in bytes 1..3 of num_sectors instead of 0..2, i.e. the same as if the full value had been shifted left 8 bits
+        ld      a,(_sd_csd+9)
+        ld      (_numSectors+2),a
+        ld      a,(_sd_csd+10)
+        ld      (_numSectors+1),a
+        ld      a,#0
+        ld      (_numSectors+0),a
+
+    	; we've already "shifted" the value left 8 bits. now we need to shift it 2 more bits to get the multiplication by 1024
+        ld      ix,#_numSectors
+        sla     1(ix)
+        rl      2(ix)
+        rl      3(ix)
+        sla     1(ix)
+        rl      2(ix)
+        rl      3(ix)    
+6$:   
+
+        ld      hl,#0           ; NO_ERROR
+        ld      a,(_cardType+1)
+        cp      #0xFF
+        jp      nz,7$
+        ld      l,#2            ; STA_NODISK
+7$:
+        pop     ix
+        pop     de
+        pop     bc
+        pop     af
+        ret
+
+
+;**********************************************************************************************
+
+
+; DSTATUS disk_status (void)
+_disk_status:
+        ld      l,#0
+        ld      a,(_cardType+0)
+        ld      h,a
+        ld      a,(_cardType+1)
+        and     a,h
+        cp      a,#0xFF
+        jr      nz,1$
+        ld      l,#1        ; STA_NOINIT
+1$:
+        ld      h,#0
+        ret
+ 
+ 
+ ;**********************************************************************************************
+ 
+        
 ;; STUBS ;;
 
+.globl neo2_enable_sd
 .globl neo2_disable_sd
+.globl neo2_pre_sd
+.globl neo2_post_sd
 
+neo2_enable_sd:
 neo2_disable_sd:
+neo2_pre_sd:
+neo2_post_sd:
 neo2_recv_sd:
 ret
 
