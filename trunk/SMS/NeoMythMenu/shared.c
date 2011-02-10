@@ -1,7 +1,7 @@
 // Shared data for all banks
 
+#include <stdint.h>
 #include "shared.h"
-
 
 FileList games;
 BYTE region;
@@ -15,6 +15,10 @@ BYTE diskioResp[17];
 BYTE diskioTemp[8];
 BYTE sd_csd[17];
 WORD cardType;
+uint32_t sec_tags[2];
+uint32_t sec_last;
+uint32_t numSectors;
+
 
 // For testing purposes
 #ifdef EMULATOR
