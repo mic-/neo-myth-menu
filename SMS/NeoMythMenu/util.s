@@ -72,20 +72,21 @@
 		ld		b,2 + 4(ix)	;;attrs
 		ld		c,2 + 5(ix)	;;max
 		sla		b			;;<<=1
-	
-		;;Quick test for zero-length ---will save 4 cycles/iteration later
-		or		c						;;z-tst
-		jp		z,puts_asm_output_done	;;zero
 
 	putsn_asm_output:
+		xor		a			
+		or		c
+		jp		z,putsn_asm_output_done
 		ld		a,(hl)		;;*str
+		or		a
+		jp		z,putsn_asm_output_done
 		sub		a,#0x20		;;-=' '
 		out		(#0xbe),a	;;w
 		ld		a,b			;;attr
 		out		(#0xbe),a	;;w
 		inc		hl			;;++str
 		dec		c			;;--left
-		jp		p,puts_asm_output	;;zero
+		jp		nz,puts_asm_output
 
 	putsn_asm_output_done:
 	pop			bc
@@ -133,6 +134,7 @@
 				ld		l,2(ix)					;;src
 				ld		h,3(ix)					;;...
 				ld		b,4(ix)					;;cnt
+				xor		a
 
 				;;		check if zero to avoid wrapping bc in ldir
 				or		b						;;tst len
@@ -198,6 +200,7 @@
 				ld		e,2(ix)					;;src
 				ld		d,3(ix)					;;...
 				ld		b,4(ix)					;;cnt
+				xor		a
 
 				;;		check if zero to avoid wrapping bc in ldir
 				or		b
@@ -242,6 +245,7 @@
 			jp		get_file_extension_asm_loop
 
 			get_file_extension_asm_nothing_found:
+			xor		a
 			xor		h
 			xor		l
 			jp		get_file_extension_asm_done
@@ -266,7 +270,10 @@
 
 	strlen_asm_loop:
 		ld		b,(hl)	;;*str
+		ld		c,a
+		xor		a
 		or		b		;;ztst
+		ld		a,c
 		jp		z,strlen_asm_done
 		inc		hl		;;++str
 		inc		a		;;++r
@@ -274,7 +281,6 @@
 
 	strlen_asm_done:
 		ld		l,a		;;l = res
-		xor		h
 	pop			ix		;;restore
 	ret
 
