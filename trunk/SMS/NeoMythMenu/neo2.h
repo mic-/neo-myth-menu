@@ -43,5 +43,7 @@ enum
  * Peform a Neo2 ASIC command
  */
 extern void neo2_asic_cmd(BYTE cmd, WORD data);
-extern void neo2_check_card();
+
+/*Returns 0 if no NEO2/3 cart found*/
+extern BYTE neo2_check_card();
 #endif
