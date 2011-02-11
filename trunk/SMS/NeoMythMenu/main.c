@@ -4,9 +4,11 @@
 #include "pad.h"
 #include "shared.h"
 #include "font.h"
+#include "neo2.h"
+#include "neo2_map.h"
 
 
-#define MENU_VERSION_STRING "0.11"
+#define MENU_VERSION_STRING "0.13"
 
 /*
  * Use the plain single-colored background instead of the pattered one.
@@ -136,6 +138,31 @@ void puts_game_list()
 }
 
 
+void dump_hex(WORD addr)
+{
+    BYTE *p = (BYTE*)addr;
+    BYTE row,col,c,d;
+
+	vdp_wait_vblank();
+
+    row = 7;
+	for (; row < 15; row++)
+	{
+		vdp_set_vram_addr(0x1800 + (row << 6) + 8);
+		for (col = 0; col < 8; col++)
+		{
+			c = *p++;
+			d = (c >> 4);
+			c &= 0x0F;
+			c += 16; d += 16;
+			if (c > 25) c += 7;
+			if (d > 25) d += 7;
+			VdpData = d; VdpData = 0;
+			VdpData = c; VdpData = 0;
+		}
+	}
+}
+
 /*
  * Move to the next entry in the games list
  */
@@ -189,7 +216,7 @@ WORD count_games_on_gbac()
     BYTE *p = (BYTE*)gbacGameList;
     WORD count = 0;
 
-    while (*p != 0xFF)
+    while ((*p != 0xFF) && (count < 512))
     {
         p += 0x20;
         count++;
@@ -256,12 +283,23 @@ void test_strings()
 void main()
 {
     BYTE temp;
+	WORD i;
 
     void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
 
 	MemCtrl = 0xA8;
 
-    Frame1 = 1;
+    Frame1 = 2;
+
+	// Copy code from ROM to RAM
+	for (i = 0; i < 0x300; i++)
+	{
+		*(volatile BYTE*)(0xD000+i) = *(volatile BYTE*)(0x4000+i);
+	}
+
+	temp = pfn_neo2_check_card();
+
+	Frame1 = 1;
 
 	Frm2Ctrl = FRAME2_AS_ROM;
 	Frame2 = 2;
@@ -275,6 +313,9 @@ void main()
 
     // Make sure the display is off before we write to VRAM
     vdp_set_reg(REG_MODE_CTRL_2, 0xA0);
+
+	// Clear the nametable
+	vdp_set_vram(0x1800, 0, 32*24*2);
 
     load_font();
 
@@ -300,7 +341,7 @@ void main()
 	test_strings();
 	#endif
 
-    puts_game_list();
+    dump_hex(0xB000); //puts_game_list();
 
     pad = padLast = 0;
 
