@@ -192,8 +192,9 @@ static unsigned int register_macro(std::vector<std::string>& code,unsigned int l
 static unsigned int get_constant(const std::string& s,unsigned int addr,int& res,int& weight)
 {
 	std::string conv;
+	unsigned int save = addr;	
 	addr = skip_whitespace(s,addr);
-
+	
 	while(addr < s.length())
 	{
 		if(!isalnum(s[addr]))
@@ -202,7 +203,7 @@ static unsigned int get_constant(const std::string& s,unsigned int addr,int& res
 		++addr;
 	}
 
-	if(conv.empty())
+	if(addr == save)
 	{
 		std::cout << "Bad constant conversion"<<std::endl;
 		exit(1);
@@ -909,4 +910,5 @@ int main(int argc, char* argv[])
 
 	return 0;
 }
+
 
