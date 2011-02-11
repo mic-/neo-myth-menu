@@ -202,6 +202,12 @@ static unsigned int get_constant(const std::string& s,unsigned int addr,int& res
 		++addr;
 	}
 
+	if(conv.empty())
+	{
+		std::cout << "Bad constant conversion"<<std::endl;
+		exit(1);
+	}
+
 	res = atoi(conv.c_str());
 	weight = conv.length();
 	return skip_whitespace(s,addr);
@@ -265,7 +271,7 @@ static unsigned int split_cs_args(const std::string& s,std::vector<std::string>&
 			}
 
 			arg.clear();
-			i += weight;
+			//i += weight;
 			continue;
 		}
 		else if( s[i] == ')' )
