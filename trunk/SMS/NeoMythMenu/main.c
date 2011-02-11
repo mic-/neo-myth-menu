@@ -107,6 +107,25 @@ void setup_vdp()
 }
 
 
+/*
+ * Prints the value val in hexadecimal form at position x,y
+ */
+void print_hex(BYTE val, BYTE x, BYTE y)
+{
+	BYTE lo,hi;
+
+	vdp_set_vram_addr(0x1800 + (x << 1) + (y << 6));
+
+	hi = (val >> 4);
+	lo = val & 0x0F;
+	lo += 16; hi += 16;
+	if (lo > 25) lo += 7;
+	if (hi > 25) hi += 7;
+	VdpData = hi; VdpData = 0;
+	VdpData = lo; VdpData = 0;
+}
+
+
 void puts_game_list()
 {
     BYTE *p = (BYTE*)gbacGameList;
@@ -335,13 +354,18 @@ void main()
     puts("[I]  Run", 1, 21, PALETTE0);
     puts("[II] More options", 1, 22, PALETTE0);
 
+	print_hex(idLo, 24, 20);
+	print_hex(idHi, 26, 20);
+	print_hex(*(BYTE*)0xC000, 28, 20);
+
     setup_vdp();
 
 	#if 0
 	test_strings();
 	#endif
 
-    dump_hex(0xB000); //puts_game_list();
+    //dump_hex(0xB000);
+    puts_game_list();
 
     pad = padLast = 0;
 

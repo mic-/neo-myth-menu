@@ -101,21 +101,28 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 
 	Frm2Ctrl = 0x80 | FRAME2_AS_SRAM;
 
+	dummy = 0;
 	if ( (*(volatile BYTE *)(0x8000)) == 0x34 )		//Check signature
 	{
 		if ( (*(volatile BYTE *)(0x8001)) != 0x16 )
-			return 0;
+			dummy = 0x16;
 
-		if ( (*(volatile BYTE *)(0x8002)) != 0x96 )
-			return 0;
+		if (dummy == 0)
+		{
+	    	if ( (*(volatile BYTE *)(0x8002)) != 0x96 )
+				dummy = 0x96;
+		}
 
-		if ( (*(volatile BYTE *)(0x8003)) != 0x24 )
-			return 0;
+		if (dummy == 0)
+		{
+			if ( (*(volatile BYTE *)(0x8003)) != 0x24 )
+				dummy = 0x24;
+		}
 	}
 	else
-		return 0;			//no signature
+		dummy = 0x34;
 
-	*(volatile BYTE *)0xC000 = 0;
+	*(volatile BYTE *)0xC000 = dummy;
 
 	Frm2Ctrl = FRAME2_AS_ROM;
 
