@@ -9,10 +9,10 @@ SMSHDR = tools/smshdr
 CFLAGS = -mz80 --data-loc 0xC001
 #CFLAGS = -mz80 --data-loc 0xC001 -DEMULATOR
 
-BANK0OBJS = vdp_asm.rel vdp.rel util.rel pad.rel font.rel neo2.rel crt0.rel
+BANK0OBJS = vdp_asm.rel vdp.rel util.rel pad.rel font.rel crt0.rel
 SHARED = shared.rel
 
-all: tools/map2h tools/bin16k tools/hex2bin tools/smshdr $(BANK0OBJS) $(SHARED) sramcode.bin bank0.bin bank1.bin menu.sms
+all: tools/map2h tools/bin16k tools/hex2bin tools/smshdr $(BANK0OBJS) $(SHARED) ramcode.bin sramcode.bin bank0.bin bank1.bin menu.sms MDBIOS.BIN
 
 
 tools/map2h:
@@ -27,6 +27,13 @@ tools/hex2bin:
 tools/smshdr:
 	gcc tools/smshdr.c -o tools/smshdr
 
+
+ramcode.bin:
+	$(CC) $(CFLAGS) --no-std-crt0 --code-loc 0xD000 neo2.c 
+	$(HEX2BIN) neo2.ihx
+	$(PADTRIM) neo2.bin ramcode.bin
+	$(MAP2H) neo2.map neo2.h
+	$(RM) neo2.bin neo2.ihx *.noi *.lnk *.rst
 
 sramcode.bin:
 	$(AS) -o diskio_asm.s
@@ -48,10 +55,13 @@ bank1.bin:
 	$(RM) bank1.bin bank1.ihx *.noi *.lnk *.rst
 
 menu.sms:
-	cat bank0.bin bank_1.bin bank0.bin bank0.bin > menu.sms
+	cat bank0.bin bank_1.bin ramcode.bin bank0.bin > menu.sms
 	$(SMSHDR) menu.sms
 	$(RM) bank0.bin bank_1.bin main.bin sramcode.bin main.ihx *.noi *.lnk *.rst *.sym *.rel
 
+MDBIOS.BIN:
+	cp menu.sms MDBIOS.BIN
+	
 %.rel: %.c
 	$(CC) $(CFLAGS) -c $<
 	rm -f $*.asm
@@ -60,7 +70,7 @@ menu.sms:
 
 
 clean:
-	$(RM) main_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
+	$(RM) MDBIOS.BIN main_map.h neo2_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
 
 distclean:
-	$(RM) tools/map2h tools/bin16k tools/hex2bin tools/smshdr main_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
+	$(RM) tools/map2h tools/bin16k tools/hex2bin tools/smshdr MDBIOS.BIN main_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map

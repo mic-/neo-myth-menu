@@ -24,6 +24,8 @@ extern FileList games;
 extern BYTE region;
 extern BYTE pad, padLast;
 
+extern BYTE idLo,idHi;
+
 #ifdef EMULATOR
 extern const char dummyGameList[];
 #endif

@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include "shared.h"
 
+BYTE idLo,idHi;
+
 FileList games;
 BYTE region;
 BYTE pad, padLast;

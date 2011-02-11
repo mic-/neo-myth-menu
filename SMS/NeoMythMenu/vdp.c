@@ -33,6 +33,17 @@ void vdp_copy_to_vram(WORD dest, BYTE *src, WORD len)
 }
 
 
+void vdp_set_vram(WORD dest, BYTE val, WORD len)
+{
+	vdp_set_vram_addr(dest);
+
+	while (len--)
+	{
+		VdpData = val;
+	}
+}
+
+
 void vdp_set_color(BYTE cnum, BYTE red, BYTE green, BYTE blue)
 {
 	vdp_set_cram_addr(cnum);

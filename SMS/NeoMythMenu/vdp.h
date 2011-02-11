@@ -56,7 +56,15 @@ extern void vdp_set_vram_addr(WORD addr);
 
 void vdp_set_cram_addr(WORD addr);
 
+/*
+ * Copy <len> bytes of data from <src> to VRAM starting at address <dest>
+ */
 void vdp_copy_to_vram(WORD dest, BYTE *src, WORD len);
+
+/*
+ * Fill <len> bytes of VRAM with the byte <val> starting at address <dest>
+ */
+void vdp_set_vram(WORD dest, BYTE val, WORD len);
 
 void vdp_set_color(BYTE cnum, BYTE red, BYTE green, BYTE blue);
 
