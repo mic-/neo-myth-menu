@@ -200,7 +200,7 @@ static unsigned int get_constant(const std::string& s,unsigned int addr,int& res
 		if(!isalnum(s[addr]))
 			break;
 		
-		++addr;
+		conv += s[addr++];
 	}
 
 	if(addr == save)
