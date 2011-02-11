@@ -134,3 +134,104 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 	return 1;
 }
 
+
+
+
+void neo2_run_game_gbac()
+{
+	BYTE hwtype;
+	GbacGameData *gameData = (GbacGameData*)0xC800
+	;
+	neo2_flash_enable();
+	neo2_asic_cmd(0x37, 0x2203);
+	neo2_asic_cmd(0xDA, 0xAE44);
+	neo2_flash_disable();
+
+	Neo2Frame1We = 1;
+
+	Frame1 = 0;
+	*(volatile BYTE*)0x4000 = 0x90;
+	*(volatile BYTE*)0x4001 = 0x90;
+	*(volatile BYTE*)0x4002 = 0x90;
+	*(volatile BYTE*)0x4003 = 0x90;
+
+	hwtype = 0;
+	// Check A type
+	if ( 0x89 == *(volatile BYTE*)0x4000 )
+		if ( 0x89 == *(volatile BYTE*)0x4002 )
+			hwtype = 1;
+
+	if (!hwtype)
+	{
+		neo2_flash_enable();
+		neo2_asic_cmd(0xDA, 0x8E44);
+		neo2_flash_disable();
+
+		Frame1 = 0;
+		*(volatile BYTE*)0x4000 = 0x90;
+		*(volatile BYTE*)0x4001 = 0x90;
+		*(volatile BYTE*)0x4002 = 0x90;
+		*(volatile BYTE*)0x4003 = 0x90;
+
+		// Check B type
+		if ( 0x89 == *(volatile BYTE*)0x4000 )
+			if ( 0x89 == *(volatile BYTE*)0x4002 )
+				hwtype = 2;
+	}
+
+	if (!hwtype)
+	{
+		neo2_flash_enable();
+		neo2_asic_cmd(0xDA, 0x0E44);
+		neo2_flash_disable();
+	}
+
+	Frame1 = 0;
+	*(volatile BYTE*)0x4000 = 0xFF;
+	*(volatile BYTE*)0x4001 = 0xFF;
+	*(volatile BYTE*)0x4002 = 0xFF;
+	*(volatile BYTE*)0x4003 = 0xFF;
+
+	Neo2Frame1We = 0;
+
+	Neo2FlashBankLo = gameData->bankLo;
+	Neo2FlashBankHi = gameData->bankHi;
+
+	switch (gameData->size)
+	{
+		case 1:
+			Neo2FlashBankSize = FLASH_SIZE_256K;
+			break;
+		case 2:
+			Neo2FlashBankSize = FLASH_SIZE_512K;
+			break;
+		case 4:
+			Neo2FlashBankSize = FLASH_SIZE_1M;
+			break;
+		case 8:		// ???
+		 	Neo2FlashBankSize = FLASH_SIZE_2M;
+		 	break;
+		 default:
+		 	Neo2FlashBankSize = FLASH_SIZE_4M;
+		 	break;
+	}
+
+	Neo2SramBank = gameData->sramBank;
+
+	Neo2Frame0We = 0;
+
+	Neo2FmOn = 0;		// TODO: Handle this
+
+	// TODO: Handle cheats
+
+
+	Neo2Run = 0xFF;
+
+	Frame1 = 1;
+	Frame2 = 2;
+
+	// Jump to address 0
+	((void (*)())0x0000)();
+}
+
+
