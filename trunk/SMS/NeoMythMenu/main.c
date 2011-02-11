@@ -303,6 +303,8 @@ void main()
 {
     BYTE temp;
 	WORD i;
+	GbacGameData *gameData;
+	BYTE *p;
 
     void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
 
@@ -491,6 +493,27 @@ void main()
         else if (pad & PAD_DOWN)
         {
             move_to_next_game();
+        }
+        else if (pad & PAD_SW1)
+        {
+			// Copy the game info data to somewhere in RAM
+			gameData = (GbacGameData*)0xC800;
+			p = (BYTE*)0xB000;
+			p += games.highlighted << 5;
+
+			gameData->mode = p[0];
+			gameData->typ = p[1];
+			gameData->size = p[2] >> 4;
+			gameData->bankHi = p[2] & 0x0F;
+			gameData->bankLo = p[3];
+			gameData->sramBank = p[4] >> 4;
+			gameData->sramSize = p[4] & 0x0F;
+			gameData->cheat[0] = p[5];
+			gameData->cheat[1] = p[6];
+			gameData->cheat[2] = p[7];
+
+			pfn_neo2_run_game_gbac();
+
         }
 
         vdp_wait_vblank();

@@ -38,6 +38,16 @@ enum
 };
 
 
+typedef struct
+{
+	BYTE mode;
+	BYTE typ;
+	BYTE size;
+	BYTE bankLo,bankHi;
+	BYTE sramBank,sramSize;
+	BYTE cheat[3];
+} GbacGameData;
+
 
 /*
  * Peform a Neo2 ASIC command
@@ -49,5 +59,7 @@ extern BYTE neo2_check_card();
 
 extern void neo2_flash_enable();
 extern void neo2_flash_disable();
+
+extern void neo2_run_game_gbac();
 
 #endif
