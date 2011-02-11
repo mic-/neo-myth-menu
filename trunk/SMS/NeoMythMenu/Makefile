@@ -33,7 +33,7 @@ sramcode.bin:
 	$(HEX2BIN) diskio_asm.ihx
 	$(PADTRIM) diskio_asm.bin sramcode.bin
 	$(RM) diskio_asm.bin diskio_asm.ihx *.noi *.lnk *.rst
-	
+
 bank0.bin:
 	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3000 --no-std-crt0 main.c $(BANK0OBJS) $(SHARED)
 	$(HEX2BIN) main.ihx
@@ -59,4 +59,7 @@ menu.sms:
 
 
 clean:
+	$(RM) main_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
+
+distclean:
 	$(RM) tools/map2h tools/bin16k tools/hex2bin tools/smshdr main_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
