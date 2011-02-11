@@ -13,7 +13,7 @@
 
 int TAB_DEPTH = 4;
 const char		   PUSH_FSTACK_TOKEN = '>';							//PUSH a function stack element
-const char		   PUSH_ACCESS_STACK_ELEMENT_TOKEN = '%';			//POP a function stack element
+const char		   POP_STACK_ELEMENT_TOKEN = '%';			//POP a function stack element
 const std::string  COMMENT_CHAR = "//";								//COMMENT CHARS
 const std::string  MACRO_BEGIN_CODE = ".BEGINMACRO";				//BEGIN MACRO BLOCK
 const std::string  MACRO_END_CODE = ".ENDMACRO";					//END MACRO BLOCK
@@ -194,7 +194,8 @@ static unsigned int get_constant(const std::string& s,unsigned int addr,int& res
 	std::string conv;
 	unsigned int save = addr;	
 	addr = skip_whitespace(s,addr);
-	
+	conv.clear();
+
 	while(addr < s.length())
 	{
 		if(!isalnum(s[addr]))
@@ -251,7 +252,7 @@ static unsigned int split_cs_args(const std::string& s,std::vector<std::string>&
 			++i;
 			continue;
 		}
-		else if( s[i] == PUSH_ACCESS_STACK_ELEMENT_TOKEN )
+		else if( s[i] == POP_STACK_ELEMENT_TOKEN )
 		{
 			int iconst;
 			int weight;
@@ -464,7 +465,7 @@ const char* parent = 0)
 				if(callstack.empty())
 				{
 					
-					while ((b = s.find("%",c)) != std::string::npos )
+					while ((b = s.find(POP_STACK_ELEMENT_TOKEN,c)) != std::string::npos )
 					{
 						f = 1;
 		
@@ -510,7 +511,7 @@ const char* parent = 0)
 				else
 				{
 					split_cs_args(s,cs,callstack);
-					while ((b = s.find("%",c)) != std::string::npos )
+					while ((b = s.find(POP_STACK_ELEMENT_TOKEN,c)) != std::string::npos )
 					{
 						f = 1;
 		
