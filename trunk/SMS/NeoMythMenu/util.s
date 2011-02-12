@@ -306,7 +306,7 @@
     pop                 ix
     ret
 
-    ;;void memset_asm(char* dst,char val,BYTE size);
+    ;;void memset_asm(char* dst,char val,WORD size);
     .globl _memset_asm
     _memset_asm:
     push                ix
@@ -316,10 +316,13 @@
             ld      l,(ix)                      ;;dst
             ld      h,1(ix)                     ;;...
             ld      a,2(ix)                     ;;val
-            ld      b,3(ix)                     ;;cnt
+            ld      c,3(ix)                     ;;cnt
+			ld		b,4(ix)						;;...
+
         memset_loop:
             ld      (hl),a
             inc     hl
+			dec		bc
             djnz    memset_loop
         pop         bc
     pop                 ix
