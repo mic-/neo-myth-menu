@@ -112,17 +112,17 @@ void setup_vdp()
  */
 void print_hex(BYTE val, BYTE x, BYTE y)
 {
-	BYTE lo,hi;
+    BYTE lo,hi;
 
-	vdp_set_vram_addr(0x1800 + (x << 1) + (y << 6));
+    vdp_set_vram_addr(0x1800 + (x << 1) + (y << 6));
 
-	hi = (val >> 4);
-	lo = val & 0x0F;
-	lo += 16; hi += 16;
-	if (lo > 25) lo += 7;
-	if (hi > 25) hi += 7;
-	VdpData = hi; VdpData = 0;
-	VdpData = lo; VdpData = 0;
+    hi = (val >> 4);
+    lo = val & 0x0F;
+    lo += 16; hi += 16;
+    if (lo > 25) lo += 7;
+    if (hi > 25) hi += 7;
+    VdpData = hi; VdpData = 0;
+    VdpData = lo; VdpData = 0;
 }
 
 
@@ -162,24 +162,24 @@ void dump_hex(WORD addr)
     BYTE *p = (BYTE*)addr;
     BYTE row,col,c,d;
 
-	vdp_wait_vblank();
+    vdp_wait_vblank();
 
     row = 7;
-	for (; row < 15; row++)
-	{
-		vdp_set_vram_addr(0x1800 + (row << 6) + 8);
-		for (col = 0; col < 8; col++)
-		{
-			c = *p++;
-			d = (c >> 4);
-			c &= 0x0F;
-			c += 16; d += 16;
-			if (c > 25) c += 7;
-			if (d > 25) d += 7;
-			VdpData = d; VdpData = 0;
-			VdpData = c; VdpData = 0;
-		}
-	}
+    for (; row < 15; row++)
+    {
+        vdp_set_vram_addr(0x1800 + (row << 6) + 8);
+        for (col = 0; col < 8; col++)
+        {
+            c = *p++;
+            d = (c >> 4);
+            c &= 0x0F;
+            c += 16; d += 16;
+            if (c > 25) c += 7;
+            if (d > 25) d += 7;
+            VdpData = d; VdpData = 0;
+            VdpData = c; VdpData = 0;
+        }
+    }
 }
 
 /*
@@ -268,33 +268,33 @@ BYTE check_sms_region()
 #if 0
 void test_strings()
 {
-	static char buf[32];
-	static char filename[8];
-	const char* ext;
+    static char buf[32];
+    static char filename[8];
+    const char* ext;
 
-	strcpy_asm(buf,"/games/");
-	strcat_asm(buf,"game");
-	strcat_asm(buf,".sms");
-	puts(buf,8,1,PALETTE0);
+    strcpy_asm(buf,"/games/");
+    strcat_asm(buf,"game");
+    strcat_asm(buf,".sms");
+    puts(buf,8,1,PALETTE0);
 
-	strncpy_asm(buf,"/games/",7);
-	strncat_asm(buf,"game2",5);
-	strncat_asm(buf,".sms",4);
-	puts(buf,8,2,PALETTE0);
+    strncpy_asm(buf,"/games/",7);
+    strncat_asm(buf,"game2",5);
+    strncat_asm(buf,".sms",4);
+    puts(buf,8,2,PALETTE0);
 
-	strcpy_asm(filename,"game.sms");
-	strcpy_asm(buf,"File ext is :");
+    strcpy_asm(filename,"game.sms");
+    strcpy_asm(buf,"File ext is :");
 
-	ext = get_file_extension_asm(filename);
+    ext = get_file_extension_asm(filename);
 
-	if(ext)
-		strcat_asm(buf,ext);
-	else
-		strcat_asm(buf,"Not found");
+    if(ext)
+        strcat_asm(buf,ext);
+    else
+        strcat_asm(buf,"Not found");
 
-	puts(buf,8,3,PALETTE0);
+    puts(buf,8,3,PALETTE0);
 
-	while(1){}
+    while(1){}
 }
 #endif
 
@@ -302,28 +302,34 @@ void test_strings()
 void main()
 {
     BYTE temp;
-	WORD i;
-	GbacGameData *gameData;
-	BYTE *p;
+    WORD i;
+    GbacGameData *gameData;
+    BYTE *p;
+    BYTE ftype;
+    char type[2];
 
     void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
 
-	MemCtrl = 0xA8;
+    MemCtrl = 0xA8;
 
     Frame1 = 2;
+    // Copy code from ROM to RAM
+    for (i = 0; i < 0x300; i++)
+    {
+        *(volatile BYTE*)(0xD000+i) = *(volatile BYTE*)(0x4000+i);
+    }
 
-	// Copy code from ROM to RAM
-	for (i = 0; i < 0x300; i++)
-	{
-		*(volatile BYTE*)(0xD000+i) = *(volatile BYTE*)(0x4000+i);
-	}
+    temp = pfn_neo2_check_card();
 
-	temp = pfn_neo2_check_card();
+    Frm2Ctrl = FRAME2_AS_ROM;
 
-	Frame1 = 1;
+    Frame1 = 3;
+    ftype = *(volatile BYTE*)0x7FF0; // flash mem type at 0xFFF0: 0 = newer(C), 1 = new(B), 2 = old(A)
+    type[0] = 'C' - ftype;
+    type[1] = 0;
 
-	Frm2Ctrl = FRAME2_AS_ROM;
-	Frame2 = 2;
+    Frame1 = 1;
+    Frame2 = 2;
 
     mute_psg();
 
@@ -335,8 +341,8 @@ void main()
     // Make sure the display is off before we write to VRAM
     vdp_set_reg(REG_MODE_CTRL_2, 0xA0);
 
-	// Clear the nametable
-	vdp_set_vram(0x1800, 0, 32*24*2);
+    // Clear the nametable
+    vdp_set_vram(0x1800, 0, 32*24*2);
 
     load_font();
 
@@ -356,15 +362,18 @@ void main()
     puts("[I]  Run", 1, 21, PALETTE0);
     puts("[II] More options", 1, 22, PALETTE0);
 
-	print_hex(idLo, 24, 20);
-	print_hex(idHi, 26, 20);
-	print_hex(*(BYTE*)0xC000, 28, 20);
+    // Print some Myth info
+    print_hex(idLo, 24, 20);
+    print_hex(idHi, 26, 20);
+    print_hex(*(BYTE*)0xC000, 28, 20);
+    // Print flash type
+    puts(type, 30, 20, PALETTE0);
 
     setup_vdp();
 
-	#if 0
-	test_strings();
-	#endif
+    #if 0
+    test_strings();
+    #endif
 
     //dump_hex(0xB000);
     puts_game_list();
@@ -496,24 +505,23 @@ void main()
         }
         else if (pad & PAD_SW1)
         {
-			// Copy the game info data to somewhere in RAM
-			gameData = (GbacGameData*)0xC800;
-			p = (BYTE*)0xB000;
-			p += games.highlighted << 5;
+            // Copy the game info data to somewhere in RAM
+            gameData = (GbacGameData*)0xC800;
+            p = (BYTE*)0xB000;
+            p += games.highlighted << 5;
 
-			gameData->mode = p[0];
-			gameData->typ = p[1];
-			gameData->size = p[2] >> 4;
-			gameData->bankHi = p[2] & 0x0F;
-			gameData->bankLo = p[3];
-			gameData->sramBank = p[4] >> 4;
-			gameData->sramSize = p[4] & 0x0F;
-			gameData->cheat[0] = p[5];
-			gameData->cheat[1] = p[6];
-			gameData->cheat[2] = p[7];
+            gameData->mode = ftype; // we know mode is ALWAYS 0, so pass flash type here
+            gameData->typ = p[1];
+            gameData->size = p[2] >> 4;
+            gameData->bankHi = p[2] & 0x0F;
+            gameData->bankLo = p[3];
+            gameData->sramBank = p[4] >> 4;
+            gameData->sramSize = p[4] & 0x0F;
+            gameData->cheat[0] = p[5];
+            gameData->cheat[1] = p[6];
+            gameData->cheat[2] = p[7];
 
-			pfn_neo2_run_game_gbac();
-
+            pfn_neo2_run_game_gbac();
         }
 
         vdp_wait_vblank();

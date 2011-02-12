@@ -31,22 +31,22 @@
  */
 enum
 {
-    FLASH_SIZE_4M   = 0x00, // 4 Mbit
-    FLASH_SIZE_2M   = 0x08,
-    FLASH_SIZE_1M   = 0x0C,
-    FLASH_SIZE_512K = 0x0E,
-    FLASH_SIZE_256K = 0x0F,
+    FLASH_SIZE_16M = 0x00,
+    FLASH_SIZE_8M  = 0x08,
+    FLASH_SIZE_4M  = 0x0C,
+    FLASH_SIZE_2M  = 0x0E,
+    FLASH_SIZE_1M  = 0x0F,
 };
 
 
 typedef struct
 {
-	BYTE mode;
-	BYTE typ;
-	BYTE size;
-	BYTE bankLo,bankHi;
-	BYTE sramBank,sramSize;
-	BYTE cheat[3];
+    BYTE mode;
+    BYTE typ;
+    BYTE size;
+    BYTE bankLo,bankHi;
+    BYTE sramBank,sramSize;
+    BYTE cheat[3];
 } GbacGameData;
 
 
