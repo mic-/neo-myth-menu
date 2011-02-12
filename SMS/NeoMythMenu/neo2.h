@@ -16,7 +16,7 @@
 #define Neo2Frame1We        (*(volatile BYTE *)0xBFC5)      // Write-enable Frame 1 (allows flash read)
 #define Neo2CardCheck       (*(volatile BYTE *)0xBFC6)
 #define Neo2UseJap          (*(volatile BYTE *)0xBFC7)
-#define Neo2Reset2Menu      (*(volatile BYTE *)0xBFC8)      // b0 = 1 = reset on RESET button, b1 = 1 = reset on CARD button
+#define Neo2Reset2Menu      (*(volatile BYTE *)0xBFC8)      // b0 = 1 = reset on RESET button, b1 = 1 = reset on MYTH button
 #define Neo2Run             (*(volatile BYTE *)0xBFCF)      // Lock hardware for game
 #define Neo2Frame0We        (*(volatile BYTE *)0xBFD0)      // Write-enable Frame 0 (allows flash read)
 #define Neo2FmOn            (*(volatile BYTE *)0xBFD1)      // Enable the FM chip (YM2413)
