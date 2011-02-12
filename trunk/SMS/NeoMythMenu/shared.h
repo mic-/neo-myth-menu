@@ -16,7 +16,7 @@ typedef struct
 
 enum
 {
-	TASK_LOAD_BG,
+    TASK_LOAD_BG,
 };
 
 

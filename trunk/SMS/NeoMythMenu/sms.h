@@ -123,7 +123,7 @@ __sfr __at 0xF2 FMDetect; /* in/out */
  * b0-b1 = page shift (00 for normal operation, unused by games)
  * b2 = cart RAM bank, 0 = first 16KB, 1 = second 16KB (only if RAM mapped to frame 2!)
  * b3 = 1 = cart RAM mapped at 0x8000 (frame 2), 0 = ROM at 0x8000
- * b4 = 1 = cart RAM mapped at 0xC000 (disable int RAM using MemCtrl first!), int RAM at 0xC000
+ * b4 = 1 = cart RAM mapped at 0xC000 (disable int RAM using MemCtrl first!), 0 = int RAM at 0xC000
  * b5-b6 = reserved
  * b7 = ROM WE, 0 = development ROM write protected, 1 = write enabled (unused by games)
  *
@@ -149,8 +149,8 @@ __sfr __at 0xF2 FMDetect; /* in/out */
 /*
  * Bitmasks for MemCtrl
  */
-#define ENABLE_INTERNAL_RAM		0x00
-#define DISABLE_INTERNAL_RAM 	0x10
+#define ENABLE_INTERNAL_RAM     0x00
+#define DISABLE_INTERNAL_RAM    0x10
 
 
 /*
@@ -167,10 +167,10 @@ enum
 /*
  * Bitmasks for Frm2Ctrl
  */
-#define SRAM_PAGE0				0x00
-#define SRAM_PAGE1				0x04
-#define FRAME2_AS_ROM			0x00
-#define FRAME2_AS_SRAM			0x08
+#define SRAM_PAGE0              0x00
+#define SRAM_PAGE1              0x04
+#define FRAME2_AS_ROM           0x00
+#define FRAME2_AS_SRAM          0x08
 
 
 
