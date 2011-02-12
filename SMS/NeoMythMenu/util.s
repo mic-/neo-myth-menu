@@ -321,6 +321,9 @@
 
         memset_loop:
 			dec		bc
+			xor		a
+			or		b
+			or		c
             jp		z,memset_done
             ld      (hl),a
             inc     hl
