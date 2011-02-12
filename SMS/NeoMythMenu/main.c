@@ -155,24 +155,13 @@ void puts_game_list()
     // there are no more games in the list
     while (show)
     {
-        if (games.highlighted == (games.firstShown + row))
-            for (col=0; col<22; col++)
-            {
-                //putsn(&p[8], 1, row, PALETTE1, 22); // the palette bit is bit 2 of the attribute
-                if (!p[col+8])
-                    break;
-                temp[row*32*2 + col*2 + 2] = p[col+8] - 32;
-                temp[row*32*2 + col*2 + 3] = PALETTE1<<1;
-            }
-        else
-            for (col=0; col<22; col++)
-            {
-                //putsn(&p[8], 1, row, PALETTE0, 22);
-                if (!p[col+8])
-                    break;
-                temp[row*32*2 + col*2 + 2] = p[col+8] - 32;
-                temp[row*32*2 + col*2 + 3] = PALETTE0<<1;
-            }
+        for (col=0; col<22; col++)
+        {
+            if (!p[col+8])
+                break;
+            temp[row*32*2 + col*2 + 2] = p[col+8] - 32;
+            temp[row*32*2 + col*2 + 3] = (games.highlighted == (games.firstShown + row)) ? PALETTE1<<1 : PALETTE0<<1;
+        }
 
         row++;
         show--;
