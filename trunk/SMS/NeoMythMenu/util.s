@@ -320,10 +320,12 @@
 			ld		b,4(ix)						;;...
 
         memset_loop:
+			dec		bc
+            jp		z,memset_done
             ld      (hl),a
             inc     hl
-			dec		bc
-            djnz    memset_loop
+			jp		memset_loop
+		memset_done:
         pop         bc
     pop                 ix
     ret
