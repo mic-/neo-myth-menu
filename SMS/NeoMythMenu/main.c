@@ -138,7 +138,7 @@ void puts_game_list()
     //puts("/", 1, 5, PALETTE0);
 
     // clear all lines
-    memset_asm(&temp[0], 0, 32*2);
+    /*memset_asm(&temp[0], 0, 32*2);
     memset_asm(&temp[32*2], 0, 32*2);
     memset_asm(&temp[32*4], 0, 32*2);
     memset_asm(&temp[32*6], 0, 32*2);
@@ -146,7 +146,8 @@ void puts_game_list()
     memset_asm(&temp[32*10], 0, 32*2);
     memset_asm(&temp[32*12], 0, 32*2);
     memset_asm(&temp[32*14], 0, 32*2);
-    memset_asm(&temp[32*16], 0, 32*2);
+    memset_asm(&temp[32*16], 0, 32*2);*/
+	memset_asm(&temp[0],0x00,32*2*NUMBER_OF_GAMES_TO_SHOW);
 
     show = (games.count < NUMBER_OF_GAMES_TO_SHOW) ? games.count : NUMBER_OF_GAMES_TO_SHOW;
     row = 0;
