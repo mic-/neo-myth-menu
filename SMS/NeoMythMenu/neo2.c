@@ -128,7 +128,7 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 
 void neo2_run_game_gbac()
 {
-    GbacGameData *gameData = (GbacGameData*)0xC800;
+    volatile GbacGameData *gameData = (volatile GbacGameData*)0xC800;
     WORD wtemp;
 
     neo2_asic_begin();
@@ -143,19 +143,18 @@ void neo2_run_game_gbac()
     neo2_asic_end();
 
     Neo2FlashBankLo = gameData->bankLo;
-    Neo2FlashBankHi = 0; //gameData->bankHi;
+    Neo2FlashBankHi = gameData->bankHi;
 
     if (gameData->size == 1)
-        wtemp = FLASH_SIZE_1M;
+        Neo2FlashBankSize = FLASH_SIZE_1M;
     else if (gameData->size == 2)
-        wtemp = FLASH_SIZE_2M;
+        Neo2FlashBankSize = FLASH_SIZE_2M;
     else if (gameData->size == 4)
-        wtemp = FLASH_SIZE_4M;
+        Neo2FlashBankSize = FLASH_SIZE_4M;
     else if (gameData->size == 8)
-        wtemp = FLASH_SIZE_8M;
+        Neo2FlashBankSize = FLASH_SIZE_8M;
     else
-        wtemp = FLASH_SIZE_16M;
-    Neo2FlashBankSize = wtemp;
+        Neo2FlashBankSize = FLASH_SIZE_16M;
 
     Neo2SramBank = gameData->sramBank;
 
