@@ -204,8 +204,8 @@ void move_to_next_game()
 
     // Check if the games list needs to be scrolled
     if ( ((games.highlighted - games.firstShown) >= (NUMBER_OF_GAMES_TO_SHOW >> 1)) &&
-    	 (games.firstShown  < games.count - NUMBER_OF_GAMES_TO_SHOW) )
-	   	games.firstShown++;
+         (games.firstShown  < games.count - NUMBER_OF_GAMES_TO_SHOW) )
+        games.firstShown++;
 
     puts_game_list();
 }
@@ -220,9 +220,9 @@ void move_to_previous_game()
         games.highlighted--;
 
     // Check if the games list needs to be scrolled
-	if ( (games.firstShown) &&
-		 ((games.highlighted - games.firstShown) < (NUMBER_OF_GAMES_TO_SHOW >> 1)) )
-		games.firstShown--;
+    if ( (games.firstShown) &&
+         ((games.highlighted - games.firstShown) < (NUMBER_OF_GAMES_TO_SHOW >> 1)) )
+        games.firstShown--;
 
     puts_game_list();
 }
@@ -314,7 +314,7 @@ void main()
 
     MemCtrl = 0xA8;
 
-	neoMode = 0;
+    neoMode = 0;
 
     Frame1 = 2;
     // Copy code from ROM to RAM
@@ -383,116 +383,8 @@ void main()
     puts_game_list();
 
     pad = padLast = 0;
-
-#if 0
-    temp = 0;
-    while (temp != PAD_START)
-    {
-        //temp = pad1_get_2button();
-        //temp = pad2_get_2button();
-        temp = pad1_get_3button();
-        //temp = pad2_get_3button();
-        if (temp & PAD_START)
-            puts("S", 11, 0, 4);
-        else
-            puts(" ", 11, 0, 4);
-        if (temp & PAD_A)
-            puts("A", 12, 0, 4);
-        else
-            puts(" ", 12, 0, 4);
-        if (temp & PAD_C)
-            puts("C", 13, 0, 4);
-        else
-            puts(" ", 13, 0, 4);
-        if (temp & PAD_B)
-            puts("B", 14, 0, 4);
-        else
-            puts(" ", 14, 0, 4);
-        if (temp & PAD_RIGHT)
-            puts("R", 15, 0, 4);
-        else
-            puts(" ", 15, 0, 4);
-        if (temp & PAD_LEFT)
-            puts("L", 16, 0, 4);
-        else
-            puts(" ", 16, 0, 4);
-        if (temp & PAD_DOWN)
-            puts("D", 17, 0, 4);
-        else
-            puts(" ", 17, 0, 4);
-        if (temp & PAD_UP)
-            puts("U", 18, 0, 4);
-        else
-            puts(" ", 18, 0, 4);
-
-        vdp_wait_vblank();
-    }
-#endif
-#if 0
-    {
-    WORD temp;
-
-    temp = 0;
-    while (temp != PAD_MODE)
-    {
-        temp = pad1_get_6button();
-        //temp = pad2_get_6button();
-        if (temp & PAD_MODE)
-            puts("M", 7, 0, 4);
-        else
-            puts(" ", 7, 0, 4);
-        if (temp & PAD_X)
-            puts("X", 8, 0, 4);
-        else
-            puts(" ", 8, 0, 4);
-        if (temp & PAD_Y)
-            puts("Y", 9, 0, 4);
-        else
-            puts(" ", 9, 0, 4);
-        if (temp & PAD_Z)
-            puts("Z", 10, 0, 4);
-        else
-            puts(" ", 10, 0, 4);
-        if (temp & PAD_START)
-            puts("S", 11, 0, 4);
-        else
-            puts(" ", 11, 0, 4);
-        if (temp & PAD_A)
-            puts("A", 12, 0, 4);
-        else
-            puts(" ", 12, 0, 4);
-        if (temp & PAD_C)
-            puts("C", 13, 0, 4);
-        else
-            puts(" ", 13, 0, 4);
-        if (temp & PAD_B)
-            puts("B", 14, 0, 4);
-        else
-            puts(" ", 14, 0, 4);
-        if (temp & PAD_RIGHT)
-            puts("R", 15, 0, 4);
-        else
-            puts(" ", 15, 0, 4);
-        if (temp & PAD_LEFT)
-            puts("L", 16, 0, 4);
-        else
-            puts(" ", 16, 0, 4);
-        if (temp & PAD_DOWN)
-            puts("D", 17, 0, 4);
-        else
-            puts(" ", 17, 0, 4);
-        if (temp & PAD_UP)
-            puts("U", 18, 0, 4);
-        else
-            puts(" ", 18, 0, 4);
-
-        vdp_wait_vblank();
-    }
-    }
-#endif
-
-	padUpReptDelay = KEY_REPEAT_INITIAL_DELAY;
-	padDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
+    padUpReptDelay = KEY_REPEAT_INITIAL_DELAY;
+    padDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
 
     while (1)
     {
@@ -508,16 +400,16 @@ void main()
         }
         else if (padLast & PAD_UP)
         {
-			if (0 == --padUpReptDelay)
-			{
-				padUpReptDelay = KEY_REPEAT_DELAY;
-				move_to_previous_game();
-			}
-		}
-		else
-		{
-			padUpReptDelay = KEY_REPEAT_INITIAL_DELAY;
-		}
+            if (0 == --padUpReptDelay)
+            {
+                padUpReptDelay = KEY_REPEAT_DELAY;
+                move_to_previous_game();
+            }
+        }
+        else
+        {
+            padUpReptDelay = KEY_REPEAT_INITIAL_DELAY;
+        }
 
 
         if (pad & PAD_DOWN)
@@ -526,16 +418,16 @@ void main()
         }
         else if (padLast & PAD_DOWN)
         {
-			if (0 == --padDownReptDelay)
-			{
-				padDownReptDelay = KEY_REPEAT_DELAY;
-				move_to_next_game();
-			}
-		}
-		else
-		{
-			padDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
-		}
+            if (0 == --padDownReptDelay)
+            {
+                padDownReptDelay = KEY_REPEAT_DELAY;
+                move_to_next_game();
+            }
+        }
+        else
+        {
+            padDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
+        }
 
         if (pad & PAD_SW1)
         {
@@ -557,23 +449,7 @@ void main()
             gameData->cheat[0] = p[5];
             gameData->cheat[1] = p[6];
             gameData->cheat[2] = p[7];
-#if 0
-            {
-                WORD i;
-                print_hex(gameData->mode, 6, 19);
-                print_hex(gameData->typ, 8, 19);
-                print_hex(gameData->size, 10, 19);
-                print_hex(gameData->bankLo, 12, 19);
-                print_hex(gameData->bankHi, 14, 19);
-                print_hex(gameData->sramBank, 16, 19);
-                print_hex(gameData->sramSize, 18, 19);
-                print_hex(gameData->cheat[0], 20, 19);
-                print_hex(gameData->cheat[1], 22, 19);
-                print_hex(gameData->cheat[2], 24, 19);
-                for (i=0; i<300; i++)
-                    vdp_wait_vblank();
-            }
-#endif
+
             pfn_neo2_run_game_gbac();
         }
 
