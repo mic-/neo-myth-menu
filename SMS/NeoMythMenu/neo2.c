@@ -166,7 +166,8 @@ void neo2_run_game_gbac()
 
     Neo2FmOn = 0;       // TODO: Handle this
 
-    // TODO: Handle cheats
+    // TODO: Handle cheats (but disable them for now)
+	*(volatile BYTE*)(0xc00e) = 0;
 
     Neo2Run = 0xFF;
 
