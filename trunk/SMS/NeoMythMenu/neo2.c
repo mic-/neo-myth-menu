@@ -128,17 +128,19 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 
 void neo2_run_game_gbac()
 {
-    volatile GbacGameData *gameData = (volatile GbacGameData*)0xC800;
+    volatile GbacGameData* gameData = (volatile GbacGameData*)0xC800;
     WORD wtemp;
 
     neo2_asic_begin();
     neo2_asic_cmd(0x37, 0x2203);
+    neo2_asic_end();
     if (gameData->mode == 0)
         wtemp = 0xAE44; // 0 = type C (newer) flash
     else if (gameData->mode == 1)
         wtemp = 0x8E44; // 1 = type B (new) flash
     else
         wtemp = 0x0E44; // 2 = type C (old) flash
+    neo2_asic_begin();
     neo2_asic_cmd(0xDA, wtemp);
     neo2_asic_end();
 
@@ -157,6 +159,8 @@ void neo2_run_game_gbac()
         Neo2FlashBankSize = FLASH_SIZE_16M;
 
     Neo2SramBank = gameData->sramBank;
+
+    Neo2Frame0We = 0;
 
     Neo2Reset2Menu = 3; // TODO: Handle this
 

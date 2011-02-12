@@ -303,7 +303,6 @@ void main()
 {
     BYTE temp;
     WORD i;
-    GbacGameData *gameData;
     BYTE *p;
     BYTE ftype;
     char type[2];
@@ -505,9 +504,12 @@ void main()
         }
         else if (pad & PAD_SW1)
         {
+            volatile GbacGameData* gameData;
+            volatile BYTE* p;
+
             // Copy the game info data to somewhere in RAM
-            gameData = (GbacGameData*)0xC800;
-            p = (BYTE*)0xB000;
+            gameData = (volatile GbacGameData*)0xC800;
+            p = (volatile BYTE*)0xB000;
             p += games.highlighted << 5;
 
             gameData->mode = ftype; // we know mode is ALWAYS 0, so pass flash type here
@@ -520,7 +522,23 @@ void main()
             gameData->cheat[0] = p[5];
             gameData->cheat[1] = p[6];
             gameData->cheat[2] = p[7];
-
+#if 0
+            {
+                WORD i;
+                print_hex(gameData->mode, 6, 19);
+                print_hex(gameData->typ, 8, 19);
+                print_hex(gameData->size, 10, 19);
+                print_hex(gameData->bankLo, 12, 19);
+                print_hex(gameData->bankHi, 14, 19);
+                print_hex(gameData->sramBank, 16, 19);
+                print_hex(gameData->sramSize, 18, 19);
+                print_hex(gameData->cheat[0], 20, 19);
+                print_hex(gameData->cheat[1], 22, 19);
+                print_hex(gameData->cheat[2], 24, 19);
+                for (i=0; i<300; i++)
+                    vdp_wait_vblank();
+            }
+#endif
             pfn_neo2_run_game_gbac();
         }
 
