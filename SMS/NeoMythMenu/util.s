@@ -310,26 +310,25 @@
     .globl _memset_asm
     _memset_asm:
     push                ix
-        push        bc
-            ld      ix,#6                       ;;2 + stack depth
-            add     ix,sp                       ;;+=sp
-            ld      l,(ix)                      ;;dst
-            ld      h,1(ix)                     ;;...
-            ld      a,2(ix)                     ;;val
-            ld      c,3(ix)                     ;;cnt
-			ld		b,4(ix)						;;...
+        push            de
+            push        bc
+                ld      ix,#8                   ;;2 + stack depth * sizeof word
+                add     ix,sp                   ;;+=sp
+                ld      l,(ix)                  ;;dst
+                ld      h,1(ix)                 ;;...
+                ld      d,2(ix)                 ;;val
+                ld      c,3(ix)                 ;;cnt
+                ld      b,4(ix)                 ;;...
+            memset_loop:
+                ld      (hl),d
+                inc     hl
+                dec     bc
+                ld      a,b
+                or      c
+                jp      nz,memset_loop
 
-        memset_loop:
-			dec		bc
-			xor		a
-			or		b
-			or		c
-            jp		z,memset_done
-            ld      (hl),a
-            inc     hl
-			jp		memset_loop
-		memset_done:
-        pop         bc
+            pop         bc
+        pop             de
     pop                 ix
     ret
 
