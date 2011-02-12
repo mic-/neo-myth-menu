@@ -4,6 +4,8 @@
 #include "shared.h"
 
 BYTE idLo,idHi;
+WORD neoMode;
+BYTE hasZipram;
 
 FileList games;
 BYTE region;

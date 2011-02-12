@@ -25,6 +25,8 @@ extern BYTE region;
 extern BYTE pad, padLast;
 
 extern BYTE idLo,idHi;
+extern WORD neoMode;
+extern BYTE hasZipram;
 
 #ifdef EMULATOR
 extern const char dummyGameList[];

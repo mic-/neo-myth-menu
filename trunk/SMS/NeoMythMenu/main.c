@@ -10,6 +10,9 @@
 
 #define MENU_VERSION_STRING "0.13"
 
+#define KEY_REPEAT_INITIAL_DELAY 15
+#define KEY_REPEAT_DELAY 7
+
 /*
  * Use the plain single-colored background instead of the pattered one.
  * If you remove this define you should also modify the Makefile to
@@ -303,11 +306,15 @@ void main()
     BYTE temp;
     WORD i;
     BYTE ftype;
+    BYTE padUpReptDelay;
+    BYTE padDownReptDelay;
     char type[2];
 
     void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
 
     MemCtrl = 0xA8;
+
+	neoMode = 0;
 
     Frame1 = 2;
     // Copy code from ROM to RAM
@@ -484,6 +491,9 @@ void main()
     }
 #endif
 
+	padUpReptDelay = KEY_REPEAT_INITIAL_DELAY;
+	padDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
+
     while (1)
     {
         temp = pad1_get_2button();
@@ -496,11 +506,38 @@ void main()
         {
             move_to_previous_game();
         }
-        else if (pad & PAD_DOWN)
+        else if (padLast & PAD_UP)
+        {
+			if (0 == --padUpReptDelay)
+			{
+				padUpReptDelay = KEY_REPEAT_DELAY;
+				move_to_previous_game();
+			}
+		}
+		else
+		{
+			padUpReptDelay = KEY_REPEAT_INITIAL_DELAY;
+		}
+
+
+        if (pad & PAD_DOWN)
         {
             move_to_next_game();
         }
-        else if (pad & PAD_SW1)
+        else if (padLast & PAD_DOWN)
+        {
+			if (0 == --padDownReptDelay)
+			{
+				padDownReptDelay = KEY_REPEAT_DELAY;
+				move_to_next_game();
+			}
+		}
+		else
+		{
+			padDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
+		}
+
+        if (pad & PAD_SW1)
         {
             volatile GbacGameData* gameData;
             volatile BYTE* p;
