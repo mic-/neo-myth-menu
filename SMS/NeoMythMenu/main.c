@@ -130,7 +130,7 @@ void puts_game_list()
 {
     BYTE *p = (BYTE*)gbacGameList;
     BYTE row, col, show;
-    BYTE temp[32*2*NUMBER_OF_GAMES_TO_SHOW];
+    static BYTE temp[32*2*NUMBER_OF_GAMES_TO_SHOW];
 
     // Print the current directory name
     // TODO: Handle this properly when SD support has been
@@ -200,8 +200,9 @@ void move_to_next_game()
         games.highlighted++;
 
     // Check if the games list needs to be scrolled
-    if ((games.highlighted - games.firstShown) >= NUMBER_OF_GAMES_TO_SHOW)
-        games.firstShown++;
+    if ( ((games.highlighted - games.firstShown) >= (NUMBER_OF_GAMES_TO_SHOW >> 1)) &&
+    	 (games.firstShown  < games.count - NUMBER_OF_GAMES_TO_SHOW) )
+	   	games.firstShown++;
 
     puts_game_list();
 }
@@ -216,8 +217,9 @@ void move_to_previous_game()
         games.highlighted--;
 
     // Check if the games list needs to be scrolled
-    if (games.highlighted < games.firstShown)
-        games.firstShown--;
+	if ( (games.firstShown) &&
+		 ((games.highlighted - games.firstShown) < (NUMBER_OF_GAMES_TO_SHOW >> 1)) )
+		games.firstShown--;
 
     puts_game_list();
 }
@@ -309,7 +311,7 @@ void main()
 
     Frame1 = 2;
     // Copy code from ROM to RAM
-    for (i = 0; i < 0x300; i++)
+    for (i = 0; i < 0x400; i++)
     {
         *(volatile BYTE*)(0xD000+i) = *(volatile BYTE*)(0x4000+i);
     }

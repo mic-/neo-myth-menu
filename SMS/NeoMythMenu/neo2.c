@@ -66,6 +66,10 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 {
     volatile BYTE dummy;
 
+	__asm
+	di
+	__endasm;
+
     neo2_asic_begin();
 
     Neo2CardCheck = 0x01;
@@ -120,10 +124,43 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 
     neo2_asic_end();
 
+	__asm
+	ei
+	__endasm;
+
     return 1;
 }
 
 
+
+void neo2_debug_dump_hex(WORD addr)
+{
+    BYTE *p = (BYTE*)addr;
+    WORD vaddr = 0x1800;
+    BYTE row,col,c,d;
+
+	while (!(VdpCtrl & 0x80)) {}
+
+    row = 7;
+    vaddr += (row << 6) + 8;
+    for (; row < 15; row++)
+    {
+        VdpCtrl = (vaddr & 0xFF);
+	    VdpCtrl = (vaddr >> 8) | 0x40;
+        for (col = 0; col < 8; col++)
+        {
+            c = *p++;
+            d = (c >> 4);
+            c &= 0x0F;
+            c += 16; d += 16;
+            if (c > 25) c += 7;
+            if (d > 25) d += 7;
+            VdpData = d; VdpData = 0;
+            VdpData = c; VdpData = 0;
+        }
+        vaddr += 64;
+    }
+}
 
 
 void neo2_run_game_gbac()
@@ -131,11 +168,15 @@ void neo2_run_game_gbac()
     volatile GbacGameData* gameData = (volatile GbacGameData*)0xC800;
     WORD wtemp;
 
+	__asm
+	di
+	__endasm;
+
     neo2_asic_begin();
     neo2_asic_cmd(0x37, 0x2203);
     neo2_asic_end();
     if (gameData->mode == 0)
-        wtemp = 0xAE44; // 0 = type C (newer) flash
+        wtemp = 0xAE44; // 0 = type A (newer) flash
     else if (gameData->mode == 1)
         wtemp = 0x8E44; // 1 = type B (new) flash
     else
@@ -176,6 +217,10 @@ void neo2_run_game_gbac()
 
     Frame1 = 1;
     Frame2 = 2;
+
+    //neo2_debug_dump_hex(0x0000);
+	//while (1) {}
+
     ((void (*)())0x0000)(); // RESET => jump to address 0
 }
 

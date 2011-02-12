@@ -29,7 +29,7 @@ tools/smshdr:
 
 
 ramcode.bin:
-	$(CC) $(CFLAGS) --no-std-crt0 --code-loc 0xD000 neo2.c
+	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0xD000 neo2.c
 	$(HEX2BIN) neo2.ihx
 	$(PADTRIM) neo2.bin ramcode.bin
 	$(MAP2H) neo2.map neo2.h
