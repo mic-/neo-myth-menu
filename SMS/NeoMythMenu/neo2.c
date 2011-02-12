@@ -160,14 +160,15 @@ void neo2_run_game_gbac()
 
     Neo2SramBank = gameData->sramBank;
 
-    Neo2Frame0We = 0;
-
     Neo2Reset2Menu = 3; // TODO: Handle this
 
     Neo2FmOn = 0;       // TODO: Handle this
 
     // TODO: Handle cheats (but disable them for now)
-	*(volatile BYTE*)(0xc00e) = 0;
+    Neo2CheatOn = 0;
+
+    Neo2Frame1We = 0;
+    Neo2Frame0We = 0;
 
     Neo2Run = 0xFF;
 

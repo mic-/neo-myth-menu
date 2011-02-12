@@ -129,31 +129,59 @@ void print_hex(BYTE val, BYTE x, BYTE y)
 void puts_game_list()
 {
     BYTE *p = (BYTE*)gbacGameList;
-    BYTE row, shown;
-
-    vdp_wait_vblank();
+    BYTE row, col, show;
+    BYTE temp[32*2*NUMBER_OF_GAMES_TO_SHOW];
 
     // Print the current directory name
     // TODO: Handle this properly when SD support has been
     //       implemented
-    puts("/", 1, 5, PALETTE0);
+    //puts("/", 1, 5, PALETTE0);
 
-    shown = 0;
-    row = 7;
+    // clear all lines
+    memset_asm(&temp[0], 0, 32*2);
+    memset_asm(&temp[32*2], 0, 32*2);
+    memset_asm(&temp[32*4], 0, 32*2);
+    memset_asm(&temp[32*6], 0, 32*2);
+    memset_asm(&temp[32*8], 0, 32*2);
+    memset_asm(&temp[32*10], 0, 32*2);
+    memset_asm(&temp[32*12], 0, 32*2);
+    memset_asm(&temp[32*14], 0, 32*2);
+    memset_asm(&temp[32*16], 0, 32*2);
+
+    show = (games.count < NUMBER_OF_GAMES_TO_SHOW) ? games.count : NUMBER_OF_GAMES_TO_SHOW;
+    row = 0;
     p += games.firstShown << 5;
     // Loop until we've shown the desired number of games, or
     // there are no more games in the list
-    while ((*p != 0xFF) && (shown < NUMBER_OF_GAMES_TO_SHOW) &&
-           ((shown + games.firstShown) < games.count))
+    while (show)
     {
-        if (games.highlighted == shown + games.firstShown)
-            putsn(&p[8], 1, row, PALETTE1, 22); // the palette bit is bit 2 of the attribute
+        if (games.highlighted == (games.firstShown + row))
+            for (col=0; col<22; col++)
+            {
+                //putsn(&p[8], 1, row, PALETTE1, 22); // the palette bit is bit 2 of the attribute
+                if (!p[col+8])
+                    break;
+                temp[row*32*2 + col*2 + 2] = p[col+8] - 32;
+                temp[row*32*2 + col*2 + 3] = PALETTE1<<1;
+            }
         else
-            putsn(&p[8], 1, row, PALETTE0, 22);
+            for (col=0; col<22; col++)
+            {
+                //putsn(&p[8], 1, row, PALETTE0, 22);
+                if (!p[col+8])
+                    break;
+                temp[row*32*2 + col*2 + 2] = p[col+8] - 32;
+                temp[row*32*2 + col*2 + 3] = PALETTE0<<1;
+            }
+
         row++;
-        shown++;
+        show--;
         p += 0x20;
     }
+
+    // wait for vblank and copy all at once
+    vdp_wait_vblank();
+    vdp_copy_to_vram(0x1800 + (7 << 6), temp, 32*2*NUMBER_OF_GAMES_TO_SHOW);
 }
 
 
@@ -187,19 +215,12 @@ void dump_hex(WORD addr)
  */
 void move_to_next_game()
 {
-    if (++games.highlighted >= games.count)
-    {
-        games.highlighted--;
-    }
-    else
-    {
-        // Check if the games list needs to be scrolled
-        if ((games.firstShown + ((NUMBER_OF_GAMES_TO_SHOW >> 1) - 1) < games.highlighted) &&
-            (games.firstShown + NUMBER_OF_GAMES_TO_SHOW < games.count))
-        {
-            games.firstShown++;
-        }
-    }
+    if (games.highlighted < (games.count - 1))
+        games.highlighted++;
+
+    // Check if the games list needs to be scrolled
+    if ((games.highlighted - games.firstShown) >= NUMBER_OF_GAMES_TO_SHOW)
+        games.firstShown++;
 
     puts_game_list();
 }
@@ -210,17 +231,12 @@ void move_to_next_game()
  */
 void move_to_previous_game()
 {
-    if (games.highlighted)
-    {
+    if (games.highlighted > 0)
         games.highlighted--;
 
-        // Check if the games list needs to be scrolled
-        if ((games.firstShown) &&
-            (games.firstShown + ((NUMBER_OF_GAMES_TO_SHOW >> 1) - 1) >= games.highlighted))
-        {
-            games.firstShown--;
-        }
-    }
+    // Check if the games list needs to be scrolled
+    if (games.highlighted < games.firstShown)
+        games.firstShown--;
 
     puts_game_list();
 }
@@ -303,7 +319,6 @@ void main()
 {
     BYTE temp;
     WORD i;
-    BYTE *p;
     BYTE ftype;
     char type[2];
 
