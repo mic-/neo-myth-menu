@@ -12,14 +12,16 @@ typedef struct
     WORD count;
 } FileList;
 
-
-
 enum
 {
-    TASK_LOAD_BG,
+    TASK_LOAD_BG = 0,
+	MENU_STATE_GAME_GBAC = 0,
+	MENU_STATE_GAME_SD,
+	MENU_STATE_OPTIONS
 };
 
-
+extern BYTE sd_fetch_info_timeout;
+extern BYTE menu_state;
 extern FileList games;
 extern BYTE region;
 extern BYTE pad, padLast;
