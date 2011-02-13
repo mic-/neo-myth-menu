@@ -25,8 +25,8 @@ FileList games;
 BYTE region;
 BYTE pad, padLast;
 
-
-
+BYTE options_count;
+Option options[MAX_OPTIONS];
 
 BYTE diskioPacket[7];
 BYTE diskioResp[17];
@@ -36,7 +36,6 @@ WORD cardType;
 uint32_t sec_tags[2];
 uint32_t sec_last;
 uint32_t numSectors;
-
 
 // For testing purposes
 #ifdef EMULATOR
