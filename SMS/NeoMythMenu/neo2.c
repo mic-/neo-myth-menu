@@ -66,9 +66,9 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 {
     volatile BYTE dummy;
 
-	__asm
-	di
-	__endasm;
+    __asm
+    di
+    __endasm;
 
     neo2_asic_begin();
 
@@ -124,13 +124,155 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 
     neo2_asic_end();
 
-	__asm
-	ei
-	__endasm;
+    __asm
+    ei
+    __endasm;
 
     return 1;
 }
 
+
+void neo2_ram_to_sram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
+{
+    dsthi, dstlo, src, len; // suppress warning
+    __asm
+    di
+    push    ix          ; save frame pointer
+    ld      ix,#4       ; WORD retaddr + WORD ix
+    add     ix,sp       ; frame pointer in ix
+
+    call    _neo2_asic_begin
+    ld      hl,#0x2203
+    push    hl
+    ld      a,#0x37     ; select game flash
+    push    af
+    inc     sp
+    call    _neo2_asic_cmd
+    pop     af
+    inc     sp          ; clean off the stack
+    ld      b,(ix)      ; dsthi
+    ld      a,2(ix)     ; dstlo MSB
+    srl     b           ; shift b0 of b into CF
+    rra                 ; rotate right, CF into b7 of a
+    srl     b
+    rra
+    srl     a
+    srl     a
+    srl     a
+    and     a,#0x1E     ; a now holds the sram offset
+    ld      l,a
+    ld      h,#0
+    push    hl
+    ld      a,#0xE0     ; set sram offset (in 8KB units)
+    push    af
+    inc     sp
+    call    _neo2_asic_cmd
+    pop     af
+    inc     sp          ; clean off the stack
+    call    _neo2_asic_end
+
+    ld      hl,#0xFFFC
+    ld      (hl),#0x88  ; enable sram in frame 2
+    ld      e,1(ix)     ; dstlo LSB
+    ld      a,2(ix)     ; dstlo MSB
+    and     a,#0x3F
+    or      a,#0x80     ; address in frame 2
+    ld      d,a
+    ld      l,3(ix)     ; src LSB
+    ld      h,4(ix)     ; src MSB
+    ld      c,5(ix)     ; len LSB
+    ld      b,6(ix)     ; len MSB
+    ldir                ; block move
+    ld      hl,#0xFFFC
+    ld      (hl),#0x00  ; disable sram in frame 2
+
+    call    _neo2_asic_begin
+    ld      hl,#0x2003
+    push    hl
+    ld      a,#0x37     ; select menu flash
+    push    af
+    inc     sp
+    call    _neo2_asic_cmd
+    pop     af
+    inc     sp          ; clean off the stack
+    call    _neo2_asic_end
+
+    pop     ix          ; restore frame pointer
+    ei
+    ret
+    __endasm;
+}
+
+void neo2_sram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
+{
+    dst, srchi, srclo, len; // suppress warning
+    __asm
+    di
+    push    ix          ; save frame pointer
+    ld      ix,#4       ; WORD retaddr + WORD ix
+    add     ix,sp       ; frame pointer in ix
+
+    call    _neo2_asic_begin
+    ld      hl,#0x2203
+    push    hl
+    ld      a,#0x37     ; select game flash
+    push    af
+    inc     sp
+    call    _neo2_asic_cmd
+    pop     af
+    inc     sp          ; clean off the stack
+    ld      b,2(ix)     ; srchi
+    ld      a,4(ix)     ; srclo MSB
+    srl     b           ; shift b0 of b into CF
+    rra                 ; rotate right, CF into b7 of a
+    srl     b
+    rra
+    srl     a
+    srl     a
+    srl     a
+    and     a,#0x1E     ; a now holds the sram offset
+    ld      l,a
+    ld      h,#0
+    push    hl
+    ld      a,#0xE0     ; set sram offset (in 8KB units)
+    push    af
+    inc     sp
+    call    _neo2_asic_cmd
+    pop     af
+    inc     sp          ; clean off the stack
+    call    _neo2_asic_end
+
+    ld      hl,#0xFFFC
+    ld      (hl),#0x88  ; enable sram in frame 2
+    ld      e,(ix)      ; dst LSB
+    ld      d,1(ix)     ; dst MSB
+    ld      l,3(ix)     ; srclo LSB
+    ld      a,4(ix)     ; srclo MSB
+    and     a,#0x3F
+    or      a,#0x80     ; address in frame 2
+    ld      h,a
+    ld      c,5(ix)     ; len LSB
+    ld      b,6(ix)     ; len MSB
+    ldir                ; block move
+    ld      hl,#0xFFFC
+    ld      (hl),#0x00  ; disable sram in frame 2
+
+    call    _neo2_asic_begin
+    ld      hl,#0x2003
+    push    hl
+    ld      a,#0x37     ; select menu flash
+    push    af
+    inc     sp
+    call    _neo2_asic_cmd
+    pop     af
+    inc     sp          ; clean off the stack
+    call    _neo2_asic_end
+
+    pop     ix          ; restore frame pointer
+    ei
+    ret
+    __endasm;
+}
 
 
 void neo2_debug_dump_hex(WORD addr)
@@ -139,14 +281,14 @@ void neo2_debug_dump_hex(WORD addr)
     WORD vaddr = 0x1800;
     BYTE row,col,c,d;
 
-	while (!(VdpCtrl & 0x80)) {}
+    while (!(VdpCtrl & 0x80)) {}
 
     row = 7;
     vaddr += (row << 6) + 8;
     for (; row < 15; row++)
     {
         VdpCtrl = (vaddr & 0xFF);
-	    VdpCtrl = (vaddr >> 8) | 0x40;
+        VdpCtrl = (vaddr >> 8) | 0x40;
         for (col = 0; col < 8; col++)
         {
             c = *p++;
@@ -168,9 +310,9 @@ void neo2_run_game_gbac()
     volatile GbacGameData* gameData = (volatile GbacGameData*)0xC800;
     WORD wtemp;
 
-	__asm
-	di
-	__endasm;
+    __asm
+    di
+    __endasm;
 
     neo2_asic_begin();
     neo2_asic_cmd(0x37, 0x2203);
@@ -219,7 +361,7 @@ void neo2_run_game_gbac()
     Frame2 = 2;
 
     //neo2_debug_dump_hex(0x0000);
-	//while (1) {}
+    //while (1) {}
 
     ((void (*)())0x0000)(); // RESET => jump to address 0
 }
