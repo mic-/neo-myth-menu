@@ -132,6 +132,48 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 }
 
 
+void neo2_enable_sram(WORD offset)
+{
+    neo2_asic_begin();
+    neo2_asic_cmd(0x37, 0x2203); // select game flash
+    neo2_asic_cmd(0xE0, offset); // set sram offset (in 8KB units)
+    neo2_asic_end();
+    Frm2Ctrl = 0x88; // enable sram in Frame 2
+}
+
+
+void neo2_disable_sram()
+{
+    Frm2Ctrl = 0x00; // disable sram in Frame 2
+    neo2_asic_begin();
+    neo2_asic_cmd(0x37,0x2003); // select menu flash
+    neo2_asic_end();
+}
+
+
+void neo2_enable_psram()
+{
+    neo2_asic_begin();
+    neo2_asic_cmd(0xE0,0x1500); // set flash and psram write enable
+    neo2_asic_cmd(0x37,0x2203); // select game flash
+    neo2_asic_cmd(0xDA,0xAF44); // select psram (works for both Neo2-SD and Pro)
+    neo2_asic_end();
+    Neo2Frame1We = 0x01;
+}
+
+
+void neo2_disable_psram()
+{
+    Frame1 = 1;
+    Neo2Frame1We = 0x00;
+    neo2_asic_begin();
+    neo2_asic_cmd(0xE2,0xD200); // set flash & psram write disable
+    neo2_asic_cmd(0x37,0x2003); // select menu flash
+    neo2_asic_cmd(0xDA,0x0044); // deselect psram
+    neo2_asic_end();
+}
+
+
 void neo2_ram_to_sram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
 {
     dsthi, dstlo, src, len; // suppress warning
@@ -141,15 +183,6 @@ void neo2_ram_to_sram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
     ld      ix,#4       ; WORD retaddr + WORD ix
     add     ix,sp       ; frame pointer in ix
 
-    call    _neo2_asic_begin
-    ld      hl,#0x2203
-    push    hl
-    ld      a,#0x37     ; select game flash
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
     ld      b,(ix)      ; dsthi
     ld      a,2(ix)     ; dstlo MSB
     srl     b           ; shift b0 of b into CF
@@ -163,16 +196,9 @@ void neo2_ram_to_sram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
     ld      l,a
     ld      h,#0
     push    hl
-    ld      a,#0xE0     ; set sram offset (in 8KB units)
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
+    call    _neo2_enable_sram
     pop     af
-    inc     sp          ; clean off the stack
-    call    _neo2_asic_end
 
-    ld      hl,#0xFFFC
-    ld      (hl),#0x88  ; enable sram in frame 2
     ld      e,1(ix)     ; dstlo LSB
     ld      a,2(ix)     ; dstlo MSB
     and     a,#0x3F
@@ -183,19 +209,8 @@ void neo2_ram_to_sram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
     ld      c,5(ix)     ; len LSB
     ld      b,6(ix)     ; len MSB
     ldir                ; block move
-    ld      hl,#0xFFFC
-    ld      (hl),#0x00  ; disable sram in frame 2
 
-    call    _neo2_asic_begin
-    ld      hl,#0x2003
-    push    hl
-    ld      a,#0x37     ; select menu flash
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    call    _neo2_asic_end
+    call    _neo2_disable_sram
 
     pop     ix          ; restore frame pointer
     ei
@@ -212,15 +227,6 @@ void neo2_sram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
     ld      ix,#4       ; WORD retaddr + WORD ix
     add     ix,sp       ; frame pointer in ix
 
-    call    _neo2_asic_begin
-    ld      hl,#0x2203
-    push    hl
-    ld      a,#0x37     ; select game flash
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
     ld      b,2(ix)     ; srchi
     ld      a,4(ix)     ; srclo MSB
     srl     b           ; shift b0 of b into CF
@@ -234,16 +240,9 @@ void neo2_sram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
     ld      l,a
     ld      h,#0
     push    hl
-    ld      a,#0xE0     ; set sram offset (in 8KB units)
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
+    call    _neo2_enable_sram
     pop     af
-    inc     sp          ; clean off the stack
-    call    _neo2_asic_end
 
-    ld      hl,#0xFFFC
-    ld      (hl),#0x88  ; enable sram in frame 2
     ld      e,(ix)      ; dst LSB
     ld      d,1(ix)     ; dst MSB
     ld      l,3(ix)     ; srclo LSB
@@ -254,19 +253,8 @@ void neo2_sram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
     ld      c,5(ix)     ; len LSB
     ld      b,6(ix)     ; len MSB
     ldir                ; block move
-    ld      hl,#0xFFFC
-    ld      (hl),#0x00  ; disable sram in frame 2
 
-    call    _neo2_asic_begin
-    ld      hl,#0x2003
-    push    hl
-    ld      a,#0x37     ; select menu flash
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    call    _neo2_asic_end
+    call    _neo2_disable_sram
 
     pop     ix          ; restore frame pointer
     ei
@@ -284,35 +272,8 @@ void neo2_ram_to_psram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
     ld      ix,#4       ; WORD retaddr + WORD ix
     add     ix,sp       ; frame pointer in ix
 
-    call    _neo2_asic_begin
-    ld      hl,#0x1500
-    push    hl
-    ld      a,#0xE2     ; set flash & psram write enable
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    ld      hl,#0x2203
-    push    hl
-    ld      a,#0x37     ; select game flash
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    ld      hl,#0xAF44  ; works for both the Neo2-SD and Pro, but only 16MB on Pro
-    push    hl
-    ld      a,#0xDA     ; select psram
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    call    _neo2_asic_end
+    call    _neo2_enable_psram
 
-    ld      hl,#0xBFC5
-    ld      (hl),#0x01  ; Neo2Frame1We = 0x01
     ld      a,(ix)      ; dsthi
     ld      hl,#0xBFC0  ; bank low
     ld      (hl),a
@@ -332,37 +293,8 @@ void neo2_ram_to_psram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
     ld      c,5(ix)     ; len LSB
     ld      b,6(ix)     ; len MSB
     ldir                ; block move
-    ld      hl,#0xFFFE
-    ld      (hl),#0x01  ; Frame1 = 1
-    ld      hl,#0xBFC5
-    ld      (hl),#0x00  ; Neo2Frame1We = 0x00
 
-    call    _neo2_asic_begin
-    ld      hl,#0xD200
-    push    hl
-    ld      a,#0xE2     ; set flash & psram write disable
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    ld      hl,#0x2003
-    push    hl
-    ld      a,#0x37     ; select menu flash
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    ld      hl,#0x0044
-    push    hl
-    ld      a,#0xDA     ; select psram
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    call    _neo2_asic_end
+    call    _neo2_disable_psram
 
     pop     ix          ; restore frame pointer
     ei
@@ -379,32 +311,7 @@ void neo2_psram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
     ld      ix,#4       ; WORD retaddr + WORD ix
     add     ix,sp       ; frame pointer in ix
 
-    call    _neo2_asic_begin
-    ld      hl,#0x1500
-    push    hl
-    ld      a,#0xE2     ; set flash & psram write enable
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    ld      hl,#0x2203
-    push    hl
-    ld      a,#0x37     ; select game flash
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    ld      hl,#0xAF44  ; works for both the Neo2-SD and Pro, but only 16MB on Pro
-    push    hl
-    ld      a,#0xDA     ; select psram
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    call    _neo2_asic_end
+    call    _neo2_enable_psram
 
     ld      a,2(ix)     ; srchi
     ld      hl,#0xBFC0  ; bank low
@@ -425,35 +332,8 @@ void neo2_psram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
     ld      c,5(ix)     ; len LSB
     ld      b,6(ix)     ; len MSB
     ldir                ; block move
-    ld      hl,#0xFFFE
-    ld      (hl),#0x01  ; Frame1 = 1
 
-    call    _neo2_asic_begin
-    ld      hl,#0xD200
-    push    hl
-    ld      a,#0xE2     ; set flash & psram write disable
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    ld      hl,#0x2003
-    push    hl
-    ld      a,#0x37     ; select menu flash
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    ld      hl,#0x0044
-    push    hl
-    ld      a,#0xDA     ; select psram
-    push    af
-    inc     sp
-    call    _neo2_asic_cmd
-    pop     af
-    inc     sp          ; clean off the stack
-    call    _neo2_asic_end
+    call    _neo2_disable_psram
 
     pop     ix          ; restore frame pointer
     ei
