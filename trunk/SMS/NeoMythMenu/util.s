@@ -245,8 +245,6 @@
     .globl _strlen_asm
     _strlen_asm:
 
-		push	hl
-		pop		hl
         xor     a       ;;z(A)
 
     strlen_asm_loop:

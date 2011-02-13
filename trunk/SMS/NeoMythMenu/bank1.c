@@ -47,6 +47,20 @@ Option* options_add(const char* name,BYTE type,BYTE state)
 	return option;
 }
 
+Option* options_add_ex(const char* name,BYTE type,BYTE state,WORD user_data0,WORD user_data1)
+{
+	Option* option = options_add(name,type,state);
+
+	if(option == 0)
+		return 0;
+
+	option->user_data[0] = user_data0>>8;
+	option->user_data[1] = user_data0&0xff;
+	option->user_data[2] = user_data1>>8;
+	option->user_data[3] = user_data1&0xff;
+	return option;
+}
+
 /*
  * Pattern data for the background
  */
