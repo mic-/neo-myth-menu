@@ -7,14 +7,13 @@
  * These variables need to be in this exact order, because they are
  * accessed using hardcoded addresses
  */
-BYTE idLo;			// C001
-BYTE idHi;			// C002
-WORD neoMode;		// C003
-BYTE vdpSpeed;		// C005
+BYTE idLo;          // C001
+BYTE idHi;          // C002
+WORD neoMode;       // C003
+BYTE vdpSpeed;      // C005
 // Extra "virtual" registers for assembly routines
-BYTE vregs[16];		// C006
+BYTE vregs[16];     // C006
 /******************************************************************/
-
 
 // The rest can be in any order..
 
@@ -27,6 +26,8 @@ BYTE pad, padLast;
 
 BYTE options_count;
 Option options[MAX_OPTIONS];
+
+BYTE generic_list_buffer[LIST_BUFFER_SIZE];
 
 BYTE diskioPacket[7];
 BYTE diskioResp[17];

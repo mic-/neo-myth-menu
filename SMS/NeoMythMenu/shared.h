@@ -14,19 +14,19 @@ typedef struct
 
 typedef struct
 {
-	BYTE encoded_info;		/*msb = type,lsb = 0 or 1 (enabled/disabled)*/
-	char name[16];
-	BYTE user_data[4];
+    BYTE encoded_info;      /*msb = type,lsb = 0 or 1 (enabled/disabled)*/
+    char name[16];
+    BYTE user_data[4];
 }Option;
 
 /*
-	Option types
+    Option types
 */
 enum
 {
-	OPTION_TYPE_SETTING = 0,	/*Internal setting*/
-	OPTION_TYPE_CHEAT,			/*Cheat*/
-	OPTION_TYPE_ROUTINE,		/*A callback*/
+    OPTION_TYPE_SETTING = 0,    /*Internal setting*/
+    OPTION_TYPE_CHEAT,          /*Cheat*/
+    OPTION_TYPE_ROUTINE,        /*A callback*/
 };
 
 /*
@@ -43,9 +43,9 @@ enum
  */
 enum
 {
-	MENU_STATE_GAME_GBAC = 0,
-	MENU_STATE_GAME_SD,
-	MENU_STATE_OPTIONS
+    MENU_STATE_GAME_GBAC = 0,
+    MENU_STATE_GAME_SD,
+    MENU_STATE_OPTIONS
 };
 
 extern Option options[MAX_OPTIONS];
@@ -64,6 +64,9 @@ extern BYTE idLo,idHi;
 extern WORD neoMode;
 extern BYTE hasZipram;
 extern BYTE vdpSpeed;
+
+#define LIST_BUFFER_SIZE (32*2*NUMBER_OF_GAMES_TO_SHOW)
+extern BYTE generic_list_buffer[LIST_BUFFER_SIZE];
 
 #ifdef EMULATOR
 extern const char dummyGameList[];
