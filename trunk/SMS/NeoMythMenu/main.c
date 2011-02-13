@@ -203,8 +203,8 @@ void move_to_next_game()
         games.highlighted++;
 
     // Check if the games list needs to be scrolled
-    if ( ((games.highlighted - games.firstShown) >= (NUMBER_OF_GAMES_TO_SHOW >> 1)) &&
-         (games.firstShown  < games.count - NUMBER_OF_GAMES_TO_SHOW) )
+    if ( ((games.highlighted - games.firstShown) >= ((NUMBER_OF_GAMES_TO_SHOW >> 1) + 1)) &&
+         (games.firstShown  < (games.count - NUMBER_OF_GAMES_TO_SHOW)) )
         games.firstShown++;
 
     puts_game_list();
@@ -220,13 +220,57 @@ void move_to_previous_game()
         games.highlighted--;
 
     // Check if the games list needs to be scrolled
-    if ( (games.firstShown) &&
-         ((games.highlighted - games.firstShown) < (NUMBER_OF_GAMES_TO_SHOW >> 1)) )
+    if ( (games.firstShown > games.highlighted) ||
+         ((games.firstShown) &&
+         ((games.highlighted - games.firstShown) < (NUMBER_OF_GAMES_TO_SHOW >> 1))) )
         games.firstShown--;
 
     puts_game_list();
 }
 
+
+/*
+ * Move to the next page in the games list
+ */
+void move_to_next_page()
+{
+    BYTE select = games.highlighted - games.firstShown;
+
+    // sanity check
+    if (games.count <= NUMBER_OF_GAMES_TO_SHOW)
+        return;
+
+    if (games.firstShown < (games.count - NUMBER_OF_GAMES_TO_SHOW*2))
+        games.firstShown += NUMBER_OF_GAMES_TO_SHOW;
+    else
+        games.firstShown = games.count - NUMBER_OF_GAMES_TO_SHOW;
+
+    games.highlighted = games.firstShown + select;
+
+    puts_game_list();
+}
+
+
+/*
+ * Move to the previous page in the games list
+ */
+void move_to_previous_page()
+{
+    BYTE select = games.highlighted - games.firstShown;
+
+    // sanity check
+    if (games.count <= NUMBER_OF_GAMES_TO_SHOW)
+        return;
+
+    if (games.firstShown > NUMBER_OF_GAMES_TO_SHOW)
+        games.firstShown -= NUMBER_OF_GAMES_TO_SHOW;
+    else
+        games.firstShown = 0;
+
+    games.highlighted = games.firstShown + select;
+
+    puts_game_list();
+}
 
 
 /*
@@ -427,6 +471,16 @@ void main()
         else
         {
             padDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
+        }
+
+        if (pad & PAD_LEFT)
+        {
+            move_to_previous_page();
+        }
+
+        if (pad & PAD_RIGHT)
+        {
+            move_to_next_page();
         }
 
         if (pad & PAD_SW1)
