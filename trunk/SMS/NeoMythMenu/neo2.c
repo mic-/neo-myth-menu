@@ -532,7 +532,7 @@ void neo2_run_game_gbac()
 
     Neo2Reset2Menu = 3; // TODO: Handle this
 
-    Neo2FmOn = 0;       // TODO: Handle this
+    Neo2FmOn = 0x0F;    // TODO: Handle this
 
     // TODO: Handle cheats (but disable them for now)
     Neo2CheatOn = 0;
@@ -546,9 +546,6 @@ void neo2_run_game_gbac()
 
     Frame1 = 1;
     Frame2 = 2;
-
-    //neo2_debug_dump_hex(0x0000);
-    //while (1) {}
 
     ((void (*)())0x0000)(); // RESET => jump to address 0
 }

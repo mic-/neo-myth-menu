@@ -3,18 +3,30 @@
 #include <stdint.h>
 #include "shared.h"
 
-BYTE idLo,idHi;
-WORD neoMode;
+/*
+ * These variables need to be in this exact order, because they are
+ * accessed using hardcoded addresses
+ */
+BYTE idLo;			// C001
+BYTE idHi;			// C002
+WORD neoMode;		// C003
+BYTE vdpSpeed;		// C005
+// Extra "virtual" registers for assembly routines
+BYTE vregs[16];		// C006
+/******************************************************************/
+
+
+// The rest can be in any order..
+
 BYTE hasZipram;
 BYTE menu_state;
 BYTE sd_fetch_info_timeout;
 FileList games;
 BYTE region;
 BYTE pad, padLast;
-BYTE vdpSpeed;
 
-// Extra "virtual" registers for assembly routines
-BYTE vregs[16];
+
+
 
 BYTE diskioPacket[7];
 BYTE diskioResp[17];
