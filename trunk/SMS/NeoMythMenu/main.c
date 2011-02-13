@@ -7,11 +7,13 @@
 #include "neo2.h"
 #include "neo2_map.h"
 
-
-#define MENU_VERSION_STRING "0.13"
-
+#define MENU_VERSION_STRING "0.14"
 #define KEY_REPEAT_INITIAL_DELAY 15
 #define KEY_REPEAT_DELAY 7
+#define SD_DEFAULT_INFO_FETCH_TIMEOUT 30
+#define LIST_BUFFER_SIZE (32*2*NUMBER_OF_GAMES_TO_SHOW)
+
+static BYTE generic_list_buffer[LIST_BUFFER_SIZE];
 
 /*
  * Use the plain single-colored background instead of the pattered one.
@@ -27,7 +29,6 @@ void mute_psg()
     PsgPort = 0xDF;     // Mute channel 2
     PsgPort = 0xFF;     // Mute channel 3
 }
-
 
 /*
  * Expand the 2-bit font and write to VRAM at
@@ -61,7 +62,6 @@ void load_font()
     enable_ints;
 }
 
-
 /*
  * Initializes the Sprite Attribute Table
  */
@@ -75,7 +75,6 @@ void init_sat()
     // of the visible area
     for (i = 0; i < 0x40; i++) VdpData = 240;
 }
-
 
 void setup_vdp()
 {
@@ -109,7 +108,6 @@ void setup_vdp()
     enable_ints();
 }
 
-
 /*
  * Prints the value val in hexadecimal form at position x,y
  */
@@ -127,47 +125,6 @@ void print_hex(BYTE val, BYTE x, BYTE y)
     VdpData = hi; VdpData = 0;
     VdpData = lo; VdpData = 0;
 }
-
-
-void puts_game_list()
-{
-    BYTE *p = (BYTE*)gbacGameList;
-    BYTE row, col, show;
-    static BYTE temp[32*2*NUMBER_OF_GAMES_TO_SHOW];
-
-    // Print the current directory name
-    // TODO: Handle this properly when SD support has been
-    //       implemented
-    //puts("/", 1, 5, PALETTE0);
-
-    // clear all lines
-    memset_asm(temp, 0, 32*2*NUMBER_OF_GAMES_TO_SHOW);
-
-    show = (games.count < NUMBER_OF_GAMES_TO_SHOW) ? games.count : NUMBER_OF_GAMES_TO_SHOW;
-    row = 0;
-    p += games.firstShown << 5;
-    // Loop until we've shown the desired number of games, or
-    // there are no more games in the list
-    while (show)
-    {
-        for (col=0; col<22; col++)
-        {
-            if (!p[col+8])
-                break;
-            temp[row*32*2 + col*2 + 2] = p[col+8] - 32;
-            temp[row*32*2 + col*2 + 3] = (games.highlighted == (games.firstShown + row)) ? PALETTE1<<1 : PALETTE0<<1;
-        }
-
-        row++;
-        show--;
-        p += 0x20;
-    }
-
-    // wait for vblank and copy all at once
-    vdp_wait_vblank();
-    vdp_copy_to_vram(0x1800 + (7 << 6), temp, 32*2*NUMBER_OF_GAMES_TO_SHOW);
-}
-
 
 void dump_hex(WORD addr)
 {
@@ -194,38 +151,100 @@ void dump_hex(WORD addr)
     }
 }
 
+void puts_active_list()
+{
+    BYTE* temp = generic_list_buffer;
+    BYTE *p;
+    BYTE row, col, show;
+	WORD offs;
+
+    // clear all lines
+    memset_asm(temp,0,LIST_BUFFER_SIZE);
+
+	if(MENU_STATE_GAME_GBAC == menu_state)
+	{
+		puts("Index of GBAC:/", 1, 5, PALETTE0);
+
+		if(!games.count)
+		{
+			puts("No games where found on GBAC",2,22/2, PALETTE1);
+			return;
+		}
+	}
+	else if(MENU_STATE_GAME_SD == menu_state)
+		puts("Index of SD:/", 1, 5, PALETTE0);//Change this to SD path
+	else
+		puts("Index of Options:/", 1, 5, PALETTE0);
+
+    row = 0;
+
+	if((MENU_STATE_GAME_GBAC == menu_state))
+	{
+		show = (games.count < NUMBER_OF_GAMES_TO_SHOW) ? games.count : NUMBER_OF_GAMES_TO_SHOW;
+		p = (BYTE*)gbacGameList;
+		p += games.firstShown << 5;
+
+		while (show)
+		{
+			offs = row*32*2;
+
+		    for (col=0; col<22; col++)
+		    {
+		        if (!p[col+8])
+		            break;
+		        temp[offs + col*2 + 2] = p[col+8] - 32;
+		        temp[offs + col*2 + 3] = (games.highlighted == (games.firstShown + row)) ? PALETTE1<<1 : PALETTE0<<1;
+		    }
+
+		    row++;
+		    show--;
+		    p += 0x20;
+		}
+	}
+
+    // wait for vblank and copy all at once
+    vdp_wait_vblank();
+
+	vdp_copy_to_vram(0x1800 + (7 << 6),&temp[0],LIST_BUFFER_SIZE);
+}
+
 /*
  * Move to the next entry in the games list
  */
-void move_to_next_game()
+void move_to_next_list_item()
 {
-    if (games.highlighted < (games.count - 1))
-        games.highlighted++;
+	if(MENU_STATE_GAME_GBAC == menu_state)
+	{
+		if (games.highlighted < (games.count - 1))
+		    games.highlighted++;
 
-    // Check if the games list needs to be scrolled
-    if ( ((games.highlighted - games.firstShown) >= ((NUMBER_OF_GAMES_TO_SHOW >> 1) + 1)) &&
-         (games.firstShown  < (games.count - NUMBER_OF_GAMES_TO_SHOW)) )
-        games.firstShown++;
+		// Check if the games list needs to be scrolled
+		if ( ((games.highlighted - games.firstShown) >= ((NUMBER_OF_GAMES_TO_SHOW >> 1) + 1)) &&
+		     (games.firstShown  < (games.count - NUMBER_OF_GAMES_TO_SHOW)) )
+		    games.firstShown++;
 
-    puts_game_list();
+		puts_active_list();
+	}
 }
-
 
 /*
  * Move to the previous entry in the games list
  */
-void move_to_previous_game()
+void move_to_previous_list_item()
 {
-    if (games.highlighted > 0)
-        games.highlighted--;
+	if(MENU_STATE_GAME_GBAC == menu_state)
+	{
+		if (games.highlighted > 0)
+		    games.highlighted--;
 
-    // Check if the games list needs to be scrolled
-    if ( (games.firstShown > games.highlighted) ||
-         ((games.firstShown) &&
-         ((games.highlighted - games.firstShown) < (NUMBER_OF_GAMES_TO_SHOW >> 1))) )
-        games.firstShown--;
+		// Check if the games list needs to be scrolled
+		if ( (games.firstShown > games.highlighted) ||
+		     ((games.firstShown) &&
+		     ((games.highlighted - games.firstShown) < (NUMBER_OF_GAMES_TO_SHOW >> 1))) )
+		    games.firstShown--;
 
-    puts_game_list();
+		puts_active_list();
+	}
 }
 
 
@@ -234,44 +253,52 @@ void move_to_previous_game()
  */
 void move_to_next_page()
 {
-    BYTE select = games.highlighted - games.firstShown;
+    BYTE select;
 
-    // sanity check
-    if (games.count <= NUMBER_OF_GAMES_TO_SHOW)
-        return;
+	if(MENU_STATE_GAME_GBAC == menu_state)
+	{
+		select = games.highlighted - games.firstShown;
 
-    if (games.firstShown < (games.count - NUMBER_OF_GAMES_TO_SHOW*2))
-        games.firstShown += NUMBER_OF_GAMES_TO_SHOW;
-    else
-        games.firstShown = games.count - NUMBER_OF_GAMES_TO_SHOW;
+		// sanity check
+		if (games.count <= NUMBER_OF_GAMES_TO_SHOW)
+		    return;
 
-    games.highlighted = games.firstShown + select;
+		if (games.firstShown < (games.count - NUMBER_OF_GAMES_TO_SHOW*2))
+		    games.firstShown += NUMBER_OF_GAMES_TO_SHOW;
+		else
+		    games.firstShown = games.count - NUMBER_OF_GAMES_TO_SHOW;
 
-    puts_game_list();
+		games.highlighted = games.firstShown + select;
+
+		puts_active_list();
+	}
 }
-
 
 /*
  * Move to the previous page in the games list
  */
 void move_to_previous_page()
 {
-    BYTE select = games.highlighted - games.firstShown;
+    BYTE select;
 
-    // sanity check
-    if (games.count <= NUMBER_OF_GAMES_TO_SHOW)
-        return;
+	if(MENU_STATE_GAME_GBAC == menu_state)
+	{
+		select = games.highlighted - games.firstShown;
 
-    if (games.firstShown > NUMBER_OF_GAMES_TO_SHOW)
-        games.firstShown -= NUMBER_OF_GAMES_TO_SHOW;
-    else
-        games.firstShown = 0;
+		// sanity check
+		if (games.count <= NUMBER_OF_GAMES_TO_SHOW)
+		    return;
 
-    games.highlighted = games.firstShown + select;
+		if (games.firstShown > NUMBER_OF_GAMES_TO_SHOW)
+		    games.firstShown -= NUMBER_OF_GAMES_TO_SHOW;
+		else
+		    games.firstShown = 0;
 
-    puts_game_list();
+		games.highlighted = games.firstShown + select;
+
+		puts_active_list();
+	}
 }
-
 
 /*
  * Count the number of games on the GBA card
@@ -290,7 +317,6 @@ WORD count_games_on_gbac()
     return count;
 }
 
-
 /*
  * Check if the machine is Domestic (Japanese) or Exported (elsewhere)
  *
@@ -308,6 +334,18 @@ BYTE check_sms_region()
     if ((JoyPort2 & 0xC0) == 0xC0)
         return EXPORTED;
     return JAPANESE;
+}
+
+BYTE is_time_to_fetch_sd_file_info()
+{
+	if(sd_fetch_info_timeout > 0)
+	{
+		--sd_fetch_info_timeout;
+		return 0;
+	}
+
+	sd_fetch_info_timeout = SD_DEFAULT_INFO_FETCH_TIMEOUT;
+	return 1;
 }
 
 
@@ -357,7 +395,8 @@ void main()
     void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
 
     MemCtrl = 0xA8;
-
+	menu_state = MENU_STATE_GAME_GBAC;	//start off with gbac game state
+	sd_fetch_info_timeout = SD_DEFAULT_INFO_FETCH_TIMEOUT;
     neoMode = 0;
 
     Frame1 = 2;
@@ -448,7 +487,7 @@ void main()
     #endif
 
     //dump_hex(0xB000);
-    puts_game_list();
+    puts_active_list();
 
     pad = padLast = 0;
     padUpReptDelay = KEY_REPEAT_INITIAL_DELAY;
@@ -464,14 +503,14 @@ void main()
 
         if (pad & PAD_UP)
         {
-            move_to_previous_game();
+            move_to_previous_list_item();
         }
         else if (padLast & PAD_UP)
         {
             if (0 == --padUpReptDelay)
             {
                 padUpReptDelay = KEY_REPEAT_DELAY;
-                move_to_previous_game();
+                move_to_previous_list_item();
             }
         }
         else
@@ -482,14 +521,14 @@ void main()
 
         if (pad & PAD_DOWN)
         {
-            move_to_next_game();
+            move_to_next_list_item();
         }
         else if (padLast & PAD_DOWN)
         {
             if (0 == --padDownReptDelay)
             {
                 padDownReptDelay = KEY_REPEAT_DELAY;
-                move_to_next_game();
+                move_to_next_list_item();
             }
         }
         else
