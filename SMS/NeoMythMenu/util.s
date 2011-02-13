@@ -18,20 +18,19 @@
     _puts_asm:
     di
     push        ix
-    push        bc
-        ld      ix,#2       ;;ix=sp
+        ld      ix,#4       ;;ix=sp
         add     ix,sp       ;;..
 
-        ld      l,2 + 5(ix) ;;lo(hl)
-        ld      h,2 + 6(ix) ;;hi(hl)
+        ld      l,3(ix) ;;lo(hl)
+        ld      h,4(ix) ;;hi(hl)
 
         push        hl          ;;save
             call    _vdp_set_vram_addr
         pop         hl          ;;restore
 
-        ld      l,2 + 2(ix) ;;str
-        ld      h,2 + 3(ix) ;;..
-        ld      b,2 + 4(ix) ;;attrs
+        ld      l,(ix) ;;str
+        ld      h,1(ix) ;;..
+        ld      b,2(ix) ;;attrs
         sla     b           ;;<<=1
 
     puts_asm_output:
@@ -46,7 +45,6 @@
         jp      puts_asm_output ;;busy
 
     puts_asm_output_done:
-    pop     bc
     pop     ix
     ei
     ret
@@ -56,21 +54,19 @@
     _putsn_asm:
     di
     push        ix
-    push        bc
-        ld      ix,#2   ;;ix=sp
+        ld      ix,#4   ;;ix=sp
         add     ix,sp   ;;..
-
-        ld      l,2 + 6(ix)     ;;lo(hl)
-        ld      h,2 + 7(ix)     ;;hi(hl)
+        ld      l,4(ix)     ;;lo(hl)
+        ld      h,5(ix)     ;;hi(hl)
 
         push        hl      ;;save
             call    _vdp_set_vram_addr
         pop         hl      ;;restore
 
-        ld      l,2 + 2(ix) ;;str
-        ld      h,2 + 3(ix) ;;..
-        ld      b,2 + 4(ix) ;;attrs
-        ld      c,2 + 5(ix) ;;max
+        ld      l,(ix) ;;str
+        ld      h,1(ix) ;;..
+        ld      b,2(ix) ;;attrs
+        ld      c,3(ix) ;;max
         sla     b           ;;<<=1
 
     putsn_asm_output:
@@ -89,7 +85,6 @@
         jp      nz,puts_asm_output
 
     putsn_asm_output_done:
-    pop         bc
     pop         ix
     ei
     ret
@@ -98,8 +93,7 @@
     .globl _strcpy_asm
     _strcpy_asm:
     push            ix
-        push        de
-            ld      ix,#6                   ;;2 + stack depth * sizeof word
+            ld      ix,#4                   ;;2 + stack depth * sizeof word
             add     ix,sp                   ;;+=sp
             ld      l,(ix)                  ;;dst
             ld      h,1(ix)                 ;;...
@@ -117,7 +111,7 @@
 
         strcpy_asm_done:
             ld          (hl),#0x00          ;;null-terminate
-        pop         de
+
     pop             ix
     ret
 
@@ -125,9 +119,7 @@
     .globl _strncpy_asm
     _strncpy_asm:
     push                ix
-        push            de
-            push        bc
-                ld      ix,#8                   ;;2 + stack depth * sizeof word
+                ld      ix,#4                   ;;2 + stack depth * sizeof word
                 add     ix,sp                   ;;+=sp
                 ld      e,(ix)                  ;;dst
                 ld      d,1(ix)                 ;;...
@@ -148,17 +140,14 @@
             strncpy_asm_done:                   ;;even if len == 0 null terminate string
                 ex          de,hl               ;;de = hl,hl = de
                 ld          (hl),#0x00          ;;null-terminate
-            pop         bc
-        pop             de
-    pop                 ix
+    pop             	    ix
     ret
 
     ;;void strcat_asm(BYTE* dst,const BYTE* src);
     .globl _strcat_asm
     _strcat_asm:
     push            ix
-        push        de
-            ld      ix,#6                   ;;2 + stack depth * sizeof word
+            ld      ix,#4                   ;;2 + stack depth * sizeof word
             add     ix,sp                   ;;+=sp
             ld      l,(ix)                  ;;dst
             ld      h,1(ix)                 ;;...
@@ -183,17 +172,14 @@
 
         strcat_asm_done:
             ld          (hl),#0x00          ;;null-terminate
-        pop         de
-    pop             ix
+    pop					ix
     ret
 
     ;;void strncat_asm(BYTE* dst,const BYTE* src,BYTE cnt);
     .globl _strncat_asm
     _strncat_asm:
     push                ix
-        push            de
-            push        bc
-                ld      ix,#8                   ;;2 + stack depth * sizeof word
+                ld      ix,#4                   ;;2 + stack depth * sizeof word
                 add     ix,sp                   ;;+=sp
                 ld      l,(ix)                  ;;dst
                 ld      h,1(ix)                 ;;...
@@ -221,8 +207,6 @@
 
             strncat_asm_done:
                 ld          (hl),#0x00          ;;null-terminate
-            pop             bc
-        pop                 de
     pop                     ix
     ret
 
@@ -261,11 +245,8 @@
     .globl _strlen_asm
     _strlen_asm:
 
-    push        ix      ;;save
-        ld      ix,#4   ;;rel addr in stack
-        add     ix,sp   ;;+=sp
-        ld      l,(ix)  ;;lo(hl)
-        ld      h,1(ix) ;;hi(hl)
+		push	hl
+		pop		hl
         xor     a       ;;z(A)
 
     strlen_asm_loop:
@@ -281,7 +262,6 @@
 
     strlen_asm_done:
         ld      l,a     ;;l = res
-    pop         ix      ;;restore
     ret
 
     ;;TODO : strcmp_asm
@@ -290,9 +270,7 @@
     .globl _memcpy_asm
     _memcpy_asm:
     push                ix
-        push            de
-            push        bc
-                ld      ix,#8                   ;;2 + stack depth * sizeof word
+                ld      ix,#4                   ;;2 + stack depth * sizeof word
                 add     ix,sp                   ;;+=sp
                 ld      e,(ix)                  ;;dst
                 ld      d,1(ix)                 ;;...
@@ -301,8 +279,6 @@
                 ld      c,4(ix)                 ;;cnt
                 ld      b,5(ix)                 ;;...
                 ldir                            ;;write all (21cycles/iter)
-            pop         bc
-        pop             de
     pop                 ix
     ret
 
@@ -310,15 +286,14 @@
     .globl _memset_asm
     _memset_asm:
     push                ix
-        push            de
-            push        bc
-                ld      ix,#8                   ;;2 + stack depth * sizeof word
+                ld      ix,#4                   ;;2 + stack depth * sizeof word
                 add     ix,sp                   ;;+=sp
                 ld      l,(ix)                  ;;dst
                 ld      h,1(ix)                 ;;...
                 ld      d,2(ix)                 ;;val
                 ld      c,3(ix)                 ;;cnt
                 ld      b,4(ix)                 ;;...
+
             memset_loop:
                 ld      (hl),d
                 inc     hl
@@ -326,9 +301,6 @@
                 ld      a,b
                 or      c
                 jp      nz,memset_loop
-
-            pop         bc
-        pop             de
     pop                 ix
     ret
 

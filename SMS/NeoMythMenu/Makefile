@@ -48,7 +48,7 @@ bank0.bin:
 	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3000 --no-std-crt0 main.c $(BANK0OBJS) $(SHARED)
 	$(HEX2BIN) main.ihx
 	$(PADTRIM) main.bin bank0.bin
-	$(MAP2H) main.map vdp.h pad.h
+	$(MAP2H) main.map vdp.h pad.h util.h
 
 bank1.bin:
 	$(CC) $(CFLAGS) --no-std-crt0 --code-loc 0x4000 bank1.c $(SHARED)
