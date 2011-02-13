@@ -52,6 +52,7 @@ extern Option options[MAX_OPTIONS];
 extern BYTE options_count;
 void options_set_state(Option* option,BYTE new_state);
 void options_set_type(Option* option,BYTE new_type);
+extern Option* options_add_ex(const char* name,BYTE type,BYTE state,WORD user_data0,WORD user_data1);
 extern Option* options_add(const char* name,BYTE type,BYTE state);
 extern BYTE sd_fetch_info_timeout;
 extern BYTE menu_state;
