@@ -435,6 +435,18 @@ void main()
     }
     #endif
 
+    #if 0
+    {
+        BYTE test1[16];
+        BYTE test2[16];
+        strcpy_asm(test1, "This is test 2");
+        pfn_neo2_ram_to_psram(0x02, 0x8800, test1, 16);
+        pfn_neo2_psram_to_ram(test2, 0x02, 0x8800, 16);
+        vdp_wait_vblank();
+        puts(test2, 9, 18, PALETTE0);
+    }
+    #endif
+
     //dump_hex(0xB000);
     puts_game_list();
 
