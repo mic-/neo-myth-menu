@@ -163,18 +163,18 @@ void puts_active_list()
 
 	if(MENU_STATE_GAME_GBAC == menu_state)
 	{
-		puts("Index of GBAC:/", 1, 5, PALETTE0);
+		puts("GBAC:/", 1, 5, PALETTE0);
 
 		if(!games.count)
 		{
-			puts("No games where found on GBAC",2,22/2, PALETTE1);
+			puts("No games found on GBAC",2, 11, PALETTE1);
 			return;
 		}
 	}
 	else if(MENU_STATE_GAME_SD == menu_state)
-		puts("Index of SD:/", 1, 5, PALETTE0);//Change this to SD path
+		puts("SD:/", 1, 5, PALETTE0);//Change this to SD path
 	else
-		puts("Index of Options:/", 1, 5, PALETTE0);
+		puts("Options:", 1, 5, PALETTE0);
 
     row = 0;
 
@@ -386,7 +386,6 @@ void test_strings()
 void main()
 {
     BYTE temp;
-    WORD i;
     BYTE ftype;
     BYTE padUpReptDelay;
     BYTE padDownReptDelay;
@@ -399,12 +398,9 @@ void main()
 	sd_fetch_info_timeout = SD_DEFAULT_INFO_FETCH_TIMEOUT;
     neoMode = 0;
 
+    // Copy neo2 code from ROM to RAM
     Frame1 = 2;
-    // Copy code from ROM to RAM
-    for (i = 0; i < 0x400; i++)
-    {
-        *(volatile BYTE*)(0xD000+i) = *(volatile BYTE*)(0x4000+i);
-    }
+    memcpy_asm(0xD000, 0x4000, 0x400);
 
     temp = pfn_neo2_check_card();
 
@@ -450,13 +446,26 @@ void main()
     puts("[II] More options", 1, 22, PALETTE0);
 
     // Print some Myth info
-    print_hex(idLo, 24, 20);
+    /*print_hex(idLo, 24, 20);
     print_hex(idHi, 26, 20);
-    print_hex(*(BYTE*)0xC000, 28, 20);
+    print_hex(*(BYTE*)0xC000, 28, 20);*/
+
     // Print flash type
-    puts(type, 30, 20, PALETTE0);
+    puts("HW  /", 24, 20, PALETTE0);
+    puts(type, 27, 20, PALETTE0);
 
     setup_vdp();
+
+	vdpSpeed = vdp_check_speed();
+
+	// Print the console model (japanese, us, european)
+	vdp_wait_vblank();
+	if (region == JAPANESE)
+		puts("J", 29, 20, PALETTE0);
+	else if (vdpSpeed == NTSC)
+		puts("U", 29, 20, PALETTE0);
+	else
+		puts("E", 29, 20, PALETTE0);
 
     #if 0
     test_strings();
@@ -569,6 +578,11 @@ void main()
 
             pfn_neo2_run_game_gbac();
         }
+
+		if (pad & PAD_SW2)
+		{
+			menu_state = MENU_STATE_OPTIONS;
+		}
 
         vdp_wait_vblank();
     }

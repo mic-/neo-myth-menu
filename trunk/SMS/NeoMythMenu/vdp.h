@@ -50,6 +50,13 @@ enum
 };
 
 
+enum
+{
+	NTSC = 0,
+	PAL = 1
+};
+
+
 void vdp_set_reg(BYTE rn, BYTE val);
 
 extern void vdp_set_vram_addr(WORD addr);
@@ -71,5 +78,7 @@ void vdp_set_color(BYTE cnum, BYTE red, BYTE green, BYTE blue);
 void vdp_copy_to_cram(WORD dest, BYTE *src, BYTE len);
 
 void vdp_wait_vblank();
+
+extern BYTE vdp_check_speed();
 
 #endif
