@@ -12,9 +12,20 @@ typedef struct
     WORD count;
 } FileList;
 
+/*
+ * Task enumerators for task dispatchers located in other
+ * banks (obsolete?)
+ */
 enum
 {
     TASK_LOAD_BG = 0,
+};
+
+/*
+ * Menu states
+ */
+enum
+{
 	MENU_STATE_GAME_GBAC = 0,
 	MENU_STATE_GAME_SD,
 	MENU_STATE_OPTIONS
@@ -29,6 +40,7 @@ extern BYTE pad, padLast;
 extern BYTE idLo,idHi;
 extern WORD neoMode;
 extern BYTE hasZipram;
+extern BYTE vdpSpeed;
 
 #ifdef EMULATOR
 extern const char dummyGameList[];

@@ -11,6 +11,7 @@ BYTE sd_fetch_info_timeout;
 FileList games;
 BYTE region;
 BYTE pad, padLast;
+BYTE vdpSpeed;
 
 // Extra "virtual" registers for assembly routines
 BYTE vregs[16];
