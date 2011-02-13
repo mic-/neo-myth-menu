@@ -400,7 +400,7 @@ void main()
 
     // Copy neo2 code from ROM to RAM
     Frame1 = 2;
-    memcpy_asm(0xD000, 0x4000, 0x400);
+    memcpy_asm(0xD000, 0x4000, 0x700);
 
     temp = pfn_neo2_check_card();
 
@@ -581,7 +581,8 @@ void main()
 
 		if (pad & PAD_SW2)
 		{
-			menu_state = MENU_STATE_OPTIONS;
+			// Test the VGM player
+			pfn_vgm_play();
 		}
 
         vdp_wait_vblank();
