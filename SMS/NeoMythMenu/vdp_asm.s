@@ -38,29 +38,25 @@
 				ld		c,#0xbe
 
 				vdp_blockcopy_to_vram_loop:							;;Check if there's enough bytes left to do large copies
-				xor		a
 				ld		a,d
-				and		#0x80
-				ld		b,a
-				cp		#0x80
+				or		a,e
+				jp		z,vdp_blockcopy_to_vram_loop_pre_single
+				push	hl
+				ld		hl,#0
+				add		hl,de
+				ld		bc,#-0x80
+				add		hl,bc
+				ld		a,h
+				or		a,l
+				pop		hl
 				jp		z,vdp_blockcopy_to_vram_large_block
-				jp		c,vdp_blockcopy_to_vram_loop_pre_single
-				xor		a
-				ld		a,e
-				and		#0x80
-				add		a,b
-				and		#0x80
-				cp		#0x80
-				jp		z,vdp_blockcopy_to_vram_large_block
-				jp		c,vdp_blockcopy_to_vram_loop_pre_single
-				or		a
-				jp		z,vdp_blockcopy_to_vram_loop
 
 				vdp_blockcopy_to_vram_loop_pre_single:				;;Rollback to single byte copies but first make sure that the size isn't zero
 				ld		a,d
 				or		e
 				jp		z,vdp_blockcopy_to_vram_loop_done
 
+				ld		c,#0xbe
 				vdp_blockcopy_to_vram_loop_single:					;;Copy a byte at a time 
 				outi
 				dec		de
