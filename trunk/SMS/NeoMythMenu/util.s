@@ -30,17 +30,18 @@
 
         ld      l,(ix) ;;str
         ld      h,1(ix) ;;..
-        ld      b,2(ix) ;;attrs
-        sla     b           ;;<<=1
+        ld      a,2(ix) ;;attrs
+		add		a
+		ld		b,a
+	 	ld		c,#0xbe
 
     puts_asm_output:
         ld      a,(hl)      ;;*str
         or      a           ;;z-tst
         jp      z,puts_asm_output_done  ;;zero
-        sub     a,#0x20     ;;-=' '
-        out     (#0xbe),a   ;;w
-        ld      a,b         ;;attr
-        out     (#0xbe),a   ;;w
+        sub     #0x20		;;-=' '
+        out     (c),a		;;w
+        out     (c),b		;;attr
         inc     hl          ;;++str
         jp      puts_asm_output ;;busy
 
@@ -66,8 +67,10 @@
         ld      l,(ix) ;;str
         ld      h,1(ix) ;;..
         ld      b,2(ix) ;;attrs
-        ld      c,3(ix) ;;max
-        sla     b           ;;<<=1
+        ld      a,3(ix) ;;max
+		add		a
+		ld		b,a
+		ld		c,#0xbe
 
     putsn_asm_output:
         xor     a
@@ -77,9 +80,8 @@
         or      a
         jp      z,putsn_asm_output_done
         sub     a,#0x20     ;;-=' '
-        out     (#0xbe),a   ;;w
-        ld      a,b         ;;attr
-        out     (#0xbe),a   ;;w
+        out     (c),a		;;w
+        out     (c),b		;;w
         inc     hl          ;;++str
         dec     c           ;;--left
         jp      nz,puts_asm_output
