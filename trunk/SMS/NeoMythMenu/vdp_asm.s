@@ -40,15 +40,16 @@
 				vdp_blockcopy_to_vram_loop:							;;Check if there's enough bytes left to do large copies
 				xor		a
 				ld		a,d
-				and		a,#0x80
+				and		#0x80
 				ld		b,a
 				cp		#0x80
 				jp		z,vdp_blockcopy_to_vram_large_block
 				jp		c,vdp_blockcopy_to_vram_loop_pre_single
 				xor		a
 				ld		a,e
-				and		a,#0x80
+				and		#0x80
 				add		a,b
+				and		#0x80
 				cp		#0x80
 				jp		z,vdp_blockcopy_to_vram_large_block
 				jp		c,vdp_blockcopy_to_vram_loop_pre_single
