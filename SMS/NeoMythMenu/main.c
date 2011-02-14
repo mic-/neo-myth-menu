@@ -202,7 +202,8 @@ void puts_active_list()
 
     // wait for vblank and copy all at once
     vdp_wait_vblank();
-    vdp_copy_to_vram(0x1800 + (7 << 6),&temp[0],LIST_BUFFER_SIZE);
+	vdp_blockcopy_to_vram(0x1800 + (7 << 6),&temp[0],LIST_BUFFER_SIZE);
+   //vdp_copy_to_vram(0x1800 + (7 << 6),&temp[0],LIST_BUFFER_SIZE);
 }
 
 /*

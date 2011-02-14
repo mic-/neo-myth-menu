@@ -60,7 +60,7 @@ enum
 void vdp_set_reg(BYTE rn, BYTE val);
 
 extern void vdp_set_vram_addr(WORD addr);
-
+extern void vdp_blockcopy_to_vram(WORD dest, BYTE *src, WORD len);
 void vdp_set_cram_addr(WORD addr);
 
 /*
