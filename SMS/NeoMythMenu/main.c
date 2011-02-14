@@ -155,9 +155,6 @@ void puts_active_list()
     BYTE row, col, show;
     WORD offs;
 
-    // clear all lines
-    memset_asm(temp,0,LIST_BUFFER_SIZE);
-
     vdp_wait_vblank();
     if(MENU_STATE_GAME_GBAC == menu_state)
     {
@@ -173,6 +170,9 @@ void puts_active_list()
         puts("SD:/", 1, 5, PALETTE0);//Change this to SD path
     else
         puts("Options:", 1, 5, PALETTE0);
+
+    // clear all lines
+    memset_asm(temp,0,LIST_BUFFER_SIZE);
 
     row = 0;
 
@@ -202,8 +202,8 @@ void puts_active_list()
 
     // wait for vblank and copy all at once
     vdp_wait_vblank();
-    vdp_blockcopy_to_vram(0x1800 + (7 << 6),&temp[0],LIST_BUFFER_SIZE);
-   //vdp_copy_to_vram(0x1800 + (7 << 6),&temp[0],LIST_BUFFER_SIZE);
+    vdp_blockcopy_to_vram(0x1800 + (7 << 6),temp,LIST_BUFFER_SIZE);
+   //vdp_copy_to_vram(0x1800 + (7 << 6),temp,LIST_BUFFER_SIZE);
 }
 
 /*
