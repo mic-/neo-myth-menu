@@ -601,17 +601,6 @@ void main()
     }
 }
 
-volatile test()
-{
-	WORD a;
-
-	while(a >= 128)
-	{
-		VdpData = 0xff;
-		a -= 128;
-	}
-}
-
 /*should be moved to another bank?*/
 BYTE options_get_state(Option* option)
 {
