@@ -394,8 +394,8 @@ void handle_action_button(BYTE button)
             p = (volatile BYTE*)0xB000;
             p += games.highlighted << 5;
 
-            gameData->mode = flash_mem_type; // we know mode is ALWAYS 0, so pass flash type here
-            gameData->typ = p[1];
+            gameData->mode = GDF_RUN_FROM_FLASH;
+            gameData->type = flash_mem_type; // we know mode is ALWAYS 0, so pass flash type here
             gameData->size = p[2] >> 4;
             gameData->bankHi = p[2] & 0x0F;
             gameData->bankLo = p[3];

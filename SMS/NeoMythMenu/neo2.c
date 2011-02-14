@@ -382,14 +382,30 @@ void neo2_run_game_gbac()
     __endasm;
 
     neo2_asic_begin();
-    neo2_asic_cmd(0x37, 0x2203);
+    neo2_asic_cmd(0x37, 0x2203); // enable game flash
     neo2_asic_end();
-    if (gameData->mode == 0)
-        wtemp = 0xAE44; // 0 = type C (newer) flash
-    else if (gameData->mode == 1)
-        wtemp = 0x8E44; // 1 = type B (new) flash
+    if (gameData->mode == GDF_RUN_FROM_FLASH)
+    {
+        // run from game flash
+        if (gameData->type == 0)
+            wtemp = 0xAE44; // 0 = type C (newer) flash
+        else if (gameData->type == 1)
+            wtemp = 0x8E44; // 1 = type B (new) flash
+        else if (gameData->type == 2)
+            wtemp = 0x0E44; // 2 = type A (old) flash
+        else
+            wtemp = 0xAE44; // 0 = type C (newer) flash
+    }
     else
-        wtemp = 0x0E44; // 2 = type A (old) flash
+    {
+        // run from psram
+        if (gameData->type == 0)
+            wtemp = 0xAF44; // 0 = Neo2-SD
+        else if (gameData->type == 1)
+            wtemp = 0x674E; // 1 = Neo2-Pro
+        else
+            wtemp = 0xAF44; // ?? use Neo2-SD setting
+    }
     neo2_asic_begin();
     neo2_asic_cmd(0xDA, wtemp);
     neo2_asic_end();
