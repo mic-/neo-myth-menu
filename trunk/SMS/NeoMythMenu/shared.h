@@ -48,6 +48,14 @@ enum
     MENU_STATE_OPTIONS
 };
 
+extern BYTE options_get_state(Option* option);
+extern BYTE options_get_type(Option* option);
+extern void options_set_state(Option* option,BYTE new_state);
+extern void options_set_type(Option* option,BYTE new_type);
+extern Option* options_add(const char* name,BYTE type,BYTE state);
+extern Option* options_add_ex(const char* name,BYTE type,BYTE state,WORD user_data0,WORD user_data1);
+extern void options_init();
+
 extern BYTE flash_mem_type;
 extern Option options[MAX_OPTIONS];
 extern BYTE options_count;

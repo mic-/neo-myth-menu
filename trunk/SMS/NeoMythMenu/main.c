@@ -414,6 +414,7 @@ void handle_action_button(BYTE button)
 void import_std_options()
 {
 	options_init();
+	//options_add("FM status",OPTION_TYPE_SETTING,0);
 }
 
 void main()
@@ -598,6 +599,17 @@ void main()
 
         vdp_wait_vblank();
     }
+}
+
+volatile test()
+{
+	WORD a;
+
+	while(a >= 128)
+	{
+		VdpData = 0xff;
+		a -= 128;
+	}
 }
 
 /*should be moved to another bank?*/
