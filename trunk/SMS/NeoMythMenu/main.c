@@ -7,7 +7,7 @@
 #include "neo2.h"
 #include "neo2_map.h"
 
-#define MENU_VERSION_STRING "0.14"
+#define MENU_VERSION_STRING "0.15"
 #define KEY_REPEAT_INITIAL_DELAY 15
 #define KEY_REPEAT_DELAY 7
 #define SD_DEFAULT_INFO_FETCH_TIMEOUT 30
@@ -380,11 +380,45 @@ void test_strings()
 }
 #endif
 
+void handle_action_button(BYTE button)
+{
+    if(MENU_STATE_GAME_GBAC == menu_state)
+    {
+		if(button = PAD_SW1)
+		{
+			volatile GbacGameData* gameData;
+			volatile BYTE* p;
+
+			// Copy the game info data to somewhere in RAM
+			gameData = (volatile GbacGameData*)0xC800;
+			p = (volatile BYTE*)0xB000;
+			p += games.highlighted << 5;
+
+			gameData->mode = flash_mem_type; // we know mode is ALWAYS 0, so pass flash type here
+			gameData->typ = p[1];
+			gameData->size = p[2] >> 4;
+			gameData->bankHi = p[2] & 0x0F;
+			gameData->bankLo = p[3];
+			gameData->sramBank = p[4] >> 4;
+			gameData->sramSize = p[4] & 0x0F;
+			gameData->cheat[0] = p[5];
+			gameData->cheat[1] = p[6];
+			gameData->cheat[2] = p[7];
+			pfn_neo2_run_game_gbac();
+		}
+		else if (button == PAD_SW2)
+			pfn_vgm_play();			//test vgm player
+	}
+}
+
+void import_std_options()
+{
+	options_init();
+}
 
 void main()
 {
     BYTE temp;
-    BYTE ftype;
     BYTE padUpReptDelay;
     BYTE padDownReptDelay;
     char type[2];
@@ -405,8 +439,8 @@ void main()
     Frm2Ctrl = FRAME2_AS_ROM;
 
     Frame1 = 3;
-    ftype = *(volatile BYTE*)0x7FF0; // flash mem type at 0xFFF0: 0 = newer(C), 1 = new(B), 2 = old(A)
-    type[0] = 'C' - ftype;
+    flash_mem_type = *(volatile BYTE*)0x7FF0; // flash mem type at 0xFFF0: 0 = newer(C), 1 = new(B), 2 = old(A)
+    type[0] = 'C' - flash_mem_type;
     type[1] = 0;
 
     Frame1 = 1;
@@ -502,6 +536,8 @@ void main()
     padUpReptDelay = KEY_REPEAT_INITIAL_DELAY;
     padDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
 
+	import_std_options();
+
     while (1)
     {
         temp = pad1_get_2button();
@@ -556,36 +592,68 @@ void main()
         }
 
         if (pad & PAD_SW1)
-        {
-            volatile GbacGameData* gameData;
-            volatile BYTE* p;
-
-            // Copy the game info data to somewhere in RAM
-            gameData = (volatile GbacGameData*)0xC800;
-            p = (volatile BYTE*)0xB000;
-            p += games.highlighted << 5;
-
-            gameData->mode = ftype; // we know mode is ALWAYS 0, so pass flash type here
-            gameData->typ = p[1];
-            gameData->size = p[2] >> 4;
-            gameData->bankHi = p[2] & 0x0F;
-            gameData->bankLo = p[3];
-            gameData->sramBank = p[4] >> 4;
-            gameData->sramSize = p[4] & 0x0F;
-            gameData->cheat[0] = p[5];
-            gameData->cheat[1] = p[6];
-            gameData->cheat[2] = p[7];
-
-            pfn_neo2_run_game_gbac();
-        }
-
-        if (pad & PAD_SW2)
-        {
-            // Test the VGM player
-            pfn_vgm_play();
-        }
+			handle_action_button(PAD_SW1);
+        else if (pad & PAD_SW2)
+			handle_action_button(PAD_SW2);
 
         vdp_wait_vblank();
     }
 }
+
+/*should be moved to another bank?*/
+BYTE options_get_state(Option* option)
+{
+	return (option->encoded_info>>4) & 0xf;
+}
+
+BYTE options_get_type(Option* option)
+{
+	return option->encoded_info & 0xf;
+}
+
+void options_set_state(Option* option,BYTE new_state)
+{
+	option->encoded_info = ((option->encoded_info>>4)<<4) | (new_state&0xf);
+}
+
+void options_set_type(Option* option,BYTE new_type)
+{
+	option->encoded_info = ((new_type&0xf)<<4) | (option->encoded_info&0xf);
+}
+
+Option* options_add(const char* name,BYTE type,BYTE state)
+{
+	Option* option;
+
+	if(options_count >= MAX_OPTIONS)
+		return 0;
+
+	option = &options[options_count++];
+	strcpy_asm(option->name,name);
+	memset_asm(option->user_data,0,4);
+	option->encoded_info = ( (type&0xf) << 4 ) | (state&0xf);
+
+	return option;
+}
+
+Option* options_add_ex(const char* name,BYTE type,BYTE state,WORD user_data0,WORD user_data1)
+{
+	Option* option = options_add(name,type,state);
+
+	if(option == 0)
+		return 0;
+
+	option->user_data[0] = user_data0>>8;
+	option->user_data[1] = user_data0&0xff;
+	option->user_data[2] = user_data1>>8;
+	option->user_data[3] = user_data1&0xff;
+	return option;
+}
+
+void options_init()
+{
+	options_count = 0;
+}
+
+
 

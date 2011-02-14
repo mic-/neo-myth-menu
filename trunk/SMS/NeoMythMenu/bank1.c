@@ -22,45 +22,6 @@ void dispatch(WORD task)
     }
 }
 
-void options_set_state(Option* option,BYTE new_state)
-{
-	option->encoded_info = ((option->encoded_info>>4)<<4) | (new_state&0xf);
-}
-
-void options_set_type(Option* option,BYTE new_type)
-{
-	option->encoded_info = ((new_type&0xf)<<4) | (option->encoded_info&0xf);
-}
-
-Option* options_add(const char* name,BYTE type,BYTE state)
-{
-	Option* option;
-
-	if(options_count >= MAX_OPTIONS)
-		return 0;
-
-	option = &options[options_count++];
-	pfn_strcpy_asm(option->name,name);
-	pfn_memset_asm(option->user_data,0,4);
-	option->encoded_info = ( (type&0xf) << 4 ) | (state&0xf);
-
-	return option;
-}
-
-Option* options_add_ex(const char* name,BYTE type,BYTE state,WORD user_data0,WORD user_data1)
-{
-	Option* option = options_add(name,type,state);
-
-	if(option == 0)
-		return 0;
-
-	option->user_data[0] = user_data0>>8;
-	option->user_data[1] = user_data0&0xff;
-	option->user_data[2] = user_data1>>8;
-	option->user_data[3] = user_data1&0xff;
-	return option;
-}
-
 /*
  * Pattern data for the background
  */

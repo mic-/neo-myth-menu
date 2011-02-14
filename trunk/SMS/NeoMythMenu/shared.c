@@ -17,6 +17,7 @@ BYTE vregs[16];     // C006
 
 // The rest can be in any order..
 
+BYTE flash_mem_type;
 BYTE hasZipram;
 BYTE menu_state;
 BYTE sd_fetch_info_timeout;
