@@ -468,7 +468,7 @@ void main()
     test_strings();
     #endif
 
-    #if 1
+    #if 0
     {
         BYTE test1[16];
         BYTE test2[16];
@@ -481,7 +481,7 @@ void main()
     }
     #endif
 
-    #if 1
+    #if 0
     {
         BYTE test1[16];
         BYTE test2[16];
