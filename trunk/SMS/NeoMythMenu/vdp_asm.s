@@ -1,7 +1,8 @@
         .area   _CODE
+		;;.globl	_vdp_wait_vblank
 
-        .globl _vdp_set_vram_addr
-_vdp_set_vram_addr:
+        .globl _vdp_set_vram_addr				;;Does not overwrite HL , so the caller doesn't have to S/R HL
+		_vdp_set_vram_addr:
 		ld      a,l				;;lb
 		out     (0xbf),a		;;w
 		ld      a,h				;;hb
@@ -9,6 +10,65 @@ _vdp_set_vram_addr:
 		out     (0xbf),a		;;w
         ret
 
+		;;void vdp_blockcopy_to_vram(WORD dest, BYTE *src, WORD len)
+		.globl _vdp_blockcopy_to_vram
+		_vdp_blockcopy_to_vram:
+		push            ix
+		        ld      ix,#4										;;2 + stack depth * sizeof word
+		        add     ix,sp										;;+=sp
+		        ld      l,(ix)										;;dest
+		        ld      h,1(ix)										;;...
+
+				;;call	_vdp_wait_vblank
+				call	_vdp_set_vram_addr
+		        ld      l,2(ix)										;;src
+		        ld      h,3(ix)										;;...
+				ld		e,4(ix)										;;len
+				ld		d,5(ix)										;;...
+				ld		c,#0xbe
+				jp		vdp_blockcopy_to_vram_loop
+
+				vdp_blockcopy_to_vram_large_block:					;;Copy 128bytes at once (21cycles * b)
+				ld		b,#0x80
+				otir
+				ld		bc,#-0x80
+				ex		de,hl
+				add		hl,bc
+				ex		de,hl
+				ld		c,#0xbe
+
+				vdp_blockcopy_to_vram_loop:							;;Check if there's enough bytes left to do large copies
+				xor		a
+				ld		a,d
+				and		a,#0x80
+				ld		b,a
+				cp		#0x80
+				jp		z,vdp_blockcopy_to_vram_large_block
+				jp		c,vdp_blockcopy_to_vram_loop_pre_single
+				xor		a
+				ld		a,e
+				and		a,#0x80
+				add		a,b
+				cp		#0x80
+				jp		z,vdp_blockcopy_to_vram_large_block
+				jp		c,vdp_blockcopy_to_vram_loop_pre_single
+				or		a
+				jp		z,vdp_blockcopy_to_vram_loop
+
+				vdp_blockcopy_to_vram_loop_pre_single:				;;Rollback to single byte copies but first make sure that the size isn't zero
+				ld		a,d
+				or		e
+				jp		z,vdp_blockcopy_to_vram_loop_done
+
+				vdp_blockcopy_to_vram_loop_single:					;;Copy a byte at a time 
+				outi
+				dec		de
+				ld		a,d
+				or		e
+				jp		nz,vdp_blockcopy_to_vram_loop_single
+
+				vdp_blockcopy_to_vram_loop_done:
+		pop				ix
 
      ; check if this is an NTSC (60 Hz) or PAL (50 Hz) vdp
     .globl _vdp_check_speed
@@ -38,3 +98,4 @@ _vdp_set_vram_addr:
     	ret	nz
     	ld	l,#1		; PAL
     	ret
+

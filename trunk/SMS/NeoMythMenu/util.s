@@ -24,9 +24,9 @@
         ld      l,3(ix) ;;lo(hl)
         ld      h,4(ix) ;;hi(hl)
 
-        push        hl          ;;save
+        ;;push        hl          ;;save
             call    _vdp_set_vram_addr
-        pop         hl          ;;restore
+        ;;pop         hl          ;;restore
 
         ld      l,(ix) ;;str
         ld      h,1(ix) ;;..
@@ -59,9 +59,9 @@
         ld      l,4(ix)     ;;lo(hl)
         ld      h,5(ix)     ;;hi(hl)
 
-        push        hl      ;;save
+        ;;push        hl      ;;save
             call    _vdp_set_vram_addr
-        pop         hl      ;;restore
+        ;;pop         hl      ;;restore
 
         ld      l,(ix) ;;str
         ld      h,1(ix) ;;..
@@ -95,22 +95,16 @@
     push            ix
             ld      ix,#4                   ;;2 + stack depth * sizeof word
             add     ix,sp                   ;;+=sp
-            ld      l,(ix)                  ;;dst
-            ld      h,1(ix)                 ;;...
-            ld      e,2(ix)                 ;;src
-            ld      d,3(ix)                 ;;...
+            ld      e,(ix)                  ;;dst
+            ld      d,1(ix)                 ;;...
+            ld      l,2(ix)                 ;;src
+            ld      h,3(ix)                 ;;...
 
         strcpy_asm_loop:
-            ld          a,(de)              ;;*src
+            ld          a,(hl)              ;;*src
+			ldi
             or          a                   ;;ztst
-            jp          z,strcpy_asm_done   ;;zr
-            ld          (hl),a              ;;*dst=*src
-            inc         hl                  ;;++dst
-            inc         de                  ;;++src
-            jp          strcpy_asm_loop     ;;loop
-
-        strcpy_asm_done:
-            ld          (hl),#0x00          ;;null-terminate
+            jp          nz,strcpy_asm_loop	;;loop
 
     pop             ix
     ret
@@ -133,8 +127,6 @@
                 jp      z,strncpy_asm_done      ;;zr
                 xor     c                       ;;z(c)
 
-                ;;de = dst,hl = src,bc = count
-                ;;while(bc--)*(de++) = *(hl++)
                 ldir                            ;;21cycles * iterations(->bc)
 
             strncpy_asm_done:                   ;;even if len == 0 null terminate string
@@ -153,25 +145,19 @@
             ld      h,1(ix)                 ;;...
             ld      e,2(ix)                 ;;src
             ld      d,3(ix)                 ;;...
+			xor		a
 
         strcat_asm_z_loop:                  ;;find zero in dst
-            ld          a,(hl)
-            or          a
-            jp          z,strcat_asm_loop
-            inc         hl
-            jp          strcat_asm_z_loop
+			cpi
+            jp		nz,strcat_asm_z_loop
+			dec		hl
+			ex		de,hl
 
         strcat_asm_loop:
-            ld          a,(de)              ;;*src
-            or          a                   ;;ztst
-            jp          z,strcat_asm_done   ;;zr
-            ld          (hl),a              ;;*dst=*src
-            inc         hl                  ;;++dst
-            inc         de                  ;;++src
-            jp          strcat_asm_loop     ;;loop
-
-        strcat_asm_done:
-            ld          (hl),#0x00          ;;null-terminate
+            ld          a,(hl)              	;;*src
+			ldi
+			or			a
+            jp          nz,strcat_asm_loop     ;;loop
     pop					ix
     ret
 
@@ -188,26 +174,15 @@
                 ld      b,4(ix)                 ;;cnt
                 xor     a
 
-                ;;      check if zero to avoid wrapping bc in ldir
-                or      b
-                jp      z,strncat_asm_done
-                xor     c
-
             strncat_asm_z_loop:                 ;;find zero in dst
-                ld          a,(hl)
-                or          a
-                jp          z,strncat_asm_loop
-                inc         hl
-                jp          strncat_asm_z_loop
+				cpi
+                jp		nz,strncat_asm_z_loop
+				dec		hl
+				ex		de,hl
 
             strncat_asm_loop:
-                ex          de,hl
                 ldir
-                ex          de,hl
-
-            strncat_asm_done:
-                ld          (hl),#0x00          ;;null-terminate
-    pop                     ix
+    pop					ix
     ret
 
     ;;extern const char* get_file_extension_asm(const BYTE* src)
@@ -244,9 +219,7 @@
     ;;BYTE strlen_asm(const BYTE* str)
     .globl _strlen_asm
     _strlen_asm:
-
-        xor     a       ;;z(A)
-
+	;;improve this
     strlen_asm_loop:
         ld      b,(hl)  ;;*str
         ld      c,a
@@ -288,17 +261,14 @@
                 add     ix,sp                   ;;+=sp
                 ld      l,(ix)                  ;;dst
                 ld      h,1(ix)                 ;;...
-                ld      d,2(ix)                 ;;val
+                ld      a,2(ix)                 ;;val
                 ld      c,3(ix)                 ;;cnt
                 ld      b,4(ix)                 ;;...
 
-            memset_loop:
-                ld      (hl),d
-                inc     hl
-                dec     bc
-                ld      a,b
-                or      c
-                jp      nz,memset_loop
+            memset_loop:						
+				ld		(hl),a					;;7cycles
+				cpi								;;16cycles
+                jp      nz,memset_loop			;;10cycles
     pop                 ix
     ret
 
@@ -307,3 +277,4 @@
    	
     
     	
+
