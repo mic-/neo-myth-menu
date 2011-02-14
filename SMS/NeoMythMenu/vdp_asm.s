@@ -11,7 +11,6 @@
         ret
 
         ;;void vdp_blockcopy_to_vram(WORD dest, BYTE *src, WORD len)
-        ;;can copy up to $80FF bytes
         .globl _vdp_blockcopy_to_vram
         _vdp_blockcopy_to_vram:
         push            ix
