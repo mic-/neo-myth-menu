@@ -42,12 +42,18 @@ enum
 typedef struct
 {
     BYTE mode;
-    BYTE typ;
+    BYTE type;
     BYTE size;
     BYTE bankLo,bankHi;
     BYTE sramBank,sramSize;
     BYTE cheat[3];
 } GbacGameData;
+
+enum
+{
+    GDF_RUN_FROM_FLASH = 0x00,
+    GDF_RUN_FROM_PSRAM,
+};
 
 
 /*
