@@ -150,14 +150,14 @@ void dump_hex(WORD addr)
 
 void vdp_delay(BYTE count)
 {
-	/*keep vdp busy for a bit*/
-	while(count--)
-		vdp_wait_vblank();
+    /*keep vdp busy for a bit*/
+    while(count--)
+        vdp_wait_vblank();
 }
 
 void clear_list_surface()
 {
-	memset_asm(generic_list_buffer,0,LIST_BUFFER_SIZE);
+    memset_asm(generic_list_buffer,0,LIST_BUFFER_SIZE);
 }
 
 void present_list_surface()
@@ -169,12 +169,12 @@ void present_list_surface()
 void puts_active_list()
 {
     BYTE* temp = generic_list_buffer;
-    BYTE *p;
+    const BYTE* p;
     BYTE row, col, show;
     WORD offs;
 
     vdp_wait_vblank();
-	puts("                               ", 1, 5, PALETTE0);
+    puts("                               ", 1, 5, PALETTE0);
 
     if(MENU_STATE_GAME_GBAC == menu_state)
     {
@@ -190,19 +190,19 @@ void puts_active_list()
         puts("SD:/", 1, 5, PALETTE0);//Change this to SD path
     else if(MENU_STATE_OPTIONS == menu_state)
         puts("Options:", 1, 5, PALETTE0);
-	else
+    else
         puts("MEDIA PLAYER", 1, 5, PALETTE0);
 
-	//print_hex(menu_state,23,1);
-	//print_hex(options_highlighted,25,1);
-	//print_hex(games.highlighted,27,1);
+    //print_hex(menu_state,23,1);
+    //print_hex(options_highlighted,25,1);
+    //print_hex(games.highlighted,27,1);
 
     if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
-    {	
-		clear_list_surface();
-		row = 0;
+    {
+        clear_list_surface();
+        row = 0;
         show = (games.count < NUMBER_OF_GAMES_TO_SHOW) ? games.count : NUMBER_OF_GAMES_TO_SHOW;
-        p = (BYTE*)gbacGameList;
+        p = (const BYTE*)gbacGameList;
         p += games.firstShown << 5;
 
         while (show)
@@ -222,31 +222,62 @@ void puts_active_list()
             p += 0x20;
         }
 
-		present_list_surface();
+        present_list_surface();
     }
-	else if(MENU_STATE_OPTIONS == menu_state)
-	{
-		col = 7;
-		show = 0;
+    else if(MENU_STATE_OPTIONS == menu_state)
+    {
+        clear_list_surface();
+        row = 0;
+        show = 0;
 
-		while(show < options_count)/*Looks slow , but the options will always be 4-5 :)*/
-		{
-			puts("                                  ",1,col,PALETTE0);
-			strcpy_asm(temp,options[show].name);
+        while(show < options_count)
+        {
+            BYTE attr = (show == options_highlighted) ? PALETTE1<<1 : PALETTE0<<1;
+            BYTE ix;
 
-			if(OPTION_TYPE_SETTING == options_get_type(&options[show]))
-			{
-				if(0 == options_get_state(&options[show]))
-					strcat_asm(temp,options[show].cond0_bhv);
-				else
-					strcat_asm(temp,options[show].cond1_bhv);
-			}
+            offs = row*32*2;
+            col = 2;
+            ix = 0;
+            while (options[show].name[ix])
+            {
+                temp[offs + col*2 + 2] = options[show].name[ix] - 32;
+                temp[offs + col*2 + 3] = attr;
+                col++;
+                ix++;
+            }
 
-			puts(temp,1,col,(show == options_highlighted) ? PALETTE1 : PALETTE0);
-			++col;
-			++show;
-		}
-	}
+            if(OPTION_TYPE_SETTING == options_get_type(&options[show]))
+            {
+                if(0 == options_get_state(&options[show]))
+                {
+                    ix =0;
+                    while (options[show].cond0_bhv[ix])
+                    {
+                        temp[offs + col*2 + 2] = options[show].cond0_bhv[ix] - 32;
+                        temp[offs + col*2 + 3] = attr;
+                        col++;
+                        ix++;
+                    }
+                }
+                else
+                {
+                    ix =0;
+                    while (options[show].cond1_bhv[ix])
+                    {
+                        temp[offs + col*2 + 2] = options[show].cond1_bhv[ix] - 32;
+                        temp[offs + col*2 + 3] = PALETTE0<<1;
+                        col++;
+                        ix++;
+                    }
+                }
+            }
+
+            row++;
+            show++;
+        }
+
+        present_list_surface();
+    }
 }
 
 /*
@@ -266,15 +297,15 @@ void move_to_next_list_item()
 
         puts_active_list();
     }
-	else if(MENU_STATE_OPTIONS == menu_state)
-	{
-		options_highlighted++;
+    else if(MENU_STATE_OPTIONS == menu_state)
+    {
+        options_highlighted++;
 
-		if(options_highlighted > options_count-1)
-			options_highlighted = options_count-1;
+        if(options_highlighted > options_count-1)
+            options_highlighted = options_count-1;
 
         puts_active_list();
-	}
+    }
 }
 
 /*
@@ -295,13 +326,13 @@ void move_to_previous_list_item()
 
         puts_active_list();
     }
-	else if(MENU_STATE_OPTIONS == menu_state)
-	{
-		if(options_highlighted > 0)
-			options_highlighted--;
+    else if(MENU_STATE_OPTIONS == menu_state)
+    {
+        if(options_highlighted > 0)
+            options_highlighted--;
 
         puts_active_list();
-	}
+    }
 }
 
 
@@ -362,7 +393,7 @@ void move_to_previous_page()
  */
 WORD count_games_on_gbac()
 {
-    BYTE *p = (BYTE*)gbacGameList;
+    const BYTE* p = (const BYTE*)gbacGameList;
     WORD count = 0;
 
     while ((*p != 0xFF) && (count < 512))
@@ -441,86 +472,86 @@ void test_strings()
 
 void handle_action_button(BYTE button)
 {
-	/*
-		Button1(start) = run
-		Button2 = toggle mode
-	*/
+    /*
+        Button1(start) = run
+        Button2 = toggle mode
+    */
 
-	if(button == PAD_SW2)
-	{
-		++menu_state;
+    if(button == PAD_SW2)
+    {
+        ++menu_state;
 
-		if(menu_state > MENU_STATES-1)
-			menu_state = MENU_STATE_TOP;
+        if(menu_state > MENU_STATES-1)
+            menu_state = MENU_STATE_TOP;
 
-		//TODO : Initialize everything properly instead just reseting everything
-		options_highlighted = 0;
-		games.highlighted = 0;
-		clear_list_surface();
-		present_list_surface();
-		puts_active_list();
-		return;
-	}
+        //TODO : Initialize everything properly instead just reseting everything
+        options_highlighted = 0;
+        games.highlighted = 0;
+        clear_list_surface();
+        present_list_surface();
+        puts_active_list();
+        return;
+    }
 
     if(MENU_STATE_GAME_GBAC == menu_state)
     {
-		volatile GbacGameData* gameData;
-		volatile BYTE* p;
-		BYTE fm = options_get_state(&options[fm_enabled_option_idx]);
-		BYTE reset = options_get_state(&options[reset_to_menu_option_idx]);
+        volatile GbacGameData* gameData;
+        volatile BYTE* p;
+        BYTE fm = options_get_state(&options[fm_enabled_option_idx]);
+        BYTE reset = options_get_state(&options[reset_to_menu_option_idx]);
 
-		// Copy the game info data to somewhere in RAM
-		gameData = (volatile GbacGameData*)0xC800;
-		p = (volatile BYTE*)0xB000;
-		p += games.highlighted << 5;
+        // Copy the game info data to somewhere in RAM
+        gameData = (volatile GbacGameData*)0xC800;
+        p = (volatile BYTE*)0xB000;
+        p += games.highlighted << 5;
 
-		gameData->mode = GDF_RUN_FROM_FLASH;
-		gameData->type = flash_mem_type; // we know mode is ALWAYS 0, so pass flash type here
-		gameData->size = p[2] >> 4;
-		gameData->bankHi = p[2] & 0x0F;
-		gameData->bankLo = p[3];
-		gameData->sramBank = p[4] >> 4;
-		gameData->sramSize = p[4] & 0x0F;
-		gameData->cheat[0] = p[5];
-		gameData->cheat[1] = p[6];
-		gameData->cheat[2] = p[7];
-		pfn_neo2_run_game_gbac(fm,reset);
+        gameData->mode = GDF_RUN_FROM_FLASH;
+        gameData->type = flash_mem_type;
+        gameData->size = p[2] >> 4;
+        gameData->bankHi = p[2] & 0x0F;
+        gameData->bankLo = p[3];
+        gameData->sramBank = p[4] >> 4;
+        gameData->sramSize = p[4] & 0x0F;
+        gameData->cheat[0] = p[5];
+        gameData->cheat[1] = p[6];
+        gameData->cheat[2] = p[7];
+        pfn_neo2_run_game_gbac(fm,reset);
     }
-	else if(MENU_STATE_OPTIONS == menu_state)
-	{
-		if(options_highlighted < options_count)//sanity check
-		{
-			if(OPTION_TYPE_SETTING == options_get_type(&options[options_highlighted]))
-			{
-				if(options_get_state(&options[options_highlighted]))
-					options_set_state(&options[options_highlighted],0);
-				else
-					options_set_state(&options[options_highlighted],1);
-			}
-			else if(OPTION_TYPE_ROUTINE == options_get_type(&options[options_highlighted]))
-			{
-				//TODO
-			}
-			else if(OPTION_TYPE_CHEAT == options_get_type(&options[options_highlighted]))
-			{
-				//TODO
-			}
-			puts_active_list();
-		}
-	}
-	else if(MENU_STATE_MEDIA_PLAYER == menu_state)
-	{
-		//TODO IMPLEMENT MEDIA PLAYBACK FROM GBAC/SD
-	}
+    else if(MENU_STATE_OPTIONS == menu_state)
+    {
+        if(options_highlighted < options_count)//sanity check
+        {
+            if(OPTION_TYPE_SETTING == options_get_type(&options[options_highlighted]))
+            {
+                if(options_get_state(&options[options_highlighted]))
+                    options_set_state(&options[options_highlighted],0);
+                else
+                    options_set_state(&options[options_highlighted],1);
+            }
+            else if(OPTION_TYPE_ROUTINE == options_get_type(&options[options_highlighted]))
+            {
+                //TODO
+            }
+            else if(OPTION_TYPE_CHEAT == options_get_type(&options[options_highlighted]))
+            {
+                //TODO
+            }
+            puts_active_list();
+        }
+    }
+    else if(MENU_STATE_MEDIA_PLAYER == menu_state)
+    {
+        //TODO IMPLEMENT MEDIA PLAYBACK FROM GBAC/SD
+    }
 }
 
 void import_std_options()
 {
     options_init();
 
-	fm_enabled_option_idx = options_count;
+    fm_enabled_option_idx = options_count;
     options_add("FM : ","off","on",OPTION_TYPE_SETTING,0);
-	reset_to_menu_option_idx = options_count;
+    reset_to_menu_option_idx = options_count;
     options_add("Reset to menu : ","off","on",OPTION_TYPE_SETTING,0);
 }
 
@@ -711,22 +742,22 @@ void main()
 /*should be moved to another bank?*/
 BYTE options_get_state(Option* option)
 {
-    return (option->encoded_info & 0x0f);
+    return (option->encoded_info & 0x0F);
 }
 
 BYTE options_get_type(Option* option)
 {
-    return (option->encoded_info>>4);
+    return (option->encoded_info >> 4);
 }
 
 volatile void options_set_state(Option* option,BYTE new_state)
 {
-    option->encoded_info = ((option->encoded_info>>4)<<4) | (new_state&0x0f);
+    option->encoded_info = (option->encoded_info & 0xF0) | (new_state & 0x0F);
 }
 
 volatile void options_set_type(Option* option,BYTE new_type)
 {
-    option->encoded_info = ((new_type&0x0f)<<4) | (option->encoded_info&0x0f);
+    option->encoded_info = (new_type << 4) | (option->encoded_info & 0x0F);
 }
 
 Option* options_add(const char* name,const char* cond0_bhv,const char* cond1_bhv,BYTE type,BYTE state)
@@ -741,7 +772,7 @@ Option* options_add(const char* name,const char* cond0_bhv,const char* cond1_bhv
     strcpy_asm(option->cond0_bhv,cond0_bhv);
     strcpy_asm(option->cond1_bhv,cond1_bhv);
     memset_asm(option->user_data,0,4);
-    option->encoded_info = ( (type&0x0f) << 4 ) | (state&0x0f);
+    option->encoded_info = (type << 4) | (state & 0x0F);
 
     return option;
 }
@@ -753,15 +784,15 @@ Option* options_add_ex(const char* name,const char* cond0_bhv,const char* cond1_
     if(option == 0)
         return 0;
 
-	*(volatile WORD*)&option->user_data[0] = user_data0;
-	*(volatile WORD*)&option->user_data[2] = user_data1;
+    *(volatile WORD*)&option->user_data[0] = user_data0;
+    *(volatile WORD*)&option->user_data[2] = user_data1;
 
     return option;
 }
 
 void options_init()
 {
-	options_highlighted = 0;
+    options_highlighted = 0;
     options_count = 0;
 }
 
