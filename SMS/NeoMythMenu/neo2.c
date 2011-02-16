@@ -430,15 +430,15 @@ void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu)
         /* LD        A,03H
          LD       (0BFC8H),A   ; BIT0  RESET KEY  TO MENU ( SMS 1 )
                                ; BIT1  CARD  KEY  TO MENU ( SMS 2 )*/
-	if(reset_to_menu)
-		Neo2Reset2Menu = 3; //0b11
-	else
-		Neo2Reset2Menu = 1; //0b01
+    if(reset_to_menu)
+        Neo2Reset2Menu = 3; // b1 = 1 (reset on Myth button), b0 = 1 (reset on Reset button)
+    else
+        Neo2Reset2Menu = 0;
 
-	if(fm_enabled)
-    	Neo2FmOn = 0x01;
-	else
-		Neo2FmOn = 0x0f;
+    if(fm_enabled)
+        Neo2FmOn = 0x00; // FM enabled
+    else
+        Neo2FmOn = 0x0F; // FM disabled
 
     // TODO: Handle cheats (but disable them for now)
     Neo2CheatOn = 0;
