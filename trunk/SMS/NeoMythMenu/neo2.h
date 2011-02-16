@@ -77,6 +77,6 @@ extern void neo2_sram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len);
 extern void neo2_ram_to_psram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len);
 extern void neo2_psram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len);
 
-extern void neo2_run_game_gbac();
+extern void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu);
 
 #endif

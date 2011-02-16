@@ -7,7 +7,7 @@
 #include "neo2.h"
 #include "neo2_map.h"
 
-#define MENU_VERSION_STRING "0.15"
+#define MENU_VERSION_STRING "0.16"
 #define KEY_REPEAT_INITIAL_DELAY 15
 #define KEY_REPEAT_DELAY 7
 #define SD_DEFAULT_INFO_FETCH_TIMEOUT 30
@@ -148,6 +148,24 @@ void dump_hex(WORD addr)
     }
 }
 
+void vdp_delay(BYTE count)
+{
+	/*keep vdp busy for a bit*/
+	while(count--)
+		vdp_wait_vblank();
+}
+
+void clear_list_surface()
+{
+	memset_asm(generic_list_buffer,0,LIST_BUFFER_SIZE);
+}
+
+void present_list_surface()
+{
+    vdp_wait_vblank();
+    vdp_blockcopy_to_vram(0x1800 + (7 << 6),generic_list_buffer,LIST_BUFFER_SIZE);
+}
+
 void puts_active_list()
 {
     BYTE* temp = generic_list_buffer;
@@ -156,6 +174,8 @@ void puts_active_list()
     WORD offs;
 
     vdp_wait_vblank();
+	puts("                               ", 1, 5, PALETTE0);
+
     if(MENU_STATE_GAME_GBAC == menu_state)
     {
         puts("GBAC:/", 1, 5, PALETTE0);
@@ -168,16 +188,19 @@ void puts_active_list()
     }
     else if(MENU_STATE_GAME_SD == menu_state)
         puts("SD:/", 1, 5, PALETTE0);//Change this to SD path
-    else
+    else if(MENU_STATE_OPTIONS == menu_state)
         puts("Options:", 1, 5, PALETTE0);
+	else
+        puts("MEDIA PLAYER", 1, 5, PALETTE0);
 
-    // clear all lines
-    memset_asm(temp,0,LIST_BUFFER_SIZE);
+	//print_hex(menu_state,23,1);
+	//print_hex(options_highlighted,25,1);
+	//print_hex(games.highlighted,27,1);
 
-    row = 0;
-
-    if((MENU_STATE_GAME_GBAC == menu_state))
-    {
+    if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
+    {	
+		clear_list_surface();
+		row = 0;
         show = (games.count < NUMBER_OF_GAMES_TO_SHOW) ? games.count : NUMBER_OF_GAMES_TO_SHOW;
         p = (BYTE*)gbacGameList;
         p += games.firstShown << 5;
@@ -198,12 +221,32 @@ void puts_active_list()
             show--;
             p += 0x20;
         }
-    }
 
-    // wait for vblank and copy all at once
-    vdp_wait_vblank();
-    vdp_blockcopy_to_vram(0x1800 + (7 << 6),temp,LIST_BUFFER_SIZE);
-   //vdp_copy_to_vram(0x1800 + (7 << 6),temp,LIST_BUFFER_SIZE);
+		present_list_surface();
+    }
+	else if(MENU_STATE_OPTIONS == menu_state)
+	{
+		col = 7;
+		show = 0;
+
+		while(show < options_count)/*Looks slow , but the options will always be 4-5 :)*/
+		{
+			puts("                                  ",1,col,PALETTE0);
+			strcpy_asm(temp,options[show].name);
+
+			if(OPTION_TYPE_SETTING == options_get_type(&options[show]))
+			{
+				if(0 == options_get_state(&options[show]))
+					strcat_asm(temp,options[show].cond0_bhv);
+				else
+					strcat_asm(temp,options[show].cond1_bhv);
+			}
+
+			puts(temp,1,col,(show == options_highlighted) ? PALETTE1 : PALETTE0);
+			++col;
+			++show;
+		}
+	}
 }
 
 /*
@@ -211,7 +254,7 @@ void puts_active_list()
  */
 void move_to_next_list_item()
 {
-    if(MENU_STATE_GAME_GBAC == menu_state)
+    if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
     {
         if (games.highlighted < (games.count - 1))
             games.highlighted++;
@@ -223,6 +266,15 @@ void move_to_next_list_item()
 
         puts_active_list();
     }
+	else if(MENU_STATE_OPTIONS == menu_state)
+	{
+		options_highlighted++;
+
+		if(options_highlighted > options_count-1)
+			options_highlighted = options_count-1;
+
+        puts_active_list();
+	}
 }
 
 /*
@@ -230,7 +282,7 @@ void move_to_next_list_item()
  */
 void move_to_previous_list_item()
 {
-    if(MENU_STATE_GAME_GBAC == menu_state)
+    if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
     {
         if (games.highlighted > 0)
             games.highlighted--;
@@ -243,6 +295,13 @@ void move_to_previous_list_item()
 
         puts_active_list();
     }
+	else if(MENU_STATE_OPTIONS == menu_state)
+	{
+		if(options_highlighted > 0)
+			options_highlighted--;
+
+        puts_active_list();
+	}
 }
 
 
@@ -253,7 +312,7 @@ void move_to_next_page()
 {
     BYTE select;
 
-    if(MENU_STATE_GAME_GBAC == menu_state)
+    if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
     {
         select = games.highlighted - games.firstShown;
 
@@ -279,7 +338,7 @@ void move_to_previous_page()
 {
     BYTE select;
 
-    if(MENU_STATE_GAME_GBAC == menu_state)
+    if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
     {
         select = games.highlighted - games.firstShown;
 
@@ -382,39 +441,87 @@ void test_strings()
 
 void handle_action_button(BYTE button)
 {
+	/*
+		Button1(start) = run
+		Button2 = toggle mode
+	*/
+
+	if(button == PAD_SW2)
+	{
+		++menu_state;
+
+		if(menu_state > MENU_STATES-1)
+			menu_state = MENU_STATE_TOP;
+
+		//TODO : Initialize everything properly instead just reseting everything
+		options_highlighted = 0;
+		games.highlighted = 0;
+		clear_list_surface();
+		present_list_surface();
+		puts_active_list();
+		return;
+	}
+
     if(MENU_STATE_GAME_GBAC == menu_state)
     {
-        if(button == PAD_SW1)
-        {
-            volatile GbacGameData* gameData;
-            volatile BYTE* p;
+		volatile GbacGameData* gameData;
+		volatile BYTE* p;
+		BYTE fm = options_get_state(&options[fm_enabled_option_idx]);
+		BYTE reset = options_get_state(&options[reset_to_menu_option_idx]);
 
-            // Copy the game info data to somewhere in RAM
-            gameData = (volatile GbacGameData*)0xC800;
-            p = (volatile BYTE*)0xB000;
-            p += games.highlighted << 5;
+		// Copy the game info data to somewhere in RAM
+		gameData = (volatile GbacGameData*)0xC800;
+		p = (volatile BYTE*)0xB000;
+		p += games.highlighted << 5;
 
-            gameData->mode = GDF_RUN_FROM_FLASH;
-            gameData->type = flash_mem_type; // we know mode is ALWAYS 0, so pass flash type here
-            gameData->size = p[2] >> 4;
-            gameData->bankHi = p[2] & 0x0F;
-            gameData->bankLo = p[3];
-            gameData->sramBank = p[4] >> 4;
-            gameData->sramSize = p[4] & 0x0F;
-            gameData->cheat[0] = p[5];
-            gameData->cheat[1] = p[6];
-            gameData->cheat[2] = p[7];
-            pfn_neo2_run_game_gbac();
-        }
-        else if (button == PAD_SW2)
-            pfn_vgm_play();         //test vgm player
+		gameData->mode = GDF_RUN_FROM_FLASH;
+		gameData->type = flash_mem_type; // we know mode is ALWAYS 0, so pass flash type here
+		gameData->size = p[2] >> 4;
+		gameData->bankHi = p[2] & 0x0F;
+		gameData->bankLo = p[3];
+		gameData->sramBank = p[4] >> 4;
+		gameData->sramSize = p[4] & 0x0F;
+		gameData->cheat[0] = p[5];
+		gameData->cheat[1] = p[6];
+		gameData->cheat[2] = p[7];
+		pfn_neo2_run_game_gbac(fm,reset);
     }
+	else if(MENU_STATE_OPTIONS == menu_state)
+	{
+		if(options_highlighted < options_count)//sanity check
+		{
+			if(OPTION_TYPE_SETTING == options_get_type(&options[options_highlighted]))
+			{
+				if(options_get_state(&options[options_highlighted]))
+					options_set_state(&options[options_highlighted],0);
+				else
+					options_set_state(&options[options_highlighted],1);
+			}
+			else if(OPTION_TYPE_ROUTINE == options_get_type(&options[options_highlighted]))
+			{
+				//TODO
+			}
+			else if(OPTION_TYPE_CHEAT == options_get_type(&options[options_highlighted]))
+			{
+				//TODO
+			}
+			puts_active_list();
+		}
+	}
+	else if(MENU_STATE_MEDIA_PLAYER == menu_state)
+	{
+		//TODO IMPLEMENT MEDIA PLAYBACK FROM GBAC/SD
+	}
 }
 
 void import_std_options()
 {
     options_init();
-    //options_add("FM status",OPTION_TYPE_SETTING,0);
+
+	fm_enabled_option_idx = options_count;
+    options_add("FM : ","off","on",OPTION_TYPE_SETTING,0);
+	reset_to_menu_option_idx = options_count;
+    options_add("Reset to menu : ","off","on",OPTION_TYPE_SETTING,0);
 }
 
 void main()
@@ -604,25 +711,25 @@ void main()
 /*should be moved to another bank?*/
 BYTE options_get_state(Option* option)
 {
-    return (option->encoded_info>>4) & 0xf;
+    return (option->encoded_info & 0x0f);
 }
 
 BYTE options_get_type(Option* option)
 {
-    return option->encoded_info & 0xf;
+    return (option->encoded_info>>4);
 }
 
-void options_set_state(Option* option,BYTE new_state)
+volatile void options_set_state(Option* option,BYTE new_state)
 {
-    option->encoded_info = ((option->encoded_info>>4)<<4) | (new_state&0xf);
+    option->encoded_info = ((option->encoded_info>>4)<<4) | (new_state&0x0f);
 }
 
-void options_set_type(Option* option,BYTE new_type)
+volatile void options_set_type(Option* option,BYTE new_type)
 {
-    option->encoded_info = ((new_type&0xf)<<4) | (option->encoded_info&0xf);
+    option->encoded_info = ((new_type&0x0f)<<4) | (option->encoded_info&0x0f);
 }
 
-Option* options_add(const char* name,BYTE type,BYTE state)
+Option* options_add(const char* name,const char* cond0_bhv,const char* cond1_bhv,BYTE type,BYTE state)
 {
     Option* option;
 
@@ -631,28 +738,30 @@ Option* options_add(const char* name,BYTE type,BYTE state)
 
     option = &options[options_count++];
     strcpy_asm(option->name,name);
+    strcpy_asm(option->cond0_bhv,cond0_bhv);
+    strcpy_asm(option->cond1_bhv,cond1_bhv);
     memset_asm(option->user_data,0,4);
-    option->encoded_info = ( (type&0xf) << 4 ) | (state&0xf);
+    option->encoded_info = ( (type&0x0f) << 4 ) | (state&0x0f);
 
     return option;
 }
 
-Option* options_add_ex(const char* name,BYTE type,BYTE state,WORD user_data0,WORD user_data1)
+Option* options_add_ex(const char* name,const char* cond0_bhv,const char* cond1_bhv,BYTE type,BYTE state,WORD user_data0,WORD user_data1)
 {
-    Option* option = options_add(name,type,state);
+    Option* option = options_add(name,cond0_bhv,cond1_bhv,type,state);
 
     if(option == 0)
         return 0;
 
-    option->user_data[0] = user_data0>>8;
-    option->user_data[1] = user_data0&0xff;
-    option->user_data[2] = user_data1>>8;
-    option->user_data[3] = user_data1&0xff;
+	*(volatile WORD*)&option->user_data[0] = user_data0;
+	*(volatile WORD*)&option->user_data[2] = user_data1;
+
     return option;
 }
 
 void options_init()
 {
+	options_highlighted = 0;
     options_count = 0;
 }
 

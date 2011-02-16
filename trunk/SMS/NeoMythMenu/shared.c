@@ -17,6 +17,8 @@ BYTE vregs[16];     // C006
 
 // The rest can be in any order..
 
+BYTE reset_to_menu_option_idx;
+BYTE fm_enabled_option_idx;
 BYTE flash_mem_type;
 BYTE hasZipram;
 BYTE menu_state;
@@ -26,6 +28,7 @@ BYTE region;
 BYTE pad, padLast;
 
 BYTE options_count;
+BYTE options_highlighted;
 Option options[MAX_OPTIONS];
 
 BYTE generic_list_buffer[LIST_BUFFER_SIZE];
