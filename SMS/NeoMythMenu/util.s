@@ -221,20 +221,16 @@
     ;;BYTE strlen_asm(const BYTE* str)
     .globl _strlen_asm
     _strlen_asm:
-    ;;improve this
+
+	ld		l,#0
+
     strlen_asm_loop:
-        ld      b,(hl)  ;;*str
-        ld      c,a
-        xor     a
-        or      b       ;;ztst
-        ld      a,c
-        jp      z,strlen_asm_done
-        inc     hl      ;;++str
-        inc     a       ;;++r
-        jp      strlen_asm_loop
+        ld      a,(hl)
+		inc		l
+		or		a
+        jp      nz,strlen_asm_loop
 
     strlen_asm_done:
-        ld      l,a     ;;l = res
     ret
 
     ;;TODO : strcmp_asm

@@ -354,6 +354,7 @@ void neo2_debug_dump_hex(WORD addr)
     vaddr += (row << 6) + 8;
     for (; row < 15; row++)
     {
+
         VdpCtrl = (vaddr & 0xFF);
         VdpCtrl = (vaddr >> 8) | 0x40;
         for (col = 0; col < 8; col++)
@@ -372,7 +373,7 @@ void neo2_debug_dump_hex(WORD addr)
 }
 
 
-void neo2_run_game_gbac()
+void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu)
 {
     volatile GbacGameData* gameData = (volatile GbacGameData*)0xC800;
     WORD wtemp;
@@ -426,9 +427,18 @@ void neo2_run_game_gbac()
 
     Neo2SramBank = gameData->sramBank;
 
-    Neo2Reset2Menu = 3; // TODO: Handle this
+        /* LD        A,03H
+         LD       (0BFC8H),A   ; BIT0  RESET KEY  TO MENU ( SMS 1 )
+                               ; BIT1  CARD  KEY  TO MENU ( SMS 2 )*/
+	if(reset_to_menu)
+		Neo2Reset2Menu = 3; //0b11
+	else
+		Neo2Reset2Menu = 1; //0b01
 
-    Neo2FmOn = 0x0F;    // TODO: Handle this
+	if(fm_enabled)
+    	Neo2FmOn = 0x01;
+	else
+		Neo2FmOn = 0x0f;
 
     // TODO: Handle cheats (but disable them for now)
     Neo2CheatOn = 0;
