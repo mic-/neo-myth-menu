@@ -19,12 +19,23 @@
  */
 #define PLAIN_BG
 
-void mute_psg()
+void mute_sound()
 {
+    BYTE i;
+
+    // mute the PSG
     PsgPort = 0x9F;     // Mute channel 0
     PsgPort = 0xBF;     // Mute channel 1
     PsgPort = 0xDF;     // Mute channel 2
     PsgPort = 0xFF;     // Mute channel 3
+
+    // mute the YM2413
+    for (i=0; i<9; i++)
+    {
+        // volume off
+        FMAddr = 0x30 + i;
+        FMData = 0x00;
+    }
 }
 
 /*
@@ -628,11 +639,11 @@ void main()
 
     region = check_sms_region();
 
+    // make sure the sound is off
+    mute_sound();
+
     // Make sure the display is off before we write to VRAM
     vdp_set_reg(REG_MODE_CTRL_2, 0xA0);
-
-    // mute the PSG
-    mute_psg();
 
     // Clear the nametable
     vdp_set_vram(0x1800, 0, 32*24*2);
