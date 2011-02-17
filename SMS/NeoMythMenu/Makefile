@@ -31,7 +31,7 @@ tools/smshdr:
 ramcode.bin:
 	$(AS) -o vgm_player.s
 	$(CC) $(CFLAGS) -c testvgm.c
-	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0xD000 neo2.c vgm_player.rel testvgm.rel
+	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0xD000 neo2.c vgm_player.rel 
 	$(HEX2BIN) neo2.ihx
 	$(PADTRIM) neo2.bin ramcode.bin
 	$(MAP2H) neo2.map neo2.h vgm_player.h

@@ -38,16 +38,15 @@ APP_CMD = 55
 DISKIO_CACHE_SIZE = 2
 
 
-; TODO: set these to their correct values
-MYTH_NEO2_WR_CMD1_CLR13 = 0xDE00
-MYTH_NEO2_WR_CMD1_SET13 = 0xEE00
-MYTH_NEO2_WR_DAT1_CLR9 = 0xFC00
-MYTH_NEO2_WR_DAT1_SET9 = 0xFE00
-MYTH_NEO2_WR_DAT4 = 0xE000
+MYTH_NEO2_WR_CMD1_CLR13 = 0x5E00    ; FlashBankLo=0x87,Frame1=7  
+MYTH_NEO2_WR_CMD1_SET13 = 0x7E00    ; 0x87,7
+MYTH_NEO2_WR_DAT1_CLR9 = 0x7C00     ; 0x87,7
+MYTH_NEO2_WR_DAT1_SET9 = 0x7E00     ; 0x87,7
+MYTH_NEO2_WR_DAT4 = 0x6000          ; 0x87,7
 
-MYTH_NEO2_RD_CMD1 = 0xFE81
-MYTH_NEO2_RD_DAT1 = 0x7C21
-MYTH_NEO2_RD_DAT4 = 0x6061
+MYTH_NEO2_RD_CMD1 = 0x7E81          ; 0x87,7
+MYTH_NEO2_RD_DAT1 = 0x7C21          ; 0x87,5
+MYTH_NEO2_RD_DAT4 = 0x6061          ; 0x87,1
 
 
 ;**********************************************************************************************
@@ -171,10 +170,10 @@ rdMmcCmdBit:
 
 ; unsigned int rdMmcDatBit()
 ;
-rdMmcDatBit:
-	ld	a,(MYTH_NEO2_RD_DAT1)
-	and	a,#1
-	ret
+;rdMmcDatBit:
+;	ld	a,(MYTH_NEO2_RD_DAT1)
+;	and	a,#1
+;	ret
 	
 
 ;**********************************************************************************************
@@ -259,14 +258,19 @@ rdMmcDatByte4:
 ; unsigned char rdMmcDatByte()
 ;
 rdMmcDatByte:
-	ld    b,#8
-	ld    c,#0
+    	ld    	a,#5
+    	ld    	(0xFFFE),a    ; Frame1=5
+	ld    	b,#8
+	ld    	c,#0
 1$:
-	call  rdMmcDatBit
-	srl   a
-	rl    c			; c = (c << 1) | rdMmcDatBit()
-	djnz  1$
-	ld    a,c
+	ld    	a,(MYTH_NEO2_RD_DAT1)
+	and   	a,#1 ;call  rdMmcDatBit
+	srl   	a
+	rl    	c		; c = (c << 1) | rdMmcDatBit()
+	djnz  	1$
+    	ld    	a,#7
+    	ld    	(0xFFFE),a    ; Frame1=7 
+	ld    	a,c
 	ret
 	
 
@@ -431,6 +435,8 @@ recvMmcCmdResp:
 ; Out:
 ;   A = 0 (failure) or 1 (success)
 sdReadSingleBlock:
+	push	hl
+	
         ld      a,#READ_SINGLE_BLOCK
         call    sendMmcCmd
 
@@ -449,12 +455,16 @@ sdReadSingleBlock:
         cp      a,#READ_SINGLE_BLOCK
         jp      z,1$
 2$:
+	pop	hl
         ld      a,#0            ; return FALSE
         ret
 1$:
 
         ld      de,#8192
-3$:                             ; while ((rdMmcDatBit4()&1) != 0)
+3$:
+        ld      a,#1
+        ld      (0xFFFE),a     ; Frame1 = 1  
+                               ; while ((rdMmcDatBit4()&1) != 0)
         call    rdMmcDatBit4
         and     a,#1
         jr      z,4$
@@ -463,11 +473,15 @@ sdReadSingleBlock:
         or      a,e
         jp      nz,3$
 
+	pop	hl
         ld      a,#0            ; return FALSE (timeout on start bit)
         ret
 4$:
+	pop	hl
         call    neo2_recv_sd
 
+        ld      a,#7
+        ld      (0xFFFE),a      ; Frame1 = 7
         ld      a,#0xFF
         call    wrMmcCmdByte    ; wrMmcCmdByte(0xFF);
 
@@ -978,6 +992,226 @@ neo2_enable_sd:
 neo2_disable_sd:
 neo2_pre_sd:
 neo2_post_sd:
-neo2_recv_sd:
 ret
+
+
+; Read to RAM/SRAM
+;
+; 46.625 cycles/byte
+;
+; In:
+;   HL = buf
+neo2_recv_sd:
+        ld      b,#64
+        ld      de,#MYTH_NEO2_RD_DAT4
+        ; Read one sector (512 bytes)
+1$:
+        ld      a,(de)   ; 7
+        ld      (hl),a   ; 7
+        ld      a,(de)   ; 7
+        rld              ; 18.  (hl) = (hl)<<4 + a&0x0F
+        inc     hl       ; 6
+; 2nd byte
+        ld      a,(de)  
+        ld      (hl),a   
+        ld      a,(de)  
+        rld             
+        inc     hl      
+; 3rd byte
+        ld      a,(de)  
+        ld      (hl),a   
+        ld      a,(de)  
+        rld             
+        inc     hl      
+; 4th byte
+        ld      a,(de)  
+        ld      (hl),a   
+        ld      a,(de)  
+        rld             
+        inc     hl      
+; 5th byte
+        ld      a,(de)  
+        ld      (hl),a   
+        ld      a,(de)  
+        rld             
+        inc     hl      
+; 6th byte
+        ld      a,(de)  
+        ld      (hl),a   
+        ld      a,(de)  
+        rld             
+        inc     hl      
+; 7th byte
+        ld      a,(de)  
+        ld      (hl),a   
+        ld      a,(de)  
+        rld             
+        inc     hl      
+; 8th byte
+        ld      a,(de)  
+        ld      (hl),a   
+        ld      a,(de)  
+        rld             
+        inc     hl      
+
+        djnz    1$       ; 13
+ 
+        ; Read 8 CRC bytes (16 nybbles)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+
+        ld      a,(de)   ; end bit
+
+        ret
+
+
+; Read to PSRAM
+;
+; 59.625 cycles/byte
+;
+; In:
+;   HL = buf
+neo2_recv_sd_psram:
+        ld      b,#64
+        ld      de,#MYTH_NEO2_RD_DAT4
+        ; Read one sector (512 bytes)
+1$:
+        ld      a,(de)   ; 7
+        add     a,a      ; 4
+        add     a,a      ; 4
+        add     a,a      ; 4
+        add     a,a      ; 4
+        ld      c,a      ; 4
+        ld      a,(de)   ; 7
+        and     #0x0F    ; 7
+        or      a,c      ; 4
+        ld      (hl),a   ; 7
+        inc     hl       ; 6
+
+; 2nd byte
+        ld      a,(de)   
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        ld      c,a      
+        ld      a,(de)   
+        and     #0x0F    
+        or      a,c      
+        ld      (hl),a   
+        inc     hl       
+; 3rd byte
+        ld      a,(de)   
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        ld      c,a      
+        ld      a,(de)   
+        and     #0x0F    
+        or      a,c      
+        ld      (hl),a   
+        inc     hl   
+; 4th byte
+        ld      a,(de)   
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        ld      c,a      
+        ld      a,(de)   
+        and     #0x0F    
+        or      a,c      
+        ld      (hl),a   
+        inc     hl   
+; 5th byte
+        ld      a,(de)   
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        ld      c,a      
+        ld      a,(de)   
+        and     #0x0F    
+        or      a,c      
+        ld      (hl),a   
+        inc     hl   
+; 6th byte
+        ld      a,(de)   
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        ld      c,a      
+        ld      a,(de)   
+        and     #0x0F    
+        or      a,c      
+        ld      (hl),a   
+        inc     hl   
+; 7th byte
+        ld      a,(de)   
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        ld      c,a      
+        ld      a,(de)   
+        and     #0x0F    
+        or      a,c      
+        ld      (hl),a   
+        inc     hl   
+; 8th byte
+        ld      a,(de)   
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        add     a,a      
+        ld      c,a      
+        ld      a,(de)   
+        and     #0x0F    
+        or      a,c      
+        ld      (hl),a   
+        inc     hl   
+        
+        djnz    1$       ; 13
+ 
+        ; Read 8 CRC bytes (16 nybbles)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+
+        ld      a,(de)   ; end bit
+
+        ret
+
+
+
+
 

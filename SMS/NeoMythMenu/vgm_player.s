@@ -22,7 +22,8 @@ CMD_END = 0x66
 
 _vgm_play:
 	push	ix
-
+	push	iy
+	
 	di
 	
 	; calc loop offset
@@ -45,13 +46,23 @@ _vgm_play:
 	ld	(VREGS+3),a
 
 	ld	bc,#VGMBASE+0x40
-
+	ld	iy,#vgm_jump_table
+	
 vgm_play_loop:	
 	ld	a,(bc)		; 7
 	inc	bc		; 6. TODO: handle 16kB frame wraps
 	.db 0xDD,0x67 ;ld	ixh,a		; 8
+
+
+; (to be used later when the jump table has been placed on a 256-byte boundary)
+;add a,#0xC0 ; 7
+;rlca        ; 4
+;ld iyl,a    ; 8
+;ld l,0(iy)  ; 19
+;ld h,1(iy)  ; 19
+;jp (hl)     ; 4
 	
-	add	a,#0xC0		; 7
+	add	a,#0xC0		; 7. subtract 0x40
 	ld	d,#0		; 7
 	ld	e,a		; 4
 	sla	e		; 8
@@ -63,7 +74,20 @@ vdm_load_address:
 	ld	hl,(0000)	; 16. address is overwritten by the previous instruction
 	jp	(hl)		; 4
 
-	; Currently never returns
+
+vgm_play_return:
+	pop	iy
+	pop	ix
+	; mute the PSG
+	ld	a,#0x9F
+	out	(SNPORT),a
+	ld	a,#0xBF
+	out	(SNPORT),a
+	ld	a,#0xDF
+	out	(SNPORT),a
+	ld	a,#0xFF
+	out	(SNPORT),a
+	ret
 
 vgm_psg_write:
 	ld	a,(bc)
@@ -100,17 +124,16 @@ vgm_end:
 vgm_short_wait:
 	.db 0xDD,0x7C ;ld	a,ixh	; 8
 	and	a,#0x0F	; 7
-	jp	z,1$	; 10
+	jp	z,vgm_play_loop	; 10
 	
 	; 80 cycles/iteration
-2$:
+1$:
 	ld	ix,#0	; 20
 	ld	ix,#0	; 20
 	ld	ix,#0	; 20
 	dec	de	; 6
 	dec	a	; 4
-	jp	nz,2$	; 10
-1$:
+	jp	nz,1$	; 10
 	jp	vgm_play_loop ; 10
 
 
@@ -125,10 +148,10 @@ vgm_wait2:
 	dec	de	; 6
 	ld	a,e	; 4
 	or	a,d	; 4
-	jp	z,1$	; 10
+	jp	z,vgm_play_loop	; 10
 	
 	; 80 cycles/iteration
-2$:
+1$:
 	set	#0,a	; 8
 	set	#0,a	; 8
 	set	#0,a	; 8
@@ -139,16 +162,21 @@ vgm_wait2:
 	dec	de	; 6
 	ld	a,e	; 4
 	or	a,d	; 4
-	jp	nz,2$	; 10
-1$:
+	jp	nz,1$	; 10
 	jp	vgm_play_loop ; 10
 	
 	
 vgm_wait_pal:
+	in	a,(0xDC)
+	and	a,#0x10
+	jp	nz,vgm_play_return
 	ld	de,#882
 	jp	vgm_wait2
 	
 vgm_wait_ntsc:
+	in	a,(0xDC)
+	and	a,#0x10
+	jp	nz,vgm_play_return
 	ld	de,#735
 	jp	vgm_wait2
 
