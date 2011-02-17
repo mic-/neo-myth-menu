@@ -265,7 +265,7 @@ void puts_active_list()
                     while (options[show].cond1_bhv[ix])
                     {
                         temp[offs + col*2 + 2] = options[show].cond1_bhv[ix] - 32;
-                        temp[offs + col*2 + 3] = PALETTE0<<1;
+                        temp[offs + col*2 + 3] = attr;
                         col++;
                         ix++;
                     }
@@ -472,28 +472,54 @@ void test_strings()
 
 void handle_action_button(BYTE button)
 {
-    /*
-        Button1(start) = run
-        Button2 = toggle mode
-    */
-
-    if(button == PAD_SW2)
+    if (MENU_STATE_OPTIONS == menu_state)
     {
-        ++menu_state;
+        // in the options state, the controls are
+        // [DOWN]/[UP] = next/prev option
+        // [LEFT]/[RIGHT] = change option
+        // [I] = run game
+        // [II] = change menu state
 
-        if(menu_state > MENU_STATES-1)
-            menu_state = MENU_STATE_TOP;
+        if ((button == PAD_LEFT) || (button == PAD_RIGHT))
+        {
+            if(options_highlighted < options_count)//sanity check
+            {
+                if(OPTION_TYPE_SETTING == options_get_type(&options[options_highlighted]))
+                {
+                    if(options_get_state(&options[options_highlighted]))
+                        options_set_state(&options[options_highlighted],0);
+                    else
+                        options_set_state(&options[options_highlighted],1);
+                }
+#if 0
+                else if(OPTION_TYPE_ROUTINE == options_get_type(&options[options_highlighted]))
+                {
+                    //TODO
+                }
+                else if(OPTION_TYPE_CHEAT == options_get_type(&options[options_highlighted]))
+                {
+                    //TODO
+                }
+#endif
+                puts_active_list();
+            }
+        }
 
-        //TODO : Initialize everything properly instead just reseting everything
-        options_highlighted = 0;
-        games.highlighted = 0;
-        clear_list_surface();
-        present_list_surface();
-        puts_active_list();
-        return;
     }
+#if 0
+    else if(MENU_STATE_MEDIA_PLAYER == menu_state)
+    {
+    }
+#endif
 
-    if(MENU_STATE_GAME_GBAC == menu_state)
+    // fall through to game flash browser state
+    // in the game flash browser state, the controls are
+    // [DOWN]/[UP] = next/prev game
+    // [LEFT]/[RIGHT] = next/prev page of games
+    // [I] = run game
+    // [II] = change menu state
+
+    if(button == PAD_SW1)
     {
         volatile GbacGameData* gameData;
         volatile BYTE* p;
@@ -515,33 +541,45 @@ void handle_action_button(BYTE button)
         gameData->cheat[0] = p[5];
         gameData->cheat[1] = p[6];
         gameData->cheat[2] = p[7];
-        pfn_neo2_run_game_gbac(fm,reset);
+        pfn_neo2_run_game_gbac(fm,reset); // never returns
     }
-    else if(MENU_STATE_OPTIONS == menu_state)
+    else if(button == PAD_SW2)
     {
-        if(options_highlighted < options_count)//sanity check
+        ++menu_state;
+
+        if(menu_state > MENU_STATES-1)
+            menu_state = MENU_STATE_TOP;
+
+        switch (menu_state)
         {
-            if(OPTION_TYPE_SETTING == options_get_type(&options[options_highlighted]))
-            {
-                if(options_get_state(&options[options_highlighted]))
-                    options_set_state(&options[options_highlighted],0);
-                else
-                    options_set_state(&options[options_highlighted],1);
-            }
-            else if(OPTION_TYPE_ROUTINE == options_get_type(&options[options_highlighted]))
-            {
-                //TODO
-            }
-            else if(OPTION_TYPE_CHEAT == options_get_type(&options[options_highlighted]))
-            {
-                //TODO
-            }
-            puts_active_list();
+            case MENU_STATE_GAME_GBAC:
+                games.highlighted = 0;
+                vdp_wait_vblank();
+                puts("[L/R/U/D] Navigate  ", 1, 21, PALETTE0);
+                puts("[I] Run [II] Options", 1, 22, PALETTE0);
+                break;
+            case MENU_STATE_OPTIONS:
+                options_highlighted = 0;
+                vdp_wait_vblank();
+                puts("[L/R] Change option ", 1, 21, PALETTE0);
+                puts("[I] Run [II] SD card", 1, 22, PALETTE0);
+                break;
+            case MENU_STATE_GAME_SD:
+                vdp_wait_vblank();
+                puts("[L/R/U/D] Navigate  ", 1, 21, PALETTE0);
+                puts("[I] Run [II] Media  ", 1, 22, PALETTE0);
+                break;
+            case MENU_STATE_MEDIA_PLAYER:
+                vdp_wait_vblank();
+                puts("[L/R/U/D] Navigate  ", 1, 21, PALETTE0);
+                puts("[I] Play [II] Flash ", 1, 22, PALETTE0);
+                break;
         }
-    }
-    else if(MENU_STATE_MEDIA_PLAYER == menu_state)
-    {
-        //TODO IMPLEMENT MEDIA PLAYBACK FROM GBAC/SD
+
+        //TODO : Initialize everything properly
+        clear_list_surface();
+        present_list_surface();
+        puts_active_list();
     }
 }
 
@@ -550,9 +588,9 @@ void import_std_options()
     options_init();
 
     fm_enabled_option_idx = options_count;
-    options_add("FM : ","off","on",OPTION_TYPE_SETTING,0);
+    options_add("FM : ","off","on",OPTION_TYPE_SETTING,1);
     reset_to_menu_option_idx = options_count;
-    options_add("Reset to menu : ","off","on",OPTION_TYPE_SETTING,0);
+    options_add("Reset to menu : ","off","on",OPTION_TYPE_SETTING,1);
 }
 
 void main()
@@ -585,8 +623,6 @@ void main()
     Frame1 = 1;
     Frame2 = 2;
 
-    mute_psg();
-
     games.count = count_games_on_gbac();
     games.firstShown = games.highlighted = 0;
 
@@ -594,6 +630,9 @@ void main()
 
     // Make sure the display is off before we write to VRAM
     vdp_set_reg(REG_MODE_CTRL_2, 0xA0);
+
+    // mute the PSG
+    mute_psg();
 
     // Clear the nametable
     vdp_set_vram(0x1800, 0, 32*24*2);
@@ -613,8 +652,8 @@ void main()
     puts("FW ", 24, 22, PALETTE0);
     puts("1.00", 27, 22, PALETTE0);     // TODO: read version from CPLD
 
-    puts("[I]  Run", 1, 21, PALETTE0);
-    puts("[II] More options", 1, 22, PALETTE0);
+    puts("[L/R/U/D] Navigate  ", 1, 21, PALETTE0);
+    puts("[I] Run [II] Options", 1, 22, PALETTE0);
 
     // Print some Myth info
     /*print_hex(idLo, 24, 20);
@@ -722,12 +761,18 @@ void main()
 
         if (pad & PAD_LEFT)
         {
-            move_to_previous_page();
+            if (MENU_STATE_OPTIONS == menu_state)
+                handle_action_button(PAD_LEFT);
+            else
+                move_to_previous_page();
         }
 
         if (pad & PAD_RIGHT)
         {
-            move_to_next_page();
+            if (MENU_STATE_OPTIONS == menu_state)
+                handle_action_button(PAD_RIGHT);
+            else
+                move_to_next_page();
         }
 
         if (pad & PAD_SW1)
