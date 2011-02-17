@@ -4,7 +4,7 @@
 #include <z80/types.h>
 #define NUMBER_OF_GAMES_TO_SHOW 9
 #define MAX_OPTIONS 4
- 
+
 typedef struct
 {
     WORD firstShown;
@@ -16,8 +16,8 @@ typedef struct
 {
     BYTE encoded_info;      /*msnyb = type,lsnyb = 0 or 1 (enabled/disabled)*/
     char name[20];
-	char cond0_bhv[6];
-	char cond1_bhv[6];
+    char cond0_bhv[6];
+    char cond1_bhv[6];
     BYTE user_data[4];
 }Option;
 
@@ -45,16 +45,14 @@ enum
  */
 enum
 {
-	MENU_STATE_TOP = 0,
+    MENU_STATE_TOP = 0,
     MENU_STATE_GAME_GBAC = 0,
     MENU_STATE_OPTIONS = 1,
     MENU_STATE_GAME_SD = 2,
-	MENU_STATE_MEDIA_PLAYER = 3,
-	MENU_STATES = 4,
+    MENU_STATE_MEDIA_PLAYER = 3,
+    MENU_STATES = 4,
 };
 
-extern BYTE reset_to_menu_option_idx;
-extern BYTE fm_enabled_option_idx;
 extern BYTE options_get_state(Option* option);
 extern BYTE options_get_type(Option* option);
 extern void options_set_state(Option* option,BYTE new_state);
@@ -64,11 +62,15 @@ extern Option* options_add_ex(const char* name,const char* cond0_bhv,const char*
 extern void options_init();
 
 extern BYTE flash_mem_type;
+
 extern Option options[MAX_OPTIONS];
 extern BYTE options_count;
 extern BYTE options_highlighted;
+extern BYTE reset_to_menu_option_idx;
+extern BYTE fm_enabled_option_idx;
 
 extern BYTE sd_fetch_info_timeout;
+
 extern BYTE menu_state;
 extern FileList games;
 extern BYTE region;
