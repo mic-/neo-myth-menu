@@ -19,5 +19,6 @@ extern void strncat_asm(char* dst,const char* src,BYTE cnt);
 extern const char* get_file_extension_asm(const char* src);
 extern void memcpy_asm(char* dst,const char* src,WORD size);
 extern void memset_asm(char* dst,char val,WORD size);
+extern BYTE memcmp_asm(const BYTE* a,const BYTE* b,WORD len);
 #endif
 

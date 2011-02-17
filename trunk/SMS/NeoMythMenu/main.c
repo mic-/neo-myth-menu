@@ -484,6 +484,22 @@ void test_strings()
 
     puts(buf,8,3,PALETTE0);
 
+	if(ext)
+	{
+		if(memcmp_asm(ext,"sms",3)==0)
+			strcpy_asm(buf,"Extension was .SMS!");
+		else
+			strcpy_asm(buf,"Extension wasn't .SMS!");
+
+    	puts(buf,8,4,PALETTE0);
+	}
+
+	print_hex(strlen_asm("Hello World"),8,8);
+	if(memcmp_asm("Hello World","Hello World",strlen_asm("Hello World")) == 0)
+		puts("Hello World matches",8,5,PALETTE0);
+	else
+		puts("Hello World doesn't match",8,5,PALETTE0);
+
     while(1){}
 }
 #endif

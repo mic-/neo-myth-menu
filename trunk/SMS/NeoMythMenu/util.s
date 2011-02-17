@@ -222,18 +222,64 @@
     .globl _strlen_asm
     _strlen_asm:
 
-	ld		l,#0
+	xor			a
+	ld			e,#0
 
     strlen_asm_loop:
-        ld      a,(hl)
-		inc		l
-		or		a
-        jp      nz,strlen_asm_loop
+		inc		e
+		cpi
+        jp     nz,strlen_asm_loop
 
-    strlen_asm_done:
+	dec			e
+	ld			l,e
     ret
 
-    ;;TODO : strcmp_asm
+	;;BYTE memcmp_asm(const BYTE* a,const BYTE* b,WORD len)
+	.globl			_vregs
+	.globl			_memcmp_asm
+	_memcmp_asm:
+    push            ix                                      
+            ld      ix,#4                                  
+            add     ix,sp                                   
+            ld      l,(ix)        				;;a                          
+            ld      h,1(ix) 					;;.
+			ld		e,2(ix)						;;b
+			ld		d,3(ix)						;;.
+			ld		c,4(ix)						;;len
+			ld		b,5(ix)						;;....
+
+			xor		a							;;flag to vreg
+			ld		(_vregs+0),a				;;............
+
+			memcmp_asm_loop:
+			ld		a,(hl)						;;save *a to vreg1
+			ld		(_vregs+1),a				;;...............
+			ld		a,b							;;save b to vreg2
+			ld		(_vregs+2),a				;;...............
+			ld		a,(de)						;;b = *b
+			ld		b,a							;;.....
+			ld		a,(_vregs+1)				;;r = a - vr[1]
+			sub		a,b							;;.............
+			ld		(_vregs+0),a				;;save to vr[0]
+			or		a							;;test
+			jp		nz,memcmp_asm_done_skip_load
+			ld		a,(_vregs+2)				;;b = vr[2]
+			ld		b,a							;;.........
+			inc		de
+			cpi									;;dec bc + inc hl in one op
+			ld		a,b
+			or		c
+			jp		nz,memcmp_asm_loop
+
+			memcmp_asm_done:
+			ld		a,(_vregs+0)				;;flag in vreg
+
+			memcmp_asm_done_skip_load:
+			ld		l,a
+
+            memcmp_asm_skip_load:
+	pop				ix
+	ret
 
     ;;void memcpy_asm(BYTE* dst,const BYTE* src,WORD size);
     .globl _memcpy_asm
