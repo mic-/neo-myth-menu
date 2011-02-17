@@ -276,13 +276,15 @@ void neo2_ram_to_psram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
 
     ld      a,(ix)      ; dsthi
     ld      hl,#0xBFC0  ; bank low
+    srl     a           ; bank is for word bus, lsb -> CF
     ld      (hl),a
     ld      a,2(ix)     ; dstlo MSB
-    rlca
-    rlca
-    and     a,#0x03
+    rla
+    rla
+    rla
+    and     a,#0x07
     ld      hl,#0xFFFE
-    ld      (hl),a      ; Frame1 = dstlo MSB >> 14
+    ld      (hl),a      ; Frame1 = ((dsthi & 1) << 2) | (dstlo MSB >> 14)
     ld      e,1(ix)     ; dstlo LSB
     ld      a,2(ix)     ; dstlo MSB
     and     a,#0x3F
@@ -315,13 +317,15 @@ void neo2_psram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
 
     ld      a,2(ix)     ; srchi
     ld      hl,#0xBFC0  ; bank low
+    srl     a           ; bank is for word bus, lsb -> CF
     ld      (hl),a
     ld      a,4(ix)     ; srclo MSB
-    rlca
-    rlca
-    and     a,#0x03
+    rla
+    rla
+    rla
+    and     a,#0x07
     ld      hl,#0xFFFE
-    ld      (hl),a      ; Frame1 = srclo MSB >> 14
+    ld      (hl),a      ; Frame1 = ((srchi & 1) << 2) | (srclo MSB >> 14)
     ld      e,(ix)      ; dst LSB
     ld      d,1(ix)     ; dst MSB
     ld      l,3(ix)     ; src LSB
