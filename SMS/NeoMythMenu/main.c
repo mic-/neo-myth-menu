@@ -21,7 +21,7 @@
 
 void mute_sound()
 {
-    BYTE i;
+    BYTE i, j;
 
     // mute the PSG
     PsgPort = 0x9F;     // Mute channel 0
@@ -29,12 +29,19 @@ void mute_sound()
     PsgPort = 0xDF;     // Mute channel 2
     PsgPort = 0xFF;     // Mute channel 3
 
+    Neo2FmOn = 0x00;    // make sure the FM chip is enabled
     // mute the YM2413
     for (i=0; i<9; i++)
     {
-        // volume off
+        FMAddr = 0x20 +i;
+        for (j=0; j<8; j++) ;
+        FMData = 0x00; // key-off
+        for (j=0; j<2; j++) ;
+
         FMAddr = 0x30 + i;
-        FMData = 0x00;
+        for (j=0; j<8; j++) ;
+        FMData = 0xFF; // full attenuation
+        for (j=0; j<2; j++) ;
     }
 }
 
@@ -642,10 +649,10 @@ void main()
     // make sure the sound is off
     mute_sound();
 
+    // Clear the nametable
     // Make sure the display is off before we write to VRAM
     vdp_set_reg(REG_MODE_CTRL_2, 0xA0);
 
-    // Clear the nametable
     vdp_set_vram(0x1800, 0, 32*24*2);
 
     load_font();
