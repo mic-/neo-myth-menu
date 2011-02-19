@@ -2,8 +2,12 @@
 #define __SHARED_H__
 
 #include <z80/types.h>
-#define NUMBER_OF_GAMES_TO_SHOW 9
+
+#define NUMBER_OF_GAMES_TO_SHOW 7
 #define MAX_OPTIONS 4
+
+#define MENU_NAMETABLE 0x3000 //0x1800
+
 
 typedef struct
 {

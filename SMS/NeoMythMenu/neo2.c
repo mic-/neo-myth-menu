@@ -349,7 +349,7 @@ void neo2_psram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
 void neo2_debug_dump_hex(WORD addr)
 {
     BYTE *p = (BYTE*)addr;
-    WORD vaddr = 0x1800;
+    WORD vaddr = MENU_NAMETABLE;
     BYTE row,col,c,d;
 
     while (!(VdpCtrl & 0x80)) {}

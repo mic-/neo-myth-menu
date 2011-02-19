@@ -64,6 +64,7 @@ void vdp_copy_to_cram(WORD dest, BYTE *src, BYTE len)
 
 void vdp_wait_vblank()
 {
+    while ( (VdpCtrl & 0x80)) {}
     while (!(VdpCtrl & 0x80)) {}
 }
 

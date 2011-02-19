@@ -7,10 +7,14 @@
 #include "neo2.h"
 #include "neo2_map.h"
 
-#define MENU_VERSION_STRING "0.16"
+#define MENU_VERSION_STRING "0.17"
 #define KEY_REPEAT_INITIAL_DELAY 15
 #define KEY_REPEAT_DELAY 7
 #define SD_DEFAULT_INFO_FETCH_TIMEOUT 30
+
+#define LEFT_MARGIN 3
+#define INSTRUCTIONS_Y 20
+
 
 /*
  * Use the plain single-colored background instead of the pattered one.
@@ -59,11 +63,12 @@ void load_font()
     for (i = 0; i < 960; i++)
     {
 #ifdef PLAIN_BG
-        BYTE b;
+        BYTE b,c;
         b = font[i] ^ 0xFF;
-        VdpData = b;
-        VdpData = 0;
-        VdpData = 0;
+        c = ~b;
+        VdpData = c;
+        VdpData = c;
+        VdpData = c;
 #else
         BYTE b,c;
         b = font[i+i];      // Bitplane 0
@@ -72,7 +77,7 @@ void load_font()
         VdpData = c;
         VdpData = b & c;
 #endif
-        VdpData = 0;
+        VdpData = b; //0;
     }
     enable_ints;
 }
@@ -84,12 +89,13 @@ void init_sat()
 {
     BYTE i;
 
-    vdp_set_vram_addr(0x2800);
+    vdp_set_vram_addr(0x3800);
 
     // Initialize the Y-coordinates. Place all sprites outside
     // of the visible area
     for (i = 0; i < 0x40; i++) VdpData = 240;
 }
+
 
 void setup_vdp()
 {
@@ -101,18 +107,17 @@ void setup_vdp()
     vdp_set_reg(REG_MODE_CTRL_2, 0xE0);     // Screen on, Frame ints on
     vdp_set_reg(REG_HSCROLL, 0x00);         // Reset scrolling
     vdp_set_reg(REG_VSCROLL, 0x00);         // ...
-    vdp_set_reg(REG_NAME_TABLE_ADDR, 0x07); // Nametable at 0x1800
-    vdp_set_reg(REG_OVERSCAN_COLOR, 0x10);
+    vdp_set_reg(REG_NAME_TABLE_ADDR, 0x0D); // Nametable at 0x3000
+    vdp_set_reg(REG_OVERSCAN_COLOR, 0x00);
     vdp_set_reg(REG_BG_PATTERN_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_COLOR_TABLE_ADDR, 0xFF); // Needed for the SMS1 VDP, ignored for later versions
     vdp_set_reg(REG_LINE_COUNT, 0xFF);      // Line ints off
-    vdp_set_reg(REG_SAT_ADDR, 0x51);        // Sprite attribute table at 0x2800
+    vdp_set_reg(REG_SAT_ADDR, 0x71);        // Sprite attribute table at 0x3800
 
 #ifdef PLAIN_BG
-    vdp_set_color(0, 0, 0, 0);
-    vdp_set_color(1, 3, 3, 3);
-    vdp_set_color(16, 0, 0, 2);
-    vdp_set_color(17, 3, 3, 3);
+    vdp_set_color(16, 0, 0, 0);				// Backdrop color
+    vdp_set_color(23, 0, 0, 0);
+    vdp_set_color(24, 3, 3, 3);
 #else
     vdp_set_color(16, 1, 0, 0);             // Color 16 (maroon)
     vdp_set_color(17, 1, 0, 0);             // Color 17 (maroon)
@@ -130,7 +135,7 @@ void print_hex(BYTE val, BYTE x, BYTE y)
 {
     BYTE lo,hi;
 
-    vdp_set_vram_addr(0x1800 + (x << 1) + (y << 6));
+    vdp_set_vram_addr(MENU_NAMETABLE + (x << 1) + (y << 6));
 
     hi = (val >> 4);
     lo = val & 0x0F;
@@ -140,6 +145,7 @@ void print_hex(BYTE val, BYTE x, BYTE y)
     VdpData = hi; VdpData = 0;
     VdpData = lo; VdpData = 0;
 }
+
 
 void dump_hex(WORD addr)
 {
@@ -151,7 +157,7 @@ void dump_hex(WORD addr)
     row = 7;
     for (; row < 15; row++)
     {
-        vdp_set_vram_addr(0x1800 + (row << 6) + 8);
+        vdp_set_vram_addr(MENU_NAMETABLE + (row << 6) + 8);
         for (col = 0; col < 8; col++)
         {
             c = *p++;
@@ -166,6 +172,7 @@ void dump_hex(WORD addr)
     }
 }
 
+
 void vdp_delay(BYTE count)
 {
     /*keep vdp busy for a bit*/
@@ -173,16 +180,70 @@ void vdp_delay(BYTE count)
         vdp_wait_vblank();
 }
 
-void clear_list_surface()
+
+void clear_list_surface() __naked
 {
-    memset_asm(generic_list_buffer,0,LIST_BUFFER_SIZE);
+	// Fills the buffer with tile# 0, palette 1
+	__asm
+	di
+	ld		hl,#_generic_list_buffer
+	ld		bc,#LIST_BUFFER_SIZE/2
+	ld		de,#0x0008
+	clear_list_surface_loop:
+	ld		(hl),d
+	inc		hl
+	ld		(hl),e
+	inc		hl
+	dec		bc
+	ld		a,b
+	or		a,c
+	jp		nz,clear_list_surface_loop
+	ei
+	ret
+	__endasm;
 }
+
 
 void present_list_surface()
 {
     vdp_wait_vblank();
-    vdp_blockcopy_to_vram(0x1800 + (7 << 6),generic_list_buffer,LIST_BUFFER_SIZE);
+
+	// Copy the buffer to VRAM, skipping the left and right
+	// margin (3 columns each)
+	__asm
+	di
+	ld		de,#MENU_NAMETABLE+576+LEFT_MARGIN*2
+	ld		hl,#_generic_list_buffer+2
+	ld		c,#NUMBER_OF_GAMES_TO_SHOW
+	present_list_surface_loop:
+	ld		a,e
+	out		(0xBF),a
+	ld		a,d
+	or		a,#0x40
+	out		(0xBF),a
+	ld		b,#64-LEFT_MARGIN*4
+	push 	bc
+	ld		c,#0xBE
+	otir
+	pop		bc
+	ld		a,#LEFT_MARGIN*4
+	add		a,l
+	ld		l,a
+	ld		a,#0
+	adc		a,h
+	ld		h,a
+	ld		a,#64
+	add		a,e
+	ld		e,a
+	ld		a,#0
+	adc		a,d
+	ld		d,a
+	dec		c
+	jp		nz,present_list_surface_loop
+	ei
+	__endasm;
 }
+
 
 void puts_active_list()
 {
@@ -192,28 +253,24 @@ void puts_active_list()
     WORD offs;
 
     vdp_wait_vblank();
-    puts("                               ", 1, 5, PALETTE0);
+    puts("                          ", 3, 7, PALETTE1);
 
     if(MENU_STATE_GAME_GBAC == menu_state)
     {
-        puts("GBAC:/", 1, 5, PALETTE0);
+        puts("GBAC:/", LEFT_MARGIN, 7, PALETTE1);
 
         if(!games.count)
         {
-            puts("No games found on GBAC",2, 11, PALETTE1);
+            puts("No games found on GBAC",3, 11, PALETTE0);
             return;
         }
     }
     else if(MENU_STATE_GAME_SD == menu_state)
-        puts("SD:/", 1, 5, PALETTE0);//Change this to SD path
+        puts("SD:/", LEFT_MARGIN, 7, PALETTE1);//Change this to SD path
     else if(MENU_STATE_OPTIONS == menu_state)
-        puts("Options:", 1, 5, PALETTE0);
+        puts("Options:", LEFT_MARGIN, 7, PALETTE1);
     else
-        puts("MEDIA PLAYER", 1, 5, PALETTE0);
-
-    //print_hex(menu_state,23,1);
-    //print_hex(options_highlighted,25,1);
-    //print_hex(games.highlighted,27,1);
+        puts("Media Player", LEFT_MARGIN, 7, PALETTE1);
 
     if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
     {
@@ -232,7 +289,7 @@ void puts_active_list()
                 if (!p[col+8])
                     break;
                 temp[offs + col*2 + 2] = p[col+8] - 32;
-                temp[offs + col*2 + 3] = (games.highlighted == (games.firstShown + row)) ? PALETTE1<<1 : PALETTE0<<1;
+                temp[offs + col*2 + 3] = (games.highlighted == (games.firstShown + row)) ? PALETTE0<<1 : PALETTE1<<1;
             }
 
             row++;
@@ -250,11 +307,11 @@ void puts_active_list()
 
         while(show < options_count)
         {
-            BYTE attr = (show == options_highlighted) ? PALETTE1<<1 : PALETTE0<<1;
+            BYTE attr = (show == options_highlighted) ? PALETTE0<<1 : PALETTE1<<1;
             BYTE ix;
 
             offs = row*32*2;
-            col = 2;
+            col = 0;
             ix = 0;
             while (options[show].name[ix])
             {
@@ -298,6 +355,7 @@ void puts_active_list()
     }
 }
 
+
 /*
  * Move to the next entry in the games list
  */
@@ -325,6 +383,7 @@ void move_to_next_list_item()
         puts_active_list();
     }
 }
+
 
 /*
  * Move to the previous entry in the games list
@@ -380,6 +439,7 @@ void move_to_next_page()
     }
 }
 
+
 /*
  * Move to the previous page in the games list
  */
@@ -406,6 +466,7 @@ void move_to_previous_page()
     }
 }
 
+
 /*
  * Count the number of games on the GBA card
  */
@@ -422,6 +483,7 @@ WORD count_games_on_gbac()
 
     return count;
 }
+
 
 /*
  * Check if the machine is Domestic (Japanese) or Exported (elsewhere)
@@ -441,6 +503,7 @@ BYTE check_sms_region()
         return EXPORTED;
     return JAPANESE;
 }
+
 
 BYTE is_time_to_fetch_sd_file_info()
 {
@@ -465,12 +528,12 @@ void test_strings()
     strcpy_asm(buf,"/games/");
     strcat_asm(buf,"game");
     strcat_asm(buf,".sms");
-    puts(buf,8,1,PALETTE0);
+    puts(buf,8,1,PALETTE1);
 
     strncpy_asm(buf,"/games/",7);
     strncat_asm(buf,"game2",5);
     strncat_asm(buf,".sms",4);
-    puts(buf,8,2,PALETTE0);
+    puts(buf,8,2,PALETTE1);
 
     strcpy_asm(filename,"game.sms");
     strcpy_asm(buf,"File ext is :");
@@ -482,7 +545,7 @@ void test_strings()
     else
         strcat_asm(buf,"Not found");
 
-    puts(buf,8,3,PALETTE0);
+    puts(buf,8,3,PALETTE1);
 
 	if(ext)
 	{
@@ -491,18 +554,19 @@ void test_strings()
 		else
 			strcpy_asm(buf,"Extension wasn't .SMS!");
 
-    	puts(buf,8,4,PALETTE0);
+    	puts(buf,8,4,PALETTE1);
 	}
 
 	print_hex(strlen_asm("Hello World"),8,8);
 	if(memcmp_asm("Hello World","Hello World",strlen_asm("Hello World")) == 0)
-		puts("Hello World matches",8,5,PALETTE0);
+		puts("Hello World matches",8,5,PALETTE1);
 	else
-		puts("Hello World doesn't match",8,5,PALETTE0);
+		puts("Hello World doesn't match",8,5,PALETTE1);
 
     while(1){}
 }
 #endif
+
 
 void handle_action_button(BYTE button)
 {
@@ -589,33 +653,32 @@ void handle_action_button(BYTE button)
             case MENU_STATE_GAME_GBAC:
                 games.highlighted = 0;
                 vdp_wait_vblank();
-                puts("[L/R/U/D] Navigate  ", 1, 21, PALETTE0);
-                puts("[I] Run [II] Options", 1, 22, PALETTE0);
+                puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+                puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
                 break;
             case MENU_STATE_OPTIONS:
                 options_highlighted = 0;
                 vdp_wait_vblank();
-                puts("[L/R] Change option ", 1, 21, PALETTE0);
-                puts("[I] Run [II] SD card", 1, 22, PALETTE0);
+                puts("[L/R] Change option ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+                puts("[I] Run [II] SD card", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
                 break;
             case MENU_STATE_GAME_SD:
                 vdp_wait_vblank();
-                puts("[L/R/U/D] Navigate  ", 1, 21, PALETTE0);
-                puts("[I] Run [II] Media  ", 1, 22, PALETTE0);
+                puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+                puts("[I] Run [II] Media  ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
                 break;
             case MENU_STATE_MEDIA_PLAYER:
                 vdp_wait_vblank();
-                puts("[L/R/U/D] Navigate  ", 1, 21, PALETTE0);
-                puts("[I] Play [II] Flash ", 1, 22, PALETTE0);
+                puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+                puts("[I] Play [II] Flash ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
                 break;
         }
 
         //TODO : Initialize everything properly
-        clear_list_surface();
-        present_list_surface();
         puts_active_list();
     }
 }
+
 
 void import_std_options()
 {
@@ -626,6 +689,8 @@ void import_std_options()
     reset_to_menu_option_idx = options_count;
     options_add("Reset to menu : ","off","on",OPTION_TYPE_SETTING,1);
 }
+
+
 
 void main()
 {
@@ -669,25 +734,25 @@ void main()
     // Make sure the display is off before we write to VRAM
     vdp_set_reg(REG_MODE_CTRL_2, 0xA0);
 
-    vdp_set_vram(0x1800, 0, 32*24*2);
+    vdp_set_vram(MENU_NAMETABLE, 0, 32*24*2);
 
     load_font();
 
 #ifdef PLAIN_BG
-    puts("Neo SMS Menu", 10, 1, PALETTE0);
-    puts("(c) NeoTeam 2011", 8, 2, PALETTE0);
+	bank1_dispatcher(TASK_LOAD_BG);
+    puts("Neo SMS Menu", LEFT_MARGIN, 1, PALETTE1);
+    puts("(c) NeoTeam 2011", LEFT_MARGIN, 2, PALETTE1);
 #else
     bank1_dispatcher(TASK_LOAD_BG);
 #endif
 
     // Print software (menu) and firmware versions
-    puts("SW ", 24, 21, PALETTE0);
-    puts(MENU_VERSION_STRING, 27, 21, PALETTE0);
-    puts("FW ", 24, 22, PALETTE0);
-    puts("1.00", 27, 22, PALETTE0);     // TODO: read version from CPLD
+	puts(MENU_VERSION_STRING, 20, 1, PALETTE1);
+	puts("/", 24, 1, PALETTE1);
+	puts("1.00", 25, 1, PALETTE1);	// TODO: read version from CPLD
 
-    puts("[L/R/U/D] Navigate  ", 1, 21, PALETTE0);
-    puts("[I] Run [II] Options", 1, 22, PALETTE0);
+    puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+    puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
 
     // Print some Myth info
     /*print_hex(idLo, 24, 20);
@@ -695,8 +760,7 @@ void main()
     print_hex(*(BYTE*)0xC000, 28, 20);*/
 
     // Print flash type
-    puts("HW  /", 24, 20, PALETTE0);
-    puts(type, 27, 20, PALETTE0);
+    puts(type, 24, 2, PALETTE1);
 
     setup_vdp();
 
@@ -705,11 +769,11 @@ void main()
     // Print the console model (japanese, us, european)
     vdp_wait_vblank();
     if (region == JAPANESE)
-        puts("J", 29, 20, PALETTE0);
+        puts("/Jap", 25, 2, PALETTE1);
     else if (vdpSpeed == NTSC)
-        puts("U", 29, 20, PALETTE0);
+        puts("/U.S", 25, 2, PALETTE1);
     else
-        puts("E", 29, 20, PALETTE0);
+        puts("/Eur", 25, 2, PALETTE1);
 
     #if 0
     test_strings();
@@ -724,7 +788,7 @@ void main()
         pfn_neo2_sram_to_ram(test2, 0x03, 0xC800, 16);
         test2[15] = 0;
         vdp_wait_vblank();
-        puts(test2, 9, 17, PALETTE0);
+        puts(test2, 9, 17, PALETTE1);
     }
     #endif
 
@@ -737,7 +801,7 @@ void main()
         pfn_neo2_psram_to_ram(test2, 0x12, 0x8800, 16);
         test2[15] = 0;
         vdp_wait_vblank();
-        puts(test2, 9, 18, PALETTE0);
+        puts(test2, 9, 18, PALETTE1);
     }
     #endif
 
@@ -818,26 +882,31 @@ void main()
     }
 }
 
+
 /*should be moved to another bank?*/
 BYTE options_get_state(Option* option)
 {
     return (option->encoded_info & 0x0F);
 }
 
+
 BYTE options_get_type(Option* option)
 {
     return (option->encoded_info >> 4);
 }
+
 
 volatile void options_set_state(Option* option,BYTE new_state)
 {
     option->encoded_info = (option->encoded_info & 0xF0) | (new_state & 0x0F);
 }
 
+
 volatile void options_set_type(Option* option,BYTE new_type)
 {
     option->encoded_info = (new_type << 4) | (option->encoded_info & 0x0F);
 }
+
 
 Option* options_add(const char* name,const char* cond0_bhv,const char* cond1_bhv,BYTE type,BYTE state)
 {
@@ -856,6 +925,7 @@ Option* options_add(const char* name,const char* cond0_bhv,const char* cond1_bhv
     return option;
 }
 
+
 Option* options_add_ex(const char* name,const char* cond0_bhv,const char* cond1_bhv,BYTE type,BYTE state,WORD user_data0,WORD user_data1)
 {
     Option* option = options_add(name,cond0_bhv,cond1_bhv,type,state);
@@ -868,6 +938,7 @@ Option* options_add_ex(const char* name,const char* cond0_bhv,const char* cond1_
 
     return option;
 }
+
 
 void options_init()
 {

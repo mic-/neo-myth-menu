@@ -14,6 +14,7 @@
         .globl _vdp_blockcopy_to_vram
         _vdp_blockcopy_to_vram:
         push            ix
+        di
                 ld      ix,#4                                       ;;2 + stack depth * sizeof word
                 add     ix,sp                                       ;;+=sp
                 ld      l,(ix)                                      ;;dest
@@ -42,6 +43,7 @@
                 ld      b,a
                 otir                                                ;;output len & $FF bytes
             vdp_blockcopy_to_vram_done:
+        ei
         pop             ix
 
      ; check if this is an NTSC (60 Hz) or PAL (50 Hz) vdp
