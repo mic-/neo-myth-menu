@@ -115,7 +115,7 @@ void setup_vdp()
     vdp_set_reg(REG_SAT_ADDR, 0x71);        // Sprite attribute table at 0x3800
 
 #ifdef PLAIN_BG
-    vdp_set_color(16, 0, 0, 0);				// Backdrop color
+    vdp_set_color(16, 0, 0, 0);             // Backdrop color
     vdp_set_color(23, 0, 0, 0);
     vdp_set_color(24, 3, 3, 3);
 #else
@@ -183,24 +183,24 @@ void vdp_delay(BYTE count)
 
 void clear_list_surface() __naked
 {
-	// Fills the buffer with tile# 0, palette 1
-	__asm
-	di
-	ld		hl,#_generic_list_buffer
-	ld		bc,#LIST_BUFFER_SIZE/2
-	ld		de,#0x0008
-	clear_list_surface_loop:
-	ld		(hl),d
-	inc		hl
-	ld		(hl),e
-	inc		hl
-	dec		bc
-	ld		a,b
-	or		a,c
-	jp		nz,clear_list_surface_loop
-	ei
-	ret
-	__endasm;
+    // Fills the buffer with tile# 0, palette 1
+    __asm
+    di
+    ld      hl,#_generic_list_buffer
+    ld      bc,#LIST_BUFFER_SIZE/2
+    ld      de,#0x0008
+    clear_list_surface_loop:
+    ld      (hl),d
+    inc     hl
+    ld      (hl),e
+    inc     hl
+    dec     bc
+    ld      a,b
+    or      a,c
+    jp      nz,clear_list_surface_loop
+    ei
+    ret
+    __endasm;
 }
 
 
@@ -208,40 +208,40 @@ void present_list_surface()
 {
     vdp_wait_vblank();
 
-	// Copy the buffer to VRAM, skipping the left and right
-	// margin (3 columns each)
-	__asm
-	di
-	ld		de,#MENU_NAMETABLE+576+LEFT_MARGIN*2
-	ld		hl,#_generic_list_buffer+2
-	ld		c,#NUMBER_OF_GAMES_TO_SHOW
-	present_list_surface_loop:
-	ld		a,e
-	out		(0xBF),a
-	ld		a,d
-	or		a,#0x40
-	out		(0xBF),a
-	ld		b,#64-LEFT_MARGIN*4
-	push 	bc
-	ld		c,#0xBE
-	otir
-	pop		bc
-	ld		a,#LEFT_MARGIN*4
-	add		a,l
-	ld		l,a
-	ld		a,#0
-	adc		a,h
-	ld		h,a
-	ld		a,#64
-	add		a,e
-	ld		e,a
-	ld		a,#0
-	adc		a,d
-	ld		d,a
-	dec		c
-	jp		nz,present_list_surface_loop
-	ei
-	__endasm;
+    // Copy the buffer to VRAM, skipping the left and right
+    // margin (3 columns each)
+    __asm
+    di
+    ld      de,#MENU_NAMETABLE+576+LEFT_MARGIN*2
+    ld      hl,#_generic_list_buffer+2
+    ld      c,#NUMBER_OF_GAMES_TO_SHOW
+    present_list_surface_loop:
+    ld      a,e
+    out     (0xBF),a
+    ld      a,d
+    or      a,#0x40
+    out     (0xBF),a
+    ld      b,#64-LEFT_MARGIN*4
+    push    bc
+    ld      c,#0xBE
+    otir
+    pop     bc
+    ld      a,#LEFT_MARGIN*4
+    add     a,l
+    ld      l,a
+    ld      a,#0
+    adc     a,h
+    ld      h,a
+    ld      a,#64
+    add     a,e
+    ld      e,a
+    ld      a,#0
+    adc     a,d
+    ld      d,a
+    dec     c
+    jp      nz,present_list_surface_loop
+    ei
+    __endasm;
 }
 
 
@@ -547,21 +547,21 @@ void test_strings()
 
     puts(buf,8,3,PALETTE1);
 
-	if(ext)
-	{
-		if(memcmp_asm(ext,"sms",3)==0)
-			strcpy_asm(buf,"Extension was .SMS!");
-		else
-			strcpy_asm(buf,"Extension wasn't .SMS!");
+    if(ext)
+    {
+        if(memcmp_asm(ext,"sms",3)==0)
+            strcpy_asm(buf,"Extension was .SMS!");
+        else
+            strcpy_asm(buf,"Extension wasn't .SMS!");
 
-    	puts(buf,8,4,PALETTE1);
-	}
+        puts(buf,8,4,PALETTE1);
+    }
 
-	print_hex(strlen_asm("Hello World"),8,8);
-	if(memcmp_asm("Hello World","Hello World",strlen_asm("Hello World")) == 0)
-		puts("Hello World matches",8,5,PALETTE1);
-	else
-		puts("Hello World doesn't match",8,5,PALETTE1);
+    print_hex(strlen_asm("Hello World"),8,8);
+    if(memcmp_asm("Hello World","Hello World",strlen_asm("Hello World")) == 0)
+        puts("Hello World matches",8,5,PALETTE1);
+    else
+        puts("Hello World doesn't match",8,5,PALETTE1);
 
     while(1){}
 }
@@ -739,7 +739,7 @@ void main()
     load_font();
 
 #ifdef PLAIN_BG
-	bank1_dispatcher(TASK_LOAD_BG);
+    bank1_dispatcher(TASK_LOAD_BG);
     puts("Neo SMS Menu", LEFT_MARGIN, 1, PALETTE1);
     puts("(c) NeoTeam 2011", LEFT_MARGIN, 2, PALETTE1);
 #else
@@ -747,9 +747,9 @@ void main()
 #endif
 
     // Print software (menu) and firmware versions
-	puts(MENU_VERSION_STRING, 20, 1, PALETTE1);
-	puts("/", 24, 1, PALETTE1);
-	puts("1.00", 25, 1, PALETTE1);	// TODO: read version from CPLD
+    puts(MENU_VERSION_STRING, 20, 1, PALETTE1);
+    puts("/", 24, 1, PALETTE1);
+    puts("1.00", 25, 1, PALETTE1);  // TODO: read version from CPLD
 
     puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
     puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
