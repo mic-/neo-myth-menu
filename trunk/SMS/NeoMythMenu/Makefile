@@ -75,4 +75,4 @@ clean:
 	$(RM) MDBIOS.BIN main_map.h neo2_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
 
 distclean:
-	$(RM) tools/map2h tools/bin16k tools/hex2bin tools/smshdr MDBIOS.BIN main_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
+	$(RM) tools/map2h tools/bin16k tools/hex2bin tools/smshdr MDBIOS.BIN main_map.h neo2_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
