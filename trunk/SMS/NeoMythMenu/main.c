@@ -693,17 +693,17 @@ void cheat_inputbox(char* dst_buf,BYTE* dst_size,const char* title)
 	present_list_surface();
 
 	//set default str
-	memset_asm(dst_buf,'_',10);
+	memset_asm(dst_buf,'_',10);													//TODO make this an argument
 	dst_buf[10] = '\0';
-	
+	addr = 0;
+
 	//Render title
 	puts(title,LEFT_MARGIN + (((22/2) - (strlen_asm(title)/2))) + 1,8,PALETTE1);
 
 	//Render default str
 	abs_addr = LEFT_MARGIN + (((22/2) - (strlen_asm(dst_buf)/2))) + 1;
 	puts(dst_buf,abs_addr,12,PALETTE1);
-
-	addr = 0;
+	putsn(dst_buf + addr,abs_addr + addr,12,PALETTE1,1);
 
 	while(1)
 	{
@@ -742,9 +742,23 @@ void cheat_inputbox(char* dst_buf,BYTE* dst_size,const char* title)
 			}
 		}
 	}
+	*dst_size = addr;
+
+	addr = 0;
+	while(addr < 10)
+	{
+		if(addr == '_')
+			break;
+
+		++addr;
+	}
+
+	dst_buf[addr] = '\0';
+
 	puts("                      ",LEFT_MARGIN,8,PALETTE1);
 	clear_list_surface();
 	sync_state();
+	vdp_delay(2);
 }
 #endif
 
