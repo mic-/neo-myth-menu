@@ -65,6 +65,7 @@ MYTH_NEO2_RD_DAT4 = 0x6061          ; 0x87,1
 
 ; Exported functions
 .globl _disk_initialize
+.globl _disk_readp
 
 ;**********************************************************************************************
 
@@ -983,6 +984,10 @@ _disk_status:
 
 ;; STUBS ;;
 
+_disk_readp:
+ret
+
+
 .globl neo2_enable_sd
 .globl neo2_disable_sd
 .globl neo2_pre_sd
@@ -993,6 +998,7 @@ neo2_disable_sd:
 neo2_pre_sd:
 neo2_post_sd:
 ret
+
 
 
 ; Read to RAM/SRAM

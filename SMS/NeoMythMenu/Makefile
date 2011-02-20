@@ -39,10 +39,10 @@ ramcode.bin:
 
 sramcode.bin:
 	$(AS) -o diskio_asm.s
-	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0x8000 diskio_asm.rel $(SHARED)
-	$(HEX2BIN) diskio_asm.ihx
-	$(PADTRIM) diskio_asm.bin sramcode.bin
-	$(RM) diskio_asm.bin diskio_asm.ihx *.noi *.lnk *.rst
+	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0x8000 pff.c diskio_asm.rel $(SHARED)
+	$(HEX2BIN) pff.ihx
+	$(PADTRIM) pff.bin sramcode.bin
+	$(RM) pff.bin pff.ihx *.noi *.lnk *.rst
 
 bank0.bin:
 	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3000 --no-std-crt0 --no-peep main.c $(BANK0OBJS) $(SHARED)
@@ -57,7 +57,7 @@ bank1.bin:
 	$(RM) bank1.bin bank1.ihx *.noi *.lnk *.rst
 
 menu.sms:
-	cat bank0.bin bank_1.bin ramcode.bin bank0.bin > menu.sms
+	cat bank0.bin bank_1.bin ramcode.bin sramcode.bin > menu.sms
 	$(SMSHDR) menu.sms
 	$(RM) bank0.bin bank_1.bin main.bin sramcode.bin main.ihx *.noi *.lnk *.rst *.sym *.rel
 
