@@ -7,6 +7,7 @@
 #include "neo2.h"
 #include "neo2_map.h"
 
+#undef TEST_CHEAT_INPUTBOX
 #define MENU_VERSION_STRING "0.17"
 #define KEY_REPEAT_INITIAL_DELAY 15
 #define KEY_REPEAT_DELAY 7
@@ -567,7 +568,34 @@ void test_strings()
 }
 #endif
 
-
+void sync_state()
+{
+	switch (menu_state)
+	{
+		case MENU_STATE_GAME_GBAC:
+			games.highlighted = 0;
+			vdp_wait_vblank();
+			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+			puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
+		break;
+		case MENU_STATE_OPTIONS:
+			options_highlighted = 0;
+			vdp_wait_vblank();
+			puts("[L/R] Change option ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+			puts("[I] Run [II] SD card", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
+		break;
+		case MENU_STATE_GAME_SD:
+			vdp_wait_vblank();
+			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+			puts("[I] Run [II] Media  ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
+		break;
+		case MENU_STATE_MEDIA_PLAYER:
+			vdp_wait_vblank();
+			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+			puts("[I] Play [II] Flash ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
+		break;
+	}
+}
 void handle_action_button(BYTE button)
 {
     if (MENU_STATE_OPTIONS == menu_state)
@@ -648,37 +676,77 @@ void handle_action_button(BYTE button)
         if(menu_state > MENU_STATES-1)
             menu_state = MENU_STATE_TOP;
 
-        switch (menu_state)
-        {
-            case MENU_STATE_GAME_GBAC:
-                games.highlighted = 0;
-                vdp_wait_vblank();
-                puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-                puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
-                break;
-            case MENU_STATE_OPTIONS:
-                options_highlighted = 0;
-                vdp_wait_vblank();
-                puts("[L/R] Change option ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-                puts("[I] Run [II] SD card", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
-                break;
-            case MENU_STATE_GAME_SD:
-                vdp_wait_vblank();
-                puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-                puts("[I] Run [II] Media  ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
-                break;
-            case MENU_STATE_MEDIA_PLAYER:
-                vdp_wait_vblank();
-                puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-                puts("[I] Play [II] Flash ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
-                break;
-        }
-
-        //TODO : Initialize everything properly
+		sync_state();
         puts_active_list();
     }
 }
 
+#ifdef TEST_CHEAT_INPUTBOX
+void cheat_inputbox(char* dst_buf,BYTE* dst_size,const char* title)
+{
+	BYTE key;
+	BYTE addr;
+	BYTE abs_addr;
+
+	//clear list surf
+	clear_list_surface();
+	present_list_surface();
+
+	//set default str
+	memset_asm(dst_buf,'_',10);
+	dst_buf[10] = '\0';
+	
+	//Render title
+	puts(title,LEFT_MARGIN + (((22/2) - (strlen_asm(title)/2))) + 1,8,PALETTE1);
+
+	//Render default str
+	abs_addr = LEFT_MARGIN + (((22/2) - (strlen_asm(dst_buf)/2))) + 1;
+	puts(dst_buf,abs_addr,12,PALETTE1);
+
+	addr = 0;
+
+	while(1)
+	{
+        key = pad1_get_2button();
+        pad = key & ~padLast;
+        padLast = key;
+
+		if(pad&PAD_SW1)
+			break;
+		else if (pad & PAD_UP)
+		{
+			++dst_buf[addr];
+			putsn(dst_buf + addr,abs_addr + addr,12,PALETTE1,1);
+		}
+		else if (pad & PAD_DOWN)
+		{
+			--dst_buf[addr];
+			putsn(dst_buf + addr,abs_addr + addr,12,PALETTE1,1);
+		}
+		else if (pad & PAD_RIGHT)
+		{
+			if(addr < 9)
+			{
+				++addr;
+				puts(dst_buf,abs_addr,12,PALETTE1);
+				putsn(dst_buf + addr,abs_addr + addr,12,PALETTE0,1);	
+			}
+		}
+		else if (pad & PAD_LEFT)
+		{
+			if(addr)
+			{
+				--addr;
+				puts(dst_buf,abs_addr,12,PALETTE1);
+				putsn(dst_buf + addr,abs_addr + addr,12,PALETTE0,1);
+			}
+		}
+	}
+	puts("                      ",LEFT_MARGIN,8,PALETTE1);
+	clear_list_surface();
+	sync_state();
+}
+#endif
 
 void import_std_options()
 {
@@ -778,6 +846,10 @@ void main()
     #if 0
     test_strings();
     #endif
+	
+	#ifdef TEST_CHEAT_INPUTBOX
+	cheat_inputbox(generic_list_buffer,0,"Enter cheat code:");
+	#endif
 
     #if 0
     {
