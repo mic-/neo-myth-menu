@@ -180,7 +180,7 @@ static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.7";
 
 /* Menu entry definitions */
 #define PAGE_ENTRIES 15                 /* number of entries to show per screen page */
-#define MAX_ENTRIES 257                 /* maximum number of menu entries in flash or per directory on SD card */
+#define MAX_ENTRIES 401                 /* maximum number of menu entries in flash or per directory on SD card */
 // note - the current flash menu can only fit 639 entries from 0xB000 to 0xFFE0
 
 struct menuEntry {
