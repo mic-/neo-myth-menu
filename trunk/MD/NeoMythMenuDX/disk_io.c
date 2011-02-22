@@ -30,7 +30,7 @@ unsigned char pkt[6];                   /* command packet */
 
 unsigned int num_sectors;
 
-#define CACHE_SIZE 8                    /* number sectors in cache */
+#define CACHE_SIZE 4                    /* number sectors in cache */
 unsigned int sec_tags[CACHE_SIZE];
 unsigned char __attribute__((aligned(16))) sec_cache[CACHE_SIZE*512 + 8];
 unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads */
@@ -735,9 +735,9 @@ DSTATUS MMC_disk_status (void)
 
 DRESULT MMC_disk_read_multi (BYTE *buff, DWORD sector, UINT count) __attribute__ ((section (".data")));
 DRESULT MMC_disk_read_multi (
-    BYTE *buff,           
-    DWORD sector,       
-    UINT count            
+    BYTE *buff,
+    DWORD sector,
+    UINT count
 )
 {
         sector <<= ((cardType & 1) ? 0 : 9);
