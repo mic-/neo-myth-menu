@@ -1390,7 +1390,7 @@ FRESULT follow_path (	/* FR_OK(0): successful, !=0: error code */
 {
 	FRESULT res;
 	BYTE *dir, last;
-
+ 
 
 	while (!_USE_LFN && *path == ' ') path++;	/* Skip leading spaces */
 #if _FS_RPATH
@@ -1765,23 +1765,35 @@ FRESULT f_open (
 /* Read File                                                             */
 /*-----------------------------------------------------------------------*/
 
-FRESULT f_read_direct(
+typedef struct
+{
+	DWORD base;
+	WORD sectors;
+}Cluster;
+
+static Cluster clusters[0x20 + 8];		 
+
+FRESULT f_read_direct(				//read up to 0x20 sectors
 	FIL *fp, 		 
 	void *buff,		 
 	UINT btr,		 
 	UINT *br		 
 )
 {
-	DWORD clst, sect, remain;
+	DWORD clst, sect;
 	UINT rcnt, cc;
-	UINT sector_base = 0xffffffff;
-	UINT sector_count = 0;
+	WORD i,j,cnt;
+	WORD cluster_ptr = 0;
 	INT bound_a;
+	Cluster* a,*b;
 
 	*br = 0;
-
-	remain = fp->fsize - fp->fptr;
-	if (btr > remain) btr = (UINT)remain; 
+	
+	if(btr > (fp->fsize - fp->fptr))/*Make sure that last block will be aligned*/
+	{
+		/*Fallback to standard fread since chances are it WONT be aligned...and we're not interested in anything < 16KB anyway*/
+		return f_read(fp,buff,btr,br);
+	}
 
 	for ( ;  btr;									 
 		 fp->fptr += rcnt, *br += rcnt, btr -= rcnt) 
@@ -1812,9 +1824,8 @@ FRESULT f_read_direct(
 				if (cc) 
 				{	
 					cc = (fp->csect + cc > fp->fs->csize) ? fp->fs->csize - fp->csect : cc;
-					sector_base = (sector_base == 0xffffffff) ? sect : sector_base;
-					sector_count += cc;
-		 
+			 		clusters[cluster_ptr].base = sect;
+			 		clusters[cluster_ptr++].sectors = cc;
 					fp->csect += (BYTE)cc;				 
 					rcnt = SS(fp->fs) * cc;				 
 					continue;
@@ -1842,16 +1853,66 @@ FRESULT f_read_direct(
 			if (rcnt > btr) rcnt = btr;
 	}
 
-	if(sector_count != 0)
+	i = 0;
+
+	while(i<cluster_ptr)	//Hackish code on porpuse :P
 	{
-		if (disk_read_multi(fp->fs->drive,buff,sector_base,sector_count) != RES_OK)
-			ABORT(fp->fs, FR_DISK_ERR);
+		cnt = 0;
+
+		if(i >= (cluster_ptr-1))
+			goto ___skip;
+
+		{
+			j = i;
+			a = &clusters[j + 0];
+			b = &clusters[j + 1];
+
+			if(b->base < a->base)
+				goto ___skip;
+			if( ((b->base - a->base) != a->sectors ) )
+				goto ___skip;
+
+			cnt += a->sectors;
+			cnt += b->sectors;
+
+			j += 2;
+
+			while(j < cluster_ptr)
+			{
+				a = &clusters[j];
+
+				if(a->base < b->base)
+					goto ___skip2;	//just fill the pending sectors
+				if( (a->base - b->base) != a->sectors )
+					goto ___skip2;	//just fill the pending sectors
+
+				cnt += a->sectors;
+				b = a;
+				++j;
+			}
+		}
+
+		if(!cnt)
+		{
+			___skip:
+			if (disk_read_multi(fp->fs->drive,buff,clusters[i].base,clusters[i].sectors) != RES_OK)
+				ABORT(fp->fs, FR_DISK_ERR);
+			
+			++i;
+			continue;
+		}
+
+		___skip2:
+		{
+			if (disk_read_multi(fp->fs->drive,buff,clusters[i].base,cnt) != RES_OK)
+				ABORT(fp->fs, FR_DISK_ERR);
+
+			i = j;
+		}
 	}
 
 	LEAVE_FF(fp->fs, FR_OK);
 }
-
-
 
 FRESULT f_read (
 	FIL *fp, 		/* Pointer to the file object */
