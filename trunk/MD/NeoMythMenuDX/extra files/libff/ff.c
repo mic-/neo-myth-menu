@@ -1758,26 +1758,17 @@ FRESULT f_open (
 	LEAVE_FF(dj.fs, FR_OK);
 }
 
-
-
-
 /*-----------------------------------------------------------------------*/
 /* Read File                                                             */
 /*-----------------------------------------------------------------------*/
 
-typedef struct
-{
-	DWORD base;
-	WORD sectors;
-}Cluster;
-
-static Cluster clusters[0x20 + 8];		 
 
 FRESULT f_read_direct(				//read up to 0x20 sectors
 	FIL *fp, 		 
 	void *buff,		 
 	UINT btr,		 
-	UINT *br		 
+	UINT *br,
+	Cluster* clusters 
 )
 {
 	DWORD clst, sect;
@@ -1786,7 +1777,6 @@ FRESULT f_read_direct(				//read up to 0x20 sectors
 	WORD cluster_ptr = 0;
 	INT bound_a;
 	Cluster* a,*b;
-
 	*br = 0;
 	
 	if(btr > (fp->fsize - fp->fptr))/*Make sure that last block will be aligned*/
