@@ -288,6 +288,7 @@ unsigned char __attribute__((aligned(16))) rom_hdr[256];             /* rom head
 
 unsigned char __attribute__((aligned(16))) buffer[XFER_SIZE*2];      /* Work RAM buffer - big enough for SMD decoding */
 unsigned char __attribute__((aligned(16))) cacheBuffer[1024];
+Cluster __attribute__((aligned(16))) __ff_clust_buffer[0x20 + 16];
 
 selEntry_t gSelections[MAX_ENTRIES];    /* entries for flash or current SD directory */
 
@@ -801,7 +802,7 @@ inline void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
     UINT ts;
     ints_on();     /* enable interrupts */
     gDirectRead = 1;
-    f_read_direct(&gSDFile, (unsigned char *)pstart, len, &ts);
+    f_read_direct(&gSDFile, (unsigned char *)pstart, len, &ts,__ff_clust_buffer);
     gDirectRead = 0;
     ints_off();     /* disable interrupts */
 }
