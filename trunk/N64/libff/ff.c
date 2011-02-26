@@ -1320,6 +1320,7 @@ void get_fileinfo (		/* No return code */
 
 
 
+
 	p = fno->fname;
 	if (dj->sect) {
 		dir = dj->dir;
@@ -1863,8 +1864,6 @@ FRESULT f_read_dummy (
 {
 	DWORD clst, sect, remain;
 	UINT rcnt, cc;
-	UINT sector_base = 0xffffffff;
-	UINT sector_count = 0;
 	INT bound_a;
 
 	asm("\tmfc0 $8,$12\n\taddi $9,$0,-2\n\tand $8,$9\n\tmtc0 $8,$12\n\t":::"$8","$9");
@@ -1914,9 +1913,12 @@ FRESULT f_read_dummy (
 				if (cc) 
 				{	
 					cc = (fp->csect + cc > fp->fs->csize) ? fp->fs->csize - fp->csect : cc;
-					sector_base = (sector_base == 0xffffffff) ? sect : sector_base;
-					sector_count += cc;
-		 
+					if (disk_read_multi(fp->fs->drive, NULL ,sect,cc) != RES_OK)
+					{
+						asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\t":::"$8");
+						ABORT(fp->fs, FR_DISK_ERR);
+					}
+			 
 					fp->csect += (BYTE)cc;				 
 					rcnt = SS(fp->fs) * cc;				 
 					continue;
@@ -1948,15 +1950,6 @@ FRESULT f_read_dummy (
 			}
 			rcnt = SS(fp->fs) - bound_a;	 
 			if (rcnt > btr) rcnt = btr;
-	}
-
-	if(sector_count != 0)
-	{
-		if (disk_read_multi(fp->fs->drive, NULL ,sector_base,sector_count) != RES_OK)
-		{
-			asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\t":::"$8");
-			ABORT(fp->fs, FR_DISK_ERR);
-		}
 	}
 
 	asm("\tmfc0 $8,$12\n\tori $8,1\n\tmtc0 $8,$12\n\t":::"$8");
