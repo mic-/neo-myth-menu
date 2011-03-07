@@ -139,11 +139,10 @@ int get_swap(unsigned char *buf)
 }
 
 /*
- * Load an image from the rom filesystem, returning a pointer to the array
- * of sprites that hold the image. The width and height of the image in
- * sprites is stored in w and h.
+ * Load an image from the rom filesystem, returning a pointer to the
+ * sprite that hold the image.
  */
-sprite_t *loadImageDFS(char *fname, int *w, int *h)
+sprite_t *loadImageDFS(char *fname)
 {
     int size, x, y, n, fd;
     u8 *tbuf;
@@ -170,37 +169,35 @@ sprite_t *loadImageDFS(char *fname, int *w, int *h)
     if (!ibuf)
         return 0;                       // couldn't decode image
 
-    *w = x / 64;
-    *h = y / 16;
-    sbuf = (sprite_t*)malloc((*w) * (*h) * (64*16*2 + 4));
+    sbuf = (sprite_t*)malloc(sizeof(sprite_t) + x * y * 2);
     if (!sbuf)
     {
         stbi_image_free(ibuf);
         return 0;                       // out of memory
     }
+    sbuf->width = x;
+    sbuf->height = y;
+    sbuf->bitdepth = 2;
+    sbuf->format = 0;
+    sbuf->hslices = x / 32;
+    sbuf->vslices = y / 16;
 
-    for (int iy=0; iy<(*h); iy++)
-        for (int ix=0; ix<(*w); ix++)
-        {
-            color_t *src = (color_t*)ibuf;
-            u16 *dst = (u16*)((u32)sbuf + ((iy*(*w) + ix) * (64*16*2 + 4)) + 4);
-            for (int j=0; j<16; j++)
-                for (int i=0; i<64; i++)
-                    dst[i + j*64] = graphics_convert_color(src[ix*64 + i + (iy*16 + j)*x]) & 0x0000FFFF;
-            *(u8*)((u32)sbuf + ((iy*(*w) + ix) * (64*16*2 + 4)) + 0) = 64;
-            *(u8*)((u32)sbuf + ((iy*(*w) + ix) * (64*16*2 + 4)) + 1) = 16;
-            *(u8*)((u32)sbuf + ((iy*(*w) + ix) * (64*16*2 + 4)) + 2) = 2;
-            *(u8*)((u32)sbuf + ((iy*(*w) + ix) * (64*16*2 + 4)) + 3) = 0;
-        }
+    color_t *src = (color_t*)ibuf;
+    u16 *dst = (u16*)((u32)sbuf + sizeof(sprite_t));
+
+    for (int j=0; j<y; j++)
+        for (int i=0; i<x; i++)
+            dst[i + j*x] = graphics_convert_color(src[i + j*x]) & 0x0000FFFF;
+    /* Invalidate data associated with sprite in cache */
+    data_cache_writeback_invalidate( sbuf->data, sbuf->width * sbuf->height * sbuf->bitdepth );
 
     stbi_image_free(ibuf);
     return sbuf;
 }
 
 /*
- * Load an image from the SD card, returning a pointer to the array
- * of sprites that hold the image. The width and height of the image in
- * sprites is stored in w and h.
+ * Load an image from the SD card, returning a pointer to the
+ * sprite that hold the image.
  */
 sprite_t *loadImageSD(char *fname, int *w, int *h)
 {
@@ -232,34 +229,36 @@ sprite_t *loadImageSD(char *fname, int *w, int *h)
     if (!ibuf)
         return 0;                       // couldn't decode image
 
-    *w = x / 64;
-    *h = y / 16;
-    sbuf = (sprite_t*)malloc((*w) * (*h) * (64*16*2 + 4));
+    sbuf = (sprite_t*)malloc(sizeof(sprite_t) + x * y * 2);
     if (!sbuf)
     {
         stbi_image_free(ibuf);
         return 0;                       // out of memory
     }
+    sbuf->width = x;
+    sbuf->height = y;
+    sbuf->bitdepth = 2;
+    sbuf->format = 0;
+    sbuf->hslices = x / 32;
+    sbuf->vslices = y / 16;
 
-    for (int iy=0; iy<(*h); iy++)
-        for (int ix=0; ix<(*w); ix++)
-        {
-            color_t *src = (color_t*)ibuf;
-            u16 *dst = (u16*)((u32)sbuf + ((iy*(*w) + ix) * (64*16*2 + 4)) + 4);
-            for (int j=0; j<16; j++)
-                for (int i=0; i<64; i++)
-                    dst[i + j*64] = graphics_convert_color(src[ix*64 + i + (iy*16 + j)*x]) & 0x0000FFFF;
-            *(u8*)((u32)sbuf + ((iy*(*w) + ix) * (64*16*2 + 4)) + 0) = 64;
-            *(u8*)((u32)sbuf + ((iy*(*w) + ix) * (64*16*2 + 4)) + 1) = 16;
-            *(u8*)((u32)sbuf + ((iy*(*w) + ix) * (64*16*2 + 4)) + 2) = 2;
-            *(u8*)((u32)sbuf + ((iy*(*w) + ix) * (64*16*2 + 4)) + 3) = 0;
-        }
+    color_t *src = (color_t*)ibuf;
+    u16 *dst = (u16*)((u32)sbuf + sizeof(sprite_t));
+
+    for (int j=0; j<y; j++)
+        for (int i=0; i<x; i++)
+            dst[i + j*x] = graphics_convert_color(src[i + j*x]) & 0x0000FFFF;
+    /* Invalidate data associated with sprite in cache */
+    data_cache_writeback_invalidate( sbuf->data, sbuf->width * sbuf->height * sbuf->bitdepth );
 
     stbi_image_free(ibuf);
     return sbuf;
 }
 
-void drawImage(display_context_t dcon, sprite_t *sprites, int w, int h)
+/*
+ * Draw an image to the screen using the sprite passed.
+ */
+void drawImage(display_context_t dcon, sprite_t *sprite)
 {
     int x, y = 0;
 
@@ -268,15 +267,15 @@ void drawImage(display_context_t dcon, sprite_t *sprites, int w, int h)
     rdp_enable_texture_copy();
     rdp_attach_display(dcon);
     // Draw image
-    for (int j=0; j<h; j++)
+    for (int j=0; j<sprite->vslices; j++)
     {
         x = 0;
-        for (int i=0; i<w; i++)
+        for (int i=0; i<sprite->hslices; i++)
         {
             rdp_sync(SYNC_PIPE);
-            rdp_load_texture(0, 0, MIRROR_DISABLED, (sprite_t*)((u32)sprites + ((j*w + i) * (64*16*2 + 4))));
+            rdp_load_texture_stride(0, 0, MIRROR_DISABLED, sprite, j*sprite->hslices + i);
             rdp_draw_sprite(0, x, y);
-            x += 64;
+            x += 32;
         }
         y += 16;
     }

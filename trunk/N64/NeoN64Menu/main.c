@@ -60,15 +60,12 @@ volatile unsigned int gTicks;           /* incremented every vblank */
 sprite_t *pattern[3] = { NULL, NULL, NULL };
 
 unsigned short boxes[16];
-char boxart[14980*16];
-char unknown[14980];
+char boxart[14984*16];
+char unknown[14984];
 
 sprite_t *splash;
-int splash_w, splash_h;
 sprite_t *browser;
-int browser_w, browser_h;
 sprite_t *loading;
-int loading_w, loading_h;
 
 struct textColors {
     u32 title;
@@ -117,9 +114,9 @@ char path[1024];
 #define ONCE_SIZE (256*1024)
 static u8 __attribute__((aligned(16))) tmpBuf[ONCE_SIZE];
 
-extern sprite_t *loadImageDFS(char *fname, int *w, int *h);
-extern sprite_t *loadImageSD(char *fname, int *w, int *h);
-extern void drawImage(display_context_t dcon, sprite_t *sprites, int w, int h);
+extern sprite_t *loadImageDFS(char *fname);
+extern sprite_t *loadImageSD(char *fname);
+extern void drawImage(display_context_t dcon, sprite_t *sprite);
 
 extern void disk_io_set_mode(int mode,int dat_swap);
 extern void neo2_enable_sd(void);
@@ -352,13 +349,13 @@ static void progress_screen(char *str1, char *str2, int frac, int total, int bfi
 
     // get next buffer to draw in
     dcon = lockVideo(1);
-   
+
     if ((str1 != NULL) || (str2 != NULL) || (bfill != -1))
     {
-		graphics_fill_screen(dcon, 0);
+        graphics_fill_screen(dcon, 0);
 
         if (loading && (bfill == 4))
-            drawImage(dcon, loading, loading_w, loading_h);
+            drawImage(dcon, loading);
         else if ((bfill < 3) && (pattern[bfill] != NULL))
         {
             rdp_sync(SYNC_PIPE);
@@ -396,7 +393,7 @@ static void progress_screen(char *str1, char *str2, int frac, int total, int bfi
         graphics_fill_screen(dcon, 0);
 
         if (loading && (bfill == 4))
-            drawImage(dcon, loading, loading_w, loading_h);
+            drawImage(dcon, loading);
         else if ((bfill < 3) && (pattern[bfill] != NULL))
         {
             rdp_sync(SYNC_PIPE);
@@ -448,7 +445,7 @@ void get_boxart(int brwsr, int entry)
     sprintf(boxpath, "/menu/n64/boxart/%c%c.sprite", gTable[entry].rom[0x1C], gTable[entry].rom[0x1D]);
 
     // default to unknown
-    memcpy(&boxart[ix*14980], unknown, 14980);
+    memcpy(&boxart[ix*14984], unknown, 14984);
     boxes[ix] = cart;
     if (brwsr)
     {
@@ -456,9 +453,11 @@ void get_boxart(int brwsr, int entry)
         if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
             return;                     // couldn't open file
         // read boxart sprite
-        f_read(&lSDFile, &boxart[ix*14980], 14980, &ts);
+        f_read(&lSDFile, &boxart[ix*14984], 14984, &ts);
         f_close(&lSDFile);
     }
+    /* Invalidate data associated with sprite in cache */
+    data_cache_writeback_invalidate( &boxart[ix*14984], 14984 );
 }
 
 void sort_entries(int max)
@@ -908,7 +907,7 @@ int getSDInfo(int entry)
         fno.lfname = (XCHAR*)lfnbuf;
         fno.lfsize = 255;
         fno.lfname[0] = (XCHAR)0;
-		fno.fname[0] = '\0';
+        fno.fname[0] = '\0';
 
         if ((fres = f_readdir(&dir, &fno)))
         {
@@ -933,27 +932,27 @@ int getSDInfo(int entry)
         if (fno.fattrib & AM_DIR)
         {
             if(fno.lfname[0])
-			{
-				if( (wstrcmp(privateName,fno.lfname) == 0) )
-					continue;
+            {
+                if( (wstrcmp(privateName,fno.lfname) == 0) )
+                    continue;
 
                 w2cstrcpy(gTable[max].name, fno.lfname);
-			}
+            }
             else
-			{
-				/*Skip checking for length to allow prefixes/etc : menu , menu_ , menu_1234567 , menu_abcd..*/
-				if( (memcmp(fno.fname,"menu",4) == 0 ) /*&& (strlen(fno.fname) == 4)*/ )
-					continue;
+            {
+                /*Skip checking for length to allow prefixes/etc : menu , menu_ , menu_1234567 , menu_abcd..*/
+                if( (memcmp(fno.fname,"menu",4) == 0 ) /*&& (strlen(fno.fname) == 4)*/ )
+                    continue;
 
-				strcpy(gTable[max].name, fno.fname);
-			}
+                strcpy(gTable[max].name, fno.fname);
+            }
 
             gTable[max].valid = 1;
             gTable[max].type = 128;     // directory entry
         }
         else
-        {	
-			u8* options = gTable[max].options;
+        {
+            u8* options = gTable[max].options;
 
             gTable[max].valid = 1;
             gTable[max].type = 127;     // unknown
@@ -1085,9 +1084,9 @@ void fastCopySD2Psram(int bselect,int bfill)
     u32 romsize, gamelen, copylen;
     XCHAR fpath[1280];
     char temp[256];
-	const int read = 256 * 1024;
+    const int read = 256 * 1024;
 
-	disk_io_set_mode(0,0);
+    disk_io_set_mode(0,0);
 
     // load rom info if not already loaded
     if (gTable[bselect].type == 127)
@@ -1119,17 +1118,17 @@ void fastCopySD2Psram(int bselect,int bfill)
     else
         copylen = gamelen;
 
-	disk_io_set_mode(1,gTable[bselect].swap);
+    disk_io_set_mode(1,gTable[bselect].swap);
 
-	progress_screen("Loading", temp, 0, 100, bfill);
+    progress_screen("Loading", temp, 0, 100, bfill);
 
-	{
-		for(int ic=0; ic<copylen; ic+=read)
-		{
-		    progress_screen(NULL,NULL, 100*ic/gamelen, 100,-1);
-		    f_read_dummy(&lSDFile,read,&ts);
-		}
-	}
+    {
+        for(int ic=0; ic<copylen; ic+=read)
+        {
+            progress_screen(NULL,NULL, 100*ic/gamelen, 100,-1);
+            f_read_dummy(&lSDFile,read,&ts);
+        }
+    }
 
     if (gamelen <= (16*1024*1024))
     {
@@ -1142,16 +1141,16 @@ void fastCopySD2Psram(int bselect,int bfill)
     // change the psram offset and copy the rest
     neo_psram_offset(copylen/(32*1024));
 
-	disk_io_set_mode(1,gTable[bselect].swap);//will reset psram addr
+    disk_io_set_mode(1,gTable[bselect].swap);//will reset psram addr
 
-	{
-		const int target = (gamelen-copylen);
-		for(int ic=0; ic<target; ic+=read)
-		{
-		    progress_screen(NULL,NULL,100*(copylen+ic)/gamelen,100,-1);
-		    f_read_dummy(&lSDFile,read,&ts);
-		}
-	}
+    {
+        const int target = (gamelen-copylen);
+        for(int ic=0; ic<target; ic+=read)
+        {
+            progress_screen(NULL,NULL,100*(copylen+ic)/gamelen,100,-1);
+            f_read_dummy(&lSDFile,read,&ts);
+        }
+    }
 
     neo_psram_offset(0);
 
@@ -1169,17 +1168,17 @@ void copySD2Psram(int bselect, int bfill)
     XCHAR fpath[1280];
     char temp[256];
 
-	disk_io_set_mode(0,0);
+    disk_io_set_mode(0,0);
 
     // load rom info if not already loaded
     if (gTable[bselect].type == 127)
         get_sd_info(bselect);
 
-	if((gTable[bselect].swap == 0) || (gTable[bselect].swap == 1) )
-	{
-		fastCopySD2Psram(bselect,bfill);
-		return;
-	}
+    if((gTable[bselect].swap == 0) || (gTable[bselect].swap == 1) )
+    {
+        fastCopySD2Psram(bselect,bfill);
+        return;
+    }
 
     romsize = (gTable[bselect].options[3]<<8) | gTable[bselect].options[4];
     // for SD card file, romsize is number of Mbits in rom
@@ -1207,13 +1206,13 @@ void copySD2Psram(int bselect, int bfill)
     else
         copylen = gamelen;
 
-	progress_screen("Loading", temp, 0, 100, bfill);
+    progress_screen("Loading", temp, 0, 100, bfill);
 
     // copy the rom from file to ram, then ram to psram
     for(int ic=0; ic<copylen; ic+=ONCE_SIZE)
     {
         progress_screen(NULL,NULL, 100*ic/gamelen, 100,-1);
-       	f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
+        f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
 
         // now check if it needs to be byte-swapped
         switch (gTable[bselect].swap)
@@ -1244,7 +1243,7 @@ void copySD2Psram(int bselect, int bfill)
             break;
         }
 
-		neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
+        neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
     }
 
     if (gamelen <= (16*1024*1024))
@@ -1259,8 +1258,8 @@ void copySD2Psram(int bselect, int bfill)
     neo_psram_offset(copylen/(32*1024));
 
     for(int ic=0; ic<(gamelen-copylen); ic+=ONCE_SIZE)
-    {		
-		progress_screen(NULL,NULL, 100*(copylen+ic)/gamelen, 100,-1);
+    {
+        progress_screen(NULL,NULL, 100*(copylen+ic)/gamelen, 100,-1);
 
         // read file to buffer
         f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
@@ -1295,12 +1294,12 @@ void copySD2Psram(int bselect, int bfill)
         }
 
         // copy to psram
-       	neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
+        neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
     }
     neo_psram_offset(0);
 
     f_close(&lSDFile);
-	progress_screen(NULL,NULL,100,100,-1);
+    progress_screen(NULL,NULL,100,100,-1);
     delay(5);
 }
 
@@ -1356,7 +1355,7 @@ int selectGBASlot(int sel, u8 *blk, int stype, int bfill)
 
         if (browser && (bfill == 4))
         {
-            drawImage(dcon, browser, browser_w, browser_h);
+            drawImage(dcon, browser);
         }
         else if ((bfill < 3) && (pattern[bfill] != NULL))
         {
@@ -1781,29 +1780,35 @@ void init_n64(void)
         int fp = dfs_open("/pattern0.sprite");
         pattern[0] = malloc(dfs_size(fp));
         dfs_read(pattern[0], 1, dfs_size(fp), fp);
+        /* Invalidate data associated with sprite in cache */
+        data_cache_writeback_invalidate( pattern[0], dfs_size(fp) );
         dfs_close(fp);
         fp = dfs_open("/pattern1.sprite");
         pattern[1] = malloc(dfs_size(fp));
         dfs_read(pattern[1], 1, dfs_size(fp), fp);
+        /* Invalidate data associated with sprite in cache */
+        data_cache_writeback_invalidate( pattern[1], dfs_size(fp) );
         dfs_close(fp);
         fp = dfs_open("/pattern2.sprite");
         pattern[2] = malloc(dfs_size(fp));
         dfs_read(pattern[2], 1, dfs_size(fp), fp);
+        /* Invalidate data associated with sprite in cache */
+        data_cache_writeback_invalidate( pattern[2], dfs_size(fp) );
         dfs_close(fp);
         // load unknown boxart sprite
         fp = dfs_open("/unknown.sprite");
-        dfs_read(unknown, 1, 14980, fp);
+        dfs_read(unknown, 1, 14984, fp);
         dfs_close(fp);
         // load backdrop images
-        splash = loadImageDFS("/splash.png", &splash_w, &splash_h);
+        splash = loadImageDFS("/splash.png");
         if (!splash)
-            splash = loadImageDFS("/splash.jpg", &splash_w, &splash_h);
-        browser = loadImageDFS("/browser.png", &browser_w, &browser_h);
+            splash = loadImageDFS("/splash.jpg");
+        browser = loadImageDFS("/browser.png");
         if (!browser)
-            browser = loadImageDFS("/browser.jpg", &browser_w, &browser_h);
-        loading = loadImageDFS("/loading.png", &loading_w, &loading_h);
+            browser = loadImageDFS("/browser.jpg");
+        loading = loadImageDFS("/loading.png");
         if (!loading)
-            loading = loadImageDFS("/loading.jpg", &loading_w, &loading_h);
+            loading = loadImageDFS("/loading.jpg");
     }
 }
 
@@ -1820,11 +1825,11 @@ int main(void)
 #endif
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v2.1 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v2.2 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v2.1 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v2.2 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v2.1 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v2.2 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad = Navigate CPad = change option";
@@ -1846,7 +1851,6 @@ int main(void)
         { "EXT CARD", "6101/7102", "6102/7101", "6103/7103", "6104/7104", "6105/7105", "6106/7106", "", "", "", "", "", "", "", "", "" }
     };
 
-    int stemp_w, stemp_h;
     sprite_t *stemp;
 
     init_n64();
@@ -1894,11 +1898,11 @@ int main(void)
     bmax = getSDInfo(-1);               // get root directory of sd card
     if (bmax)
     {
-		int load_ex_menu = 0;
+        int load_ex_menu = 0;
         FIL lSDFile;
         XCHAR fpath[32];
 
-		disk_io_set_mode(0,0);
+        disk_io_set_mode(0,0);
         check_fast();                   // let SD read at full speed if allowed
 
         strcpy(path, "/menu/n64/");
@@ -1906,17 +1910,17 @@ int main(void)
         c2wstrcpy(fpath, path);
         c2wstrcat(fpath, gTable[0].name);
 
-		load_ex_menu = (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK);
+        load_ex_menu = (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK);
 
-		if(load_ex_menu == 0)
-		{
-			memset(&lSDFile,0,sizeof(FIL));
-		    strcpy(path, "/menu/n64/");
-		    strcpy(gTable[0].name, "NEON64SD.v64");
-		    c2wstrcpy(fpath, path);
-		    c2wstrcat(fpath, gTable[0].name);
-			load_ex_menu = (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK);
-		}
+        if(load_ex_menu == 0)
+        {
+            memset(&lSDFile,0,sizeof(FIL));
+            strcpy(path, "/menu/n64/");
+            strcpy(gTable[0].name, "NEON64SD.v64");
+            c2wstrcpy(fpath, path);
+            c2wstrcat(fpath, gTable[0].name);
+            load_ex_menu = (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK);
+        }
 
         if(load_ex_menu)
         {
@@ -1933,16 +1937,14 @@ int main(void)
             f_close(&lSDFile);
             get_sd_info(0);
 
-            stemp = loadImageSD("/menu/n64/images/loading.png", &stemp_w, &stemp_h);
+            stemp = loadImageSD("/menu/n64/images/loading.png");
             if (!stemp)
-                stemp = loadImageSD("/menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
+                stemp = loadImageSD("/menu/n64/images/loading.jpg");
             if (stemp)
             {
                 if (loading)
                     free(loading);
                 loading = stemp;
-                loading_w = stemp_w;
-                loading_h = stemp_h;
             }
 
             setTextColors((loading) ? 4 : 0);
@@ -1958,42 +1960,36 @@ int main(void)
     bmax = getSDInfo(-1);
     if (bmax)
     {
-		disk_io_set_mode(0,0);
+        disk_io_set_mode(0,0);
         check_fast();                   // let SD read at full speed if allowed
 
         // try for images on the SD card
-        stemp = loadImageSD("/menu/n64/images/splash.png", &stemp_w, &stemp_h);
+        stemp = loadImageSD("/menu/n64/images/splash.png");
         if (!stemp)
-            stemp = loadImageSD("/menu/n64/images/splash.jpg", &stemp_w, &stemp_h);
+            stemp = loadImageSD("/menu/n64/images/splash.jpg");
         if (stemp)
         {
             if (splash)
                 free(splash);
             splash = stemp;
-            splash_w = stemp_w;
-            splash_h = stemp_h;
         }
-        stemp = loadImageSD("/menu/n64/images/browser.png", &stemp_w, &stemp_h);
+        stemp = loadImageSD("/menu/n64/images/browser.png");
         if (!stemp)
-            stemp = loadImageSD("/menu/n64/images/browser.jpg", &stemp_w, &stemp_h);
+            stemp = loadImageSD("/menu/n64/images/browser.jpg");
         if (stemp)
         {
             if (browser)
                 free(browser);
             browser = stemp;
-            browser_w = stemp_w;
-            browser_h = stemp_h;
         }
-        stemp = loadImageSD("/menu/n64/images/loading.png", &stemp_w, &stemp_h);
+        stemp = loadImageSD("/menu/n64/images/loading.png");
         if (!stemp)
-            stemp = loadImageSD("/menu/n64/images/loading.jpg", &stemp_w, &stemp_h);
+            stemp = loadImageSD("/menu/n64/images/loading.jpg");
         if (stemp)
         {
             if (loading)
                 free(loading);
             loading = stemp;
-            loading_w = stemp_w;
-            loading_h = stemp_h;
         }
     }
     neo2_disable_sd();
@@ -2003,7 +1999,7 @@ int main(void)
         display_context_t dcon;
         dcon = lockVideo(1);
         graphics_fill_screen(dcon, 0);
-        drawImage(dcon, splash, splash_w, splash_h);
+        drawImage(dcon, splash);
         unlockVideo(dcon);
         delay(120);
     }
@@ -2051,7 +2047,7 @@ int main(void)
 
         if (browser && (bfill == 4))
         {
-            drawImage(dcon, browser, browser_w, browser_h);
+            drawImage(dcon, browser);
         }
         else if ((bfill < 3) && (pattern[bfill] != NULL))
         {
@@ -2166,7 +2162,7 @@ int main(void)
                 // do boxart
                 if (boxes[ix] != cart)
                     get_boxart(brwsr, bselect);
-                graphics_draw_sprite(dcon, 184, 112, (sprite_t*)&boxart[ix*14980]);
+                graphics_draw_sprite(dcon, 184, 112, (sprite_t*)&boxart[ix*14984]);
             }
         }
 
