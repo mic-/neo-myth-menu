@@ -1,5 +1,5 @@
 ========================================================================
-              Neo N64 Myth Menu v1.9 by Chilly Willy
+              Neo N64 Myth Menu v2.2 by Chilly Willy
 ========================================================================
 The Neo N64 Myth Menu uses libdragon, by Shaun Taylor. Many thanks for
 his work on this fine SDK for the N64.
@@ -21,28 +21,31 @@ you to do updates to the GBA menu flash, leaving the N64 menu flash alone
 unless there is a major update. You could also boot only the GBA menu
 flash directly.
 
-Similarly, you can put the NEON64SD.v64 on your SD card. Copy it to
-"/.menu/n64/NEON64SD.v64" - create the directories if they don't already
-exist. Spelling and capitalization matter, so get it right! While you are
-at it, make a "/.menu/n64/save" directory. It is needed for the autosave
-manager.
+Similarly, you can put the NEON64SD.z64 on your SD card. Copy it to
+"/menu/n64/NEON64SD.z64" - if the menu directories don't exist, the
+menu will create them the first time you boot it (from U2 flash or
+GBA menu flash).
 
 When the menu in either the N64 menu flash or the GBA menu flash find that
 file, they will boot it, assuming it to be the most up to date version.
-This is the easiest way to handle minor updates - put v1.9 in the N64 menu
-flash and then any new updates on the SD card.
+This is the easiest way to handle minor updates - put v2.2 in the N64 menu
+flash and then any new updates on the SD card. The newer SD loaded menus
+are in z64 format which will not be loaded properly by old menus. You
+might wish to take the opportunity to update your menu in the flash to
+v2.2 as that will give you the best speed and features even if you don't
+load the menu from the SD card.
 
 You can replace the splash, browser, and loading images by placing your
-own images in the "/.menu/n64/images" directory. The images should be
+own images in the "/menu/n64/images" directory. The images should be
 named "splash.jpg" or "splash.png", "browser.jpg" or "browser.png", and
 "loading.jpg" or "loading.png", and they should be jpeg/png images 320
 pixels wide by 240 lines tall. You can have any or all of them. Images
 not included in the directory will use the default image. If you have both
 png and jpg images, the png image will be used.
 
-Starting with v1.9, boxart is supported in the menu. You must place the
-sprites from the boxart archive into "/.menu/n64/boxart" or you will only
-get the default boxart image.
+The boxart for v2.2 has changed slightly, so download the new boxart. You
+must place the sprites from the boxart archive into  "/menu/n64/boxart"
+or you will only get the default boxart image.
 
 ========================================================================
 
@@ -85,8 +88,8 @@ combined is 1279 characters. The game info for SD card files is not shown
 initially to speed things up. Pause over a file for a second and it will
 read and display the game info. Note that while flash games start instantly,
 SD card games must be read into memory, and can take a while. Currently,
-it take about 27 seconds to load an 8 MByte game, about 0:53 to load a
-16 MByte game, and about 1:46 to load a 32 MByte game. Larger games cannot
+it take about 15 seconds to load an 8 MByte game, about 0:31 to load a
+16 MByte game, and about 1:02 to load a 32 MByte game. Larger games cannot
 be loaded at this time as the Neo2-Pro has only 32 MBytes of memory for
 loading games into. If you have a Neo2-SD, the maximum is 16 MBytes.
 
@@ -117,7 +120,7 @@ Myth hardware (particularly the SD card interface) may be used.
 
 The latest feature is auto load/save of save ram. When you run a game and
 it uses save ram of any kind (except ext cart), the save ram will be
-automatically loaded from "/.menu/n64/save/<game_name>.<save extension>"
+automatically loaded from "/menu/n64/save/<game_name>.<save extension>"
 when you have an SD card. If the file doesn't exist, the save ram is
 cleared. When you restart the menu the next time, the save ram will be
 automatically saved to the file. If the directory mentioned doesn't exist
@@ -125,7 +128,9 @@ on your SD card, create it or this will not work.
 
 The extension for the file depends on the type of save ram used. For SRAM,
 the extension is ".sra"; for EEPROM, it is ".eep"; and for FRAM, it is
-".fla". These files are compatible with N64 emulator save ram files.
+".fla". These files are compatible with N64 emulator save ram files. DexDrive
+save files have an extension of ".n64" and must be converted to a supported
+form before they can be used.
 
 When you don't have an SD card plugged in, or are using a cart without the
 SD interface, the save ram is saved in the SRAM on the GBA cart. In that
