@@ -763,7 +763,7 @@ DRESULT MMC_disk_read_multi (
         }
 
         if (!neo2_recv_sd_multi(buff, count))
-    {
+        {
                 if (!sdReadStartMulti(sector))
                 {
                         neo2_post_sd();
@@ -775,7 +775,7 @@ DRESULT MMC_disk_read_multi (
                         neo2_post_sd();
                         return RES_ERROR;
                 }
-    }
+        }
 
         sdReadStopMulti();
         neo2_post_sd();

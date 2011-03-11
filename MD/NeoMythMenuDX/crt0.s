@@ -88,8 +88,8 @@ initialize:
         adda.l  #0x00300000,a0
         lea     0xFF0000,a1
         move.l  #_sdata,d0
-		lsr.l	#1,d0
-		subq.w	#1,d0
+        lsr.l   #1,d0
+        subq.w  #1,d0
 2:
         move.w  (a0)+,(a1)+
         dbra    d0,2b
@@ -196,6 +196,10 @@ vblank:
         addq.l  #1,gTicks
         addq.l  #4,sp
         rte
+
+        .align  16
+
+        .long   0,0,0
 
         .else
 
@@ -366,11 +370,11 @@ continue:
 |        move.l  #0xC0000000,0xC00004    /* write CRAM address 0 */
 |        move.w  #0x0008,0xC00000        /* entry 0 (red) BGR */
 
-		moveq	#0,d0
-		move.l	d0,exception_vector
-		move.l	d0,hblank_vector
-		move.l	d0,vblank_vector
-		move.l	d0,gTicks
+        moveq   #0,d0
+        move.l  d0,exception_vector
+        move.l  d0,hblank_vector
+        move.l  d0,vblank_vector
+        move.l  d0,gTicks
 
         lea     0x01000000,a0
         movea.l a0,sp                   /* set stack pointer to top of Work RAM */
@@ -399,8 +403,8 @@ continue:
         lea     _stext,a0
         lea     0xFF0000,a1
         move.l  #_sdata,d0
-		lsr.l	#1,d0
-		subq.w	#1,d0
+        lsr.l   #1,d0
+        subq.w  #1,d0
 2:
         move.w  (a0)+,(a1)+
         dbra    d0,2b
