@@ -4419,15 +4419,15 @@ void run_rom(int reset_mode)
 
             // Play VGM song
 #ifndef RUN_IN_PSRAM
-            if (fsize > 0x1C0000)
+            if (fsize > 0x7C0000)
                 return; // too big for current method of playing
 #else
-            if (fsize > 0x100000)
+            if (fsize > 0x700000)
                 return; // too big for current method of playing
 #endif
             // copy file to myth psram
             ints_off();
-            copyGame(&neo_copyto_myth_psram, &neo_copy_game, 0x600000, fstart, fsize, "Loading ", temp);
+            copyGame(&neo_copyto_myth_psram, &neo_copy_game, 0x000000, fstart, fsize, "Loading ", temp);
             ints_on();     /* enable interrupts */
 
             gCursorX = 1;
@@ -4579,14 +4579,14 @@ void run_rom(int reset_mode)
 
             // Play VGM song
 #ifndef RUN_IN_PSRAM
-            if (fsize > 0x1C0000)
+            if (fsize > 0x7C0000)
                 return; // too big for current method of playing
 #else
-            if (fsize > 0x100000)
+            if (fsize > 0x700000)
                 return; // too big for current method of playing
 #endif
             // copy file to myth psram
-            copyGame(&neo_copyto_myth_psram, &neo_copy_sd, 0x600000, 0, fsize, "Loading ", temp);
+            copyGame(&neo_copyto_myth_psram, &neo_copy_sd, 0x000000, 0, fsize, "Loading ", temp);
             ints_on();     /* enable interrupts */
 
             gCursorX = 1;
@@ -5245,7 +5245,7 @@ int main(void)
 {
     int ix;
 //    char temp[44];                      /* keep in sync with RTC print below! */
-    //mm_init();
+    mm_init();
 
 #ifndef RUN_IN_PSRAM
     init_hardware();                    /* set hardware to a consistent state, clears vram and loads the font */
