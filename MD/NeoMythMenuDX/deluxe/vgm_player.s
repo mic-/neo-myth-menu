@@ -73,11 +73,11 @@ ExitVGM:
         move.b  (a5)+,0x0011(a0)
         move.b  (a5)+,0x0011(a0)
         move.b  (a5),0x0011(a0)
-3:
+9:
         /* wait on C released */
         move.b  0xA10003,d0     /* - 1 c b r l d u */
         andi.w  #0x0020,d0      /* 0 0 0 0 0 0 0 0 0 0 c 0 0 0 0 0 */
-        beq.b   3b
+        beq.b   9b
 
         move.w  #0x2000,sr
         movem.l (sp)+,d2-d7/a2-a6
@@ -111,13 +111,17 @@ PlayVGM:
 0:
         move.w  #0x40,d4        /* No loop offset - use the start of the song */
 1:
-        cmpi.l  #0x50010000,8(a6) /* >= v1.50? */
-        bcs.b   2f              /* no, assume data always starts at offset 0x40 */
-        move.l  0x34(a6),d0     /* VGM data offset */
+        move.l  8(a6),d0        /* version */
         ror.w   #8,d0
         swap    d0
         ror.w   #8,d0
+        cmpi.l  #0x150,d0       /* >= v1.50? */
+        bcs.b   2f              /* no, assume data always starts at offset 0x40 */
+        move.l  0x34(a6),d0     /* VGM data offset */
         beq.b   2f              /* not set - use 0x40 */
+        ror.w   #8,d0
+        swap    d0
+        ror.w   #8,d0
         addi.l  #0x34,d0
         bra.b   3f
 2:
