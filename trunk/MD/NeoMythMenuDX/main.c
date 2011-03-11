@@ -282,13 +282,13 @@ WCHAR *lfnames = (WCHAR *)(0x400000 - MAX_ENTRIES * 512); /* space for long file
 WCHAR *wstr_buf = (WCHAR *)0x380000;    /* space for WCHAR strings in PSRAM */
 static unsigned int gWStrOffs = 0;
 
-unsigned char rtc[8];                   /* RTC from Neo2/3 flash cart */
+//unsigned char rtc[8];                   /* RTC from Neo2/3 flash cart */
 
 Cluster __attribute__((aligned(16))) __ff_clust_buffer[0x20 + 16];
 
 static char gStsLine[64];
 static char entrySNameBuf[64];
-static char gProgressBarStaticBuffer[36];
+static char gProgressBarStaticBuffer[64];
 
 WCHAR ipsPath[512];                     /* ips path */
 WCHAR path[512];                        /* SD card file path */
@@ -849,7 +849,7 @@ void sort_entries()
 void get_menu_flash(void)
 {
     menuEntry_t *p = NULL;
-    char extension[6];
+    char extension[8];
     int ix;
 
     gMaxEntry = 0;
@@ -1167,7 +1167,7 @@ void get_sd_cheat(WCHAR* sss)
 void get_sd_info(int entry)
 {
     unsigned char jump[4];
-    char extension[6];
+    char extension[8];
     int eos = utility_wstrlen(path);
     UINT ts;
 
@@ -1481,6 +1481,7 @@ inline void update_sd_display_make_name(int e)//single session
     {
         utility_strcpy(entrySNameBuf,"[");
         utility_strncat(entrySNameBuf,(const char *)buffer,34);
+        entrySNameBuf[35] = '\0';
         utility_strcat(entrySNameBuf,"]");
 
         return;
@@ -1534,7 +1535,7 @@ inline void update_sd_display()//quick hack to remove flickering
 void update_display(void)
 {
     int ix;
-    char temp[48];
+    char temp[64];
 
     if (gUpdate < 0)
     {
@@ -3753,7 +3754,7 @@ void do_options(void)
     int maxOptions = 0;
     int currOption = 0;
     int update = 1;
-    char ipsFPath[40];
+    char ipsFPath[64];
     char optCheatFirst = 1;
 
     __options_EntryPoint:
@@ -4143,7 +4144,7 @@ void do_options(void)
             if ((changed & SEGA_CTRL_B) && !(buttons & SEGA_CTRL_B))
             {
                 // B released
-                char temp[32];
+                char temp[64];
 
                 utility_w2cstrcpy((char*)buffer, gSelections[gCurEntry].name);
                 //strncpy(temp, (const char *)buffer, 30);
@@ -4368,7 +4369,7 @@ int do_SDMgr(void)
 {
     int i, y;
     unsigned short int buttons,changed;
-    char temp[40];
+    char temp[64];
 
     clear_screen();
 
@@ -4452,7 +4453,7 @@ int do_SDMgr(void)
 
 void run_rom(int reset_mode)
 {
-    char temp[32];
+    char temp[64];
 
     utility_w2cstrcpy((char*)buffer, gSelections[gCurEntry].name);
     //strncpy(temp, (const char *)buffer, 30);
@@ -4477,7 +4478,7 @@ void run_rom(int reset_mode)
         if (gSelections[gCurEntry].type == 4)
         {
             int ix;
-            char temp2[48];
+            char temp2[64];
 
             // Play VGM song
 #ifndef RUN_IN_PSRAM
@@ -4637,7 +4638,7 @@ void run_rom(int reset_mode)
         if (gSelections[gCurEntry].type == 4)
         {
             int ix;
-            char temp2[48];
+            char temp2[64];
 
             // Play VGM song
 #ifndef RUN_IN_PSRAM
@@ -5313,7 +5314,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
 int main(void)
 {
     int ix;
-//    char temp[44];                      /* keep in sync with RTC print below! */
+//    char temp[64];                      /* keep in sync with RTC print below! */
     mm_init();
 
 #ifndef RUN_IN_PSRAM
