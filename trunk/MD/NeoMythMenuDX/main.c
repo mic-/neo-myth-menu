@@ -278,17 +278,23 @@ char gSRAMBankStr[8];
 
 optionEntry gOptions[OPTION_ENTRIES];   /* entries for global options */
 
-WCHAR ipsPath[512];                     /* ips path */
-WCHAR path[512];                        /* SD card file path */
 WCHAR *lfnames = (WCHAR *)(0x400000 - MAX_ENTRIES * 512); /* space for long file names in PSRAM */
+WCHAR *wstr_buf = (WCHAR *)0x380000;    /* space for WCHAR strings in PSRAM */
+static unsigned int gWStrOffs = 0;
 
 unsigned char rtc[8];                   /* RTC from Neo2/3 flash cart */
+
+Cluster __attribute__((aligned(16))) __ff_clust_buffer[0x20 + 16];
+
+static char entrySNameBuf[64];
+static char gProgressBarStaticBuffer[36];
+
+WCHAR ipsPath[512];                     /* ips path */
+WCHAR path[512];                        /* SD card file path */
 
 unsigned char __attribute__((aligned(16))) rom_hdr[256];             /* rom header from selected rom (if loaded) */
 
 unsigned char __attribute__((aligned(16))) buffer[XFER_SIZE*2];      /* Work RAM buffer - big enough for SMD decoding */
-unsigned char __attribute__((aligned(16))) cacheBuffer[1024];
-Cluster __attribute__((aligned(16))) __ff_clust_buffer[0x20 + 16];
 
 selEntry_t gSelections[MAX_ENTRIES];    /* entries for flash or current SD directory */
 
@@ -348,7 +354,6 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
 
 void update_display(void);
 
-static char __attribute__((aligned(16))) entrySNameBuf[64];
 static short int gChangedPage = 0;
 static short int gCacheOutOfSync = 0;
 static int inputboxDelay = 5;
@@ -420,8 +425,9 @@ inline int fileExists(const XCHAR* fss)
 
 void makeDir(const XCHAR* fps)
 {
-    WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
     int i,l,j,di;
+    WCHAR* ss = &wstr_buf[gWStrOffs];
+    gWStrOffs += 512;
 
     utility_strcpy((char*)ss,"Creating directory: ");
     utility_w2cstrcpy((char*)(ss+10),fps);
@@ -456,6 +462,7 @@ void makeDir(const XCHAR* fps)
     }
 
     clearStatusMessage();
+    gWStrOffs -= 512;
 }
 
 inline int createDirectory(const XCHAR* fps)
@@ -470,10 +477,14 @@ inline int createDirectory(const XCHAR* fps)
 
 inline int createDirectoryFast(const XCHAR* fps)
 {
-    WCHAR* ss = (WCHAR*)&buffer[XFER_SIZE >> 1];
+    WCHAR* ss = &wstr_buf[gWStrOffs];
+    gWStrOffs += 512;
 
     if(directoryExists(fps))
+    {
+        gWStrOffs -= 512;
         return 1;
+    }
 
     utility_strcpy((char*)ss,"Creating directory: ");
     utility_w2cstrcpy((char*)(ss+10),fps);
@@ -482,6 +493,7 @@ inline int createDirectoryFast(const XCHAR* fps)
     f_mkdir(fps);
 
     clearStatusMessage();
+    gWStrOffs -= 512;
     return 1;
 }
 
@@ -577,7 +589,7 @@ void cheat_invalidate()
 
     for(a = 0; a < CHEAT_ENTRIES_COUNT; a++)
     {
-        cheatEntries[a].name[0] = cheatEntries[a].name[32] = '\0';
+        cheatEntries[a].name[0] = cheatEntries[a].name[31] = '\0';
         cheatEntries[a].pairs = 0;
         cheatEntries[a].active = 0;
         cheatEntries[a].type = CT_NULL;
@@ -598,7 +610,7 @@ void cheat_popEntry()
         cheatEntries[registeredCheatEntries].type = CT_NULL;
         cheatEntries[registeredCheatEntries].active = 0;
         cheatEntries[registeredCheatEntries].name[0] =
-        cheatEntries[registeredCheatEntries].name[32] = '\0';
+        cheatEntries[registeredCheatEntries].name[31] = '\0';
     }
 
     --registeredCheatEntries;
@@ -802,7 +814,7 @@ inline void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
     UINT ts;
     ints_on();     /* enable interrupts */
     gDirectRead = 1;
-    f_read_direct(&gSDFile, (unsigned char *)pstart, len, &ts,__ff_clust_buffer);
+    f_read_direct(&gSDFile, (unsigned char *)pstart, len, &ts, __ff_clust_buffer);
     gDirectRead = 0;
     ints_off();     /* disable interrupts */
 }
@@ -938,6 +950,7 @@ void get_smd_hdr(unsigned char *jump)
         }
     }
 }
+
 /*
 WCHAR *get_file_ext(WCHAR *src)
 {
@@ -999,7 +1012,7 @@ void get_sd_ips(int entry)
 void get_sd_cheat(WCHAR* sss)
 {
     char *cheatBuf = (char*)&buffer[XFER_SIZE + 2];
-    WCHAR* cheatPath = (WCHAR*)&buffer[XFER_SIZE + 18];
+    WCHAR* cheatPath = &wstr_buf[gWStrOffs];
     CheatEntry* e = NULL;
     char* pb = (char*)&buffer[0];
     char* head,*sp;
@@ -1008,6 +1021,7 @@ void get_sd_cheat(WCHAR* sss)
     short lk,ll;
     char region = systemRegion();
 
+    gWStrOffs += 512;
     ints_on();
     cheat_invalidate();
 
@@ -1027,7 +1041,10 @@ void get_sd_cheat(WCHAR* sss)
         bytesToRead = gSDFile.fsize;
 
         if(!bytesToRead)
+        {
+            gWStrOffs -= 512;
             return;
+        }
 
         if(bytesToRead > WORK_RAM_SIZE) //32K are more than enough
             bytesToRead = WORK_RAM_SIZE;
@@ -1036,7 +1053,10 @@ void get_sd_cheat(WCHAR* sss)
         if(f_read(&gSDFile, pb, bytesToRead, &bytesWritten) == FR_OK)
         {
             if(!bytesWritten)
+            {
+                gWStrOffs -= 512;
                 return;
+            }
 
             pb[bytesWritten] = '\0';
             head = pb;
@@ -1054,7 +1074,10 @@ void get_sd_cheat(WCHAR* sss)
                     e = cheat_register();
 
                     if(!e)//all cheat slots used
+                    {
+                        gWStrOffs -= 512;
                         return;
+                    }
 
                     utility_memset(e->name,'\0',32);//UTIL_SetMemorySafe(e->name,'\0',32);//remove possible garbage
                     UTIL_SubString(e->name,sp,"$Name(",")"); e->name[31] = '\0';
@@ -1144,6 +1167,7 @@ void get_sd_cheat(WCHAR* sss)
         }//f_read -> ok?
         //f_close(&gSDFile);
     }//open handle?
+    gWStrOffs -= 512;
 }
 
 void get_sd_info(int entry)
@@ -2008,7 +2032,6 @@ void gen_bram(unsigned char *dest, int fstart, int len)
         dest[ix+1] = 0x03;
     }
 }
-static char gProgressBarStaticBuffer[36];
 
 inline void update_progress(char *str1, char *str2, int curr, int total)
 {
@@ -2613,7 +2636,7 @@ int cache_process()
 void cache_loadPA(WCHAR* sss)
 {
     UINT fbr = 0;
-    WCHAR* fnbuf = (WCHAR*)&cacheBuffer[0];
+    WCHAR* fnbuf = &wstr_buf[gWStrOffs];
 
     if(gCurMode != MODE_SD)
         return;
@@ -2631,6 +2654,8 @@ void cache_loadPA(WCHAR* sss)
 
     if(*utility_getFileExtW(sss) != '.')
         return;
+
+    gWStrOffs += 512;
 
     setStatusMessage("Reading cache...");
     utility_memset(fnbuf,0,512);
@@ -2652,6 +2677,7 @@ void cache_loadPA(WCHAR* sss)
         cache_invalidate_pointers();
         gCacheBlock.processed = cache_process();
         cache_sync();
+        gWStrOffs -= 512;
         return;
     }
 
@@ -2659,6 +2685,7 @@ void cache_loadPA(WCHAR* sss)
     {
         clearStatusMessage();
         f_close(&gSDFile);
+        gWStrOffs -= 512;
         return;
     }
     ints_on();
@@ -2687,6 +2714,7 @@ void cache_loadPA(WCHAR* sss)
 
     clearStatusMessage();
     ints_on();
+    gWStrOffs -= 512;
 }
 
 void cache_load()
@@ -2708,7 +2736,7 @@ void cache_load()
 void cache_sync()
 {
     UINT fbr = 0;
-    WCHAR* fnbuf = (WCHAR*)&cacheBuffer[0];
+    WCHAR* fnbuf = &wstr_buf[gWStrOffs];
 
     if(gCurMode != MODE_SD)
         return;
@@ -2732,13 +2760,18 @@ void cache_sync()
     if(*utility_getFileExtW(gSelections[gCurEntry].name) != '.')
         return;
 
+    gWStrOffs += 512;
+
     ints_on();
     utility_memset(fnbuf,0,512);
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,CACHE_DIR);
 
     if(!createDirectory(fnbuf))
+    {
+        gWStrOffs -= 512;
         return;
+    }
 
     setStatusMessage("Writing cache...");
 
@@ -2754,6 +2787,7 @@ void cache_sync()
     if(f_open(&gSDFile,fnbuf,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
     {
         clearStatusMessage();
+        gWStrOffs -= 512;
         return;
     }
 
@@ -2797,6 +2831,7 @@ void cache_sync()
     }
 
     clearStatusMessage();
+    gWStrOffs -= 512;
 }
 
 /*SRAM manager*/
@@ -2835,12 +2870,14 @@ void sram_mgr_toggleService(int index)
 void sram_mgr_saveGamePA(WCHAR* sss)
 {
     UINT fbr = 0;
-    WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fnbuf = &wstr_buf[gWStrOffs];
     int sramLength,sramBankOffs,k,i,tw;
 
     //dont let this happen
     if(!gSRAMSize)
         return;
+
+    gWStrOffs += 512;
 
     ints_on();
     utility_memset(fnbuf,0,512);
@@ -2852,7 +2889,10 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     utility_c2wstrcat(fnbuf,SAVES_DIR);
 
     if(!createDirectory(fnbuf))
+    {
+        gWStrOffs -= 512;
         return;
+    }
 
     utility_c2wstrcat(fnbuf,"/");
     utility_wstrcat(fnbuf,sss);
@@ -2882,7 +2922,10 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     f_close(&gSDFile);
 
     if(f_open(&gSDFile,fnbuf,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
+    {
+        gWStrOffs -= 512;
         return;
+    }
 
     setStatusMessage("Backing up GAME sram...");
 
@@ -2933,6 +2976,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 
     setStatusMessage("Backing up GAME sram...OK!");
     clearStatusMessage();
+    gWStrOffs -= 512;
 }
 
 void sram_mgr_saveGame(int index)
@@ -2945,8 +2989,10 @@ void sram_mgr_saveGame(int index)
 void sram_mgr_restoreGame(int index)
 {
     UINT fbr = 0;
-    WCHAR* fnbuf = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fnbuf = &wstr_buf[gWStrOffs];
     int sramLength,sramBankOffs,k,i,tr;
+
+    gWStrOffs += 512;
 
     ints_on();
     utility_memset(fnbuf,0,512);
@@ -2980,11 +3026,15 @@ void sram_mgr_restoreGame(int index)
     f_close(&gSDFile);
 
     if(f_open(&gSDFile,fnbuf,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    {
+        gWStrOffs -= 512;
         return;
+    }
 
     if(!gSDFile.fsize)
     {
         f_close(&gSDFile);
+        gWStrOffs -= 512;
         return;
     }
 
@@ -3036,12 +3086,15 @@ void sram_mgr_restoreGame(int index)
     setStatusMessage("Restoring GAME sram...OK!");
 
     clearStatusMessage();
+    gWStrOffs -= 512;
 }
 
 void sram_mgr_saveAll(int index)
 {
-    WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fss = &wstr_buf[gWStrOffs];
     UINT fsize = 0 , i = 0 , fbr = 0;
+
+    gWStrOffs += 512;
 
     ints_on();
     setStatusMessage("Working...");
@@ -3054,6 +3107,7 @@ void sram_mgr_saveAll(int index)
     if(!createDirectory(fss))
     {
         clearStatusMessage();
+        gWStrOffs -= 512;
         return;
     }
 
@@ -3065,7 +3119,10 @@ void sram_mgr_saveAll(int index)
     f_close(&gSDFile);
 
     if(f_open(&gSDFile, fss , FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
+    {
+        gWStrOffs -= 512;
         return;
+    }
 
     fsize = gSDFile.fsize;
 
@@ -3084,12 +3141,15 @@ void sram_mgr_saveAll(int index)
     f_close(&gSDFile);
     update_progress("Saving ALL SRAM.."," ",100,100);
     clearStatusMessage();
+    gWStrOffs -= 512;
 }
 
 void sram_mgr_restoreAll(int index)
 {
-    WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fss = &wstr_buf[gWStrOffs];
     UINT fsize = 0 , i = 0 , fbr = 0;
+
+    gWStrOffs += 512;
 
     ints_on();
     setStatusMessage("Working...");
@@ -3104,13 +3164,17 @@ void sram_mgr_restoreAll(int index)
     f_close(&gSDFile);
 
     if(f_open(&gSDFile,fss, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    {
+        gWStrOffs -= 512;
         return;
+    }
 
     fsize = gSDFile.fsize;
 
     if(fsize < 2 * MB)
     {
         f_close(&gSDFile);
+        gWStrOffs -= 512;
         return;
     }
 
@@ -3128,6 +3192,7 @@ void sram_mgr_restoreAll(int index)
     f_close(&gSDFile);
     update_progress("Restoring ALL SRAM.."," ",100,100);
     clearStatusMessage();
+    gWStrOffs -= 512;
 }
 
 void sram_mgr_clearGame(int index)
@@ -3181,7 +3246,7 @@ void sram_mgr_clearAll(int index)
     ints_on();
     update_progress("Clearing ALL SRAM.."," ",100,100);
     setStatusMessage("Clearing ALL SRAM...OK");
-;
+
     clearStatusMessage();
 }
 
@@ -3511,7 +3576,7 @@ void runCheatEditor(int index)
     char* line = (char*)&buffer[XFER_SIZE];
     char* buf = (char*)&buffer[XFER_SIZE + 256 ];
     char* pb = (char*)&buffer[0];
-    WCHAR* cheatPath = (WCHAR*)&buffer[XFER_SIZE + 512 ];
+    WCHAR* cheatPath = &wstr_buf[gWStrOffs];
     UINT fbr,read;
     int r;
     int added = 0;
@@ -3522,11 +3587,12 @@ void runCheatEditor(int index)
     if(gCurMode != MODE_SD)
         return;
 
+    gWStrOffs += 512;
+
     clear_screen();
 
     ints_on();
     printToScreen("Working...",(40 >> 1) - (utility_strlen("Working...") >>1),12,0x2000);
-
 
     cache_sync();
 
@@ -3544,6 +3610,7 @@ void runCheatEditor(int index)
     if(!r)
     {
         clear_screen();
+        gWStrOffs -= 512;
         return;
     }
 
@@ -3682,6 +3749,7 @@ void runCheatEditor(int index)
     gButtons = SEGA_CTRL_NONE;
     delay(10);
     clear_screen();
+    gWStrOffs -= 512;
 }
 
 void do_options(void)
@@ -3920,7 +3988,7 @@ void do_options(void)
     {
         utility_w2cstrcpy((char*)buffer, ipsPath);
         strncpy(ipsFPath, (const char *)buffer, 36);
-        ipsFPath[36] = '\0';
+        ipsFPath[35] = '\0';
         gOptions[maxOptions].name = ipsFPath;
 
         if(!gImportIPS)
@@ -4760,7 +4828,8 @@ void run_rom(int reset_mode)
 void updateConfig()
 {
     UINT fbr = 0;
-    WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fss = &wstr_buf[gWStrOffs];
+    gWStrOffs += 512;
 
     ints_on();
 
@@ -4769,6 +4838,7 @@ void updateConfig()
     if(config_saveToBuffer((char*)buffer))
     {
         clearStatusMessage();
+        gWStrOffs -= 512;
         return;
     }
 
@@ -4781,6 +4851,7 @@ void updateConfig()
     if(f_open(&gSDFile, fss, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
     {
         clearStatusMessage();
+        gWStrOffs -= 512;
         return;
     }
 
@@ -4791,16 +4862,19 @@ void updateConfig()
 
     clearStatusMessage();
     ints_on();
+    gWStrOffs -= 512;
 }
 
 void loadConfig()
 {
     //The above code covers all cases just to make sure that we're not going to run into issues
     UINT fbr = 0,bytesToRead = 0,newConfig = 0;
-    WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE + 512];
+    WCHAR* fss = &wstr_buf[gWStrOffs];
 
     if(!gSdDetected)
         return;
+
+    gWStrOffs += 512;
 
     setStatusMessage("Reading config...");
 
@@ -4919,8 +4993,8 @@ void loadConfig()
     }
 
     setStatusMessage("Finalizing configuration...");
-    WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE + 24];
-    memset(buf,0,256);
+    WCHAR* buf = &wstr_buf[gWStrOffs];
+    gWStrOffs += 512;
 
     //if config existed before, it's the responsibility of user to create directories
     //if it's new default config, we create directories here
@@ -4932,6 +5006,7 @@ void loadConfig()
 
     clearStatusMessage();
     ints_on();
+    gWStrOffs -= 1024;
 }
 
 /*Inputbox*/
@@ -4939,7 +5014,7 @@ int inputBox(char* result,const char* caption,const char* defaultText,short int 
             short int  captionColor,short int boxColor,short int textColor,short int hlTextColor,short int maxChars)
 {
     char* buf = result;
-    char* in = (char*)&buffer[(XFER_SIZE*2) - 8];/*single character replacement*/
+    char* in = (char*)&buffer[(XFER_SIZE*2) - 128];/*single character replacement*/
     static const char chars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!@#$^&,-:\x83\0";
     unsigned short int buttons;
     const short int  numChars = utility_strlen(chars);
@@ -5267,7 +5342,8 @@ int main(void)
 
 #ifndef RUN_IN_PSRAM
     {
-        WCHAR* fss = (WCHAR*)&buffer[XFER_SIZE];
+        WCHAR* fss = &wstr_buf[gWStrOffs];
+        gWStrOffs += 512;
 
         gCurEntry = 0;
         gStartEntry = 0;
@@ -5295,6 +5371,7 @@ int main(void)
             }
         }
         //neo2_disable_sd();
+        gWStrOffs -= 512;
     }
 #endif
 
@@ -5357,7 +5434,8 @@ int main(void)
         {
             if(utility_strlen(p) > 2)
             {
-                WCHAR* buf = (WCHAR*)&buffer[XFER_SIZE - 256];//remember loadPA() uses the block after XFER_SIZE...so move 256bytes back!
+                WCHAR* buf = &wstr_buf[gWStrOffs];
+                gWStrOffs += 512;
 
                 utility_c2wstrcpy(buf,p);
 
@@ -5379,6 +5457,7 @@ int main(void)
                     cache_sync();
                     updateConfig();
                 }
+                gWStrOffs -= 512;
             }
         }
         setStatusMessage("Loading cache & configuration...OK");
@@ -5386,7 +5465,6 @@ int main(void)
     }
 
     utility_memcpy(gCacheBlock.sig,"DXCS",4);
-    gCacheBlock.sig[4] = '\0';
     gCacheBlock.processed = 0;
     gCacheBlock.version = 1;
 
@@ -5424,7 +5502,7 @@ int main(void)
     gLastEntryIndex = -1;
     utility_memset(entrySNameBuf,'\0',64);
     utility_memset(gProgressBarStaticBuffer,0x87,36);
-    *(gProgressBarStaticBuffer + 32) = '\0';
+    gProgressBarStaticBuffer[32] = '\0';
     gCacheOutOfSync = 0;
 
     while(1)

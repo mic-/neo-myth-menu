@@ -199,7 +199,7 @@ vblank:
 
         .align  16
 
-        .long   0,0,0
+|        .long   0,0,0
 
         .else
 
