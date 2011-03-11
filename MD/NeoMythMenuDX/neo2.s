@@ -180,6 +180,24 @@ init_hardware:
         nop
         dbra    d2,9b
 
+        moveq   #0x30,d0
+        moveq   #0x5F,d2
+99:
+        move.b  d0,0x4000(a0)           /* FM reg */
+        nop
+        nop
+        move.b  #0xFF,0x4001(a0)        /* FM data */
+        nop
+        nop
+        move.b  d0,0x4002(a0)           /* FM reg */
+        nop
+        nop
+        move.b  #0xFF,0x4003(a0)        /* FM data */
+        nop
+        nop
+        addq.b  #1,d0
+        dbra    d2,99b
+
 | Copy Z80 default program
         moveq   #37,d2
 4:
@@ -256,9 +274,9 @@ FMReset:
         .byte   1,0x05
         .byte   1,0x02
         .byte   1,0x06
-        .byte   1,0x03
-        .byte   1,0x07
         /* disable DAC */
+        .byte   0,0x2A
+        .byte   1,0x80
         .byte   0,0x2B
         .byte   1,0x00
         /* turn off channels */

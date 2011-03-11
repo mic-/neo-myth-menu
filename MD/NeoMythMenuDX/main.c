@@ -286,6 +286,7 @@ unsigned char rtc[8];                   /* RTC from Neo2/3 flash cart */
 
 Cluster __attribute__((aligned(16))) __ff_clust_buffer[0x20 + 16];
 
+static char gStsLine[64];
 static char entrySNameBuf[64];
 static char gProgressBarStaticBuffer[36];
 
@@ -429,9 +430,9 @@ void makeDir(const XCHAR* fps)
     WCHAR* ss = &wstr_buf[gWStrOffs];
     gWStrOffs += 512;
 
-    utility_strcpy((char*)ss,"Creating directory: ");
-    utility_w2cstrcpy((char*)(ss+10),fps);
-    setStatusMessage((char*)ss);
+    utility_strcpy(gStsLine,"Creating directory: ");
+    utility_w2cstrcpy(&gStsLine[20],fps);
+    setStatusMessage(gStsLine);
 
     i = j = 0;
     l = utility_wstrlen(fps);
@@ -477,23 +478,16 @@ inline int createDirectory(const XCHAR* fps)
 
 inline int createDirectoryFast(const XCHAR* fps)
 {
-    WCHAR* ss = &wstr_buf[gWStrOffs];
-    gWStrOffs += 512;
-
     if(directoryExists(fps))
-    {
-        gWStrOffs -= 512;
         return 1;
-    }
 
-    utility_strcpy((char*)ss,"Creating directory: ");
-    utility_w2cstrcpy((char*)(ss+10),fps);
-    setStatusMessage((char*)ss);
+    utility_strcpy(gStsLine,"Creating directory: ");
+    utility_w2cstrcpy(&gStsLine[20],fps);
+    setStatusMessage(gStsLine);
 
     f_mkdir(fps);
 
     clearStatusMessage();
-    gWStrOffs -= 512;
     return 1;
 }
 

@@ -48,6 +48,24 @@ ExitVGM:
         nop
         dbra    d2,1b
 
+        moveq   #0x30,d0
+        moveq   #0x5F,d2
+2:
+        move.b  d0,0x4000(a0)           /* FM reg */
+        nop
+        nop
+        move.b  #0xFF,0x4001(a0)        /* FM data */
+        nop
+        nop
+        move.b  d0,0x4002(a0)           /* FM reg */
+        nop
+        nop
+        move.b  #0xFF,0x4003(a0)        /* FM data */
+        nop
+        nop
+        addq.b  #1,d0
+        dbra    d2,2b
+
 | reset PSG
         lea     PSGReset(pc),a5
         lea     0xC00000,a0
@@ -55,11 +73,11 @@ ExitVGM:
         move.b  (a5)+,0x0011(a0)
         move.b  (a5)+,0x0011(a0)
         move.b  (a5),0x0011(a0)
-2:
+3:
         /* wait on C released */
         move.b  0xA10003,d0     /* - 1 c b r l d u */
         andi.w  #0x0020,d0      /* 0 0 0 0 0 0 0 0 0 0 c 0 0 0 0 0 */
-        beq.b   2b
+        beq.b   3b
 
         move.w  #0x2000,sr
         movem.l (sp)+,d2-d7/a2-a6
@@ -817,9 +835,9 @@ FMReset:
         .byte   1,0x05
         .byte   1,0x02
         .byte   1,0x06
-        .byte   1,0x03
-        .byte   1,0x07
         /* disable DAC */
+        .byte   0,0x2A
+        .byte   1,0x80
         .byte   0,0x2B
         .byte   1,0x00
         /* turn off channels */
