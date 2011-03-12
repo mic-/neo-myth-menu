@@ -212,6 +212,7 @@ typedef struct selEntry selEntry_t;
 /* global variables */
 static unsigned int gSelectionSize;
 static short int gPSRAM;                /* 0 = gba psram, 1 = myth psram */
+static short int gShortenMode = 0;      /* 0 = show left side, 1 = show right side, 2 = try to show important parts */
 
 short int gCpldVers;                    /* 3 = V11 hardware, 4 = V12 hardware, 5 = V5 hardware */
 short int gCardType;                    /* 0 = 512 Mbit Neo2 Flash, 1 = other */
@@ -532,6 +533,25 @@ inline void shortenName(char *dst, char *src, int max)
     {
         // string fits, just copy it
         utility_strcpy(dst, src);
+        return;
+    }
+
+    if (gShortenMode == 0)
+    {
+        // copy left side
+        utility_memcpy(dst, src, max-4);
+        dst[max - 5] = '~';
+        utility_memcpy(&dst[max - 4], &src[len-4], 4);
+        dst[max] = '\0';
+        return;
+    }
+    else if (gShortenMode == 1)
+    {
+        // copy right side
+        utility_memcpy(dst, src, 4);
+        dst[4] = '~';
+        utility_memcpy(&dst[5], &src[len-max+5], max-5);
+        dst[max] = '\0';
         return;
     }
 
@@ -5315,7 +5335,7 @@ int main(void)
 {
     int ix;
 //    char temp[64];                      /* keep in sync with RTC print below! */
-    mm_init();
+//    mm_init();
 
 #ifndef RUN_IN_PSRAM
     init_hardware();                    /* set hardware to a consistent state, clears vram and loads the font */
@@ -5703,6 +5723,14 @@ int main(void)
                 }
 
                 //rom_hdr[0] = 0xFF;        /* rom header not loaded */
+                gUpdate = -1;
+                continue;
+            }
+
+            if ((changed & SEGA_CTRL_MODE) && !(buttons & SEGA_CTRL_MODE))
+            {
+                // MODE released, change shorten filename mode
+                gShortenMode = (gShortenMode < 2) ? gShortenMode + 1 : 0;
                 gUpdate = -1;
                 continue;
             }
