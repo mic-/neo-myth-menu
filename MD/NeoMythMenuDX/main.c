@@ -4502,7 +4502,7 @@ void run_rom(int reset_mode)
 
             // Play VGM song
 #ifndef RUN_IN_PSRAM
-            if (fsize > 0x7C0000)
+            if (fsize > 0x780000)
                 return; // too big for current method of playing
 #else
             if (fsize > 0x700000)
@@ -4662,7 +4662,7 @@ void run_rom(int reset_mode)
 
             // Play VGM song
 #ifndef RUN_IN_PSRAM
-            if (fsize > 0x7C0000)
+            if (fsize > 0x780000)
                 return; // too big for current method of playing
 #else
             if (fsize > 0x700000)
