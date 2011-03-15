@@ -5,12 +5,9 @@ OBJC := $(GENDEV)/m68k/bin/objcopy
 ASMZ80 := $(GENDEV)/bin/zasm
 BINTOC := $(GENDEV)/bin/bin2c
 
-OBJS := crt0.o main.o neo2.o font.o disk_io.o rom_io.o conf.o utility.o util_68k.o cheat.o vgm_player.o Z80.o \
-u_memory.o \
-adler32.o crc32.o inffast.o inflate.o inftrees.o zutil.o \
-ioapi.o unzip.o zip_io.o
+OBJS := crt0.o main.o neo2.o font.o disk_io.o rom_io.o conf.o utility.o util_68k.o cheat.o vgm_player.o Z80.o
 
-OPTION := -DRUN_IN_PSRAM -DMAX_WBITS=15 -DMAX_MEM_LEVEL=7 -DSYS16BIT -DUSE_FILE32API
+OPTION := -DRUN_IN_PSRAM
 INCS := -I$(GENDEV)/m68k/include -I$(GENDEV)/m68k/sdk/include -I.
 CCFLAGS := $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -fshort-wchar
 Z80FLAGS := -vb2
@@ -23,7 +20,7 @@ TARGET := MDEBIOS.BIN
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
 export OUTPUT  := $(CURDIR)/$(TARGET)
-export VPATH   := $(CURDIR) $(CURDIR)/deluxe $(CURDIR)/zip $(CURDIR)/zip/zlib $(CURDIR)/zip/unzip
+export VPATH   := $(CURDIR) $(CURDIR)/deluxe
 export DEPENDS := $(OBJS:.o=.d)
 export INCLUDE := $(INCS) $(foreach dir,$(VPATH),-I$(dir))
 

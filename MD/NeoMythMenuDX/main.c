@@ -22,8 +22,12 @@
 /*profiling ??*/
 #include "deluxe/profiling.h"
 
-#include <u_memory.h>
-#include <zip_io.h>
+//#include <u_memory.h>
+//#include <zip_io.h>
+#define f_open_zip f_open
+#define f_close_zip f_close
+#define f_lseek_zip f_lseek
+#define f_read_zip f_read
 
 #define min(x,y) (((x)<(y))?(x):(y))
 #define max(x,y) (((x)>(y))?(x):(y))
@@ -231,16 +235,6 @@ short int gMythHdr = 0;                 /* 1 = found "MYTH" header in memo */
 unsigned short int gButtons = 0;        /* previous button state */
 extern volatile int gTicks;             /* incremented every vblank */
 
-extern unsigned short cardType;         /* b0 = block access, b1 = V2 and/or HC, b15 = funky read timing */
-
-extern unsigned int num_sectors;        /* number of sectors on SD card (or 0) */
-extern unsigned char *sd_csd;           /* card specific data */
-
-FATFS gSDFatFs;                         /* global FatFs structure for FF */
-FIL gSDFile;                            /* global file structure for FF */
-
-short int gSdDetected = 0;              /* 0 - not detected, 1 - detected */
-
 /* global options table entry definitions */
 
 typedef struct {
@@ -266,18 +260,12 @@ short int gYM2413 = 0x0001;             /* 0x0000 = YM2413 disabled, 0x0001 = YM
 short int gImportIPS = 0;
 static int gLastEntryIndex = -1;
 
-short int gDirectRead = 0;
-
-/* arrays */
 const char gEmptyLine[] = "                                      ";
 const char gFEmptyLine[] = "\x7C                                    \x7C";
 const char gLine[]  = "\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82";
 const char gFBottomLine[] = "\x86\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x83";
 
-char gSRAMSizeStr[8];
-char gSRAMBankStr[8];
-
-optionEntry gOptions[OPTION_ENTRIES];   /* entries for global options */
+const short int fsz_tbl[16] = { 0,1,2,0,4,5,6,0,8,16,24,32,40,0,0,0 };
 
 WCHAR *lfnames = (WCHAR *)(0x400000 - MAX_ENTRIES * 512); /* space for long file names in PSRAM */
 WCHAR *wstr_buf = (WCHAR *)0x380000;    /* space for WCHAR strings in PSRAM */
@@ -285,11 +273,24 @@ static unsigned int gWStrOffs = 0;
 
 //unsigned char rtc[8];                   /* RTC from Neo2/3 flash cart */
 
-Cluster __attribute__((aligned(16))) __ff_clust_buffer[0x20 + 16];
+static char gSRAMSizeStr[8];
+static char gSRAMBankStr[8];
 
 static char gStsLine[64];
 static char entrySNameBuf[64];
 static char gProgressBarStaticBuffer[64];
+
+short int gDirectRead = 0;
+short int gSdDetected = 0;              /* 0 - not detected, 1 - detected */
+
+extern unsigned short cardType;         /* b0 = block access, b1 = V2 and/or HC, b15 = funky read timing */
+extern unsigned int num_sectors;        /* number of sectors on SD card (or 0) */
+extern unsigned char *sd_csd;           /* card specific data */
+
+Cluster __attribute__((aligned(16))) __ff_clust_buffer[0x20 + 16];
+
+FATFS gSDFatFs;                         /* global FatFs structure for FF */
+FIL gSDFile;                            /* global file structure for FF */
 
 WCHAR ipsPath[512];                     /* ips path */
 WCHAR path[512];                        /* SD card file path */
@@ -298,9 +299,9 @@ unsigned char __attribute__((aligned(16))) rom_hdr[256];             /* rom head
 
 unsigned char __attribute__((aligned(16))) buffer[XFER_SIZE*2];      /* Work RAM buffer - big enough for SMD decoding */
 
+optionEntry gOptions[OPTION_ENTRIES];   /* entries for global options */
 selEntry_t gSelections[MAX_ENTRIES];    /* entries for flash or current SD directory */
 
-const short int fsz_tbl[16] = { 0,1,2,0,4,5,6,0,8,16,24,32,40,0,0,0 };
 
 /* misc definitions */
 
@@ -393,6 +394,17 @@ inline char systemRegion()
     return _od ? (_pn ? 'E' : 'U') : 'J';
 }
 
+inline void delay(int count)
+{
+    int ticks;
+
+    ints_on();
+
+    ticks = gTicks + count;
+
+    while (gTicks < ticks) ;
+}
+
 inline void setStatusMessage(const char* msg)
 {
     printToScreen(gEmptyLine, 1, 23, 0x0000);
@@ -404,7 +416,7 @@ inline void clearStatusMessage()
     printToScreen(gEmptyLine, 1, 23, 0x0000);
 }
 
-inline int directoryExists(const XCHAR* fps)
+int directoryExists(const XCHAR* fps)
 {
     DIR dir;
 
@@ -414,7 +426,7 @@ inline int directoryExists(const XCHAR* fps)
     return 0;
 }
 
-inline int fileExists(const XCHAR* fss)
+int fileExists(const XCHAR* fss)
 {
     f_close(&gSDFile);
 
@@ -467,7 +479,7 @@ void makeDir(const XCHAR* fps)
     gWStrOffs -= 512;
 }
 
-inline int createDirectory(const XCHAR* fps)
+int createDirectory(const XCHAR* fps)
 {
     if(directoryExists(fps))
         return 1;
@@ -477,7 +489,7 @@ inline int createDirectory(const XCHAR* fps)
     return directoryExists(fps);
 }
 
-inline int createDirectoryFast(const XCHAR* fps)
+int createDirectoryFast(const XCHAR* fps)
 {
     if(directoryExists(fps))
         return 1;
@@ -492,7 +504,7 @@ inline int createDirectoryFast(const XCHAR* fps)
     return 1;
 }
 
-inline int deleteFile(const XCHAR* fss)
+int deleteFile(const XCHAR* fss)
 {
     if(!fileExists(fss))
         return FR_OK;
@@ -500,7 +512,7 @@ inline int deleteFile(const XCHAR* fss)
     return (f_unlink(fss) == FR_OK);
 }
 
-inline int deleteDirectory(const XCHAR* fps)
+int deleteDirectory(const XCHAR* fps)
 {
     if(!directoryExists(fps))
         return FR_OK;
@@ -508,7 +520,7 @@ inline int deleteDirectory(const XCHAR* fps)
     return (f_unlink(fps) == FR_OK);
 }
 
-inline UINT getFileSize(const XCHAR* fss)
+UINT getFileSize(const XCHAR* fss)
 {
     UINT r = 0;
 
@@ -523,7 +535,7 @@ inline UINT getFileSize(const XCHAR* fss)
     return r;
 }
 
-inline void shortenName(char *dst, char *src, int max)
+void shortenName(char *dst, char *src, int max)
 {
     short len,ix,iy,right;
 
@@ -815,7 +827,7 @@ WCHAR *c2wstrcat(WCHAR *ws1, char *s2)
 }
 */
 /* support functions */
-inline void neo_copy_sd(unsigned char *dest, int fstart, int len)
+void neo_copy_sd(unsigned char *dest, int fstart, int len)
 {
     UINT ts;
     ints_on();     /* enable interrupts */
@@ -823,7 +835,7 @@ inline void neo_copy_sd(unsigned char *dest, int fstart, int len)
     ints_off();     /* disable interrupts */
 }
 
-inline void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
+void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
 {
     UINT ts;
     ints_on();     /* enable interrupts */
@@ -833,17 +845,6 @@ inline void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
     ints_off();     /* disable interrupts */
 }
 
-
-inline void delay(int count)
-{
-    int ticks;
-
-    ints_on();
-
-    ticks = gTicks + count;
-
-    while (gTicks < ticks) ;
-}
 
 void sort_entries()
 {
@@ -1202,11 +1203,6 @@ void get_sd_info(int entry)
     if (gSelections[entry].type == 128)
         return;
 
-    //get_sd_cheat(gSelections[entry].name);
-    //get_sd_ips(entry);
-
-    //cache_invalidate_pointers();
-
     if (path[eos-1] != (WCHAR)'/')
         utility_c2wstrcat(path, "/");
 
@@ -1219,13 +1215,14 @@ void get_sd_info(int entry)
         char *temp2 = (char *)&buffer[1024];
         utility_w2cstrcpy(temp2, path);
         temp2[32] = '\0';
-        sprintf(temp, "!open %s",temp2);
+        utility_strcpy(temp, "!open ");
+        utility_strcat(temp, temp2);
         setStatusMessage(temp);
         path[eos] = 0;
         return;
     }
     path[eos] = 0;
-    gSelections[entry].length=gSDFile.fsize;/*ugly hack :)*/
+    gSelections[entry].length = gSDFile.fsize;
 
     f_lseek_zip(&gSDFile, 0x7FF0);
     f_read_zip(&gSDFile, rom_hdr, 16, &ts);
@@ -1492,7 +1489,7 @@ void get_sd_directory(int entry)
     sort_entries();
 }
 
-inline void update_sd_display_make_name(int e)//single session
+void update_sd_display_make_name(int e)//single session
 {
     //convert 16bit -> 8bit string
     utility_w2cstrcpy((char*)buffer, gSelections[e].name);
@@ -1510,7 +1507,7 @@ inline void update_sd_display_make_name(int e)//single session
     shortenName(entrySNameBuf, (char *)buffer, 36);
 }
 
-inline void update_sd_display()//quick hack to remove flickering
+void update_sd_display()//quick hack to remove flickering
 {
     static int x1,x2;
 
@@ -1647,8 +1644,11 @@ void update_display(void)
 //  put_str(temp, 0);
 
     {
-        char flash_type[] = "CBA?????";
-        sprintf(temp, " CPLD V%d / Flash Type %c ", gCpldVers, flash_type[gCardType & 7]);
+        char *flash_type[4] = { "C ", "B ", "A ", "? " };
+        utility_strcpy(temp, " CPLD V");
+        UTIL_IntegerToString(&temp[7], gCpldVers, 10);
+        utility_strcat(temp, " / Flash Type ");
+        utility_strcat(temp, flash_type[gCardType & 3]);
 
         //batch print
         gCursorX = 1;
@@ -1683,9 +1683,9 @@ void update_display(void)
     put_str(gEmptyLine, 0);
     if (gCardOkay == -1)
     {
-        // no Neo2/3 card found
-        gCursorX = 5;
-        put_str("Neo2/3 Flash Card not found!", 0x4000);
+        // no Neo2 card found
+        gCursorX = 6;
+        put_str("Neo2 Flash Card not found!", 0x4000);
     }
     else
     {
@@ -1823,7 +1823,8 @@ void update_display(void)
                 gCursorX = 1;
                 gCursorY = 20;
                 put_str("Type=VGM", 0);
-                sprintf(temp, "Size=%d", gSelections[gCurEntry].length);
+                utility_strcpy(temp, "Size=");
+                UTIL_IntegerToString(&temp[5], gSelections[gCurEntry].length, 10);
                 gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
             }
@@ -1831,27 +1832,37 @@ void update_display(void)
             {
                 gCursorX = 1;
                 gCursorY = 20;
-                sprintf(temp, "Type=%s", (gSelections[gCurEntry].type == 0) ? "MD" : (gSelections[gCurEntry].type == 1) ? "32X" : "SMS");
+                utility_strcpy(temp, "Type=");
+                utility_strcat(temp, (gSelections[gCurEntry].type == 0) ? "MD" : (gSelections[gCurEntry].type == 1) ? "32X" : "SMS");
                 put_str(temp, 0);
                 gCursorX = 12;
-                sprintf(temp, "Offset=0x%08X", gSelections[gCurEntry].offset);
+                utility_strcpy(temp, "Offset=0x");
+                UTIL_IntegerToString(&temp[9], gSelections[gCurEntry].offset, 16);
                 put_str(temp, 0);
-                sprintf(temp, "Size=%dMb", gSelections[gCurEntry].length/131072);
+                utility_strcpy(temp, "Size=");
+                UTIL_IntegerToString(&temp[5], gSelections[gCurEntry].length/131072, 10);
+                utility_strcat(temp, "Mb");
                 gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
 
                 printToScreen(gEmptyLine,1,21,0x0000);
                 gCursorX = 1;
                 gCursorY = 21;
-                sprintf(temp, "Run=0x%02X", gSelections[gCurEntry].run);
+                utility_strcpy(temp, "Run=0x");
+                UTIL_IntegerToString(&temp[6], gSelections[gCurEntry].run, 16);
                 put_str(temp, 0);
                 gCursorX = 12;
                 if (gSelections[gCurEntry].run == 5)
                     utility_strcpy(temp, "SRAM=EEPROM");
                 else
-                    sprintf(temp, "SRAM Bank=%d", gSelections[gCurEntry].bbank);
+                {
+                    utility_strcpy(temp, "SRAM Bank=");
+                    UTIL_IntegerToString(&temp[10],  gSelections[gCurEntry].bbank, 10);
+                }
                 put_str(temp, 0);
-                sprintf(temp, "Size=%dKb", (gSelections[gCurEntry].run == 5) ? 1: gSelections[gCurEntry].bsize*64);
+                utility_strcpy(temp, "Size=");
+                UTIL_IntegerToString(&temp[5], (gSelections[gCurEntry].run == 5) ? 1: gSelections[gCurEntry].bsize*64, 10);
+                utility_strcat(temp, "Kb");
                 gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
             }
@@ -1969,7 +1980,9 @@ void update_display(void)
                 gCursorY = 23;
                 start = rom_hdr[0xA0]<<24|rom_hdr[0xA1]<<16|rom_hdr[0xA2]<<8|rom_hdr[0xA3];
                 end = rom_hdr[0xA4]<<24|rom_hdr[0xA5]<<16|rom_hdr[0xA6]<<8|rom_hdr[0xA7];
-                sprintf(temp, "ROM Size=%dMbit",(end - start + 1)/131072);
+                utility_strcpy(temp, "ROM Size=");
+                UTIL_IntegerToString(&temp[9], (end - start + 1)/131072, 10);
+                utility_strcat(temp, "Mbit");
                 put_str(temp, 0);
                 if ((rom_hdr[0xB0] == 'R') && (rom_hdr[0xB1] == 'A'))
                 {
@@ -1980,7 +1993,9 @@ void update_display(void)
                 {
                     start = end = 0;
                 }
-                sprintf(temp, "SRAM Size=%dKbit",(end - start + 2)/128);
+                utility_strcpy(temp, "SRAM Size=");
+                UTIL_IntegerToString(&temp[10], (end - start + 2)/128, 10);
+                utility_strcat(temp, "Kbit");
                 gCursorX = 39 - utility_strlen(temp);   // right justify string
                 put_str(temp, 0);
             }
@@ -2048,7 +2063,7 @@ void gen_bram(unsigned char *dest, int fstart, int len)
     }
 }
 
-inline void update_progress(char *str1, char *str2, int curr, int total)
+void update_progress(char *str1, char *str2, int curr, int total)
 {
     static char *cstr1 = NULL, *cstr2 = NULL;
     static int ctotal = 0, div, last;
@@ -2182,14 +2197,15 @@ void incSaveRAMSize(int index)
     if (gSRAMSize == 0x20)
         gSRAMSize = 0;
 
-    sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
+    UTIL_IntegerToString(gSRAMSizeStr, gSRAMSize*64, 10);
+    utility_strcat(gSRAMSizeStr, "Kb");
     // remask bank setting
     gSRAMBank = gSRAMBank & (63 >> utility_logtwo(gSRAMSize));
 
     if (gSRAMBank > 31)
         gSRAMBank = 0; // max of 32 banks since minimum bank size is 8KB sram
 
-    sprintf(gSRAMBankStr, "%d", gSRAMBank);
+    UTIL_IntegerToString(gSRAMBankStr, gSRAMBank, 10);
     gCacheOutOfSync = 1;
 }
 
@@ -2200,7 +2216,7 @@ void incSaveRAMBank(int index)
     if (gSRAMBank > 31)
         gSRAMBank = 0; // max of 32 banks since minimum bank size is 8KB sram
 
-    sprintf(gSRAMBankStr, "%d", gSRAMBank);
+    UTIL_IntegerToString(gSRAMBankStr, gSRAMBank, 10);
     gCacheOutOfSync = 1;
 }
 
@@ -2482,8 +2498,9 @@ void cache_invalidate_pointers()
     gYM2413 = 0x0001;
     gManageSaves = gSRAMgrServiceStatus = 0;
 
-    sprintf(gSRAMBankStr, "%d", gSRAMBank);
-    sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
+    UTIL_IntegerToString(gSRAMSizeStr, gSRAMSize*64, 10);
+    utility_strcat(gSRAMSizeStr, "Kb");
+    UTIL_IntegerToString(gSRAMBankStr, gSRAMBank, 10);
 }
 
 int cache_process()
@@ -2639,8 +2656,9 @@ int cache_process()
         }
     }
 
-    sprintf(gSRAMBankStr, "%d", gSRAMBank);
-    sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
+    UTIL_IntegerToString(gSRAMSizeStr, gSRAMSize*64, 10);
+    utility_strcat(gSRAMSizeStr, "Kb");
+    UTIL_IntegerToString(gSRAMBankStr, gSRAMBank, 10);
 
     setStatusMessage("One-time detection in progress...OK");
 
@@ -2717,8 +2735,9 @@ void cache_loadPA(WCHAR* sss)
 
     f_close(&gSDFile);
 
-    sprintf(gSRAMBankStr, "%d", gSRAMBank);
-    sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
+    UTIL_IntegerToString(gSRAMSizeStr, gSRAMSize*64, 10);
+    utility_strcat(gSRAMSizeStr, "Kb");
+    UTIL_IntegerToString(gSRAMBankStr, gSRAMBank, 10);
 
     if(gCacheBlock.processed != 0xFF)
     {
@@ -2832,8 +2851,9 @@ void cache_sync()
 
     f_close(&gSDFile);
 
-    sprintf(gSRAMBankStr, "%d", gSRAMBank);
-    sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
+    UTIL_IntegerToString(gSRAMSizeStr, gSRAMSize*64, 10);
+    utility_strcat(gSRAMSizeStr, "Kb");
+    UTIL_IntegerToString(gSRAMBankStr, gSRAMBank, 10);
 
     ints_on();
 
@@ -3295,8 +3315,6 @@ void sram_mgr_copyGameToNextBank(int index)
     }
     else
     {
-        //inlined code..no loops
-
         if(sramLength <= (XFER_SIZE * 2) * 2)//64KB
         {
             k = XFER_SIZE * 2;
@@ -3909,7 +3927,7 @@ void do_options(void)
             gSRAMBank = gSelections[gCurEntry].bbank;
 
         gOptions[maxOptions].exclusiveFCall = 0;
-        sprintf(gSRAMBankStr, "%d", gSRAMBank);
+        UTIL_IntegerToString(gSRAMBankStr, gSRAMBank, 10);
         gOptions[maxOptions].name = "Save RAM Bank";
         gOptions[maxOptions].value = gSRAMBankStr;
         gOptions[maxOptions].callback = &incSaveRAMBank;
@@ -3931,7 +3949,8 @@ void do_options(void)
         if(!gSRAMSize)
             gSRAMSize = gSelections[gCurEntry].bsize;
 
-        sprintf(gSRAMSizeStr, "%dKb", gSRAMSize*64);
+        UTIL_IntegerToString(gSRAMSizeStr, gSRAMSize*64, 10);
+        utility_strcat(gSRAMSizeStr, "Kb");
         gOptions[maxOptions].name = "Save RAM Size";
         gOptions[maxOptions].value = gSRAMSizeStr;
         gOptions[maxOptions].callback = &incSaveRAMSize;
@@ -3942,7 +3961,7 @@ void do_options(void)
             gSRAMBank = gSelections[gCurEntry].bbank;
 
         gOptions[maxOptions].exclusiveFCall = 0;
-        sprintf(gSRAMBankStr, "%d", gSRAMBank);
+        UTIL_IntegerToString(gSRAMBankStr, gSRAMBank, 10);
         gOptions[maxOptions].name = "Save RAM Bank";
         gOptions[maxOptions].value = gSRAMBankStr;
         gOptions[maxOptions].callback = &incSaveRAMBank;
@@ -4286,7 +4305,7 @@ void do_options(void)
                             utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                             config_push("romName",p);
 
-                            sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
+                            UTIL_IntegerToString(p, (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X, 10);
                             config_push("romType",p);
 
                             updateConfig();
@@ -4342,7 +4361,7 @@ void do_options(void)
                             utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                             config_push("romName",p);
 
-                            sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
+                            UTIL_IntegerToString(p, (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X, 10);
                             config_push("romType",p);
 
                             updateConfig();
@@ -4424,7 +4443,11 @@ int do_SDMgr(void)
     printToScreen("C",23,25,0x4000);
     printToScreen("=Format SD Card",24,25,0x0000);
 
-    sprintf(temp, "Card has %d blocks (%d MB)", num_sectors, (num_sectors / 2048));
+    utility_strcpy(temp, "Card has ");
+    UTIL_IntegerToString(&temp[9], num_sectors, 10);
+    utility_strcat(temp, " blocks (");
+    UTIL_IntegerToString(&temp[utility_strlen(temp)], (num_sectors / 2048), 10);
+    utility_strcat(temp, " MB)");
     printToScreen(temp, (40 - utility_strlen(temp))>>1, 3, 0x2000);
 
 //    sprintf(temp, "CSD: %02X %02X %02X %02X %02X %02X", sd_csd[0], sd_csd[1], sd_csd[2], sd_csd[3], sd_csd[4], sd_csd[5]);
@@ -4730,7 +4753,7 @@ void run_rom(int reset_mode)
                 utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                 config_push("romName",p);
 
-                sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
+                UTIL_IntegerToString(p, (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X, 10);
                 config_push("romType",p);
 
                 updateConfig();
@@ -4777,7 +4800,7 @@ void run_rom(int reset_mode)
                 utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                 config_push("romName",p);
 
-                sprintf(p,"%d",(gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X);
+                UTIL_IntegerToString(p, (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X, 10);
                 config_push("romType",p);
 
                 updateConfig();
@@ -4848,7 +4871,7 @@ void updateConfig()
 
     ints_on();
 
-    setStatusMessage("Writing config...");
+    setStatusMessage("Updating config...");
 
     if(config_saveToBuffer((char*)buffer))
     {
@@ -4869,6 +4892,8 @@ void updateConfig()
         gWStrOffs -= 512;
         return;
     }
+
+    setStatusMessage("Writing config...");
 
     ints_on();
     f_write(&gSDFile,(char*)buffer,utility_strlen((char*)buffer), &fbr);
@@ -4891,7 +4916,7 @@ void loadConfig()
 
     gWStrOffs += 512;
 
-    setStatusMessage("Reading config...");
+    setStatusMessage("Loading config...");
 
     ints_on();
 
@@ -4909,10 +4934,13 @@ void loadConfig()
             bytesToRead = XFER_SIZE;
 
         ints_on();
-        setStatusMessage("Initializing configuration...");
+        setStatusMessage("Reading config...");
         if(f_read(&gSDFile,(char*)buffer,bytesToRead, &fbr) == FR_OK)
         {
+            setStatusMessage("Initializing configuration...");
             config_loadFromBuffer((char*)buffer,(int)fbr);
+
+            gShortenMode = (short int)config_getI("shortenMode");
 
             CHEATS_DIR = config_getS("cheatsPath");
             IPS_DIR = config_getS("ipsPath");
@@ -4943,6 +4971,7 @@ void loadConfig()
         config_push("md32xSaveExt",md_32x_save_ext_default);
         config_push("smsSaveExt",sms_save_ext_default);
         config_push("brmSaveExt",brm_save_ext_default);
+        config_push("shortenMode","0");
         config_push("romName","*");
         config_push("romType","0");
 
@@ -5335,7 +5364,6 @@ int main(void)
 {
     int ix;
 //    char temp[64];                      /* keep in sync with RTC print below! */
-//    mm_init();
 
 #ifndef RUN_IN_PSRAM
     init_hardware();                    /* set hardware to a consistent state, clears vram and loads the font */
@@ -5729,9 +5757,14 @@ int main(void)
 
             if ((changed & SEGA_CTRL_MODE) && !(buttons & SEGA_CTRL_MODE))
             {
+                char p[4];
                 // MODE released, change shorten filename mode
                 gShortenMode = (gShortenMode < 2) ? gShortenMode + 1 : 0;
                 gUpdate = -1;
+                p[0] = 0x30 + gShortenMode;
+                p[1] = 0;
+                config_push("shortenMode", p);
+                updateConfig();
                 continue;
             }
 
