@@ -1,19 +1,20 @@
-CC := $(GENDEV)/m68k/bin/gcc
-AS := $(GENDEV)/m68k/bin/as
+CC := m68k-elf-gcc
+AS := m68k-elf-as
+OBJC := m68k-elf-objcopy
 RM := rm -f
-OBJC := $(GENDEV)/m68k/bin/objcopy
-ASMZ80 := $(GENDEV)/bin/zasm
-BINTOC := $(GENDEV)/bin/bin2c
+ASMZ80 := zasm
+BINTOC := bin2c
 
 OBJS := crt0.o main.o neo2.o font.o disk_io.o rom_io.o conf.o utility.o util_68k.o cheat.o vgm_player.o Z80.o
 
 OPTION :=
-INCS := -I$(GENDEV)/m68k/include -I$(GENDEV)/m68k/sdk/include -I.
-CCFLAGS := $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -fshort-wchar
+INCS := -I. -I$(GENDEV)/m68k-elf/include -I$(GENDEV)/m68k-elf/m68k-elf/include
+CCFLAGS := $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -fshort-wchar -fno-strict-aliasing
+HWCCFLAGS := $(OPTION) -m68000 -Wall -O1 -c -fomit-frame-pointer -fshort-wchar -fno-strict-aliasing
 Z80FLAGS := -vb2
 ASFLAGS := -m68000 --register-prefix-optional
-LIBS := -L$(GENDEV)/m68k/lib -L$(GENDEV)/m68k/sdk/lib -lff -lc -lgcc
-LINKFLAGS := -T $(GENDEV)/m68k/lib/md-neo.ld -Wl,-Map=output.map
+LIBS := -L$(GENDEV)/m68k-elf/lib -L$(GENDEV)/m68k-elf/m68k-elf/lib -lff -lc -lgcc -lnosys
+LINKFLAGS := -T $(GENDEV)/ldscripts/md.ld -Wl,-Map=output.map
 BUILD := build_rom
 TARGET := MDBIOS.BIN
 
@@ -56,6 +57,18 @@ $(ELF): $(OBJS)
 
 %.c: %.o80
 	@$(BINTOC) $<
+
+disk_io.o: disk_io.c
+	@echo Compiling $(notdir $<)...
+	@$(CC) -MMD $(HWCCFLAGS) $(INCLUDE) -c $< -o $@
+
+rom_io.o: rom_io.c
+	@echo Compiling $(notdir $<)...
+	@$(CC) -MMD $(HWCCFLAGS) $(INCLUDE) -c $< -o $@
+
+z80.o: z80.c
+	@echo Compiling $(notdir $<)...
+	@$(CC) -MMD $(HWCCFLAGS) $(INCLUDE) -c $< -o $@
 
 %.o: %.c
 	@echo Compiling $(notdir $<)...
