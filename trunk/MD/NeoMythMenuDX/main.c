@@ -600,12 +600,6 @@ void shortenName(char *dst, char *src, int max)
     dst[max] = '\0';
 }
 
-// needed for GCC 4.x libc
-int atexit(void (*function)(void))
-{
-    return -1;
-}
-
 /* cheat handling functions */
 void cheat_invalidate()
 {
