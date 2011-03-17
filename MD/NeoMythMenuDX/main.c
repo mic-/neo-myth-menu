@@ -2668,16 +2668,19 @@ void cache_loadPA(WCHAR* sss)
     if(gCurMode != MODE_SD)
         return;
 
-    switch(gSelections[gCurEntry].type)
+    if (gCurEntry != 0xffff)
     {
-        case 4://vgm
-        case 127://unknown
-        case 128://dir
+        switch(gSelections[gCurEntry].type)
+        {
+            case 4://vgm
+            case 127://unknown
+            case 128://dir
+                return;
+        }
+
+        if(gSelections[gCurEntry].run == 0x27)
             return;
     }
-
-    if(gSelections[gCurEntry].run == 0x27)
-        return;
 
     if(*utility_getFileExtW(sss) != '.')
         return;
@@ -5476,7 +5479,9 @@ int main(void)
 
                 utility_c2wstrcpy(buf,p);
 
+                gCurEntry = 0xffff;
                 cache_loadPA(buf);
+                gCurEntry = 0;
 
                 if(p[0] == '*')
                     gSRAMgrServiceStatus = SMGR_STATUS_NULL;
