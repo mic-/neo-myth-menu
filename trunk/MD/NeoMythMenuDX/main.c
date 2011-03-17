@@ -2064,9 +2064,9 @@ void update_progress(char *str1, char *str2, int curr, int total)
     int this;
 
 //  if ((cstr1 != str1) || (cstr2 != str2) || (ctotal != total) || (curr < last))
-    if (curr == 0)
+    if ((curr == 0) || (curr == total))
     {
-        // new progress bar, recompute divisor and start
+        // new or complete progress bar, recompute divisor and start
         cstr1 = str1;
         cstr2= str2;
         ctotal = total;
@@ -3263,7 +3263,7 @@ void sram_mgr_clearAll(int index)
 
     while( i < 2 * MB)//write  32KB blocks
     {
-        update_progress("Clearing ALL SRAM.."," ",i,2 * MB);
+        update_progress("Clearing ALL SRAM..."," ",i,2 * MB);
 
         ints_off();
         neo_copyto_sram(buffer,i,XFER_SIZE * 2);
@@ -3273,7 +3273,7 @@ void sram_mgr_clearAll(int index)
     }
 
     ints_on();
-    update_progress("Clearing ALL SRAM.."," ",100,100);
+    update_progress("Clearing ALL SRAM..."," ",100,100);
     setStatusMessage("Clearing ALL SRAM...OK");
 
     clearStatusMessage();
