@@ -56,8 +56,9 @@ utility_getFileExtW:
         subq.l  #2,a0
         move.l  a0,d0
 2:
-        cmpi.w  #46,-(a0)
+        cmpi.w  #46,(a0)
         beq.b   3f
+        subq.l  #2,a0
         cmpa.l  a0,a1
         bne.b   2b
         rts
@@ -92,8 +93,8 @@ utility_getFileExt:
     .global utility_w2cstrcpy
 
 utility_w2cstrcpy:
-        |movea.l 4(sp),a0 
-        |movea.l 8(sp),a1 
+        |movea.l 4(sp),a0
+        |movea.l 8(sp),a1
 		movem.l 4(sp),a0-a1
         moveq   #0,d1
 1:
@@ -111,8 +112,8 @@ utility_w2cstrcpy:
     .global utility_wstrcmp
 
 utility_wstrcmp:
-        |movea.l 4(sp),a0 
-        |movea.l 8(sp),a1 
+        |movea.l 4(sp),a0
+        |movea.l 8(sp),a1
 		movem.l 4(sp),a0-a1
 		moveq   #0,d0
 0:
@@ -134,14 +135,14 @@ utility_wstrcmp:
     .global utility_wstrcpy
 
 utility_wstrcpy:
-        |movea.l 4(sp),a0 
-        |movea.l 8(sp),a1 
+        |movea.l 4(sp),a0
+        |movea.l 8(sp),a1
 		movem.l 4(sp),a0-a1
 1:
-        move.w  (a1)+,(a0)+ 
-        bne.b   1b         
+        move.w  (a1)+,(a0)+
+        bne.b   1b
 2:
-        subq.l  #2,a0      
+        subq.l  #2,a0
         move.l  a0,d0
         rts
 
@@ -149,14 +150,14 @@ utility_wstrcpy:
     .global utility_strcpy
 
 utility_strcpy:
-        |movea.l 4(sp),a0 
-        |movea.l 8(sp),a1 
+        |movea.l 4(sp),a0
+        |movea.l 8(sp),a1
 		movem.l 4(sp),a0-a1
 1:
-        move.b  (a1)+,(a0)+ 
-        bne.b   1b        
+        move.b  (a1)+,(a0)+
+        bne.b   1b
 2:
-        subq.l  #1,a0      
+        subq.l  #1,a0
         move.l  a0,d0
         rts
 
@@ -164,8 +165,8 @@ utility_strcpy:
     .global utility_c2wstrcat
 
 utility_c2wstrcat:
-        |movea.l 4(sp),a0 
-        |movea.l 8(sp),a1 
+        |movea.l 4(sp),a0
+        |movea.l 8(sp),a1
 		movem.l 4(sp),a0-a1
 1:
         tst.w   (a0)+
@@ -187,8 +188,8 @@ utility_c2wstrcat:
     .global utility_wstrcat
 
 utility_wstrcat:
-        |movea.l 4(sp),a0 
-        |movea.l 8(sp),a1 
+        |movea.l 4(sp),a0
+        |movea.l 8(sp),a1
 		movem.l 4(sp),a0-a1
 
 1:
@@ -208,8 +209,8 @@ utility_wstrcat:
     .global utility_strcat
 
 utility_strcat:
-        |movea.l 4(sp),a0 
-        |movea.l 8(sp),a1 
+        |movea.l 4(sp),a0
+        |movea.l 8(sp),a1
 		movem.l 4(sp),a0-a1
 
 1:
@@ -229,7 +230,7 @@ utility_strcat:
     .global utility_strncat
 
 utility_strncat:
-		movem.l 4(sp),a0-a1 
+		movem.l 4(sp),a0-a1
 		move.l 12(sp),d1
 
 1:
@@ -254,8 +255,8 @@ utility_strncat:
     .global utility_c2wstrcpy
 
 utility_c2wstrcpy:
-        |movea.l 4(sp),a0 
-        |movea.l 8(sp),a1 
+        |movea.l 4(sp),a0
+        |movea.l 8(sp),a1
 		movem.l 4(sp),a0-a1
         moveq   #0,d1
 1:
@@ -296,8 +297,8 @@ utility_wstrlen2:
         bne.b   1b
 2:
         move.l  a0,d0
-        sub.l   a1,d0 
-        lsr.l   #1,d0 
+        sub.l   a1,d0
+        lsr.l   #1,d0
         subq.l  #1,d0
 
         rts
@@ -310,11 +311,11 @@ utility_strlen:
         movea.l 4(sp),a0
         moveq.l #0,d0
 1:
-        tst.b   (a0)+ 
-        beq.b   2f         
+        tst.b   (a0)+
+        beq.b   2f
 
-        addq.l  #1,d0 
-        bra.b   1b         
+        addq.l  #1,d0
+        bra.b   1b
 2:
         rts
 
@@ -354,15 +355,15 @@ utility_isMultipleOf:
 | void utility_memcpy(void* dst,const void* src,int len)
         .global utility_memcpy
 utility_memcpy:
-        movea.l 4(sp),a0 
+        movea.l 4(sp),a0
         movea.l 8(sp),a1
-        move.l  12(sp),d0 
+        move.l  12(sp),d0
 
         bra.b   2f
 1:
         move.b  (a1)+,(a0)+
 2:
-        dbra    d0,1b 
+        dbra    d0,1b
 
         rts
 
