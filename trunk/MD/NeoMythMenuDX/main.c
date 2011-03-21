@@ -2849,14 +2849,10 @@ void cache_sync()
         return;
 
     gCacheOutOfSync = 0;
-
-    if(*get_file_ext(gSelections[gCurEntry].name) != (WCHAR)'.')
-        return;
-
     gWStrOffs += 512;
 
     ints_on();
-    utility_memset(fnbuf,0,512);
+    utility_memset_psram(fnbuf,0,512);
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,CACHE_DIR);
 
@@ -4380,6 +4376,8 @@ void do_options(void)
                                 (gOptions[ix].patch)(ix);
                         }
 
+						cache_load();
+						gCacheOutOfSync = 1;
                         if(gManageSaves)
                         {
                             f_close_zip(&gSDFile);
@@ -4436,6 +4434,8 @@ void do_options(void)
                                 (gOptions[ix].patch)(ix);
                         }
 
+						cache_load();
+						gCacheOutOfSync = 1;
                         if(gManageSaves)
                         {
                             f_close_zip(&gSDFile);
@@ -4829,7 +4829,8 @@ void run_rom(int reset_mode)
         {
             // copy file to flash cart psram
             copyGame(&neo_copyto_psram, &neo_copy_sd, 0, 0, fsize, "Loading ", temp);
-
+			cache_load();
+			gCacheOutOfSync = 1;
             if(gManageSaves)
             {
                 gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
@@ -4877,6 +4878,8 @@ void run_rom(int reset_mode)
             if (!utility_memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
                 fsize = 0x300000;
 
+			cache_load();
+			gCacheOutOfSync = 1;
             if(gManageSaves)
             {
                 gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
@@ -5571,14 +5574,12 @@ int main(void)
                 utility_c2wstrcpy(buf,p);
                 cache_loadPA(buf,1);
 
-				STEP_INTO(p);
                 if(p[0] == '*')
 				{
 					STEP_INTO("SMGR_STATUS_NULL");
                     gSRAMgrServiceStatus = SMGR_STATUS_NULL;
-				}
-
-                if(gSRAMgrServiceStatus == SMGR_STATUS_BACKUP_SRAM)
+				}	
+                else if(gSRAMgrServiceStatus == SMGR_STATUS_BACKUP_SRAM)
                 {
 					STEP_INTO("SMGR_STATUS_BACKUP_SRAM");
                     gSRAMgrServiceMode = (short int)config_getI("romType");
