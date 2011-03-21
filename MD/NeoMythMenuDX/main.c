@@ -535,7 +535,7 @@ UINT getFileSize(const XCHAR* fss)
     return r;
 }
 
-void shortenName(char *dst, char *src, int max)
+int shortenName(char *dst, char *src, int max)
 {
     short len,ix,iy,right;
 
@@ -545,7 +545,7 @@ void shortenName(char *dst, char *src, int max)
     {
         // string fits, just copy it
         utility_strcpy(dst, src);
-        return;
+        return len;
     }
 
     if (gShortenMode == 0)
@@ -555,7 +555,7 @@ void shortenName(char *dst, char *src, int max)
         dst[max - 5] = '~';
         utility_memcpy(&dst[max - 4], &src[len-4], 4);
         dst[max] = '\0';
-        return;
+        return max;
     }
     else if (gShortenMode == 1)
     {
@@ -564,7 +564,7 @@ void shortenName(char *dst, char *src, int max)
         dst[4] = '~';
         utility_memcpy(&dst[5], &src[len-max+5], max-5);
         dst[max] = '\0';
-        return;
+        return max;
     }
 
     right = (max >> 1);
@@ -598,6 +598,7 @@ void shortenName(char *dst, char *src, int max)
     dst[max - right - 1] = '~';
     utility_memcpy(&dst[max - right], &src[iy], right);
     dst[max] = '\0';
+	return max;
 }
 
 /* cheat handling functions */
@@ -843,21 +844,38 @@ void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
 void sort_entries()
 {
     int ix;
+	short int a,b;
+	selEntry_t temp;
+	selEntry_t* pa,*pb;
 
-    // Sort entries! Not very fast, but small and easy.
+	/*
+		Not very efficient sorting algorithm , but at least is optimized.
+		A better method would be to use a pointer swap table but that needs some work...
+	*/
     for (ix=0; ix<gMaxEntry-1; ix++)
     {
-        selEntry_t temp;
+		pa = &gSelections[ix];
+		pb = &gSelections[ix+1];
+		a = (short int)pa->type;
+		b = (short int)pb->type;
 
-        if (((gSelections[ix].type != 128) && (gSelections[ix+1].type == 128)) || // directories first
-            ((gSelections[ix].type == 128) && (gSelections[ix+1].type == 128) &&  utility_wstrcmp(gSelections[ix].name, gSelections[ix+1].name) > 0) ||
-            ((gSelections[ix].type != 128) && (gSelections[ix+1].type != 128) &&  utility_wstrcmp(gSelections[ix].name, gSelections[ix+1].name) > 0))
+        if((a != 128) && (b == 128))
         {
-            utility_memcpy((void*)&temp, (void*)&gSelections[ix], sizeof(selEntry_t));
-            utility_memcpy((void*)&gSelections[ix], (void*)&gSelections[ix+1], sizeof(selEntry_t));
-            utility_memcpy((void*)&gSelections[ix+1], (void*)&temp, sizeof(selEntry_t));
+            utility_memcpy_entry_block((void*)&temp,(void*)pa);
+            utility_memcpy_entry_block((void*)pa,(void*)pb);
+            utility_memcpy_entry_block((void*)pb,(void*)&temp);
             ix = !ix ? -1 : ix-2;
         }
+		else if((a+b) == (128+128))//( (a+b) & 0x100 )//( ((a == 128) && (b == 128)) )
+		{	
+			if(utility_wstrcmp(pa->name,pb->name) > 0)
+			{
+		        utility_memcpy_entry_block((void*)&temp,(void*)pa);
+		        utility_memcpy_entry_block((void*)pa,(void*)pb);
+		        utility_memcpy_entry_block((void*)pb,(void*)&temp);
+		        ix = !ix ? -1 : ix-2;
+			}
+		}
     }
 }
 
@@ -973,6 +991,7 @@ WCHAR *get_file_ext(WCHAR *src)
 void get_sd_ips(int entry)
 {
     char* pa;
+	WCHAR* fp;
     UINT bytesWritten = 0;
 
     gImportIPS = 0;
@@ -981,7 +1000,10 @@ void get_sd_ips(int entry)
     utility_c2wstrcat(ipsPath, IPS_DIR);
     utility_c2wstrcat(ipsPath, "/");
     utility_wstrcat(ipsPath, gSelections[entry].name);
-    *utility_getFileExtW(ipsPath) = 0;
+	
+	fp = utility_getFileExtW(ipsPath);
+	if(fp != ipsPath)
+    	*fp = 0;
     utility_c2wstrcat(ipsPath, ".ips");
 
     f_close(&gSDFile);
@@ -1022,6 +1044,7 @@ void get_sd_cheat(WCHAR* sss)
 {
     char *cheatBuf = (char*)&buffer[XFER_SIZE + 2];
     WCHAR* cheatPath = &wstr_buf[gWStrOffs];
+	WCHAR* fp;
     CheatEntry* e = NULL;
     char* pb = (char*)&buffer[0];
     char* head,*sp;
@@ -1038,7 +1061,12 @@ void get_sd_cheat(WCHAR* sss)
     utility_c2wstrcat(cheatPath, CHEATS_DIR);
     utility_c2wstrcat(cheatPath, "/");
     utility_wstrcat(cheatPath, sss);
-    *utility_getFileExtW(cheatPath) = 0; // cut off the extension
+
+	fp = utility_getFileExtW(cheatPath);
+
+	if(fp != cheatPath)
+		*fp = 0; // cut off the extension
+
     utility_c2wstrcat(cheatPath, ".cht");
 
     f_close(&gSDFile);
@@ -1483,7 +1511,7 @@ void get_sd_directory(int entry)
     sort_entries();
 }
 
-void update_sd_display_make_name(int e)//single session
+int update_sd_display_make_name(int e)//single session
 {
     //convert 16bit -> 8bit string
     utility_w2cstrcpy((char*)buffer, gSelections[e].name);
@@ -1491,19 +1519,19 @@ void update_sd_display_make_name(int e)//single session
     if (gSelections[e].type == 128)
     {
         utility_strcpy(entrySNameBuf,"[");
-        utility_strncat(entrySNameBuf,(const char *)buffer,34);
+        utility_strncat(entrySNameBuf,(const char*)buffer,34);
         entrySNameBuf[35] = '\0';
         utility_strcat(entrySNameBuf,"]");
 
-        return;
+        return utility_strlen(entrySNameBuf);
     }
 
-    shortenName(entrySNameBuf, (char *)buffer, 36);
+    return shortenName(entrySNameBuf, (char*)buffer, 36);
 }
 
 void update_sd_display()//quick hack to remove flickering
 {
-    static int x1,x2;
+	int x1,x2,x3;
 
     //Fast update not possible without " "statically" rendered tiles".Reload "map"
     if((gLastEntryIndex == -1) || (gCurEntry == -1) /*|| (gCurMode != MODE_SD)*/ || (gChangedPage)
@@ -1531,16 +1559,16 @@ void update_sd_display()//quick hack to remove flickering
     x2 = ((gCurEntry > PAGE_ENTRIES) ? (gCurEntry % PAGE_ENTRIES) : gCurEntry);
 
     //prev
-    update_sd_display_make_name(gLastEntryIndex);
+    x3 = update_sd_display_make_name(gLastEntryIndex);
     x1 += 3;
     printToScreen(gFEmptyLine,1,x1,0x2000);
-    printToScreen(entrySNameBuf,20 - (utility_strlen(entrySNameBuf) >> 1),x1,0x0000);
+    printToScreen(entrySNameBuf,20 - (x3 >> 1),x1,0x0000);
 
     //next
-    update_sd_display_make_name(gCurEntry);
+    x3 = update_sd_display_make_name(gCurEntry);
     x2 += 3;
     printToScreen(gFEmptyLine,1,x2,0x2000);
-    printToScreen(entrySNameBuf,20 - (utility_strlen(entrySNameBuf) >> 1),x2,0x2000);
+    printToScreen(entrySNameBuf,20 - (x3 >> 1),x2,0x2000);
 }
 
 void update_display(void)
@@ -1594,6 +1622,7 @@ void update_display(void)
         if (gMaxEntry)
         {
             int lines = ((gMaxEntry - gStartEntry) > PAGE_ENTRIES) ? PAGE_ENTRIES : (gMaxEntry - gStartEntry);
+			int len;
 
             for (ix = 0; ix < lines; ix++)
             {
@@ -1606,11 +1635,15 @@ void update_display(void)
                     utility_strncat(temp, (const char *)buffer, 34);
                     temp[35] = '\0';
                     utility_strcat(temp, "]"); // show directories in brackets
+					len = utility_strlen(temp);
                 }
                 else
-                    shortenName(temp, (char *)buffer, 36);
+				{
+					//file
+                    len = shortenName(temp, (char *)buffer, 36);
+				}
 
-                printToScreen(temp,20 - (utility_strlen(temp) >> 1),3 + ix,((gStartEntry + ix) == gCurEntry) ? 0x2000 : 0x0000);
+                printToScreen(temp,20 - (len >> 1),3 + ix,((gStartEntry + ix) == gCurEntry) ? 0x2000 : 0x0000);
                 printToScreen("\x7c",1,3 + ix,0x2000);printToScreen("\x7c",38,3 + ix,0x2000);
             }
 
@@ -2660,15 +2693,15 @@ int cache_process()
     return 0xFF;
 }
 
-void cache_loadPA(WCHAR* sss)
+void cache_loadPA(WCHAR* sss,int skip_check)
 {
     UINT fbr = 0;
-    WCHAR* fnbuf = &wstr_buf[gWStrOffs];
+    WCHAR* fnbuf;
 
     if(gCurMode != MODE_SD)
         return;
 
-    if (gCurEntry != -1)
+	if(!skip_check)
     {
         switch(gSelections[gCurEntry].type)
         {
@@ -2684,7 +2717,8 @@ void cache_loadPA(WCHAR* sss)
 
     if(*utility_getFileExtW(sss) != '.')
         return;
-
+	
+	fnbuf = &wstr_buf[gWStrOffs];
     gWStrOffs += 512;
 
     setStatusMessage("Reading cache...");
@@ -2761,7 +2795,7 @@ void cache_load()
     if(gSelections[gCurEntry].run == 0x27)
         return;
 
-    cache_loadPA(gSelections[gCurEntry].name);
+    cache_loadPA(gSelections[gCurEntry].name,0);
 }
 
 void cache_sync()
@@ -2903,6 +2937,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 {
     UINT fbr = 0;
     WCHAR* fnbuf = &wstr_buf[gWStrOffs];
+	WCHAR* fnnew;
     int sramLength,sramBankOffs,k,i,tw;
 
     //dont let this happen
@@ -2929,7 +2964,11 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     utility_c2wstrcat(fnbuf,"/");
     utility_wstrcat(fnbuf,sss);
 
-    *utility_getFileExtW(fnbuf) = 0;
+	fnnew = utility_getFileExtW(fnbuf);
+	if((fnnew)&&(fnnew != fnbuf))
+    	*fnnew = 0;
+
+	fnbuf = fnnew;
 
     if(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)
     {
@@ -3022,6 +3061,7 @@ void sram_mgr_restoreGame(int index)
 {
     UINT fbr = 0;
     WCHAR* fnbuf = &wstr_buf[gWStrOffs];
+	WCHAR* fnnew;
     int sramLength,sramBankOffs,k,i,tr;
 
     gWStrOffs += 512;
@@ -3037,7 +3077,12 @@ void sram_mgr_restoreGame(int index)
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
     sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
 
-    *utility_getFileExtW(fnbuf) = 0;
+	fnnew = utility_getFileExtW(fnbuf);
+	if((fnnew)&&(fnnew != fnbuf))
+    	*fnnew = 0;
+
+	fnbuf = fnnew;
+
     if(gSelections[gCurEntry].type==2||gSRAMSize==16)
     {
         //sms or bram
@@ -4635,7 +4680,7 @@ void run_rom(int reset_mode)
 
         cache_invalidate_pointers();
 
-        cache_loadPA(gSelections[gCurEntry].name);//don't forget to load the cache
+        cache_loadPA(gSelections[gCurEntry].name,0);//don't forget to load the cache
 
         if(gSRAMSize || gSRAMType)//load cached info
         {
@@ -5479,8 +5524,8 @@ int main(void)
 
                 utility_c2wstrcpy(buf,p);
 
-                gCurEntry = -1;
-                cache_loadPA(buf);
+                gCurEntry = 0x7fff;
+                cache_loadPA(buf,1);
                 gCurEntry = 0;
 
                 if(p[0] == '*')
