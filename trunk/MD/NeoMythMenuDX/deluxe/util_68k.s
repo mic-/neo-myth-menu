@@ -172,7 +172,7 @@ utility_c2wstrcat:
         /*append src*/
         move.b  (a1)+,d1
         move.w  d1,(a0)+
-        bne.b   2b
+        dbra	d1,2b
 
         subq.l  #2,a0
         move.l  a0,d0
@@ -253,10 +253,10 @@ utility_c2wstrcpy:
         |movea.l 8(sp),a1
 		movem.l 4(sp),a0-a1
         moveq   #0,d1
-1:
+0:
         move.b  (a1)+,d1
         move.w  d1,(a0)+
-        bne.b   1b
+        dbra	d1,0b
 
         subq.l  #2,a0
         move.l  a0,d0
@@ -400,6 +400,20 @@ utility_memset:
 		subq.l	#1,d1
 1:
         move.b  d0,(a0)+
+2:
+        dbra    d1,1b
+
+        rts
+
+| void utility_memset_psram(void* dst,int c,int len)
+        .global utility_memset_psram
+utility_memset_psram:
+
+        movea.l	4(sp),a0
+        movem.l	8(sp),d0-d1
+		subq.l	#1,d1
+1:
+        move.w  d0,(a0)+
 2:
         dbra    d1,1b
 
