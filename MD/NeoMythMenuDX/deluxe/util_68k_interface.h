@@ -28,6 +28,7 @@ extern void utility_memcpy(void* dst,const void* src,int len);
 extern void utility_memset(void* dst,int c,int len);
 extern void utility_memcpy16(void* dst,const void* src,int len);
 extern void utility_memcpy_entry_block(void* dst,const void* src);
+extern void utility_memset_psram(void* dst,int c,int len);
 
 //MISC
 extern int utility_isMultipleOf(int base,int n);
