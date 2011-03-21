@@ -865,13 +865,15 @@ void sort_entries()
 
         if((a != 128) && (b == 128))
         {
+            // directories go first
             utility_memcpy_entry_block((void*)&temp,(void*)pa);
             utility_memcpy_entry_block((void*)pa,(void*)pb);
             utility_memcpy_entry_block((void*)pb,(void*)&temp);
             ix = !ix ? -1 : ix-2;
         }
-		else if((a+b) == (128+128))//( (a+b) & 0x100 )//( ((a == 128) && (b == 128)) )
-		{	
+		else if(((a^b) & 0x80) == 0)
+		{
+            // both entries are directories, or both are files
 			if(utility_wstrcmp(pa->name,pb->name) > 0)
 			{
 		        utility_memcpy_entry_block((void*)&temp,(void*)pa);
@@ -1009,7 +1011,7 @@ void get_sd_ips(int entry)
     utility_c2wstrcat(ipsPath, IPS_DIR);
     utility_c2wstrcat(ipsPath, "/");
     utility_wstrcat(ipsPath, gSelections[entry].name);
-	
+
 	fp = get_file_ext(ipsPath);
 	if(*fp == (WCHAR)'.')
     	*fp = 0;
@@ -2987,7 +2989,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,SAVES_DIR);
-	
+
     if(!createDirectory(fnbuf))
     {
 		STEP_INTO("createDirectory(fnbuf) == 0");
@@ -5584,7 +5586,7 @@ int main(void)
 				{
 					STEP_INTO("SMGR_STATUS_NULL");
                     gSRAMgrServiceStatus = SMGR_STATUS_NULL;
-				}	
+				}
                 else if(gSRAMgrServiceStatus == SMGR_STATUS_BACKUP_SRAM)
                 {
 					STEP_INTO("SMGR_STATUS_BACKUP_SRAM");
