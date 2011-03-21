@@ -2668,7 +2668,7 @@ void cache_loadPA(WCHAR* sss)
     if(gCurMode != MODE_SD)
         return;
 
-    if (gCurEntry != 0xffff)
+    if (gCurEntry != -1)
     {
         switch(gSelections[gCurEntry].type)
         {
@@ -5479,7 +5479,7 @@ int main(void)
 
                 utility_c2wstrcpy(buf,p);
 
-                gCurEntry = 0xffff;
+                gCurEntry = -1;
                 cache_loadPA(buf);
                 gCurEntry = 0;
 
