@@ -3102,27 +3102,33 @@ void sram_mgr_restoreGame(int index)
 	WCHAR* fnew;
     int sramLength,sramBankOffs,k,i,tr;
 
+	if(!gSRAMSize)
+		return;
+
     gWStrOffs += 512;
 
     ints_on();
-    utility_memset(fnbuf,0,512);
+    utility_memset_psram(fnbuf,0,512);
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,SAVES_DIR);
 
     utility_c2wstrcat(fnbuf,"/");
-    utility_wstrcat(fnbuf,gSelections[gCurEntry].name);
+    utility_wstrcat(fnbuf,gSelections[index].name);
 
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
-    sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
+	if(gSRAMBank)
+    	sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
+	else
+    	sramBankOffs = max(sramLength,8192);//minimum bank size is 8KB, not 4KB
 
 	fnew = get_file_ext(fnbuf);
 	if(*fnew == (WCHAR)'.')
     	*fnew = 0;
 
-    if(gSelections[gCurEntry].type==2||gSRAMSize==16)
+    if(gSelections[index].type==2||gSRAMSize==16)
     {
         //sms or bram
-        if(gSelections[gCurEntry].type==2)
+        if(gSelections[index].type==2)
         {
             utility_c2wstrcat(fnbuf,SMS_SAVE_EXT);
         }
@@ -3153,7 +3159,7 @@ void sram_mgr_restoreGame(int index)
 
     setStatusMessage("Restoring GAME sram...");
 
-    if(gSelections[gCurEntry].type==2||gSRAMSize==16)
+    if(gSelections[index].type==2||gSRAMSize==16)
     {
         //sms or bram - direct copy
         sramLength = min(sramLength,gSDFile.fsize);
@@ -4394,7 +4400,7 @@ void do_options(void)
 
                             updateConfig();
 
-                            sram_mgr_restoreGame(0);
+                            sram_mgr_restoreGame(gCurEntry);
                         }
                         else
                             cache_sync();
@@ -4452,7 +4458,7 @@ void do_options(void)
 
                             updateConfig();
 
-                            sram_mgr_restoreGame(0);
+                            sram_mgr_restoreGame(gCurEntry);
                         }
 
                         ints_on();
@@ -4845,7 +4851,7 @@ void run_rom(int reset_mode)
 
                 updateConfig();
 
-                sram_mgr_restoreGame(0);
+                sram_mgr_restoreGame(gCurEntry);
             }
             else
                 cache_sync();
@@ -4894,7 +4900,7 @@ void run_rom(int reset_mode)
 
                 updateConfig();
 
-                sram_mgr_restoreGame(0);
+                sram_mgr_restoreGame(gCurEntry);
             }
             else
                 cache_sync();
