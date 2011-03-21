@@ -32,6 +32,9 @@
 #define min(x,y) (((x)<(y))?(x):(y))
 #define max(x,y) (((x)>(y))?(x):(y))
 
+#define STEP_INTO(S)
+// {setStatusMessage(S); delay(100);}
+
 /*tables*/
 static const char* EEPROM_MAPPERS[] =
 {
@@ -269,6 +272,7 @@ const short int fsz_tbl[16] = { 0,1,2,0,4,5,6,0,8,16,24,32,40,0,0,0 };
 
 WCHAR *lfnames = (WCHAR *)(0x400000 - MAX_ENTRIES * 512); /* space for long file names in PSRAM */
 WCHAR *wstr_buf = (WCHAR *)0x380000;    /* space for WCHAR strings in PSRAM */
+//WCHAR wstr_buf[512*4];
 static unsigned int gWStrOffs = 0;
 
 //unsigned char rtc[8];                   /* RTC from Neo2/3 flash cart */
@@ -978,15 +982,20 @@ void get_smd_hdr(unsigned char *jump)
     }
 }
 
-/*
+
 WCHAR *get_file_ext(WCHAR *src)
 {
-    int ix = wstrlen(src) - 1;
-    while (ix && (src[ix] != (WCHAR)'.')) ix--;
-    if (!ix)
-        ix = wstrlen(src); // no extension, use whole string
-    return &src[ix];
-}*/
+	WCHAR* s = src;
+	while(*src != 0)
+	{
+		if(*src == (WCHAR)'.')
+			return src;
+
+		++src;
+	}
+
+	return s;
+}
 
 void get_sd_ips(int entry)
 {
@@ -1001,8 +1010,8 @@ void get_sd_ips(int entry)
     utility_c2wstrcat(ipsPath, "/");
     utility_wstrcat(ipsPath, gSelections[entry].name);
 	
-	fp = utility_getFileExtW(ipsPath);
-	if(fp != ipsPath)
+	fp = get_file_ext(ipsPath);
+	if(*fp == (WCHAR)'.')
     	*fp = 0;
     utility_c2wstrcat(ipsPath, ".ips");
 
@@ -1062,9 +1071,9 @@ void get_sd_cheat(WCHAR* sss)
     utility_c2wstrcat(cheatPath, "/");
     utility_wstrcat(cheatPath, sss);
 
-	fp = utility_getFileExtW(cheatPath);
+	fp = get_file_ext(cheatPath);
 
-	if(fp != cheatPath)
+	if(*fp == (WCHAR)'.')
 		*fp = 0; // cut off the extension
 
     utility_c2wstrcat(cheatPath, ".cht");
@@ -2697,9 +2706,13 @@ void cache_loadPA(WCHAR* sss,int skip_check)
 {
     UINT fbr = 0;
     WCHAR* fnbuf;
+	WCHAR* fnew;
 
     if(gCurMode != MODE_SD)
+	{
+		STEP_INTO("gCurMode != MODE_SD");
         return;
+	}
 
 	if(!skip_check)
     {
@@ -2708,35 +2721,48 @@ void cache_loadPA(WCHAR* sss,int skip_check)
             case 4://vgm
             case 127://unknown
             case 128://dir
+			{
+				STEP_INTO("gSelections[gCurEntry].type == 4/127/128");
                 return;
+			}
         }
 
         if(gSelections[gCurEntry].run == 0x27)
+		{
+			STEP_INTO("gSelections[gCurEntry].run == 0x27");
             return;
+		}
     }
 
-    if(*utility_getFileExtW(sss) != '.')
-        return;
-	
 	fnbuf = &wstr_buf[gWStrOffs];
     gWStrOffs += 512;
 
-    setStatusMessage("Reading cache...");
-    utility_memset(fnbuf,0,512);
+    //setStatusMessage("Reading cache...");
+    utility_memset_psram(fnbuf,0,512);
 
-    ints_on();
+	ints_off();
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,CACHE_DIR);
 
     utility_c2wstrcat(fnbuf,"/");
     utility_wstrcat(fnbuf,sss);
 
-    *utility_getFileExtW(fnbuf) = 0;
+    fnew = get_file_ext(fnbuf);
+	if(*fnew == (WCHAR)'.')
+		*fnew = 0;
+
     utility_c2wstrcat(fnbuf,".dxcs");
 
+	//utility_w2cstrcpy((char*)&buffer[(XFER_SIZE*2)-256],fnbuf);
+	//setStatusMessage((const char*)&buffer[(XFER_SIZE*2)-256]);
+	//delay(100);
+	ints_on();
     f_close(&gSDFile);
+	ints_on();
+
     if(f_open(&gSDFile,fnbuf,FA_OPEN_EXISTING | FA_READ) != FR_OK)
     {
+		STEP_INTO("f_open(&gSDFile,fnbuf,FA_OPEN_EXISTING | FA_READ) != FR_OK");
         clearStatusMessage();
         cache_invalidate_pointers();
         gCacheBlock.processed = cache_process();
@@ -2747,6 +2773,7 @@ void cache_loadPA(WCHAR* sss,int skip_check)
 
     if(gSDFile.fsize != sizeof(CacheBlock))
     {
+		STEP_INTO("gSDFile.fsize != sizeof(CacheBlock)");
         clearStatusMessage();
         f_close(&gSDFile);
         gWStrOffs -= 512;
@@ -2772,6 +2799,7 @@ void cache_loadPA(WCHAR* sss,int skip_check)
 
     if(gCacheBlock.processed != 0xFF)
     {
+		STEP_INTO("gCacheBlock.processed != 0xFF");
         clearStatusMessage();
         gCacheBlock.processed = cache_process();
         cache_sync();
@@ -2802,14 +2830,9 @@ void cache_sync()
 {
     UINT fbr = 0;
     WCHAR* fnbuf = &wstr_buf[gWStrOffs];
-
+	WCHAR* fnew;
     if(gCurMode != MODE_SD)
         return;
-
-    if(!gCacheOutOfSync)
-        return;
-
-    gCacheOutOfSync = 0;
 
     switch(gSelections[gCurEntry].type)
     {
@@ -2822,7 +2845,12 @@ void cache_sync()
     if(gSelections[gCurEntry].run == 0x27)
         return;
 
-    if(*utility_getFileExtW(gSelections[gCurEntry].name) != '.')
+    if(!gCacheOutOfSync)
+        return;
+
+    gCacheOutOfSync = 0;
+
+    if(*get_file_ext(gSelections[gCurEntry].name) != (WCHAR)'.')
         return;
 
     gWStrOffs += 512;
@@ -2843,7 +2871,10 @@ void cache_sync()
     utility_c2wstrcat(fnbuf,"/");
     utility_wstrcat(fnbuf,gSelections[gCurEntry].name);
 
-    *utility_getFileExtW(fnbuf) = 0;
+    fnew = get_file_ext(fnbuf);
+	if(*fnew == (WCHAR)'.')
+		*fnew = 0;
+
     utility_c2wstrcat(fnbuf,".dxcs");
 
     f_close(&gSDFile);
@@ -2937,12 +2968,15 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 {
     UINT fbr = 0;
     WCHAR* fnbuf = &wstr_buf[gWStrOffs];
-	WCHAR* fnnew;
+	WCHAR* fnew;
     int sramLength,sramBankOffs,k,i,tw;
 
     //dont let this happen
     if(!gSRAMSize)
+	{
+		STEP_INTO("GSRAMSIZE == 0");
         return;
+	}
 
     gWStrOffs += 512;
 
@@ -2950,13 +2984,17 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     utility_memset(fnbuf,0,512);
 
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
-    sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
+	if(gSRAMBank)
+		sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
+	else
+		sramBankOffs = max(sramLength,8192);
 
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,SAVES_DIR);
-
+	
     if(!createDirectory(fnbuf))
     {
+		STEP_INTO("createDirectory(fnbuf) == 0");
         gWStrOffs -= 512;
         return;
     }
@@ -2964,14 +3002,13 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     utility_c2wstrcat(fnbuf,"/");
     utility_wstrcat(fnbuf,sss);
 
-	fnnew = utility_getFileExtW(fnbuf);
-	if((fnnew)&&(fnnew != fnbuf))
-    	*fnnew = 0;
-
-	fnbuf = fnnew;
+	fnew = get_file_ext(fnbuf);
+	if(*fnew == (WCHAR)'.')
+    	*fnew = 0;
 
     if(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)
     {
+		STEP_INTO("(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
         //sms or bram
         if(gSRAMgrServiceMode==SMGR_MODE_SMS)
         {
@@ -2984,6 +3021,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     }
     else
     {
+		STEP_INTO("NOT (gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
         utility_c2wstrcat(fnbuf,MD_32X_SAVE_EXT);
     }
 
@@ -2991,9 +3029,12 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     deleteFile(fnbuf);
 
     f_close(&gSDFile);
+	delay(80);
+	ints_on();
 
     if(f_open(&gSDFile,fnbuf,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
     {
+		STEP_INTO("f_open(&gSDFile,fnbuf,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK");
         gWStrOffs -= 512;
         return;
     }
@@ -3002,6 +3043,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 
     if(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)
     {
+		STEP_INTO("(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
         gSRAMgrServiceMode = 0x0000;
 
         //sms or bram - direct copy
@@ -3061,7 +3103,7 @@ void sram_mgr_restoreGame(int index)
 {
     UINT fbr = 0;
     WCHAR* fnbuf = &wstr_buf[gWStrOffs];
-	WCHAR* fnnew;
+	WCHAR* fnew;
     int sramLength,sramBankOffs,k,i,tr;
 
     gWStrOffs += 512;
@@ -3077,11 +3119,9 @@ void sram_mgr_restoreGame(int index)
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
     sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
 
-	fnnew = utility_getFileExtW(fnbuf);
-	if((fnnew)&&(fnnew != fnbuf))
-    	*fnnew = 0;
-
-	fnbuf = fnnew;
+	fnew = get_file_ext(fnbuf);
+	if(*fnew == (WCHAR)'.')
+    	*fnew = 0;
 
     if(gSelections[gCurEntry].type==2||gSRAMSize==16)
     {
@@ -3776,7 +3816,11 @@ void runCheatEditor(int index)
     utility_c2wstrcat(cheatPath, CHEATS_DIR); createDirectory(cheatPath);
     utility_c2wstrcat(cheatPath, "/");
     utility_wstrcat(cheatPath, gSelections[gCurEntry].name);
-    *utility_getFileExtW(cheatPath) = 0; // cut off the extension
+
+	WCHAR* fnew = get_file_ext(cheatPath);
+
+	if(*fnew == (WCHAR)'.')
+    	*fnew = 0; // cut off the extension
     utility_c2wstrcat(cheatPath, ".cht");
 
     f_close(&gSDFile);
@@ -5515,24 +5559,28 @@ int main(void)
         setStatusMessage("Loading cache & configuration...");
         loadConfig();
         char* p = config_getS("romName");
+		STEP_INTO("Checking last loaded rom..");
         if(p)
         {
+			ints_off();
             if(utility_strlen(p) > 2)
             {
                 WCHAR* buf = &wstr_buf[gWStrOffs];
                 gWStrOffs += 512;
 
                 utility_c2wstrcpy(buf,p);
-
-                gCurEntry = 0x7fff;
                 cache_loadPA(buf,1);
-                gCurEntry = 0;
 
+				STEP_INTO(p);
                 if(p[0] == '*')
+				{
+					STEP_INTO("SMGR_STATUS_NULL");
                     gSRAMgrServiceStatus = SMGR_STATUS_NULL;
+				}
 
                 if(gSRAMgrServiceStatus == SMGR_STATUS_BACKUP_SRAM)
                 {
+					STEP_INTO("SMGR_STATUS_BACKUP_SRAM");
                     gSRAMgrServiceMode = (short int)config_getI("romType");
                     sram_mgr_saveGamePA(buf);
                     setStatusMessage("Loading cache & configuration...");
