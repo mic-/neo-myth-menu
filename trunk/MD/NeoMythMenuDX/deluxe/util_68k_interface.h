@@ -1,13 +1,6 @@
 #ifndef __UTIL_68K_INTERFACE_H__
 #define __UTIL_68K_INTERFACE_H__
 
-/*
-	util68k lib - By conleon1988@gmail.com for ChillyWilly's DX myth menu
-	http://code.google.com/p/neo-myth-menu/
-
-	Special thanks to ChillyWilly for all the hints & support :D
-*/
-
 //WCHAR
 extern int utility_wstrcmp(const unsigned short* ws1,const unsigned short* ws2);
 extern int utility_wstrlen2(const unsigned short* s);
@@ -33,6 +26,8 @@ extern char* utility_strncat(char* s1,const char* s2,int n);
 //MEM - CHAR
 extern void utility_memcpy(void* dst,const void* src,int len);
 extern void utility_memset(void* dst,int c,int len);
+extern void utility_memcpy16(void* dst,const void* src,int len);
+extern void utility_memcpy_entry_block(void* dst,const void* src);
 
 //MISC
 extern int utility_isMultipleOf(int base,int n);

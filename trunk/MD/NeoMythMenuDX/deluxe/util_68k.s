@@ -1,10 +1,4 @@
-/*
-    util68k lib - By conleon1988@gmail.com for ChillyWilly's DX myth menu
-    http://code.google.com/p/neo-myth-menu/
-
-    Special thanks to ChillyWilly for all the hints & support :D
-*/
-
+|Todo : optimize this mess
         .text
         .align 2
 
@@ -355,11 +349,9 @@ utility_isMultipleOf:
 | void utility_memcpy(void* dst,const void* src,int len)
         .global utility_memcpy
 utility_memcpy:
-        movea.l 4(sp),a0
-        movea.l 8(sp),a1
+		movem.l	4(sp),a0-a1
         move.l  12(sp),d0
-
-        bra.b   2f
+		subq.l	#1,d0
 1:
         move.b  (a1)+,(a0)+
 2:
@@ -367,15 +359,45 @@ utility_memcpy:
 
         rts
 
+| void utility_memcpy16(void* dst,const void* src,int len)
+        .global utility_memcpy16
+utility_memcpy16:
+		movem.l	4(sp),a0-a1
+        move.l  12(sp),d0
+
+		lsr.l	#1,d0
+        subq.l	#1,d0
+1:
+        move.w  (a1)+,(a0)+
+2:
+        dbra    d0,1b
+
+        rts
+
+| void utility_memcpy_entry_block(void* dst,const void* src)
+        .global utility_memcpy_entry_block
+utility_memcpy_entry_block:
+		movem.l	4(sp),a0-a1
+
+		|16 bytes (long-writes are slower , actually :) )
+        move.w  (a1)+,(a0)+
+        move.w  (a1)+,(a0)+
+        move.w  (a1)+,(a0)+
+        move.w  (a1)+,(a0)+
+        move.w  (a1)+,(a0)+
+        move.w  (a1)+,(a0)+
+        move.w  (a1)+,(a0)+
+        move.w  (a1),(a0)
+
+        rts
+
 | void utility_memset(void* dst,int c,int len)
         .global utility_memset
 utility_memset:
 
-        movea.l 4(sp),a0
-        move.l  8(sp),d0
-        move.l  12(sp),d1
-
-        bra.b   2f
+        movea.l	4(sp),a0
+        movem.l	8(sp),d0-d1
+		subq.l	#1,d1
 1:
         move.b  d0,(a0)+
 2:
