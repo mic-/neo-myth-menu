@@ -5564,11 +5564,18 @@ int main(void)
     neo2_enable_sd();
     get_sd_directory(-1);               /* get root directory of sd card */
 #endif
+
+	cache_invalidate_pointers();
+	utility_memcpy(gCacheBlock.sig,"DXCS",4);
+	gCacheBlock.processed = 0;
+	gCacheBlock.version = 1;
+
     if(gSdDetected)
     {
         clear_screen();
         setStatusMessage("Loading cache & configuration...");
         loadConfig();
+
         char* p = config_getS("romName");
 		STEP_INTO("Checking last loaded rom..");
         if(p)
@@ -5597,7 +5604,8 @@ int main(void)
                     config_push("romName","*");
                     config_push("romType","0");
 
-                    gSRAMgrServiceStatus = SMGR_STATUS_NULL;
+                    gSRAMgrServiceStatus = SMGR_STATUS_NULL; //just in case mute cache even if the config has been updated
+					gCacheOutOfSync = 1;
                     cache_sync();
                     updateConfig();
                 }
@@ -5607,10 +5615,6 @@ int main(void)
         setStatusMessage("Loading cache & configuration...OK");
         clear_screen();
     }
-
-    utility_memcpy(gCacheBlock.sig,"DXCS",4);
-    gCacheBlock.processed = 0;
-    gCacheBlock.version = 1;
 
     cache_invalidate_pointers();
 
