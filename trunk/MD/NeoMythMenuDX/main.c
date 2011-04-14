@@ -2310,7 +2310,6 @@ void importCheats(int index)
     {
         e = &cheatEntries[a];
 
-        if(e->active)
         {
             //apply all master codes if exist
             for(b = 0; b < registeredCheatEntries; b++)
@@ -2320,9 +2319,6 @@ void importCheats(int index)
                 if(e->type & CT_MASTER)
                     e->active = 1;
             }
-
-            //one time is enough to enable all master codes -- exit
-            break;
         }
     }
 
@@ -4384,7 +4380,7 @@ void do_options(void)
                                 (gOptions[ix].patch)(ix);
                         }
 
-						cache_load();
+						//cache_load();
 						gCacheOutOfSync = 1;
                         if(gManageSaves)
                         {
@@ -4442,7 +4438,7 @@ void do_options(void)
                                 (gOptions[ix].patch)(ix);
                         }
 
-						cache_load();
+						//cache_load();
 						gCacheOutOfSync = 1;
                         if(gManageSaves)
                         {
