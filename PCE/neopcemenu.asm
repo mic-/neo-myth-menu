@@ -1,7 +1,7 @@
 ; Updated menu for the Neo Power PCE Flash Card
-; v1.10
+; v1.11
 ;
-; Mic, 2010
+; Mic, 2010-2011
 
 .memorymap
         defaultslot 0
@@ -55,6 +55,18 @@
 .DEFINE INTERRUPT_STATUS	$5403
 
 
+.DEFINE GAME_BANK			$9A
+.DEFINE GAME_SIZTYP			$9B
+.DEFINE GAME_SRAM			$9C
+.DEFINE GAME_SIZE			$A1
+.DEFINE NEO_MAGIC1			$A3
+.DEFINE NEO_MAGIC2			$A4
+.DEFINE NEO_MAGIC3			$A5
+.DEFINE NEO_MAGIC4			$A6
+.DEFINE NEO_MAGIC5			$A7
+.DEFINE SRAM_ON				$AB
+
+
 .DEFINE GAMES_TO_SHOW		8
 
 .DEFINE VALID_META_STRING_HEAD $A8
@@ -98,6 +110,10 @@ firstShown	ds 1		; The index of the first game that's currently listed on the sc
 count1		ds 1
 tempw		ds 2
 textColor	ds 1		; Used by write_char/print_meta_string. Contains the palette index and the upper bits of the tile index.
+subMenu		ds 1
+stringTbl	ds 2
+listPtr		ds 2
+listLen		ds 1
 .ende
 
 .enum $0091
@@ -154,29 +170,31 @@ font_data:
 	
 
 ram_code:
-	lda		<$A3
+	lda		<NEO_MAGIC1
 	sta		$FFF0
-	lda		<$A4
+	lda		<NEO_MAGIC2
 	sta		$FFF0
-	lda		<$A5
+	lda		<NEO_MAGIC3
 	sta		$FFF0
-	lda		<$9A
+	lda		<GAME_BANK
 	sta		$FFF0
-	lda		<$A3
+	
+	lda		<NEO_MAGIC1
 	sta		$FFF0
-	lda		<$A4
+	lda		<NEO_MAGIC2
 	sta		$FFF0
-	lda		<$A6
+	lda		<NEO_MAGIC4
 	sta		$FFF0
-	lda		<$9C
+	lda		<GAME_SRAM
 	sta		$FFF0
-	lda		<$A3
+	
+	lda		<NEO_MAGIC1
 	sta		$FFF0
-	lda		<$A4
+	lda		<NEO_MAGIC2
 	sta		$FFF0
-	lda		<$A7
+	lda		<NEO_MAGIC5
 	sta		$FFF0
-	lda		<$9B
+	lda		<GAME_SIZTYP
 	sta		$FFF0
 	sta		$FFF0
 
@@ -385,27 +403,8 @@ start:
 	
 	tii		ram_code,$2800,ram_code_end-ram_code
 
-	lda		#$11				; $11 = solid white text
-	sta		<textColor
-	
 	cly
 	jsr		setup_video
-	jsr 	print_strings
-
-	; Print "I"/"II" in blue
-	lda		#$31				; $31 = ligh blue text
-	sta		<textColor
-	lda		#'I'
-	sta		<charCode
-	sti16	vramAddr,$0245
-	jsr		write_char
-	lda		#$65
-	sta		<vramAddr
-	jsr		write_char
-	inc		<vramAddr
-	jsr		write_char
-	lda		#$11
-	sta		<textColor
 
 	; Count the number of games on the card	
 	ldx		#$FF
@@ -433,8 +432,28 @@ start:
 	jmp		-
 ++:
 
+main_menu:
+	jsr		wait_keyrelease
 	stz		<highlighted
 	stz		<firstShown
+	stz		<subMenu
+	lda		<lastGame
+	sta		<listLen
+	lda		#<game_table_pointers
+	sta		<listPtr
+	lda		#>game_table_pointers
+	sta		<listPtr+1
+	lda		#<main_menu_string_table
+	sta		<stringTbl
+	lda		#>main_menu_string_table
+	sta		<stringTbl+1
+	
+	lda		#$11				; $11 = solid white text
+	sta		<textColor
+	
+	cly
+	jsr 	print_strings
+	jsr		print_i_ii
 	jsr		print_game_info
 menu_loop:
 	jsr		read_joypad
@@ -447,13 +466,15 @@ menu_loop:
 	beq		key_ii
 	cmp		#$80
 	beq		key_i
-	bra		menu_loop
+	cmp		#$20	; Select
+	bne		menu_loop
+	jmp		sram_manager
 key_ii:
-	stz 	<$AB
+	stz 	<SRAM_ON
 	bra		load_game
 key_i:
 	lda 	#$80
-	sta 	<$AB
+	sta 	<SRAM_ON
 	bra		load_game
 key_down:
 	jsr 	wait_keyrelease
@@ -475,16 +496,16 @@ print_game_info:
 
 	ldy 	#1
 	lda 	(<indPtr),y
-	sta 	<$9A
+	sta 	<GAME_BANK
 	iny
 	lda 	(<indPtr),y
-	sta 	<$9B
+	sta 	<GAME_SIZTYP
 	iny
 	lda 	(<indPtr),y
-	sta 	<$9C
+	sta 	<GAME_SRAM
 	iny
 	lda 	(<indPtr),y
-	sta 	<$A1
+	sta 	<GAME_SIZE
 
 	jsr		print_games_list
 
@@ -500,50 +521,105 @@ load_game:
 	cmp 	#1
 	beq		_lg_tg16
 	lda		#$57
-	sta		<$A3
+	sta		<NEO_MAGIC1
 	lda		#$75
-	sta		<$A4
+	sta		<NEO_MAGIC2
 	lda		#$63
-	sta		<$A5
+	sta		<NEO_MAGIC3
 	lda		#$85
-	sta		<$A6
+	sta		<NEO_MAGIC4
 	lda		#$36
-	sta		<$A7
-	lda		<$AB
+	sta		<NEO_MAGIC5
+	lda		<SRAM_ON
 	beq		+
-	lda		<$9C
+	lda		<GAME_SRAM
 	ora		#$80
-	sta		<$9C
+	sta		<GAME_SRAM
 +:
 	jmp		$2800		; jump to our RAM code
 _lg_tg16:
 	lda		#$EA
-	sta		<$A3
+	sta		<NEO_MAGIC1
 	lda		#$AE
-	sta		<$A4
+	sta		<NEO_MAGIC2
 	lda		#$C6
-	sta		<$A5
+	sta		<NEO_MAGIC3
 	lda		#$A1
-	sta		<$A6
+	sta		<NEO_MAGIC4
 	lda		#$6C
-	sta		<$A7
-	lda		<$9A
+	sta		<NEO_MAGIC5
+	lda		<GAME_BANK
 	jsr		reverse_byte
-	sta		<$9A
-	lda		<$9C
+	sta		<GAME_BANK
+	lda		<GAME_SRAM
 	jsr		reverse_byte
-	sta		<$9C
-	lda		<$9B
+	sta		<GAME_SRAM
+	lda		<GAME_SIZTYP
 	jsr		reverse_byte
-	sta		<$9B
-	lda		<$AB
+	sta		<GAME_SIZTYP
+	lda		<SRAM_ON
 	beq		+
-	lda		<$9C
+	lda		<GAME_SRAM
 	ora		#1
-	sta		<$9C
+	sta		<GAME_SRAM
 +:
 	jmp		$2800
 
+
+sram_manager:
+	jsr		wait_keyrelease
+	stz		<highlighted
+	stz		<firstShown
+	lda		#1
+	sta		<subMenu
+	lda		#6
+	sta		<listLen
+	lda		#<sram_manager_options_pointers
+	sta		<listPtr
+	lda		#>sram_manager_options_pointers
+	sta		<listPtr+1
+	lda		#<sram_manager_string_table
+	sta		<stringTbl
+	lda		#>sram_manager_string_table
+	sta		<stringTbl+1
+	
+	lda		#$11				; $11 = solid white text
+	sta		<textColor
+	
+	cly
+	jsr 	print_strings
+	jsr		print_i_ii
+	jsr		print_games_list
+sram_manager_loop:
+	jsr		read_joypad
+	lda		<joyData
+	cmp		#$04
+	beq 	sram_manager_key_down
+	cmp		#$08
+	beq		sram_manager_key_up
+	cmp		#$40
+	beq		sram_manager_key_ii
+	cmp		#$80
+	beq		sram_manager_key_i
+	bra		sram_manager_loop
+sram_manager_key_ii:
+	jmp		main_menu
+sram_manager_key_i:
+	jsr		wait_keyrelease
+	; TODO: handle
+	bra		sram_manager_loop
+sram_manager_key_down:
+	jsr 	wait_keyrelease
+	jsr		move_to_next_game
+	jsr		print_games_list
+	bra 	sram_manager_loop
+sram_manager_key_up:
+	jsr 	wait_keyrelease
+	jsr		move_to_previous_game
+	jsr		print_games_list
+	bra 	sram_manager_loop
+	
+	
 reverse_byte:	
 	ror		a
 	rol 	<temp
@@ -561,7 +637,7 @@ reverse_byte:
 	rol 	<temp
 	ror		a
 	rol 	<temp
-	lda		<temp ;$A2
+	lda		<temp 
 	rts
 	
 
@@ -573,7 +649,7 @@ move_to_next_game:
 	;   highlighted = firstShown = 0;
 	; }
 	lda 	<highlighted
-	cmp 	<lastGame
+	cmp 	<listLen
 	beq 	+
 	inc		<highlighted
 	bra 	++
@@ -591,7 +667,7 @@ move_to_next_game:
 	lda		<firstShown
 	clc
 	adc		#GAMES_TO_SHOW-1
-	cmp		<lastGame
+	cmp		<listLen
 	bcs		_mtng_done
 	inc		<firstShown
 _mtng_done:
@@ -612,7 +688,7 @@ move_to_previous_game:
 	sta 	<highlighted
 	bra 	++
 +:
-	lda 	<lastGame
+	lda 	<listLen
 	sta 	<highlighted
 	sec
 	sbc		#GAMES_TO_SHOW-1
@@ -634,15 +710,32 @@ _mtpg_done:
 	rts
 
 
-
+print_i_ii:
+	; Print "I"/"II" in blue
+	lda		#$31				; $31 = light blue text
+	sta		<textColor
+	lda		#'I'
+	sta		<charCode
+	sti16	vramAddr,$0245
+	jsr		write_char
+	lda		#$65
+	sta		<vramAddr
+	jsr		write_char
+	inc		<vramAddr
+	jsr		write_char
+	lda		#$11
+	sta		<textColor
+	rts
+	
+	
 print_strings:
-	stz		<tempw ;$9F
+	stz		<tempw 
 -:
 	ldy		<tempw
-	lda		string_table,y
+	lda		(<stringTbl),y
 	sta		<indPtr
 	iny
-	lda		string_table,y
+	lda		(<stringTbl),y
 	sta		<indPtr+1
 	lda		(<indPtr)
 	cmp		#VALID_META_STRING_HEAD
@@ -668,7 +761,7 @@ print_games_list:
 	lda		<count1
 	clc
 	adc		<firstShown
-	cmp		<lastGame
+	cmp		<listLen
 	bcc		+
 	beq		+
 	bra		_pgl_done
@@ -690,10 +783,10 @@ print_games_list:
 	stx		<textColor
 	asl		a
 	tay
-	lda.w 	game_table_pointers,y
+	lda 	(<listPtr),y
 	sta 	<indPtr
 	iny
-	lda.w 	game_table_pointers,y
+	lda 	(<listPtr),y
 	sta 	<indPtr+1
 	ldy		#4
 	jsr		print_meta_string
@@ -754,14 +847,14 @@ print_game_num_game_size:
 	sta		<charCode
 	dec		<vramAddr
 	jsr		write_char
-	lda 	<$A1
+	lda 	<GAME_SIZE
 	and 	#$0F
 	tay
 	lda.w 	hex_to_ascii,y
 	sta 	<charCode
 	sti16	vramAddr,$0293
 	jsr		write_char	
-	lda		<$A1
+	lda		<GAME_SIZE
 	ror		a
 	ror		a
 	ror		a
@@ -836,17 +929,38 @@ key_bits_hi:
 	.db $E0,$60,$A0,$20,$C0,$40,$80,$00
 	
 
-string_table:	
+main_menu_string_table:	
 	.dw string1,string2,string3,string4
 	.dw string5 
 
-
-string1: .db $A8,$C4,$00,"MENU V1.10, NEOTEAM 2010",$FF
+main_menu_strings:
+string1: .db $A8,$C4,$00,"MENU V1.11, NEOTEAM 2011",$FF
 string2: .db $A8,$C0,$00,$FF
 string3: .db $A8,$44,$02,"[ ] : LOAD (SAVE ON)",$FF 
 string4: .db $A8,$64,$02,"[  ]: LOAD (SAVE OFF)",$FF
 string5: .db $A8,$84,$02,"GAME 00, SIZE 00M",$FF
 .db $A0
+
+sram_manager_string_table:	
+	.dw string6,string7,string8,string9
+	.dw stringA 
+	
+sram_manager_strings:
+string6: .db $A8,$C4,$00,"MENU V1.11, NEOTEAM 2011",$FF
+string7: .db $A8,$C0,$00,$FF
+string8: .db $A8,$44,$02,"[ ] : OK             ",$FF 
+string9: .db $A8,$64,$02,"[  ]: CANCEL         ",$FF
+stringA: .db $A8,$84,$02,"                 ",$FF
+.db $A0
+
+sram_manager_options:
+.db $8A,$04,$87,$00,$01,"SAVE TO SLOT 1            ",$FF
+.db $8A,$04,$87,$00,$01,"SAVE TO SLOT 2            ",$FF
+.db $8A,$04,$87,$00,$01,"SAVE TO SLOT 3            ",$FF
+.db $8A,$04,$87,$00,$01,"LOAD FROM SLOT 1          ",$FF
+.db $8A,$04,$87,$00,$01,"LOAD FROM SLOT 2          ",$FF
+.db $8A,$04,$87,$00,$01,"LOAD FROM SLOT 3          ",$FF
+.db $8A,$04,$87,$00,$01,"CLEAR                     ",$FF
 
 
 hex_to_ascii:  
@@ -871,6 +985,11 @@ game_table_pointers:
 .dw $FD00,$FD20,$FD40,$FD60,$FD80,$FDA0,$FDC0,$FDE0
 .dw $FE00,$FE20,$FE40,$FE60,$FE80,$FEA0,$FEC0,$FEE0
 .dw $FF00,$FF20,$FF40,$FF60,$FF80,$FFA0,$FFC0,$FFE0
+
+sram_manager_options_pointers:
+.dw sram_manager_options, sram_manager_options+$20, sram_manager_options+$40
+.dw sram_manager_options+$60, sram_manager_options+$80, sram_manager_options+$A0
+.dw sram_manager_options+$C0
 
 	
 palette:
@@ -900,7 +1019,7 @@ bg_nametable:
 .bank 1 slot 6
 .section "data"
 
-
+	
 bg_nametable2:
 	.incbin "assets\menu_bg4.nam"
 	
@@ -909,7 +1028,7 @@ bg_patterns:
 
 bg_patterns2:
 	.incbin "assets\menu_bg4.chr" read 48*32
-	
+
 
 .ends
 .org $1FFD
