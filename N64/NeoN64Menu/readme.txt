@@ -1,5 +1,5 @@
 ========================================================================
-              Neo N64 Myth Menu v2.2 by Chilly Willy
+              Neo N64 Myth Menu v2.4 by Chilly Willy
 ========================================================================
 The Neo N64 Myth Menu uses libdragon, by Shaun Taylor. Many thanks for
 his work on this fine SDK for the N64.
@@ -28,11 +28,11 @@ GBA menu flash).
 
 When the menu in either the N64 menu flash or the GBA menu flash find that
 file, they will boot it, assuming it to be the most up to date version.
-This is the easiest way to handle minor updates - put v2.2 in the N64 menu
+This is the easiest way to handle minor updates - put v2.4 in the N64 menu
 flash and then any new updates on the SD card. The newer SD loaded menus
 are in z64 format which will not be loaded properly by old menus. You
 might wish to take the opportunity to update your menu in the flash to
-v2.2 as that will give you the best speed and features even if you don't
+v2.4 as that will give you the best speed and features even if you don't
 load the menu from the SD card.
 
 You can replace the splash, browser, and loading images by placing your
@@ -43,8 +43,8 @@ pixels wide by 240 lines tall. You can have any or all of them. Images
 not included in the directory will use the default image. If you have both
 png and jpg images, the png image will be used.
 
-The boxart for v2.2 has changed slightly, so download the new boxart. You
-must place the sprites from the boxart archive into  "/menu/n64/boxart"
+The boxart from v2.2 on has changed slightly, so download the new boxart.
+You must place the sprites from the boxart archive into "/menu/n64/boxart"
 or you will only get the default boxart image.
 
 ========================================================================
@@ -88,10 +88,10 @@ combined is 1279 characters. The game info for SD card files is not shown
 initially to speed things up. Pause over a file for a second and it will
 read and display the game info. Note that while flash games start instantly,
 SD card games must be read into memory, and can take a while. Currently,
-it take about 15 seconds to load an 8 MByte game, about 0:31 to load a
-16 MByte game, and about 1:02 to load a 32 MByte game. Larger games cannot
-be loaded at this time as the Neo2-Pro has only 32 MBytes of memory for
-loading games into. If you have a Neo2-SD, the maximum is 16 MBytes.
+it take about 15 seconds to load an 8 MByte game, about 31 to load a
+16 MByte game, and just over a minute to load a 32 MByte game. Larger games
+cannot be loaded at this time as the Neo2-Pro has only 32 MBytes of memory
+for loading games into. If you have a Neo2-SD, the maximum is 16 MBytes.
 
 Notes: The byte order of files is important. There are three main types
 of N64 rom images: .v64, which has the bytes in a word swapped; .z64,
@@ -118,7 +118,7 @@ author does is set the first eight characters of the rom header name to
 are found, the program is run with the hardware unlocked so that the N64
 Myth hardware (particularly the SD card interface) may be used.
 
-The latest feature is auto load/save of save ram. When you run a game and
+Auto load/save of save ram is supported. When you run a game and
 it uses save ram of any kind (except ext cart), the save ram will be
 automatically loaded from "/menu/n64/save/<game_name>.<save extension>"
 when you have an SD card. If the file doesn't exist, the save ram is
@@ -158,6 +158,28 @@ was selected. It defaults to the background images, the game info, and
 browsing the SD card if you booted the menu from the SD card, or browsing
 the flash otherwise.
 
+v2.3 added a Save Manager; while in the SD browser, press the left shoulder
+button to enter the save manager. You will see a list of save ram types you
+can use to save the save memory of the cart plugged into the pass-through
+on the N64 Myth. The current menu cannot tell what kind of save it has, so
+you have to select the save memory type that corresponds to what is in the
+cart (if any). Below that will be a list of options to load/save or format
+the MemPak plugged into the currently selected controller. Press the left
+or right shoulder buttons to switch to another controller. Below that will
+be a list of game saves on the selected MemPak; eventually you will be able
+to load/save individual games, but for now that is not supported. The list
+is currently mainly to help you identify MemPaks. Press START to exit the
+save manager back to the SD browser.
+
+v2.4 added the ability to run NES games. When you select an NES game from
+the SD browser, the menu will try to load the NES emulator, Neon64. It is
+included with the archive and should be copied to the N64 menu directory
+on the SD card. The full path used is "/menu/n64/neon64/neon64cd.rom". The
+menu will load the emulator, append the selected game, recalculate the 
+checksum, and run the emulator. The emulator title screen will appear - 
+press any button to start the NES game. Read the readme in the neon64 
+directory for details on the emulator.
+
 ========================================================================
                             Controls
 ========================================================================
@@ -180,6 +202,9 @@ CPad Up: increase selected game option
 CPad Down: decrease selected game option
 CPad Left: select previous game option
 CPad Right: select next game option
+
+Note - the left trigger switches fill patterns in the flash browser, and
+runs the save manager in the SD browser.
 ========================================================================
 
 For more info, please visit the NeoFlash forums:
@@ -187,5 +212,8 @@ http://www.neoflash.com/forum/index.php
 
 Shaun Taylor's N64 Development web page:
 http://www.dragonminded.com/?loc=n64dev/N64DEV
+
+Halley's Comet Software's Neon64 emulator web page:
+http://hcs.freeshell.org/neon64.cgi
 
 ========================================================================

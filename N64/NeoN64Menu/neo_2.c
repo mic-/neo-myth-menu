@@ -24,6 +24,18 @@ typedef uint64_t u64;
 #define PI_BSD_DOM2_PGS_REG *(vu32*)0xA460002C
 #define PI_BSD_DOM2_RLS_REG *(vu32*)0xA4600030
 
+#define FRAM_STATUS_REG	*(vu32*)0xA8000000
+#define FRAM_COMMAND_REG *(vu32*)0xA8010000
+
+#define FRAM_EXECUTE_CMD		0xD2000000
+#define FRAM_STATUS_MODE_CMD	0xE1000000
+#define FRAM_ERASE_OFFSET_CMD	0x4B000000
+#define FRAM_WRITE_OFFSET_CMD	0xA5000000
+#define FRAM_ERASE_MODE_CMD		0x78000000
+#define FRAM_WRITE_MODE_CMD		0xB4000000
+#define FRAM_READ_MODE_CMD		0xF0000000
+
+
 // V1.2-A hardware
 #define MYTH_IO_BASE 0xA8040000
 #define SAVE_IO   *(vu32*)(MYTH_IO_BASE | 0x00*2) // 0x00000000 = ext card save, 0x000F000F = off
@@ -62,7 +74,10 @@ extern unsigned int gCpldVers;          /* 0x81 = V1.2 hardware, 0x82 = V2.0 har
 extern unsigned int sd_speed;
 extern unsigned int fast_flag;
 
+extern void delay(int cnt);
+
 extern int get_cic(unsigned char *buffer);
+
 u32 PSRAM_ADDR = 0;
 int DAT_SWAP = 0;
 
@@ -414,14 +429,14 @@ void neo_copyfrom_sram(void *dst, int sstart, int len)
     hw_delay();
 }
 
-void neo_copyto_nsram(void *src, int sstart, int len)
+void neo_copyto_nsram(void *src, int sstart, int len, int mode)
 {
     neo2_cycle_sd();
     //neo_select_menu();
     neo_select_game();
     hw_delay();
 
-    SAVE_IO = 0x00080008;               // SRAM 256KB
+    SAVE_IO = (mode << 16) | mode;
     hw_delay();
     hw_delay();
     if ((gCpldVers & 0x0F) == 1)
@@ -470,14 +485,14 @@ void neo_copyto_nsram(void *src, int sstart, int len)
     hw_delay();
 }
 
-void neo_copyfrom_nsram(void *dst, int sstart, int len)
+void neo_copyfrom_nsram(void *dst, int sstart, int len, int mode)
 {
     neo2_cycle_sd();
     //neo_select_menu();
     neo_select_game();
     hw_delay();
 
-    SAVE_IO = 0x00080008;               // SRAM 256KB
+    SAVE_IO = (mode << 16) | mode;
     hw_delay();
     if ((gCpldVers & 0x0F) == 1)
         SRAM2C_I0 = 0x00000000;         // disable gba sram
@@ -580,6 +595,80 @@ void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode)
     //neo_select_menu();
 }
 
+void neo_copyto_fram(void *src, int sstart, int len, int mode)
+{
+}
+
+void neo_copyfrom_fram(void *dst, int sstart, int len, int mode)
+{
+    neo2_cycle_sd();
+    //neo_select_menu();
+    neo_select_game();
+    hw_delay();
+
+    SAVE_IO = (mode<<16) | mode;        // set FRAM mode
+    hw_delay();
+    if ((gCpldVers & 0x0F) == 1)
+        SRAM2C_I0 = 0x00000000;         // disable gba sram
+    else
+        SRAM2C_IO = 0x00000000;         // disable gba sram
+    hw_delay();
+
+    // Init the PI for sram
+    vu32 piLatReg = PI_BSD_DOM2_LAT_REG;
+    vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
+    vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
+    vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
+    PI_BSD_DOM2_LAT_REG = 0x00000005;
+    PI_BSD_DOM2_PWD_REG = 0x0000000C;
+    PI_BSD_DOM2_PGS_REG = 0x0000000D;
+    PI_BSD_DOM2_RLS_REG = 0x00000002;
+
+    FRAM_COMMAND_REG = FRAM_EXECUTE_CMD;
+    delay(10);
+    FRAM_COMMAND_REG = FRAM_EXECUTE_CMD;
+    delay(10);
+    FRAM_COMMAND_REG = FRAM_STATUS_MODE_CMD;
+    delay(10);
+
+    while (len > 0)
+    {
+        FRAM_COMMAND_REG = FRAM_READ_MODE_CMD;
+
+        if ((u32)dst & 7)
+        {
+            // not properly aligned - DMA sram space to buffer, then copy it
+            data_cache_writeback_invalidate(dmaBuf, 128);
+            while (dma_busy()) ;
+            PI_STATUS_REG = 3;
+            dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart/2, 128);
+            // copy DMA buffer to dst
+            memcpy(dst, dmaBuf, 128);
+        }
+        else
+        {
+            // destination is aligned - DMA sram space directly to dst
+            data_cache_writeback_invalidate(dst, 128);
+            while (dma_busy()) ;
+            PI_STATUS_REG = 3;
+            dma_read((void *)((u32)dst & 0x1FFFFFFF), 0xA8000000 + sstart/2, 128);
+        }
+
+        dst += 128;
+        sstart += 128;
+        len -= 128;
+    }
+
+    SAVE_IO = 0x00050005;               // save off
+    hw_delay();
+
+    PI_BSD_DOM2_LAT_REG = piLatReg;
+    PI_BSD_DOM2_PWD_REG = piPwdReg;
+    PI_BSD_DOM2_PGS_REG = piPgsReg;
+    PI_BSD_DOM2_RLS_REG = piRlsReg;
+    hw_delay();
+}
+
 void neo_get_rtc(unsigned char *rtc)
 {
 }
@@ -604,25 +693,24 @@ void neo2_disable_sd(void)
 
 void neo2_pre_sd(void)
 {
-    if (!sd_speed && fast_flag)
-    {
-        // set the PI for myth sd
-        PI_BSD_DOM1_LAT_REG = 0x00000000;
-        PI_BSD_DOM1_RLS_REG = 0x00000000;
-        PI_BSD_DOM1_PWD_REG = 0x00000003;
-        PI_BSD_DOM1_PGS_REG = 0x00000000;
-    }
+    // set the PI for myth sd
+    if (!sd_speed)
+        switch(fast_flag)
+        {
+            case 1:
+                PI_BSD_DOM1_LAT_REG = 0x00000010;
+                PI_BSD_DOM1_RLS_REG = 0x00000003;
+                PI_BSD_DOM1_PWD_REG = 0x00000003;
+                PI_BSD_DOM1_PGS_REG = 0x00000007;
+                break;
 
-/*
-    if (!sd_speed && fast_flag)
-    {
-        // set the PI for myth sd
-        PI_BSD_DOM1_LAT_REG = 0x00000003; // fasest safe speed = 3/2/3/7
-        PI_BSD_DOM1_RLS_REG = 0x00000002;
-        PI_BSD_DOM1_PWD_REG = 0x00000003;
-        PI_BSD_DOM1_PGS_REG = 0x00000007;
-    }
-*/
+            case 2:
+                PI_BSD_DOM1_LAT_REG = 0x00000000;
+                PI_BSD_DOM1_RLS_REG = 0x00000000;
+                PI_BSD_DOM1_PWD_REG = 0x00000003;
+                PI_BSD_DOM1_PGS_REG = 0x00000000;
+                break;
+        }
 }
 
 void neo2_post_sd(void)
@@ -788,23 +876,30 @@ int neo2_recv_sd_multi(unsigned char *buf, int count)
 // Simulated PIF ROM bootcode adapted from DaedalusX64 emulator
 void simulate_pif_boot(u32 cic_chip)
 {
-    u32 ix;
+    u32 ix, sz, cart, country;
     vu32 *src, *dst;
-    u32 country = ((*(vu32 *)0xB000003C) >> 8) & 0xFF;
-    vu64 *gGPR = (vu64 *)0xA0300000;
+    u32 info = *(vu32 *)0xB000003C;
+    vu64 *gGPR = (vu64 *)0xA0080000;
 
-    /* Clear XBUS/Flush/Freeze */
+    cart = info >> 16;
+    country = (info >> 8) & 0xFF;
+
+    // clear XBUS/Flush/Freeze
     ((vu32 *)0xA4100000)[3] = 0x15;
 
-    // clear some OS globals for cleaner boot
-    *(vu32*)0xA000030C = 0;             // cold boot
-    memset((void*)0xA000031C, 0, 64);   // clear app nmi buffer
-
     // copy the memsize for different boot loaders
-    if ((cic_chip == CIC_6105) && (gBootCic != CIC_6105))
-        *(vu32 *)0xA00003F0 = *(vu32 *)0xA0000318;
-    else if ((cic_chip != CIC_6105) && (gBootCic == CIC_6105))
-        *(vu32 *)0xA0000318 = *(vu32 *)0xA00003F0;
+    sz = (gBootCic != CIC_6105) ? *(vu32 *)0xA0000318 : *(vu32 *)0xA00003F0;
+    if (cic_chip == CIC_6105)
+        *(vu32 *)0xA00003F0 = sz;
+    else
+        *(vu32 *)0xA0000318 = sz;
+
+    // clear some OS globals for cleaner boot
+    *(vu32 *)0xA000030C = 0;             // cold boot
+    memset((void *)0xA000031C, 0, 64);   // clear app nmi buffer
+
+    // clear memory outside boot segment
+    //memset((void *)0xA0100000, 0, sz - 0x00100000);
 
     // Copy low 0x1000 bytes to DMEM
     src = (vu32 *)0xB0000000;
@@ -816,7 +911,6 @@ void simulate_pif_boot(u32 cic_chip)
     dst = (vu32 *)0xA4001000;
 
     // register values due to pif boot for CiC chip and country code, and IMEM crap
-
     gGPR[0]=0x0000000000000000LL;
     gGPR[6]=0xFFFFFFFFA4001F0CLL;
     gGPR[7]=0xFFFFFFFFA4001F08LL;
@@ -890,6 +984,7 @@ void simulate_pif_boot(u32 cic_chip)
                     dst[0x04>>2] = 0x8DA807FC;
                     gGPR[5]=0x000000005493FB9ALL;
                     gGPR[14]=0xFFFFFFFFC2C20384LL;
+                    break;
                 case CIC_6106:
                     gGPR[5]=0xFFFFFFFFE067221FLL;
                     gGPR[14]=0x000000005CD2B70FLL;
@@ -959,7 +1054,19 @@ void simulate_pif_boot(u32 cic_chip)
     }
 
 
-    // set HW registers - PI_BSD_DOM1 regs, etc
+    // set HW registers
+    PI_STATUS_REG = 3;
+    switch (cart)
+    {
+        case 0x4258: // 'BX' - Battle Tanx
+            PI_BSD_DOM1_LAT_REG = 0x00000080;
+            PI_BSD_DOM1_RLS_REG = 0x00000037;
+            PI_BSD_DOM1_PWD_REG = 0x00000012;
+            PI_BSD_DOM1_PGS_REG = 0x00000040;
+            break;
+        default:
+            break;
+    }
 
 
     // now set MIPS registers - set CP0, and then GPRs, then jump thru gpr11 (which is 0xA400040)
@@ -983,11 +1090,16 @@ void simulate_pif_boot(u32 cic_chip)
         "li $9,0xFFFFFFFF\n\t"
         "mtc0 $9,$14\n\t"
         "nop\n\t"
-        "mtc0 $9,$8\n\t"
-        "nop\n\t"
         "mtc0 $9,$30\n\t"
         "nop\n\t"
-        "lui $31,0xA030\n\t"
+        "lui $8,0\n\t"
+        "mthi $8\n\t"
+        "nop\n\t"
+        "mtlo $8\n\t"
+        "nop\n\t"
+        "ctc1 $8,$31\n\t"
+        "nop\n\t"
+        "lui $31,0xA008\n\t"
         "ld $1,0x08($31)\n\t"
         "ld $2,0x10($31)\n\t"
         "ld $3,0x18($31)\n\t"

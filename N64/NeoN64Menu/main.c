@@ -106,7 +106,7 @@ FATFS gSDFatFs;                         /* global FatFs structure for FF */
 
 short int gSdDetected = 0;              /* 0 - not detected, 1 - detected */
 
-unsigned int fast_flag = 0;             /* 0 - use normal cart timing for SD read, 1 - use fast timing */
+unsigned int fast_flag = 0;             /* 0 - use normal cart timing for SD read, 1 - use quick timing, 2 - use fast timing */
 
 char path[1024];
 
@@ -136,20 +136,28 @@ extern void neo_run_psram(u8 *options, int reset);
 extern void neo_copyfrom_game(void *dest, int fstart, int len);
 extern void neo_copyfrom_menu(void *dest, int fstart, int len);
 extern void neo_xferto_psram(void *src, int pstart, int len);
+extern void neo_xferfrom_psram(void *dst, int pstart, int len);
 extern void neo_copyto_psram(void *src, int pstart, int len);
 extern void neo_copyfrom_psram(void *dst, int pstart, int len);
 extern void neo_copyto_sram(void *src, int sstart, int len);
 extern void neo_copyfrom_sram(void *dst, int sstart, int len);
-extern void neo_copyto_nsram(void *src, int sstart, int len);
-extern void neo_copyfrom_nsram(void *dst, int sstart, int len);
+extern void neo_copyto_nsram(void *src, int sstart, int len, int mode);
+extern void neo_copyfrom_nsram(void *dst, int sstart, int len, int mode);
 extern void neo_copyto_eeprom(void *src, int sstart, int len, int mode);
 extern void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode);
+extern void neo_copyto_fram(void *src, int sstart, int len, int mode);
+extern void neo_copyfrom_fram(void *dst, int sstart, int len, int mode);
 extern void neo_get_rtc(unsigned char *rtc);
 extern void neo2_cycle_sd(void);
 
 extern int get_cic(unsigned char *buffer);
 extern int get_swap(unsigned char *buffer);
 extern int get_cic_save(char *cartid, int *cic, int *save);
+
+extern void checksum_psram(void);
+
+extern int doOSKeyb(char *title, char *deflt, char *buffer, int max, int bfill);
+extern int RequestFile (char *title, char *initialPath, int bfill);
 
 void w2cstrcpy(void *dst, void *src)
 {
@@ -572,11 +580,19 @@ void check_fast(void)
     XCHAR fpath[24];
 
     fast_flag = 0;
-    c2wstrcpy(fpath, "/menu/n64/.fast");
+    c2wstrcpy(fpath, "/menu/n64/.quick");
     if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
     {
         fast_flag = 1;
         f_close(&lSDFile);
+        return;
+    }
+    c2wstrcpy(fpath, "/menu/n64/.fast");
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+    {
+        fast_flag = 2;
+        f_close(&lSDFile);
+        return;
     }
 }
 
@@ -614,6 +630,12 @@ int check_sd(void)
         return -1;
 
     c2wstrcpy(fpath, "/menu/n64/.fast");
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+    {
+        f_close(&lSDFile);
+        return 0;
+    }
+    c2wstrcpy(fpath, "/menu/n64/.quick");
     if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) == FR_OK)
     {
         f_close(&lSDFile);
@@ -699,7 +721,7 @@ int do_sd_mgr(int state)
         progress_screen(temp1, temp2, 0, 100, (loading) ? 4 : 0);
         if (f_open(&lSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
         {
-            fast_flag = 1;
+            fast_flag = 2; // fast - full speed
             for (int i=0; i<ONCE_SIZE; i+=8192)
             {
                 progress_screen(temp1, temp2, i*100/ONCE_SIZE, 100, (loading) ? 4 : 0);
@@ -708,16 +730,37 @@ int do_sd_mgr(int state)
                     if (*(int*)&tmpBuf[j] != (i+j))
                         fast_flag = 0;
             }
+            f_lseek(&lSDFile, 0);
+            if (!fast_flag)
+            {
+                fast_flag = 1; // quick - slightly less than full speed
+                for (int i=0; i<ONCE_SIZE; i+=8192)
+                {
+                    progress_screen(temp1, temp2, i*100/ONCE_SIZE, 100, (loading) ? 4 : 0);
+                    f_read(&lSDFile, tmpBuf, 8192, &ts);
+                    for (int j=0; j<8192; j+=4)
+                        if (*(int*)&tmpBuf[j] != (i+j))
+                            fast_flag = 0;
+                }
+                f_lseek(&lSDFile, 0);
+            }
             f_close(&lSDFile);
             f_unlink(wname); // delete test file
         }
-        sprintf(temp2, "SD card speed %s", fast_flag ? "FAST" : "SLOW");
+        sprintf(temp2, "SD card speed %s", (fast_flag == 2) ? "FAST" : (fast_flag == 1) ? "QUICK" : "SLOW");
         progress_screen(temp1, temp2, 100, 100, (loading) ? 4 : 0);
         delay(120);
-        if (fast_flag)
+        if (fast_flag == 2)
         {
             // the existence of this file implies fast read mode allowed
             c2wstrcpy(wname, "/menu/n64/.fast");
+            if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+                f_close(&lSDFile);
+        }
+        else if (fast_flag == 1)
+        {
+            // the existence of this file implies quick read mode allowed
+            c2wstrcpy(wname, "/menu/n64/.quick");
             if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
                 f_close(&lSDFile);
         }
@@ -757,6 +800,23 @@ void get_sd_info(int entry)
     // read rom header
     f_read(&lSDFile, buffer, 0x440, &ts);
     f_close(&lSDFile);
+
+    // check for NES rom
+    if (!strncasecmp(buffer, "NES\x1A", 4))
+    {
+        // NES rom with header
+        gTable[entry].options[0] = 0xFF; // game
+        gTable[entry].options[1] = 0;
+        gTable[entry].options[2] = 0;
+        gTable[entry].options[3] = 0;
+        gTable[entry].options[4] = 0x0F; // 64Mbit
+        gTable[entry].options[5] = 0x0F; // Save off
+        gTable[entry].options[6] = 2;    // CIC 6102
+        gTable[entry].options[7] = 0;
+        gTable[entry].type = 254;
+
+        return;
+    }
 
     // copy rom info - both hdr and rom arrays at once
     memcpy(gTable[entry].hdr, buffer, 0x40);
@@ -1159,6 +1219,83 @@ void fastCopySD2Psram(int bselect,int bfill)
     delay(5);
 }
 
+/* Load neon64 emulator and append NES file in psram */
+void loadNES2Psram(int bselect, int bfill)
+{
+    FIL lSDFile;
+    UINT ts, emusize;
+    u32 gamelen;
+    XCHAR fpath[1280];
+    char temp[256];
+
+    disk_io_set_mode(0,0);
+
+    progress_screen("Loading", "neon64 emulator", 0, 100, bfill);
+
+    // clear psram
+    memset(tmpBuf, 0, ONCE_SIZE);
+    for(int ix=0; ix<1280*1024; ix+=ONCE_SIZE)
+        neo_xferto_psram(tmpBuf, ix, ONCE_SIZE);
+
+    c2wstrcpy(fpath, "/menu/n64/neon64/neon64cd.rom");
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    {
+        char temp[1536];
+        // couldn't open file
+        w2cstrcpy(temp, fpath);
+        debugText("Couldn't open file: ", 2, 2, 0);
+        debugText(temp, 22, 2, 180);
+        return;
+    }
+    f_read(&lSDFile, tmpBuf, lSDFile.fsize, &emusize);
+    neo_xferto_psram(tmpBuf, 0, emusize);
+    f_close(&lSDFile);
+
+    strcpy(temp, gTable[bselect].name);
+    progress_screen("Loading", temp, 33, 100, bfill);
+
+    c2wstrcpy(fpath, path);
+    if (path[strlen(path)-1] != '/')
+        c2wstrcat(fpath, "/");
+
+    c2wstrcat(fpath, gTable[bselect].name);
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    {
+        char temp[1536];
+        // couldn't open file
+        w2cstrcpy(temp, fpath);
+        debugText("Couldn't open file: ", 2, 2, 0);
+        debugText(temp, 22, 2, 180);
+        return;
+    }
+
+    // copy the rom from file to ram, then ram to psram
+    gamelen = lSDFile.fsize;
+    for(int ic=0; ic<gamelen; ic+=ONCE_SIZE)
+    {
+        memset(tmpBuf, 0, ONCE_SIZE);
+        f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
+        neo_xferto_psram(tmpBuf, ic + emusize, ONCE_SIZE);
+    }
+    f_close(&lSDFile);
+
+    progress_screen("Checksumming", "...", 66, 100, bfill);
+    checksum_psram();
+#if 0
+    {
+        char temp[40];
+        unsigned int cs1, cs2;
+        debugText("checksum = ", 2, 2, 2);
+        cs1 = *(unsigned int *)0xB0000010;
+        cs2 = *(unsigned int *)0xB0000014;
+        sprintf(temp, "%08X %08X", cs1, cs2);
+        debugText(temp, 13, 2, 1200);
+    }
+#endif
+    progress_screen(NULL,NULL,100,100,-1);
+    delay(5);
+}
+
 /* Copy data from file to gba psram */
 void copySD2Psram(int bselect, int bfill)
 {
@@ -1177,6 +1314,7 @@ void copySD2Psram(int bselect, int bfill)
     if((gTable[bselect].swap == 0) || (gTable[bselect].swap == 1) )
     {
         fastCopySD2Psram(bselect,bfill);
+        disk_io_set_mode(0,0);
         return;
     }
 
@@ -1512,18 +1650,12 @@ void loadSaveState(int bsel, int bfill)
     neo2_enable_sd();
     ix = getSDInfo(-1);             // try to get root
 
-    /*c2wstrcpy(wname,"name.bin");
-    f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
-    f_write(&lSDFile,(void*)temp,strlen(temp),&ts);
-    f_close(&lSDFile);
-    */
-
     if (!ix)
     {
         // no SD card, use GBA SRAM
         u8 blk[32];
         int ix;
-        int soffs[20] = { 0x00000, // one slot for 128KB FPRAM games
+        int soffs[20] = { 0x00000, // one slot for 128KB FRAM games
                           0x20000, 0x28000, 0x30000, // three slots for 32KB SRAM games
                           0x38000, 0x38800, 0x39000, 0x39800, 0x3A000, 0x3A800, 0x3B000, 0x3B800, // 8 slots for 16Kb EEPROM games
                           0x3C000, 0x3C200, 0x3C400, 0x3C600, 0x3C800, 0x3CA00, 0x3CC00, 0x3CE00 }; // 8 slots for 4Kb EEPROM games
@@ -1582,11 +1714,11 @@ void loadSaveState(int bsel, int bfill)
         case 2:
         case 3:
             byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
-            neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]]);
+            neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]], 8);
             break;
         case 4:
             byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
-            neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]]);
+            neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]], 8);
             break;
         case 5:
         case 6:
@@ -1594,7 +1726,7 @@ void loadSaveState(int bsel, int bfill)
             break;
         case 8:
             byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
-            neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]]);
+            neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]], 8);
             break;
     }
     flags = 0xAA550100LL | entry.options[5];
@@ -1637,11 +1769,11 @@ void saveSaveState(void)
         case 1:
         case 2:
         case 3:
-            neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15]);
+            neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15], 8);
             byte_swap_buf(tmpBuf, ssize[flags & 15]);
             break;
         case 4:
-            neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15]);
+            neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15], 8);
             byte_swap_buf(tmpBuf, ssize[flags & 15]);
             break;
         case 5:
@@ -1649,7 +1781,7 @@ void saveSaveState(void)
             neo_copyfrom_eeprom(tmpBuf, 0, ssize[flags & 15], flags & 15);
             break;
         case 8:
-            neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15]);
+            neo_copyfrom_nsram(tmpBuf, 0, ssize[flags & 15], 8);
             byte_swap_buf(tmpBuf, ssize[flags & 15]);
             break;
     }
@@ -1662,7 +1794,7 @@ void saveSaveState(void)
         // no SD card, use GBA SRAM
         u8 blk[32];
         int ix;
-        int soffs[20] = { 0x00000, // one slot for 128KB FPRAM games
+        int soffs[20] = { 0x00000, // one slot for 128KB FRAM games
                           0x20000, 0x28000, 0x30000, // three slots for 32KB SRAM games
                           0x38000, 0x38800, 0x39000, 0x39800, 0x3A000, 0x3A800, 0x3B000, 0x3B800, // 8 slots for 16Kb EEPROM games
                           0x3C000, 0x3C200, 0x3C400, 0x3C600, 0x3C800, 0x3CA00, 0x3CC00, 0x3CE00 }; // 8 slots for 4Kb EEPROM games
@@ -1729,6 +1861,485 @@ void saveBrowserFlags(int brwsr, int bopt, int bfill)
         neo2_enable_sd();               // make sure still in proper mode for SD
 }
 
+int getMPInfo(int bcon)
+{
+    int bmax, ix;
+
+    strcpy(gTable[0].name, "4Kb EEPROM on Ext Card");
+    gTable[0].valid = 1;
+    strcpy(gTable[1].name, "16Kb EEPROM on Ext Card");
+    gTable[1].valid = 1;
+    strcpy(gTable[2].name, "32KB SRAM on Ext Card");
+    gTable[2].valid = 1;
+    strcpy(gTable[3].name, "128KB FRAM on Ext Card");
+    gTable[3].valid = 1;
+    bmax = 4;
+    gTable[bmax].valid = 0;
+
+    // add saves on current mempak here
+    ix = get_controllers_present();
+    if (((bcon == 0) && !(ix & CONTROLLER_1_INSERTED)) ||
+        ((bcon == 1) && !(ix & CONTROLLER_2_INSERTED)) ||
+        ((bcon == 2) && !(ix & CONTROLLER_3_INSERTED)) ||
+        ((bcon == 3) && !(ix & CONTROLLER_4_INSERTED)))
+    {
+        gTable[bmax].valid = 0;
+        return bmax;
+    }
+
+    get_accessories_present();
+    if (identify_accessory(bcon) == ACCESSORY_MEMPAK)
+    {
+        if (validate_mempak(bcon))
+        {
+            // not formatted or some other error
+            strcpy(gTable[bmax].name, "Raw MemPak");
+            gTable[bmax].valid = 1;
+            bmax++;
+            strcpy(gTable[bmax].name, "Format MemPak");
+            gTable[bmax].valid = 1;
+            bmax++;
+        }
+        else
+        {
+            strcpy(gTable[bmax].name, "Raw MemPak");
+            gTable[bmax].valid = 1;
+            bmax++;
+            for (ix=0; ix<16; ix++)
+            {
+                entry_structure_t entry;
+
+                get_mempak_entry(bcon, ix, &entry );
+
+                if (entry.valid)
+                {
+                    strcpy(gTable[bmax].name, entry.name);
+                    gTable[bmax].valid = 1;
+                    gTable[bmax].type = entry.blocks;
+                }
+                else
+                {
+                    strcpy(gTable[bmax].name, "Empty Slot");
+                    gTable[bmax].valid = 1;
+                    gTable[bmax].type = get_mempak_free_space(bcon);
+                }
+                bmax++;
+            }
+        }
+        gTable[bmax].valid = 0;
+    }
+    return bmax;
+}
+
+void doSaveMgr(int bfill)
+{
+    display_context_t dcon;
+    u16 previous = 0, buttons = 0;
+    int bselect = 0, bstart = 0, bmax = 0, bcon = 0;
+    FIL lSDFile;
+    UINT ts;
+    char temp[44];
+    XCHAR wname[40];
+
+    char *save_title = "Save Manager";
+    char *save_help1 = "A=Save to SD          B=Load from SD";
+    char *save_help2 = "DPad=Navigate    LT/RT=Change MemPak";
+    char *save_help3 = "Z=                        START=Exit";
+
+    bmax = getMPInfo(bcon);
+
+    while (1)
+    {
+        // get next buffer to draw in
+        dcon = lockVideo(1);
+        graphics_fill_screen(dcon, 0);
+
+        if (browser && (bfill == 4))
+        {
+            drawImage(dcon, browser);
+        }
+        else if ((bfill < 3) && (pattern[bfill] != NULL))
+        {
+            rdp_sync(SYNC_PIPE);
+            rdp_set_default_clipping();
+            rdp_enable_texture_copy();
+            rdp_attach_display(dcon);
+            // Draw pattern
+            rdp_sync(SYNC_PIPE);
+            rdp_load_texture(0, 0, MIRROR_DISABLED, pattern[bfill]);
+            for (int j=0; j<240; j+=pattern[bfill]->height)
+                for (int i=0; i<320; i+=pattern[bfill]->width)
+                    rdp_draw_sprite(0, i, j);
+            rdp_detach_display();
+        }
+
+        // show title
+        graphics_set_color(gTextColors.title, 0);
+        printText(dcon, save_title, 20 - strlen(save_title)/2, 1);
+
+        // print save list (lines 3 to 12)
+        if (bmax)
+        {
+            for (int ix=0; ix<10; ix++)
+            {
+                if ((bstart+ix) == 1024)
+                    break; // end of table
+                if (gTable[bstart+ix].valid)
+                {
+                    strncpy(temp, gTable[bstart+ix].name, 36);
+                    temp[36] = 0;
+                    graphics_set_color((bstart+ix) == bselect ? gTextColors.sel_game : gTextColors.usel_game, 0);
+                    printText(dcon, temp, 20 - strlen(temp)/2, 3 + ix);
+                }
+                else
+                    break; // stop on invalid entry
+            }
+        }
+
+        // show help messages
+        graphics_set_color(gTextColors.help_info, 0);
+        printText(dcon, save_help1, 20 - strlen(save_help1)/2, 25);
+        printText(dcon, save_help2, 20 - strlen(save_help2)/2, 26);
+        printText(dcon, save_help3, 20 - strlen(save_help3)/2, 27);
+
+        // show display
+        unlockVideo(dcon);
+
+        // get buttons
+        previous = buttons;
+        buttons = getButtons(0);
+
+        if (DU_BUTTON(buttons))
+        {
+            // UP pressed, go one entry back
+            bselect--;
+            if (bselect < 0)
+            {
+                bselect = bmax - 1;
+                bstart = bmax - (bmax % 10);
+            }
+            if (bselect < bstart)
+            {
+                bstart -= 10;
+                if (bstart < 0)
+                    bstart = 0;
+            }
+            delay(7);
+        }
+        if (DL_BUTTON(buttons))
+        {
+            // LEFT pressed, go one page back
+            bselect -= 10;
+            if (bselect < 0)
+            {
+                bselect = bmax - 1;
+                bstart = bmax - (bmax % 10);
+            }
+            else
+            {
+                bstart -= 10;
+                if (bstart < 0)
+                    bstart = 0;
+            }
+            delay(15);
+        }
+        if (DD_BUTTON(buttons))
+        {
+            // DOWN pressed, go one entry forward
+            bselect++;
+            if (bselect == bmax)
+            {
+                bselect = bstart = 0;
+            }
+            else if ((bselect - bstart) == 10)
+            {
+                bstart += 10;
+            }
+            delay(7);
+        }
+        if (DR_BUTTON(buttons))
+        {
+            // RIGHT pressed, go one page forward
+            bselect += 10;
+            if (bselect >= bmax)
+            {
+                bselect = bstart = 0;
+            }
+            else
+            {
+                bstart += 10;
+            }
+            delay(15);
+        }
+
+        if (START_BUTTON(buttons ^ previous))
+        {
+            // START changed
+            if (!START_BUTTON(buttons))
+            {
+                // START just released
+                return;                 // exit back to SD browser
+            }
+        }
+
+        if (Z_BUTTON(buttons ^ previous))
+        {
+            // Z changed
+            if (!Z_BUTTON(buttons))
+            {
+                // Z just released
+
+            }
+        }
+
+        if (A_BUTTON(buttons ^ previous) && bmax)
+        {
+            // A changed
+            if (!A_BUTTON(buttons))
+            {
+                // A just released - save ext cart save to SD
+                if (bselect == 0)
+                {
+                    // save 4Kb EEPROM
+                    neo_copyfrom_eeprom(tmpBuf, 0, 512, 0);
+                    neo2_enable_sd();
+                    bmax = getSDInfo(-1);
+                    if (!doOSKeyb("Enter Save Name", "Save-4Kb.eep", temp, 40, bfill))
+                    {
+                        bmax = getMPInfo(bcon);
+                        continue;
+                    }
+                    c2wstrcpy(wname, "/menu/n64/save/");
+                    c2wstrcat(wname, temp);
+                    if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+                    {
+                        progress_screen("Saving 4Kb EEPROM", temp, 0, 100, bfill);
+                        f_write(&lSDFile, tmpBuf, 512, &ts);
+                        progress_screen(NULL, NULL, 100, 100, -1);
+                        f_close(&lSDFile);
+                        delay(30);
+                    }
+                    bmax = getMPInfo(bcon);
+                }
+                else if (bselect == 1)
+                {
+                    // save 16Kb EEPROM
+                    neo_copyfrom_eeprom(tmpBuf, 0, 2048, 0);
+                    neo2_enable_sd();
+                    bmax = getSDInfo(-1);
+                    if (!doOSKeyb("Enter Save Name", "Save-16Kb.eep", temp, 40, bfill))
+                    {
+                        bmax = getMPInfo(bcon);
+                        continue;
+                    }
+                    c2wstrcpy(wname, "/menu/n64/save/");
+                    c2wstrcat(wname, temp);
+                    if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+                    {
+                        progress_screen("Saving 16Kb EEPROM", temp, 0, 100, bfill);
+                        f_write(&lSDFile, tmpBuf, 2048, &ts);
+                        progress_screen(NULL, NULL, 100, 100, -1);
+                        f_close(&lSDFile);
+                        delay(30);
+                    }
+                    bmax = getMPInfo(bcon);
+                }
+                else if (bselect == 2)
+                {
+                    int i;
+                    // save 32KB SRAM
+                    neo_copyfrom_nsram(tmpBuf, 0, 32768, 0);
+                    byte_swap_buf(tmpBuf, 32768);
+                    neo2_enable_sd();
+                    bmax = getSDInfo(-1);
+                    if (!doOSKeyb("Enter Save Name", "Save-32KB.sra", temp, 40, bfill))
+                    {
+                        bmax = getMPInfo(bcon);
+                        continue;
+                    }
+                    c2wstrcpy(wname, "/menu/n64/save/");
+                    c2wstrcat(wname, temp);
+                    if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+                    {
+                        progress_screen("Saving 32KB SRAM", temp, 0, 100, bfill);
+                        for (i=0; i<32768; i+=4096)
+                        {
+                            f_write(&lSDFile, &tmpBuf[i], 4096, &ts);
+                            progress_screen(NULL, NULL, i*100/32768, 100, -1);
+                        }
+                        progress_screen(NULL, NULL, 100, 100, -1);
+                        f_close(&lSDFile);
+                        delay(30);
+                    }
+                    bmax = getMPInfo(bcon);
+                }
+                else if (bselect == 3)
+                {
+                    // save 128KB FRAM
+                    int i;
+                    neo_copyfrom_fram(tmpBuf, 0, 131072, 0); // 0 = EXT, 4 = FRAM
+                    byte_swap_buf(tmpBuf, 131072);
+                    neo2_enable_sd();
+                    bmax = getSDInfo(-1);
+                    if (!doOSKeyb("Enter Save Name", "Save-128KB.fla", temp, 40, bfill))
+                    {
+                        bmax = getMPInfo(bcon);
+                        continue;
+                    }
+                    c2wstrcpy(wname, "/menu/n64/save/");
+                    c2wstrcat(wname, temp);
+                    if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+                    {
+                        progress_screen("Saving 128KB FRAM", temp, 0, 100, bfill);
+                        for (i=0; i<131072; i+=4096)
+                        {
+                            f_write(&lSDFile, &tmpBuf[i], 4096, &ts);
+                            progress_screen(NULL, NULL, i*100/131072, 100, -1);
+                        }
+                        progress_screen(NULL, NULL, 100, 100, -1);
+                        f_close(&lSDFile);
+                        delay(30);
+                    }
+                    bmax = getMPInfo(bcon);
+                }
+                else if (bselect == 4)
+                {
+                    // save 32KB raw mempak
+                    int i;
+                    for (i=0; i<128; i++)
+                        read_mempak_sector(bcon, i, &tmpBuf[i*256]);
+                    if (!doOSKeyb("Enter Save Name", "Save-32KB.mpk", temp, 40, bfill))
+                    {
+                        bmax = getMPInfo(bcon);
+                        continue;
+                    }
+                    c2wstrcpy(wname, "/menu/n64/save/");
+                    c2wstrcat(wname, temp);
+                    if (f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+                    {
+                        progress_screen("Saving 32KB MemPak", temp, 0, 100, bfill);
+                        for (i=0; i<128; i++)
+                        {
+                            f_write(&lSDFile, &tmpBuf[i*256], 256, &ts);
+                            progress_screen(NULL, NULL, i*100/128, 100, -1);
+                        }
+                        progress_screen(NULL, NULL, 100, 100, -1);
+                        f_close(&lSDFile);
+                        delay(30);
+                    }
+                    bmax = getMPInfo(bcon);
+                }
+                else if ((bselect == 5) && (bmax == 6))
+                {
+                    // format mempak
+                    progress_screen("Formatting", "MemPak", 0, 100, bfill);
+                    format_mempak(bcon);
+                    progress_screen(NULL, NULL, 100, 100, -1);
+                    delay(30);
+                    bmax = getMPInfo(bcon);
+                }
+                else
+                {
+                    // save MemPak entry to SD
+
+                }
+            }
+        }
+        if (B_BUTTON(buttons ^ previous) && bmax)
+        {
+            // B changed
+            if (!B_BUTTON(buttons))
+            {
+                // B just released - load ext cart save from SD
+                if (bselect == 0)
+                {
+                    // load 4Kb EEPROM
+                }
+                else if (bselect == 1)
+                {
+                    // load 16Kb EEPROM
+                }
+                else if (bselect == 2)
+                {
+                    // load 32KB SRAM
+                }
+                else if (bselect == 3)
+                {
+                    // load 128KB FRAM
+                }
+                else if (bselect == 4)
+                {
+                    // load 32KB raw mempak
+                    int i, j;
+                    j = RequestFile("Select MemPak file to load", "/menu/n64/save", bfill);
+                    if (j == -1)
+                    {
+                        bmax = getMPInfo(bcon);
+                        continue;
+                    }
+                    c2wstrcpy(wname, path);
+                    if (path[strlen(path)-1] != '/')
+                        c2wstrcat(wname, "/");
+                    c2wstrcat(wname, gTable[j].name);
+                    if (f_open(&lSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+                    {
+                        // handle DexDrive .n64 file
+                        if (lSDFile.fsize > 32768)
+                            f_lseek(&lSDFile, lSDFile.fsize - 32768);
+                        progress_screen("Loading 32KB MemPak", gTable[j].name, 0, 100, bfill);
+                        for (i=0; i<128; i++)
+                        {
+                            f_read(&lSDFile, &tmpBuf[i*256], 256, &ts);
+                            progress_screen(NULL, NULL, i*100/128, 100, -1);
+                        }
+                        progress_screen(NULL, NULL, 100, 100, -1);
+                        f_close(&lSDFile);
+                        for (i=0; i<128; i++)
+                            write_mempak_sector(bcon, i, &tmpBuf[i*256]);
+                    }
+                    bmax = getMPInfo(bcon);
+                }
+                else if ((bselect == 5) && (bmax == 6))
+                {
+                    // format mempak
+                    progress_screen("Formatting", "MemPak", 0, 100, bfill);
+                    format_mempak(bcon);
+                    progress_screen(NULL, NULL, 100, 100, -1);
+                    delay(30);
+                    bmax = getMPInfo(bcon);
+                }
+                else
+                {
+                    // load MemPak entry from SD
+
+                }
+            }
+        }
+
+        if (TL_BUTTON(buttons ^ previous))
+        {
+            // TL changed
+            if (!TL_BUTTON(buttons))
+            {
+                // TL just released
+                bcon = (bcon == 0) ? 3 : bcon-1;
+                bmax = getMPInfo(bcon);
+            }
+        }
+
+        if (TR_BUTTON(buttons ^ previous))
+        {
+            // TR changed
+            if (!TR_BUTTON(buttons))
+            {
+                // TR just released
+                bcon = (bcon == 3) ? 0 : bcon+1;
+                bmax = getMPInfo(bcon);
+            }
+        }
+    }
+}
+
 void setTextColors(int bfill)
 {
     if (bfill < 4)
@@ -1768,6 +2379,7 @@ void init_n64(void)
     // Initialize display
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     rdp_init();
+    rdp_set_texture_flush(0);
     register_VI_handler(vblCallback);
 
     // Initialize controllers
@@ -1825,14 +2437,14 @@ int main(void)
 #endif
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v2.2 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v2.4 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v2.2 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v2.4 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v2.2 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v2.4 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
-    char *menu_help2 = "DPad = Navigate CPad = change option";
+    char *menu_help2 = "DPad=Navigate     CPad=change option";
     char *menu_help3[4] = { "Z=Show Options      START=SD browser",
                             "Z=Show ROM Info     START=SD browser",
                             "Z=Show Options   START=Flash browser",
@@ -1886,7 +2498,7 @@ int main(void)
 
 #ifdef RUN_FROM_U2
     // check for boot rom in menu
-   neo_select_menu();                  // enable menu flash in cart space
+    neo_select_menu();                  // enable menu flash in cart space
 
     if (!memcmp((void *)0xB0000020, "N64 Myth Menu (MF)", 18))
         neo_run_menu();
@@ -2279,7 +2891,7 @@ int main(void)
             // Z changed
             if (!Z_BUTTON(buttons))
             {
-                // START just released
+                // Z just released
                 bopt ^= 1;              // toggle options display
                 saveBrowserFlags(brwsr, bopt, bfill);
             }
@@ -2306,7 +2918,10 @@ int main(void)
                             // load rom info if not already loaded
                             get_sd_info(bselect);
                         }
-                        copySD2Psram(bselect, bfill);
+                        if (gTable[bselect].type == 254)
+                            loadNES2Psram(bselect, bfill);
+                        else
+                            copySD2Psram(bselect, bfill);
                         loadSaveState(bselect, bfill);
                         neo_run_psram(gTable[bselect].options, 1);
                     }
@@ -2348,7 +2963,10 @@ int main(void)
                             // load rom info if not already loaded
                             get_sd_info(bselect);
                         }
-                        copySD2Psram(bselect, bfill);
+                        if (gTable[bselect].type == 254)
+                            loadNES2Psram(bselect, bfill);
+                        else
+                            copySD2Psram(bselect, bfill);
                         loadSaveState(bselect, bfill);
                         neo_run_psram(gTable[bselect].options, 0);
                     }
@@ -2404,9 +3022,19 @@ int main(void)
             if (!TL_BUTTON(buttons))
             {
                 // TL just released
-                bfill = bfill ? bfill-1 : 4;
-                saveBrowserFlags(brwsr, bopt, bfill);
-                setTextColors(bfill);
+                if (brwsr)
+                {
+                    doSaveMgr(bfill);
+                    // browse SD card
+                    neo2_enable_sd();
+                    bmax = getSDInfo(-1);
+                }
+                else
+                {
+                    bfill = bfill ? bfill-1 : 4;
+                    saveBrowserFlags(brwsr, bopt, bfill);
+                    setTextColors(bfill);
+                }
             }
         }
 
