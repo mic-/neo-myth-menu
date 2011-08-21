@@ -106,7 +106,7 @@
 		sw $11,0($9)				/*save sector data*/
 		lbu $8,0($1)				/*dl bus*/
 		addu $13,$13,$23			/*dec long_cnt*/
-		
+
 		bne $13,$0,neo2_recv_sd_multi_psram_no_ds_gsloop
 		addu $14,$14,$16				/*inc psram offs*/
 
@@ -142,7 +142,7 @@
 		lw $21,20($sp)
 		lw $22,24($sp)
 		lw $23,28($sp)
-		
+
 		la $8,PSRAM_ADDR
 		sw $14,0($8)
 
@@ -250,7 +250,7 @@
 		sw $11,0($9)				/*save sector data*/
 		lbu $8,0($1)				/*dl bus*/
 		addu $13,$13,$23			/*dec long_cnt*/
-		
+
 		bne $13,$0,neo2_recv_sd_psram_ds1_gsloop
 		addu $14,$14,$16				/*inc psram offs*/
 
@@ -286,7 +286,7 @@
 		lw $21,20($sp)
 		lw $22,24($sp)
 		lw $23,28($sp)
-		
+
 		la $8,PSRAM_ADDR
 		sw $14,0($8)
 
@@ -315,7 +315,7 @@
 		lui $25,0x0F00
 		lui $10,0x00F0
 		lui $1,0x000F
-		
+
 		oloop:
 		lui $11,0x0001		    /* $11 = timeout = 64 * 1024*/
 
@@ -434,7 +434,7 @@
 		sw $12,0($10)
 
 		addiu $10,$10,4
-		
+
 		bne $4,$8,0b
 		addiu $4,$4,4
 
@@ -445,6 +445,37 @@
 	nop
 
 .end neo_xferto_psram
+
+.global neo_xferfrom_psram
+.ent    neo_xferfrom_psram
+		neo_xferfrom_psram:
+
+	mfc0 $15,$12
+	addi $8,$0,-2 /*la $8,~1*/
+	and $15,$8
+	mtc0 $15,$12
+
+	lui $10,0xB000
+	ori $8,$4,0
+	addu $8,$8,$6
+	addu $10,$10,$5
+
+	0:
+		lw $12,0($10)
+		sw $12,0($4)
+
+		addiu $10,$10,4
+
+		bne $4,$8,0b
+		addiu $4,$4,4
+
+	ori $15,1 /*enable ints back*/
+	mtc0 $15,$12
+
+	jr $ra
+	nop
+
+.end neo_xferfrom_psram
 
 .global neo_memcpy64
 .ent    neo_memcpy64
@@ -457,7 +488,7 @@
 		ld $9,($5)
 		sd $9,($4)
 		addiu $4,$4,8
-		
+
 	bne $5,$8,0b
 	addiu $5,$5,8
 
@@ -476,7 +507,7 @@
 		lw $9,($5)
 		sw $9,($4)
 		addiu $4,$4,4
-		
+
 	bne $5,$8,0b
 	addiu $5,$5,4
 
