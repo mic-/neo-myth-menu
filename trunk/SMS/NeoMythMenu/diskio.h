@@ -31,18 +31,16 @@ typedef enum {
 
 
 extern unsigned short cardType;
-extern extern unsigned long long num_sectors;
+extern uint32_t num_sectors;
 
 /*---------------------------------------*/
 /* Prototypes for disk control functions */
 
 
 BOOL assign_drives (int argc, char *argv[]);
-extern DSTATUS (*disk_initialize) (void);
-extern DRESULT (*disk_read) (BYTE*, DWORD, BYTE);
-extern DRESULT (*disk_readp) (void* dest, DWORD sector, WORD sofs, WORD count);
-//extern DRESULT (*disk_readsect_psram) (WORD prbank, WORD proffs, DWORD sector);
-//extern DRESULT (*disk_read_psram_multi) (WORD prbank, WORD proffs, DWORD sector, WORD count);
+DSTATUS disk_initialize(void);
+DRESULT disk_read(BYTE*, DWORD, BYTE);
+DRESULT disk_readp(void* dest, DWORD sector, WORD sofs, WORD count);
 
 extern void diskio_init();
 

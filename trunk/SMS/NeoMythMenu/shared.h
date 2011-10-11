@@ -84,6 +84,10 @@ extern BYTE idLo,idHi;
 extern WORD neoMode;
 extern BYTE hasZipram;
 extern BYTE vdpSpeed;
+extern BYTE vregs[16];
+extern WORD cardType;
+
+extern BYTE diskioPacket[7];
 
 #define LIST_BUFFER_SIZE (32*2*NUMBER_OF_GAMES_TO_SHOW)
 extern BYTE generic_list_buffer[LIST_BUFFER_SIZE];

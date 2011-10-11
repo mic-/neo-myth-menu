@@ -72,11 +72,16 @@ extern BYTE neo2_check_card();
 extern void neo2_asic_begin();
 extern void neo2_asic_end();
 
+extern void neo2_enable_sram(WORD offset);
+extern void neo2_disable_sram();
+
 extern void neo2_ram_to_sram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len);
 extern void neo2_sram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len);
 extern void neo2_ram_to_psram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len);
 extern void neo2_psram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len);
 
 extern void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu);
+
+extern int neo2_init_sd();
 
 #endif

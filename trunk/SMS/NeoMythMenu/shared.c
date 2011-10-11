@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include "shared.h"
+#include "pff.h"
 
 /*
  * These variables need to be in this exact order, because they are
@@ -13,6 +14,7 @@ WORD neoMode;       // C003
 BYTE vdpSpeed;      // C005
 // Extra "virtual" registers for assembly routines
 BYTE vregs[16];     // C006
+WORD cardType;      // C016
 /******************************************************************/
 
 // The rest can be in any order..
@@ -37,10 +39,17 @@ BYTE diskioPacket[7];
 BYTE diskioResp[17];
 BYTE diskioTemp[8];
 BYTE sd_csd[17];
-WORD cardType;
 uint32_t sec_tags[2];
 uint32_t sec_last;
 uint32_t numSectors;
+
+FATFS *FatFs;
+FATFS sdFatFs;   
+WCHAR LfnBuf[_MAX_LFN + 1];
+unsigned char pfmountbuf[36];
+unsigned char pfMountFmt;
+DWORD pffbcs;
+WORD pffclst;
 
 // For testing purposes
 #ifdef EMULATOR

@@ -6,6 +6,9 @@
 #include "font.h"
 #include "neo2.h"
 #include "neo2_map.h"
+#include "diskio.h"
+#include "pff.h"
+#include "pff_map.h"
 
 #undef TEST_CHEAT_INPUTBOX
 #define MENU_VERSION_STRING "0.17"
@@ -16,6 +19,7 @@
 #define LEFT_MARGIN 3
 #define INSTRUCTIONS_Y 20
 
+extern FATFS sdFatFs; 
 
 /*
  * Use the plain single-colored background instead of the pattered one.
@@ -831,7 +835,7 @@ void main()
     // Print software (menu) and firmware versions
     puts(MENU_VERSION_STRING, 20, 1, PALETTE1);
     puts("/", 24, 1, PALETTE1);
-    puts("1.00", 25, 1, PALETTE1);  // TODO: read version from CPLD
+    puts("1.04", 25, 1, PALETTE1);  // TODO: read version from CPLD
 
     puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
     puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
@@ -891,6 +895,17 @@ void main()
     }
     #endif
 
+    /**** SD card test ****/
+    temp = pfn_neo2_init_sd();
+    Frame2 = 5;
+    temp = pfn_pf_mount(&sdFatFs);
+    Frame1 = 1;
+    dump_hex((WORD)&diskioPacket[0]);
+    print_hex(cardType, 2, 3);
+    print_hex(temp, 4, 3);
+    while (1) ;
+    /**********************/
+    
     //dump_hex(0xB000);
     puts_active_list();
 
