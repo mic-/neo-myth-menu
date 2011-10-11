@@ -837,9 +837,6 @@ _disk_initialize:
 
         call    neo2_enable_sd
 
-    ; DEBUG
-    ;ld hl,#2
-    ;jp 7$        
         ; Invalidate all cache entries (sec_tags[i] = 0xFFFFFFFF)
         ld      a,#0xFF
         ld      b,#DISKIO_CACHE_SIZE*4
@@ -1239,15 +1236,27 @@ disk_readp_calc_sector:
 .globl neo2_post_sd
 
 neo2_enable_sd:
+        ret
+
+neo2_pre_sd:
         ld      a,#0x87
         ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x87
+        ld      a,#0x0F
+        ld      (0xBFC1),a      ; Neo2FlashBankSize = FLASH_SIZE_1M
+        ld      a,#1
+        ld      (0xBFD0),a      ; Neo2Frame0We = 1
         ld      a,#7
         ld      (0xFFFE),a      ; Frame1 = 7
         ret
-        
+    
 neo2_disable_sd:
-neo2_pre_sd:
+    ret
+    
 neo2_post_sd:
+        ld      a,#0x00
+        ld      (0xBFC1),a      ; Neo2FlashBankSize = FLASH_SIZE_16M
+        ld      a,#0
+        ld      (0xBFD0),a      ; Neo2Frame0We = 0
         ret
 
 
