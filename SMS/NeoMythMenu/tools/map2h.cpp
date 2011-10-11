@@ -136,6 +136,10 @@ void check_for_func_decl(string s)
               (find_word(s, "typedef") == string::npos) &&
               (blockDepth == 0) )
     {
+		if (s.find("//") != string::npos) {
+			s = s.substr(0, s.find("//"));
+		}
+
         i = 0;
         // Skip past the "extern" qualifier if one is found
         if (find_word(s, "extern") != string::npos) i = find_word(s, "extern") + 6;
@@ -161,6 +165,7 @@ void check_for_func_decl(string s)
             while (!is_whitespace(s[i])) i--;       // find the beginning of the last word before the (
 
             if (j > i) funcNames.push_back(s.substr(i+1, j-i));
+            //printf("Function name is: %s\n", s.substr(i+1, j-i).data());
 
             while (is_whitespace(s[i])) i--;        // find the end of the second last word before the (
             if (i > p) funcTypes.push_back(s.substr(p, i+1-p));
@@ -239,6 +244,7 @@ int main(int argc, char **argv)
     string shortFn,hFileName,cFileName;
     map<string,string>::iterator it;
     bool saveCode;
+    bool outputConsts = false;
 	int i, j, varOffs, varSize, varsMoved, bytesMoved, ch, currSection;
 
 	if (argc < 3)
@@ -291,6 +297,10 @@ int main(int argc, char **argv)
 	        }
             fclose(hFile);
         }
+        else if (strcmp(argv[i], "--output-consts") == 0)
+        {
+			outputConsts = true;
+		}
     }
 
 	// Now go through the map-file and look up the addresses of the functions
@@ -340,11 +350,24 @@ int main(int argc, char **argv)
 
         for (i = 0; i < funcTypes.size(); i++)
         {
+			//printf("Index %d, Names %d\n", i, funcNames.size());
+			//printf("Looking for %s\n", funcNames[i].data());
             /*if ((it = funcsInMapFile.find(funcNames[i])) != funcsInMapFile.end())
                 fprintf(outHFile, "extern const %s (*pfn_%s)%s;\n", funcTypes[i].data(), funcNames[i].data(), funcArgLists[i].data());*/
             if (funcsInMapFile.find(funcNames[i]) != funcsInMapFile.end())
-	            fprintf(outHFile, "#define pfn_%s ((%s (*)%s)0x%s)\n", funcNames[i].data(), funcTypes[i].data(),
-	                                                                  funcArgLists[i].data(), funcsInMapFile.find(funcNames[i])->second.data());
+            {
+				if (outputConsts)
+				{
+		            fprintf(outHFile, "const %s (*pfn_%s)%s = (%s (*)%s)0x%s;\n", funcTypes[i].data(), funcNames[i].data(),
+		                    funcArgLists[i].data(), funcTypes[i].data(), funcArgLists[i].data(),
+		                    funcsInMapFile.find(funcNames[i])->second.data());
+				}
+				else
+				{
+		            fprintf(outHFile, "#define pfn_%s ((%s (*)%s)0x%s)\n", funcNames[i].data(), funcTypes[i].data(),
+                            funcArgLists[i].data(), funcsInMapFile.find(funcNames[i])->second.data());
+				}
+			}
         }
 
         fclose(outHFile);

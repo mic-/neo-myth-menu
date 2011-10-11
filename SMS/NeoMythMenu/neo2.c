@@ -2,7 +2,9 @@
 #include "sms.h"
 #include "shared.h"
 
+//FATFS sdFatFs;
 
+    
 void neo2_asic_begin()
 {
     Neo2FlashBankSize = FLASH_SIZE_1M;
@@ -135,18 +137,18 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 void neo2_enable_sram(WORD offset)
 {
     neo2_asic_begin();
-    neo2_asic_cmd(0x37, 0x2203); // select game flash
+    neo2_asic_cmd(0x37, 0x2203|(*(WORD*)0xC003)); // select game flash
     neo2_asic_cmd(0xE0, offset); // set sram offset (in 8KB units)
     neo2_asic_end();
-    Frm2Ctrl = 0x88; // enable sram in Frame 2
+    Frm2Ctrl = 0x80 | FRAME2_AS_SRAM; // enable sram in Frame 2
 }
 
 
 void neo2_disable_sram()
 {
-    Frm2Ctrl = 0x00; // disable sram in Frame 2
+    Frm2Ctrl = FRAME2_AS_ROM; // disable sram in Frame 2
     neo2_asic_begin();
-    neo2_asic_cmd(0x37,0x2003); // select menu flash
+    neo2_asic_cmd(0x37,0x2003|(*(WORD*)0xC003)); // select menu flash
     neo2_asic_end();
 }
 
@@ -460,4 +462,31 @@ void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu)
     ((void (*)())0x0000)(); // RESET => jump to address 0
 }
 
+
+int neo2_init_sd()
+{
+    BYTE *ramBuffer;
+    BYTE *romData;
+    int i,j;
+    
+	//cardType = 0
+    *(WORD *)0xC2BC = 0;
+    
+    // neoMode = 0x480
+    *(WORD *)0xC003 = 0x480;
+ 
+    // copy the diskio code to SRAM
+    romData = (BYTE *)0x4000;
+    for (j = 0; j < 0x1000; j+=0x200) 
+    {
+        Frame1 = 4;
+        ramBuffer = (BYTE *)0xC800;
+        for (i = 0; i < 0x200; i++)
+            ramBuffer[i] = *(romData++);
+            
+        neo2_ram_to_sram(0, j, 0xC800, 0x200);
+    }
+
+    return 0;
+}
 
