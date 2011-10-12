@@ -591,12 +591,7 @@ sdInit:
         ld      a,#1
         call    wrMmcCmdBit             ; wrMmcCmdBit(1)
         djnz    1$
-
           
-         ; DEBUG
- ;ld a,#33
- ;ld (_diskioTemp+2),a
-
         ld      bc,#0
         ld      de,#0
         ld      a,#GO_IDLE_STATE
@@ -604,10 +599,6 @@ sdInit:
         
         ld      a,#0xFF
         call    wrMmcCmdByte
-
-         ; DEBUG
- ;ld a,#35
- ;ld (_diskioTemp+2),a
 
         ; Check if the card can operate on the given voltage (2.7-3.6 V)
         ld      bc,#0x01AA
@@ -621,7 +612,7 @@ sdInit:
         ld      c,#1
         call    recvMmcCmdResp
   ;ld (_diskioTemp+3),a
-             jp      sdInit_failed
+             ;jp      sdInit_failed
         
         and     a,a
         jr      z,2$
@@ -867,16 +858,11 @@ _disk_initialize2:
         and     a,#0x80
         ld      (_cardType+1),a         ; keep funky flag
 
-    
         call    neo2_pre_sd
-
-    ;call neo2_post_sd
-    ;ld hl,#2
-    ;jp 7$
       
         call    sdInit
         and     a,a                      ; if (!sdInit()) cardType = 0xFFFF
-        jr      z,2$
+        jr      nz,2$
         ld      a,#0xFF
         ld      (_cardType+0),a
         ld      (_cardType+1),a
@@ -884,8 +870,8 @@ _disk_initialize2:
         call    neo2_post_sd
 
     ; DEBUG
-    ld hl,#2
-    jp 7$
+    ;ld hl,#2
+    ;jp 7$
         
         ld      a,(_sd_csd+1)
         and     a,#0xC0
@@ -1035,14 +1021,24 @@ _disk_readp2:
         push    ix
         di
         ld      ix,#4                                       
-        add     ix,sp                                       
+        add     ix,sp
+
+ld a,2(ix)
+ld (_diskioTemp+2),a
+ld a,3(ix)
+ld (_diskioTemp+3),a
+ld a,4(ix)
+ld (_diskioTemp+4),a
+ld a,5(ix)
+ld (_diskioTemp+5),a
+        
         ld      l,8(ix)             ; count                                      
         ld      h,9(ix)             ; ...
         ; if ((count & 0x8000) || (count >= 513)) return RES_PARERR
         ld      a,h
         and     a,#0x7F
         ld      h,a
-        and     a,l
+        or      a,l
         jp      z,disk_readp_invalid_count
         push	hl
         ld	    de,#513
@@ -1196,9 +1192,6 @@ disk_readp_fetch_done:
         ld      hl,#_sec_cache
         add     hl,bc
 
-; DEBUG
-;lda _disk_readp_count,s
-;sta.w diskioTemp+6
 	
 disk_readp_copy_data:
         ld      c,8(ix)         ; count
@@ -1229,10 +1222,10 @@ _disk_readp_return:
 
 ; Helper subroutine
 disk_readp_calc_sector:
-        ld      c,2+2(ix)       ; sector
-        ld      b,3+2(ix)       ; ...
-        ld      e,4+2(ix)       ; ...
-        ld      d,5+2(ix)       ; ...
+        ld      c,2(ix)       ; sector
+        ld      b,3(ix)       ; ...
+        ld      e,4(ix)       ; ...
+        ld      d,5(ix)       ; ...
         ld      a,(_cardType)
         and     a,#1
         jp      nz,1$
@@ -1241,7 +1234,7 @@ disk_readp_calc_sector:
         ld      e,b
         ld      b,c
         ld      c,#0
-        sla     c
+        sla     b
         rl      e
         rl      d
 1$:

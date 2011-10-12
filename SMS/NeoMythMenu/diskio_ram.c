@@ -1,5 +1,4 @@
 #include "diskio.h"
-#include "diskio_asm_map.h"
 #include "neo2.h"
 #include "sms.h"
 
