@@ -52,19 +52,30 @@ MYTH_NEO2_RD_DAT4 = 0x6061          ; 0x87,1
 ;**********************************************************************************************
 
 ; External variables
-.globl _vregs
-.globl _diskioPacket
-.globl _diskioResp
-.globl _diskioTemp
-.globl _cardType
-.globl _sd_csd
-.globl _numSectors
-.globl _sec_tags
-.globl _sec_last
+;.globl _vregs
+;.globl _diskioPacket
+;.globl _diskioResp
+;.globl _diskioTemp
+;.globl _cardType
+;.globl _sd_csd
+;.globl _numSectors
+;.globl _sec_tags
+;.globl _sec_last
 
+_vregs = 0xC006
+_cardType = 0xC016
+_diskioPacket   = 0xC27D                
+_diskioResp  = 0xC284                   
+_diskioTemp = 0xC295                  
+_sd_csd   = 0xC29D                       
+_sec_tags  = 0xC2AE                      
+_sec_last   = 0xC2B6                      
+_numSectors = 0xC2BA  
+     
+               
 ; Exported functions
-.globl _disk_initialize
-.globl _disk_readp
+.globl _disk_initialize2
+.globl _disk_readp2
 
 ;**********************************************************************************************
 
@@ -143,12 +154,12 @@ wrMmcCmdByte:
 ;
 ;   A = byte
 wrMmcDatByte:
-        ld  b,#8
+        ld      b,#8
 1$:
-        rlc a
-        ld  c,a
+        rlc     a
+        ld      c,a
         call    wrMmcDatBit         ; write  (byte >> (7-i)) & 1
-        ld  a,c
+        ld      a,c
         djnz    1$
         ret
 
@@ -158,12 +169,13 @@ wrMmcDatByte:
 ; unsigned int rdMmcCmdBit()
 ;
 rdMmcCmdBit:
-        ld  a,(MYTH_NEO2_RD_CMD1)
-        srl a
-        srl a
-        srl a
-        srl a
-        and a,#1
+        ld      a,(MYTH_NEO2_RD_CMD1) 
+;ld (_diskioTemp+5),a   
+        srl     a
+        srl     a
+        srl     a
+        srl     a
+        and     a,#1
         ret
 
 
@@ -582,8 +594,8 @@ sdInit:
 
           
          ; DEBUG
- ld a,#33
- ld (_diskioTemp+2),a
+ ;ld a,#33
+ ;ld (_diskioTemp+2),a
 
         ld      bc,#0
         ld      de,#0
@@ -594,8 +606,8 @@ sdInit:
         call    wrMmcCmdByte
 
          ; DEBUG
- ld a,#35
- ld (_diskioTemp+2),a
+ ;ld a,#35
+ ;ld (_diskioTemp+2),a
 
         ; Check if the card can operate on the given voltage (2.7-3.6 V)
         ld      bc,#0x01AA
@@ -608,8 +620,8 @@ sdInit:
         ld      b,#R7_LEN
         ld      c,#1
         call    recvMmcCmdResp
-  ld (_diskioTemp+3),a
-       ;      jp      sdInit_failed
+  ;ld (_diskioTemp+3),a
+             jp      sdInit_failed
         
         and     a,a
         jr      z,2$
@@ -825,15 +837,15 @@ sdInit_failed:
 
 
 ; DSTATUS disk_initialize (void)
-_disk_initialize:
+_disk_initialize2:
         push    af
         push    bc
         push    de
         push    ix
 
  ; DEBUG
- ld a,#31
- ld (_diskioTemp+2),a
+ ;ld a,#31
+ ;ld (_diskioTemp+2),a
 
         call    neo2_enable_sd
 
@@ -855,12 +867,14 @@ _disk_initialize:
         and     a,#0x80
         ld      (_cardType+1),a         ; keep funky flag
 
+    
         call    neo2_pre_sd
 
+    ;call neo2_post_sd
+    ;ld hl,#2
+    ;jp 7$
+      
         call    sdInit
-    ; DEBUG
-    ld hl,#2
-    jp 7$
         and     a,a                      ; if (!sdInit()) cardType = 0xFFFF
         jr      z,2$
         ld      a,#0xFF
@@ -869,6 +883,10 @@ _disk_initialize:
 2$:
         call    neo2_post_sd
 
+    ; DEBUG
+    ld hl,#2
+    jp 7$
+        
         ld      a,(_sd_csd+1)
         and     a,#0xC0
         jp      nz,3$
@@ -1008,7 +1026,7 @@ _disk_status:
 
 ;; STUBS ;;
 
-_disk_readp:
+_disk_readp2:
 ;     void* dest,         /* Pointer to the destination object */
 ;     DWORD sector,       /* Sector number (LBA) */
 ;     WORD sofs,          /* Offset in the sector (0..511) */
@@ -1253,6 +1271,8 @@ neo2_disable_sd:
     ret
     
 neo2_post_sd:
+        ld      a,#0x0
+        ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x0
         ld      a,#0x00
         ld      (0xBFC1),a      ; Neo2FlashBankSize = FLASH_SIZE_16M
         ld      a,#0

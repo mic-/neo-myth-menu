@@ -57,6 +57,16 @@ enum
     MENU_STATES = 4,
 };
 
+enum
+{
+    BANK_MAIN = 0,
+    BANK_BG_GFX = 1,
+    BANK_RAM_CODE = 2,
+    //
+    BANK_DISKIO = 4,
+    BANK_PFF = 5,
+};
+
 extern BYTE options_get_state(Option* option);
 extern BYTE options_get_type(Option* option);
 extern void options_set_state(Option* option,BYTE new_state);
