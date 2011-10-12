@@ -2,6 +2,7 @@
 #define __SHARED_H__
 
 #include <z80/types.h>
+#include <stdint.h>
 
 #define NUMBER_OF_GAMES_TO_SHOW 7
 #define MAX_OPTIONS 4
@@ -98,6 +99,9 @@ extern BYTE vregs[16];
 extern WORD cardType;
 
 extern BYTE diskioPacket[7];
+extern BYTE diskioResp[17];
+extern BYTE diskioTemp[8];
+extern uint32_t numSectors;
 
 #define LIST_BUFFER_SIZE (32*2*NUMBER_OF_GAMES_TO_SHOW)
 extern BYTE generic_list_buffer[LIST_BUFFER_SIZE];

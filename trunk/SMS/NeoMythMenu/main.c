@@ -840,7 +840,7 @@ void main()
     // Print software (menu) and firmware versions
     puts(MENU_VERSION_STRING, 20, 1, PALETTE1);
     puts("/", 24, 1, PALETTE1);
-    puts("1.04", 25, 1, PALETTE1);  // TODO: read version from CPLD
+    puts("1.05", 25, 1, PALETTE1);  // TODO: read version from CPLD
 
     puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
     puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
@@ -905,6 +905,8 @@ void main()
     Frame2 = BANK_PFF;
     temp = pfn_pf_mount(&sdFatFs);
     Frame1 = BANK_BG_GFX;
+    diskioTemp[6] = numSectors & 0xFF;
+    diskioTemp[7] = numSectors >> 8;
     dump_hex((WORD)&diskioPacket[0]);
     print_hex(cardType, 2, 3);
     print_hex(temp, 4, 3);
