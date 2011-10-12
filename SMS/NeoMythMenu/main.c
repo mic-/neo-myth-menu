@@ -133,6 +133,10 @@ void setup_vdp()
     enable_ints();
 }
 
+void waste_time()
+{
+   *(BYTE*)0xC000 = *(BYTE*)0xC000;
+}
 /*
  * Prints the value val in hexadecimal form at position x,y
  */
@@ -147,8 +151,8 @@ void print_hex(BYTE val, BYTE x, BYTE y)
     lo += 16; hi += 16;
     if (lo > 25) lo += 7;
     if (hi > 25) hi += 7;
-    VdpData = hi; VdpData = 0;
-    VdpData = lo; VdpData = 0;
+    VdpData = hi; waste_time(); VdpData = 0; waste_time();
+    VdpData = lo; waste_time(); VdpData = 0; waste_time();
 }
 
 
@@ -171,8 +175,8 @@ void dump_hex(WORD addr)
             c += 16; d += 16;
             if (c > 25) c += 7;
             if (d > 25) d += 7;
-            VdpData = d; VdpData = 0;
-            VdpData = c; VdpData = 0;
+            VdpData = d; waste_time(); VdpData = 0; waste_time();
+            VdpData = c; waste_time(); VdpData = 0; waste_time();
         }
     }
 }
@@ -793,8 +797,9 @@ void main()
     neoMode = 0;
 
     // Copy neo2 code from ROM to RAM
-    Frame1 = 2;
-    memcpy_asm(0xD000, 0x4000, 0x700);
+    Frame1 = BANK_RAM_CODE;
+    //memcpy_asm(0xD000, 0x4000, 0x700);
+    memcpy_asm(0xC800, 0x4000, 0xE00);
 
     temp = pfn_neo2_check_card();
 
@@ -805,8 +810,8 @@ void main()
     type[0] = 'C' - flash_mem_type;
     type[1] = 0;
 
-    Frame1 = 1;
-    Frame2 = 2;
+    Frame1 = BANK_BG_GFX;
+    Frame2 = BANK_RAM_CODE;
 
     games.count = count_games_on_gbac();
     games.firstShown = games.highlighted = 0;
@@ -897,9 +902,9 @@ void main()
 
     /**** SD card test ****/
     temp = pfn_neo2_init_sd();
-    Frame2 = 5;
+    Frame2 = BANK_PFF;
     temp = pfn_pf_mount(&sdFatFs);
-    Frame1 = 1;
+    Frame1 = BANK_BG_GFX;
     dump_hex((WORD)&diskioPacket[0]);
     print_hex(cardType, 2, 3);
     print_hex(temp, 4, 3);

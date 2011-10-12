@@ -12,7 +12,7 @@ CFLAGS = -mz80 --data-loc 0xC001
 BANK0OBJS = vdp_asm.rel vdp.rel util.rel pad.rel font.rel crt0.rel
 SHARED = shared.rel
 
-all: tools/map2h tools/bin16k tools/hex2bin tools/smshdr $(BANK0OBJS) diskio_ram.rel $(SHARED) ramcode.bin sramcode.bin pffromcode.bin bank0.bin bank1.bin menu.sms NEOSEGA4.BIN
+all: tools/map2h tools/bin16k tools/hex2bin tools/smshdr $(BANK0OBJS) diskio_ram.rel $(SHARED) ramcode.bin pffromcode.bin bank0.bin bank1.bin menu.sms NEOSEGA4.BIN
 
 
 tools/map2h:
@@ -26,19 +26,12 @@ tools/hex2bin:
 
 tools/smshdr:
 	gcc tools/smshdr.c -o tools/smshdr
-
-sramcode.bin:
-	$(AS) -o diskio_asm.s
-	$(CC) $(CFLAGS) --no-std-crt0 --code-loc 0x8000 diskio_asm.rel $(SHARED)
-	$(HEX2BIN) diskio_asm.ihx
-	$(PADTRIM) diskio_asm.bin sramcode.bin
-	$(MAP2H) diskio_asm.map diskio.h
-	$(RM) diskio_asm.bin diskio_asm.ihx *.noi *.lnk *.rst
-    
+  
 ramcode.bin:
 	$(AS) -o vgm_player.s
+	$(AS) -o diskio_asm.s
 	$(CC) $(CFLAGS) -c testvgm.c
-	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0xD000 neo2.c diskio_ram.rel vgm_player.rel
+	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0xC800 neo2.c diskio_ram.rel diskio_asm.rel
 	$(HEX2BIN) neo2.ihx
 	$(PADTRIM) neo2.bin ramcode.bin
 	$(MAP2H) neo2.map neo2.h vgm_player.h diskio.h
@@ -64,9 +57,8 @@ bank1.bin:
 	$(RM) bank1.bin bank1.ihx *.noi *.lnk *.rst
 
 menu.sms:
-	cat bank0.bin bank_1.bin ramcode.bin bank0.bin sramcode.bin pffromcode.bin sramcode.bin sramcode.bin > menu.sms
+	cat bank0.bin bank_1.bin ramcode.bin bank0.bin bank0.bin pffromcode.bin bank0.bin bank0.bin > menu.sms
 	$(SMSHDR) menu.sms
-#	$(RM) bank0.bin bank_1.bin main.bin ramcode.bin sramcode.bin main.ihx *.noi *.lnk *.rst *.sym *.rel
 	$(RM) main.ihx *.noi *.lnk *.rst *.sym *.rel
 
 NEOSEGA4.BIN:
