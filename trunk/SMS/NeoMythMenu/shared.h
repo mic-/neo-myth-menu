@@ -9,6 +9,12 @@
 
 #define MENU_NAMETABLE 0x3000 //0x1800
 
+#define GAME_MODE_NORMAL_ROM 4
+#define GAME_MODE_SPC 32
+#define GAME_MODE_VGM 33
+#define GAME_MODE_PACKED_VGM 34
+#define GAME_MODE_ZIPPED_ROM 35
+#define GAME_MODE_VGZ 36
 
 typedef struct
 {
@@ -25,6 +31,15 @@ typedef struct
     char cond1_bhv[6];
     BYTE user_data[4];
 }Option;
+
+typedef struct
+{
+    char sfn[13];
+    char lfn[32];
+    uint32_t fsize;
+    BYTE fattrib;
+    BYTE ftype;
+} FileInfoEntry;
 
 /*
     Option types
@@ -58,6 +73,9 @@ enum
     MENU_STATES = 4,
 };
 
+/*
+ * Code/data banks
+ */
 enum
 {
     BANK_MAIN = 0,
@@ -66,6 +84,21 @@ enum
     //
     BANK_DISKIO = 4,
     BANK_PFF = 5,
+};
+
+/*
+ * SD card operations (for error handling)
+ */
+enum
+{
+	SD_OP_MOUNT,
+	SD_OP_OPEN_FILE,
+	SD_OP_READ_FILE,
+	SD_OP_WRITE_FILE,
+	SD_OP_SEEK,
+	SD_OP_OPEN_DIR,
+	SD_OP_READ_DIR,
+	SD_OP_UNKNOWN
 };
 
 extern BYTE options_get_state(Option* option);

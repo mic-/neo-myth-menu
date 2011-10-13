@@ -9,6 +9,7 @@
 #include "diskio.h"
 #include "pff.h"
 #include "pff_map.h"
+#include "sd_utils.h"
 
 #undef TEST_CHEAT_INPUTBOX
 #define MENU_VERSION_STRING "0.17"
@@ -901,9 +902,9 @@ void main()
     #endif
 
     /**** SD card test ****/
-    temp = pfn_neo2_init_sd();
+    //temp = pfn_neo2_init_sd();
     Frame2 = BANK_PFF;
-    temp = pfn_pf_mount(&sdFatFs);
+    temp = init_sd();
     Frame1 = BANK_BG_GFX;
     diskioTemp[6] = numSectors & 0xFF;
     diskioTemp[7] = numSectors >> 8;

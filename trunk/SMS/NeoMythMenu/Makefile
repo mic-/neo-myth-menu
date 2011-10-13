@@ -12,7 +12,7 @@ CFLAGS = -mz80 --data-loc 0xC001
 BANK0OBJS = vdp_asm.rel vdp.rel util.rel pad.rel font.rel crt0.rel
 SHARED = shared.rel
 
-all: tools/map2h tools/bin16k tools/hex2bin tools/smshdr $(BANK0OBJS) diskio_ram.rel $(SHARED) ramcode.bin pffromcode.bin bank0.bin bank1.bin menu.sms NEOSEGA4.BIN
+all: tools/map2h tools/bin16k tools/hex2bin tools/smshdr diskio_ram.rel ramcode.bin $(SHARED) pffromcode.bin $(BANK0OBJS) bank0.bin bank1.bin menu.sms NEOSEGA4.BIN
 
 
 tools/map2h:
@@ -45,7 +45,8 @@ pffromcode.bin:
 	$(RM) pff.bin pff.ihx *.noi *.lnk *.rst
     
 bank0.bin:
-	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3000 --no-std-crt0 --no-peep main.c $(BANK0OBJS) $(SHARED)
+	$(CC) $(CFLAGS) --no-peep -c sd_utils.c
+	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3000 --no-std-crt0 --no-peep main.c $(BANK0OBJS) sd_utils.rel $(SHARED)
 	$(HEX2BIN) main.ihx
 	$(PADTRIM) main.bin bank0.bin
 	$(MAP2H) main.map vdp.h pad.h util.h
