@@ -2,6 +2,9 @@
 #include "sms.h"
 #include "shared.h"
 
+// Since we're not linking this code against shared.rel
+#define neoMode_ (*(WORD *)0xC003)
+
     
 void neo2_asic_begin()
 {
@@ -135,7 +138,7 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 void neo2_enable_sram(WORD offset)
 {
     neo2_asic_begin();
-    neo2_asic_cmd(0x37, 0x2683); //0x2203|(*(WORD*)0xC003)); // select game flash
+    neo2_asic_cmd(0x37, 0x2203|neoMode_); // select game flash
     neo2_asic_cmd(0xE0, offset); // set sram offset (in 8KB units)
     neo2_asic_end();
     Frm2Ctrl = 0x80 | FRAME2_AS_SRAM; // enable sram in Frame 2
@@ -146,7 +149,7 @@ void neo2_disable_sram()
 {
     Frm2Ctrl = FRAME2_AS_ROM; // disable sram in Frame 2
     neo2_asic_begin();
-    neo2_asic_cmd(0x37,0x2483); //0x2003|(*(WORD*)0xC003)); // select menu flash
+    neo2_asic_cmd(0x37, 0x2003|neoMode_); // select menu flash
     neo2_asic_end();
 }
 
@@ -155,7 +158,7 @@ void neo2_enable_psram()
 {
     neo2_asic_begin();
     neo2_asic_cmd(0xE0,0x1500); // set flash and psram write enable
-    neo2_asic_cmd(0x37,0x2203); // select game flash
+    neo2_asic_cmd(0x37,0x2203|neoMode_); // select game flash
     neo2_asic_cmd(0xDA,0xAF44); // select psram (works for both Neo2-SD and Pro)
     neo2_asic_end();
     Neo2Frame1We = 0x01;
@@ -168,7 +171,7 @@ void neo2_disable_psram()
     Neo2Frame1We = 0x00;
     neo2_asic_begin();
     neo2_asic_cmd(0xE2,0xD200); // set flash & psram write disable
-    neo2_asic_cmd(0x37,0x2003); // select menu flash
+    neo2_asic_cmd(0x37,0x2003|neoMode_); // select menu flash
     neo2_asic_cmd(0xDA,0x0044); // deselect psram
     neo2_asic_end();
 }
@@ -460,19 +463,4 @@ void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu)
     ((void (*)())0x0000)(); // RESET => jump to address 0
 }
 
-
-int neo2_init_sd()
-{
-    BYTE *ramBuffer;
-    BYTE *romData;
-    int i,j;
-    
-	//cardType = 0
-    *(WORD *)0xC2BC = 0;
-    
-    // neoMode = 0x480
-    *(WORD *)0xC003 = 0x480;
-
-    return 0;
-}
 
