@@ -261,7 +261,10 @@ void puts_active_list()
     const BYTE* p;
     BYTE row, col, show;
     WORD offs;
-
+    DWORD praddr;
+    uint16_t prbank, proffs;
+    FileInfoEntry *fi;
+    
     vdp_wait_vblank();
     puts("                          ", 3, 7, PALETTE1);
 
@@ -309,6 +312,44 @@ void puts_active_list()
 
         present_list_surface();
     }
+    else if(MENU_STATE_GAME_SD == menu_state)
+    {
+        clear_list_surface();
+        row = 0;
+        show = (games.count < NUMBER_OF_GAMES_TO_SHOW) ? games.count : NUMBER_OF_GAMES_TO_SHOW;
+
+ 		praddr = games.firstShown;
+		praddr <<= 6;
+		proffs = praddr & 0x3FFF;
+		prbank = praddr >> 14;
+		prbank += 0; //0x20;
+        fi = (FileInfoEntry*)0xD600;
+  
+        while (show)
+        {
+            offs = row*32*2;
+            pfn_neo2_psram_to_ram((BYTE *)fi, prbank, proffs, 64);
+            
+            for (col=0; col<22; col++)
+            {
+                if (!fi->sfn[col])
+                    break;
+                temp[offs + col*2 + 2] = fi->sfn[col] - 32;
+                temp[offs + col*2 + 3] = (games.highlighted == (games.firstShown + row)) ? PALETTE0<<1 : PALETTE1<<1;
+            }
+
+            row++;
+            show--;
+            proffs += 64;
+            if (proffs == 0x4000)
+            {
+                prbank++;
+                proffs = 0;
+            }
+        }
+
+        present_list_surface();
+    }    
     else if(MENU_STATE_OPTIONS == menu_state)
     {
         clear_list_surface();
@@ -371,7 +412,9 @@ void puts_active_list()
  */
 void move_to_next_list_item()
 {
-    if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
+    if((MENU_STATE_GAME_GBAC == menu_state) ||
+       (MENU_STATE_MEDIA_PLAYER == menu_state) ||
+       (MENU_STATE_GAME_SD == menu_state))
     {
         if (games.highlighted < (games.count - 1))
             games.highlighted++;
@@ -400,7 +443,9 @@ void move_to_next_list_item()
  */
 void move_to_previous_list_item()
 {
-    if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
+    if((MENU_STATE_GAME_GBAC == menu_state) ||
+       (MENU_STATE_MEDIA_PLAYER == menu_state) ||
+       (MENU_STATE_GAME_SD == menu_state))
     {
         if (games.highlighted > 0)
             games.highlighted--;
@@ -430,7 +475,9 @@ void move_to_next_page()
 {
     BYTE select;
 
-    if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
+    if((MENU_STATE_GAME_GBAC == menu_state) ||
+       (MENU_STATE_MEDIA_PLAYER == menu_state) ||
+       (MENU_STATE_GAME_SD == menu_state))
     {
         select = games.highlighted - games.firstShown;
 
@@ -457,7 +504,9 @@ void move_to_previous_page()
 {
     BYTE select;
 
-    if((MENU_STATE_GAME_GBAC == menu_state) || (MENU_STATE_MEDIA_PLAYER == menu_state))
+    if((MENU_STATE_GAME_GBAC == menu_state) ||
+       (MENU_STATE_MEDIA_PLAYER == menu_state) ||
+       (MENU_STATE_GAME_SD == menu_state))
     {
         select = games.highlighted - games.firstShown;
 
@@ -906,15 +955,14 @@ void main()
     Frame2 = BANK_PFF;
     temp = init_sd();
     Frame1 = BANK_BG_GFX;
-    diskioTemp[6] = numSectors & 0xFF;
+    /*diskioTemp[6] = numSectors & 0xFF;
     diskioTemp[7] = numSectors >> 8;
-    dump_hex((WORD)&diskioPacket[0]);
+    dump_hex((WORD)&diskioPacket[0]);*/
     print_hex(cardType, 2, 3);
     print_hex(temp, 4, 3);
-    while (1) ;
+    print_hex(games.count, 6, 3);
     /**********************/
     
-    //dump_hex(0xB000);
     puts_active_list();
 
     pad = padLast = 0;
