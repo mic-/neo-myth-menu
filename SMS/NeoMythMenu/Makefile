@@ -46,7 +46,7 @@ pffromcode.bin:
     
 bank0.bin:
 	$(CC) $(CFLAGS) --no-peep -c sd_utils.c
-	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3000 --no-std-crt0 --no-peep main.c $(BANK0OBJS) sd_utils.rel $(SHARED)
+	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3000 --no-std-crt0 --no-peep --oldralloc main.c $(BANK0OBJS) sd_utils.rel $(SHARED)
 	$(HEX2BIN) main.ihx
 	$(PADTRIM) main.bin bank0.bin
 	$(MAP2H) main.map vdp.h pad.h util.h

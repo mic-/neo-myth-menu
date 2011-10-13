@@ -13,35 +13,6 @@ extern char sdRootDir[100];
 extern uint16_t sdRootDirLength;
 
 
-int init_sd()
-{
-	int mountResult = 0;
-
-	cardType = 0;
-    neoMode = 0x480;
-	menu_state = MENU_STATE_GAME_SD;
-
-/*#ifdef _USE_LFN
-	sdFileInfo.lfname = sdLfnBuf;
-	sdFileInfo.lfsize = 80;
-#endif*/
-
-    mountResult = pfn_pf_mount(&sdFatFs);
-    if (mountResult)
-    {
-    	cardType = 0x8000;
-        mountResult = pfn_pf_mount(&sdFatFs);
-        if (mountResult)
-     	{
-			menu_state = MENU_STATE_GAME_GBAC;
-            neoMode = 0;
-        }
-    }
-
-    return mountResult;
-}
-
-
 char toupper(char c)
 {
 	if ((c >= 'a') && (c <= 'z'))
@@ -122,7 +93,7 @@ uint16_t count_games_on_sd_card()
 	}
 
     // Start writing the file info table at offset 0x200000 in PSRAM
-    prbank = 0x20;
+    prbank = 0; //0x20;
     proffs = 0x0000;
 
     buf = (FileInfoEntry*)0xD600;
@@ -172,7 +143,11 @@ uint16_t count_games_on_sd_card()
                 pfn_neo2_ram_to_psram(prbank, proffs, (BYTE *)buf, 64);
 
                 proffs += 64;
-                if (proffs == 0) prbank++;
+                if (proffs == 0x4000)
+                {
+                    prbank++;
+                    proffs = 0;
+                }
 			} else
 			{
 				break;
@@ -250,4 +225,40 @@ void change_directory(char *path)
 	{
         // ToDo: Display error?
 	}
+}
+
+
+int init_sd()
+{
+	int mountResult = 0;
+
+	cardType = 0;
+    neoMode = 0x480;
+	menu_state = MENU_STATE_GAME_SD;
+
+/*#ifdef _USE_LFN
+	sdFileInfo.lfname = sdLfnBuf;
+	sdFileInfo.lfsize = 80;
+#endif*/
+
+    lastSdOperation = SD_OP_MOUNT;
+
+    mountResult = pfn_pf_mount(&sdFatFs);
+    if (mountResult)
+    {
+    	cardType = 0x8000;
+        mountResult = pfn_pf_mount(&sdFatFs);
+        if (mountResult)
+     	{
+			menu_state = MENU_STATE_GAME_GBAC;
+            neoMode = 0;
+        }
+    }
+
+    if (mountResult == FR_OK)
+    {
+        change_directory("/");
+    }
+    
+    return mountResult;
 }
