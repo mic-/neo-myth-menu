@@ -51,6 +51,15 @@ unsigned char pfMountFmt;
 DWORD pffbcs;
 WORD pffclst;
 
+DIR sdDir;
+FILINFO sdFileInfo;
+int lastSdError, lastSdOperation;
+/*#ifdef _USE_LFN
+char sdLfnBuf[80];
+#endif*/
+char sdRootDir[100];
+uint16_t sdRootDirLength;
+
 // For testing purposes
 #ifdef EMULATOR
 const char dummyGameList[] =
