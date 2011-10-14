@@ -48,7 +48,7 @@ typedef WORD WCHAR;
 /* To enable pf_opendir and pf_readdir function, set _USE_DIR to 1. */
 
 
-#define _USE_LSEEK  0
+#define _USE_LSEEK  1
 /* To enable pf_lseek function, set _USE_LSEEK to 1. */
 
 

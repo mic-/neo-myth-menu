@@ -7,7 +7,7 @@
 #include "vdp.h"
 
 extern FATFS sdFatFs;   
-extern DIR sdDir;
+extern DIR sdDir,cdDir;
 extern FILINFO sdFileInfo;
 extern int lastSdError, lastSdOperation;
 extern char sdRootDir[100];
@@ -15,6 +15,7 @@ extern uint16_t sdRootDirLength;
 extern unsigned char pfmountbuf[36];
 extern WCHAR LfnBuf[_MAX_LFN + 1];
 extern void cls();
+extern void print_hex(BYTE val, BYTE x, BYTE y);
 
 
 char toupper(char c)
@@ -82,14 +83,13 @@ int strcmp(char *a, char *b)
 uint16_t count_games_on_sd_card()
 {
 	uint16_t cnt = 0, i = 0;
-	DIR dir;
     uint16_t prbank, proffs;     // PSRAM bank/offset
     FileInfoEntry *buf;
     //char *fn;
     FRESULT (*p_pf_opendir)(DIR*, const char*) = pfn_pf_opendir;
     FRESULT (*p_pf_readdir)(DIR*, FILINFO*) = pfn_pf_readdir;
     
-   	if (p_pf_opendir(&dir, sdRootDir) != FR_OK)
+   	if (p_pf_opendir(&cdDir, sdRootDir) != FR_OK)
    	{
         // ToDo: Display error?
         return 0;
@@ -103,11 +103,11 @@ uint16_t count_games_on_sd_card()
     
     buf = (FileInfoEntry*)LfnBuf;
 
-	while (cnt != 0xFFFF)
+	while (cnt < 1024)
 	{
-		if (p_pf_readdir(&dir, &sdFileInfo) == FR_OK)
+		if (p_pf_readdir(&cdDir, &sdFileInfo) == FR_OK)
 		{
-			if (dir.sect != 0)
+			if (cdDir.sect != 0)
 			{
 				cnt++;
                 //fn = sdFileInfo.fname;
@@ -173,6 +173,8 @@ void change_directory(char *path)
 	int i,j;
     FRESULT (*p_pf_opendir)(DIR*, const char*) = pfn_pf_opendir;
 
+    Frame2 = BANK_PFF;
+    
 	if (strcmp(path, ".") == 0)
 	{
 		// Do nothing
@@ -213,9 +215,9 @@ void change_directory(char *path)
 	}
     
 	sdRootDirLength = strlen_asm(sdRootDir);
-
+ 
 	lastSdOperation = SD_OP_OPEN_DIR;
-
+  
 	if ((lastSdError = p_pf_opendir(&sdDir, sdRootDir)) == FR_OK)
 	{
 		
@@ -236,7 +238,8 @@ int init_sd()
 	cardType = 0;
     neoMode = 0x480;
 	menu_state = MENU_STATE_GAME_SD;
-
+    Frame2 = BANK_PFF;
+    
 /*#ifdef _USE_LFN
 	sdFileInfo.lfname = sdLfnBuf;
 	sdFileInfo.lfsize = 80;

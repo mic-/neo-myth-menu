@@ -51,7 +51,7 @@ unsigned char pfMountFmt;
 DWORD pffbcs;
 WORD pffclst;
 
-DIR sdDir;
+DIR sdDir,cdDir;
 FILINFO sdFileInfo;
 int lastSdError, lastSdOperation;
 /*#ifdef _USE_LFN
