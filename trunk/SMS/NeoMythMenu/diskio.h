@@ -41,6 +41,7 @@ BOOL assign_drives (int argc, char *argv[]);
 DSTATUS disk_initialize(void);
 DRESULT disk_read(BYTE*, DWORD, BYTE);
 DRESULT disk_readp(void* dest, DWORD sector, WORD sofs, WORD count);
+DRESULT disk_read_sector(void* dest, DWORD sector);
 
 extern void diskio_init();
 

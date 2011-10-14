@@ -59,6 +59,8 @@ char sdLfnBuf[80];
 #endif*/
 char sdRootDir[100];
 uint16_t sdRootDirLength;
+BYTE highlightedIsDir;
+char highlightedFileName[13];
 
 // For testing purposes
 #ifdef EMULATOR

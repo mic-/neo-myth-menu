@@ -807,6 +807,48 @@ FRESULT pf_read (
 }
 
 
+FRESULT pf_read_sector (
+    void* dest     /* Pointer to the destination object */
+)
+{
+    DRESULT dr;
+    CLUST clst;
+    DWORD sect;
+    FATFS *fs = FatFs;
+    DSTATUS (*p_disk_read_sector)(void*, DWORD) = pfn_disk_read_sector;
+
+    if (!fs) return FR_NOT_ENABLED;     /* Check file system */
+    if (!(fs->flag & FA_READ))
+            return FR_INVALID_OBJECT;
+
+     if ((fs->fptr & 511) == 0) {                /* On the sector boundary? */
+        if (((fs->fptr >> 9) & (fs->csize - 1)) == 0) { /* On the cluster boundary? */
+            clst = (fs->fptr == 0) ?            /* On the top of the file? */
+                fs->org_clust : get_fat(fs->curr_clust);
+            if (clst <= 1) {
+                fs->flag = 0; return FR_DISK_ERR;
+            }
+            fs->curr_clust = clst;              /* Update current cluster */
+            fs->csect = 0;                      /* Reset sector offset in the cluster */
+        }
+        sect = clust2sect(fs->curr_clust);      /* Get current sector */
+        if (!sect) {
+            fs->flag = 0; return FR_DISK_ERR;
+        }
+        sect += fs->csect;
+        fs->dsect = sect;
+        fs->csect++;                            /* Next sector address in the cluster */
+    }
+
+    dr = p_disk_read_sector(dest, fs->dsect);
+    if (dr) {
+        fs->flag = 0;
+        return (dr == RES_WRPRT/*STRERR*/) ? FR_STREAM_ERR : FR_DISK_ERR;
+    }
+
+    return FR_OK;
+}
+
 
 //extern DWORD pffbcs;
 //extern WORD pffclst;

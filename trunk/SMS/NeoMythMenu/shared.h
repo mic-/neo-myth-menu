@@ -135,6 +135,8 @@ extern BYTE diskioPacket[7];
 extern BYTE diskioResp[17];
 extern BYTE diskioTemp[8];
 extern uint32_t numSectors;
+extern BYTE highlightedIsDir;
+extern char highlightedFileName[13];
 
 #define LIST_BUFFER_SIZE (32*2*NUMBER_OF_GAMES_TO_SHOW)
 extern BYTE generic_list_buffer[LIST_BUFFER_SIZE];
