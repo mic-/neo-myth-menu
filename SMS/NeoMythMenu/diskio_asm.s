@@ -169,8 +169,7 @@ wrMmcDatByte:
 ; unsigned int rdMmcCmdBit()
 ;
 rdMmcCmdBit:
-        ld      a,(MYTH_NEO2_RD_CMD1) 
-;ld (_diskioTemp+5),a   
+        ld      a,(MYTH_NEO2_RD_CMD1)  
         srl     a
         srl     a
         srl     a
@@ -611,8 +610,6 @@ sdInit:
         ld      b,#R7_LEN
         ld      c,#1
         call    recvMmcCmdResp
-  ;ld (_diskioTemp+3),a
-             ;jp      sdInit_failed
         
         and     a,a
         jr      z,2$
@@ -834,10 +831,6 @@ _disk_initialize2:
         push    de
         push    ix
 
- ; DEBUG
- ;ld a,#31
- ;ld (_diskioTemp+2),a
-
         call    neo2_enable_sd
 
         ; Invalidate all cache entries (sec_tags[i] = 0xFFFFFFFF)
@@ -868,10 +861,6 @@ _disk_initialize2:
         ld      (_cardType+1),a
 2$:
         call    neo2_post_sd
-
-    ; DEBUG
-    ;ld hl,#2
-    ;jp 7$
         
         ld      a,(_sd_csd+1)
         and     a,#0xC0
@@ -1022,15 +1011,6 @@ _disk_readp2:
         di
         ld      ix,#4                                       
         add     ix,sp
-
-ld a,2(ix)
-ld (_diskioTemp+2),a
-ld a,3(ix)
-ld (_diskioTemp+3),a
-ld a,4(ix)
-ld (_diskioTemp+4),a
-ld a,5(ix)
-ld (_diskioTemp+5),a
         
         ld      l,8(ix)             ; count                                      
         ld      h,9(ix)             ; ...

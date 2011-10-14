@@ -254,7 +254,12 @@ void present_list_surface()
     __endasm;
 }
 
-
+void cls()
+{
+    clear_list_surface();
+    present_list_surface();
+}
+    
 void puts_active_list()
 {
     BYTE* temp = generic_list_buffer;
@@ -951,10 +956,10 @@ void main()
     #endif
 
     /**** SD card test ****/
-    //temp = pfn_neo2_init_sd();
     Frame2 = BANK_PFF;
     temp = init_sd();
     Frame1 = BANK_BG_GFX;
+    Frame2 = BANK_RAM_CODE;
     /*diskioTemp[6] = numSectors & 0xFF;
     diskioTemp[7] = numSectors >> 8;
     dump_hex((WORD)&diskioPacket[0]);*/

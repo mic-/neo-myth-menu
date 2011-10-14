@@ -4,6 +4,7 @@
 #include "pff.h"
 #include "neo2_map.h"
 #include "util.h"
+#include "vdp.h"
 
 extern FATFS sdFatFs;   
 extern DIR sdDir;
@@ -11,6 +12,7 @@ extern FILINFO sdFileInfo;
 extern int lastSdError, lastSdOperation;
 extern char sdRootDir[100];
 extern uint16_t sdRootDirLength;
+extern void cls();
 
 
 char toupper(char c)
@@ -76,7 +78,6 @@ int strcmp(char *a, char *b)
 // Return the number of games stored on the SD card
 //
 uint16_t count_games_on_sd_card()
-
 {
 	uint16_t cnt = 0, i = 0;
 	DIR dir;
@@ -96,6 +97,8 @@ uint16_t count_games_on_sd_card()
     prbank = 0; //0x20;
     proffs = 0x0000;
 
+    puts("Getting file info..", 3, 10, PALETTE0);
+    
     buf = (FileInfoEntry*)0xD600;
 
 	while (cnt != 0xFFFF)
@@ -105,13 +108,13 @@ uint16_t count_games_on_sd_card()
 			if (dir.sect != 0)
 			{
 				cnt++;
-                fn = sdFileInfo.fname;
+                //fn = sdFileInfo.fname;
 /*#ifdef _USE_LFN
                 sdFileInfo.lfname[_MAX_LFN - 1] = 0;
                 if (sdFileInfo.lfname[0]) fn = sdFileInfo.lfname;
 #endif*/
-                i = strlen_asm(fn);
-                if (i > 31) i = 31;
+                //i = strlen_asm(fn);
+                //if (i > 31) i = 31;
                 memcpy_asm(buf->sfn, sdFileInfo.fname, 13);
                 //memcpy_asm(buf->lfn, fn, i);
                 buf->lfn[0] = 0; //buf->lfn[i] = 0;
@@ -174,7 +177,8 @@ void change_directory(char *path)
 		return;
 	}
 
-	//hide_games_list();
+    cls();
+    puts("Changing dir..", 3, 9, PALETTE0);
 
 	if (strcmp(path, "..") == 0)
 	{
@@ -212,14 +216,8 @@ void change_directory(char *path)
 
 	if ((lastSdError = p_pf_opendir(&sdDir, sdRootDir)) == FR_OK)
 	{
-		//update_screen();
-
 		games.count = count_games_on_sd_card();
 		games.firstShown = games.highlighted = 0;
-
-		//clear_screen();
-		//switch_to_menu(MID_MAIN_MENU, 0);
-
 	}
 	else
 	{
@@ -243,6 +241,9 @@ int init_sd()
 
     lastSdOperation = SD_OP_MOUNT;
 
+    cls();
+    puts("Mounting SD card..", 3, 9, PALETTE0);
+    
     mountResult = pfn_pf_mount(&sdFatFs);
     if (mountResult)
     {
