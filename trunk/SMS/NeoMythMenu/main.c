@@ -739,14 +739,14 @@ void handle_action_button(BYTE button)
 
     if(button == PAD_SW1)
     {
-        volatile GbacGameData* gameData;
-        volatile BYTE* p;
-        BYTE fm = options_get_state(&options[fm_enabled_option_idx]);
-        BYTE reset = options_get_state(&options[reset_to_menu_option_idx]);
-
         if (MENU_STATE_GAME_GBAC == menu_state)
         {
-            // Copy the game info data to somewhere in RAM
+            volatile GbacGameData* gameData;
+            volatile BYTE* p;
+            BYTE fm = options_get_state(&options[fm_enabled_option_idx]);
+            BYTE reset = options_get_state(&options[reset_to_menu_option_idx]);
+
+        // Copy the game info data to somewhere in RAM
             gameData = (volatile GbacGameData*)0xC800;
             p = (volatile BYTE*)0xB000;
             p += games.highlighted << 5;
@@ -768,6 +768,7 @@ void handle_action_button(BYTE button)
             if (highlightedIsDir)
             {
                 change_directory(highlightedFileName);
+                Frame2 = BANK_RAM_CODE; // reset Frame2, since change_directory modifies it
                 return;
             }
         }
@@ -996,7 +997,6 @@ void main()
     #endif
 
     /**** SD card test ****/
-    Frame2 = BANK_PFF;
     temp = init_sd();
     Frame1 = BANK_BG_GFX;
     Frame2 = BANK_RAM_CODE;

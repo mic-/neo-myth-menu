@@ -20,7 +20,7 @@
 #include "diskio.h"     /* Declarations of low level disk I/O functions */
 #include "neo2_map.h"
 #include <string.h>
-
+#include "sms.h"
 
 /*--------------------------------------------------------------------------
 
@@ -72,6 +72,26 @@ int chk_chr (const char* str, int chr) {
     return *str;
 }
 
+
+void waste_time()
+{
+   *(BYTE*)0xC000 = *(BYTE*)0xC000;
+}
+void pff_debug_print(BYTE val)
+{
+    BYTE lo,hi;
+    WORD vaddr = 0x3000 + (3 << 1) + (4 << 6);
+    VdpCtrl = (vaddr & 0xFF);
+    VdpCtrl = (vaddr >> 8) | 0x40;
+        
+    hi = (val >> 4);
+    lo = val & 0x0F;
+    lo += 16; hi += 16;
+    if (lo > 25) lo += 7;
+    if (hi > 25) hi += 7;
+    VdpData = hi; waste_time(); VdpData = 0; waste_time();
+    VdpData = lo; waste_time(); VdpData = 0; waste_time();
+}
 
 
 /*-----------------------------------------------------------------------*/
@@ -365,8 +385,6 @@ FRESULT dir_read (
         c = dir[DIR_Name];
         if (c == 0) { res = FR_NO_FILE; break; }    /* Reached to end of table */
         a = dir[DIR_Attr] & AM_MASK;
-        //if (c != 0xE5 && c != '.' && !(a & AM_VOL))   /* Is it a valid entry? */
-        //  break;
 
 #if _USE_LFN    /* LFN configuration */
         a = dir[DIR_Attr] & AM_MASK;
@@ -388,7 +406,7 @@ FRESULT dir_read (
             }
         }
 #else       /* Non LFN configuration */
-        if (c != 0xE5 &&  (_FS_RPATH || c != (BYTE)'.') && !(a & AM_VOL)) /* Is it a valid entry? */
+        if (c != 0xE5 &&  (_FS_RPATH || (c != (BYTE)'.')) && !(a & AM_VOL)) /* Is it a valid entry? */
             break;
 #endif
 
@@ -538,9 +556,9 @@ FRESULT follow_path (   /* FR_OK(0): successful, !=0: error code */
         FatFs->buf[0] = 0;
 
     } else {                            /* Follow path */
-        for (;;) {
-            res = create_name(dj, &path);   /* Get a segment */
-            if (res != FR_OK) break;
+        for (;;) {    
+           res = create_name(dj, &path);   /* Get a segment */
+            if (res != FR_OK) break;       
             res = dir_find(dj);             /* Find it */
             if (res != FR_OK) {             /* Could not find the object */
                 if (res == FR_NO_FILE && !*(dj->fn+11))
@@ -946,12 +964,11 @@ FRESULT pf_opendir (
     BYTE sp[12], dir[32];
     FATFS *fs = FatFs;
 
-
     if (!fs) {              /* Check file system */
         res = FR_NOT_ENABLED;
     } else {
         fs->buf = dir;
-        dj->fn = sp;
+        dj->fn = sp;  
         res = follow_path(dj, path);            /* Follow the path to the directory */
         if (res == FR_OK) {                     /* Follow completed */
             if (dir[0]) {                       /* It is not the root dir */
@@ -965,7 +982,7 @@ FRESULT pf_opendir (
                     res = FR_NO_PATH;
                 }
             }
-            if (res == FR_OK) {
+            if (res == FR_OK) {     
                 res = dir_rewind(dj);           /* Rewind dir */
             }
         }
