@@ -12,6 +12,8 @@ extern FILINFO sdFileInfo;
 extern int lastSdError, lastSdOperation;
 extern char sdRootDir[100];
 extern uint16_t sdRootDirLength;
+extern unsigned char pfmountbuf[36];
+extern WCHAR LfnBuf[_MAX_LFN + 1];
 extern void cls();
 
 
@@ -83,7 +85,7 @@ uint16_t count_games_on_sd_card()
 	DIR dir;
     uint16_t prbank, proffs;     // PSRAM bank/offset
     FileInfoEntry *buf;
-    char *fn;
+    //char *fn;
     FRESULT (*p_pf_opendir)(DIR*, const char*) = pfn_pf_opendir;
     FRESULT (*p_pf_readdir)(DIR*, FILINFO*) = pfn_pf_readdir;
     
@@ -94,12 +96,12 @@ uint16_t count_games_on_sd_card()
 	}
 
     // Start writing the file info table at offset 0x200000 in PSRAM
-    prbank = 0; //0x20;
+    prbank = 0x20;
     proffs = 0x0000;
 
     puts("Getting file info..", 3, 10, PALETTE0);
     
-    buf = (FileInfoEntry*)0xD600;
+    buf = (FileInfoEntry*)LfnBuf;
 
 	while (cnt != 0xFFFF)
 	{
@@ -116,7 +118,7 @@ uint16_t count_games_on_sd_card()
                 //i = strlen_asm(fn);
                 //if (i > 31) i = 31;
                 memcpy_asm(buf->sfn, sdFileInfo.fname, 13);
-                //memcpy_asm(buf->lfn, fn, i);
+                 //memcpy_asm(buf->lfn, fn, i);
                 buf->lfn[0] = 0; //buf->lfn[i] = 0;
                 buf->fsize = sdFileInfo.fsize;
                 buf->fattrib = sdFileInfo.fattrib;
@@ -160,7 +162,7 @@ uint16_t count_games_on_sd_card()
 			break;
 		}
 	}
-
+    
 	return cnt;
 }
 
@@ -209,14 +211,15 @@ void change_directory(char *path)
 		strcpy_asm(&sdRootDir[0], path);
 		sdRootDir[strlen_asm(path)] = 0;
 	}
-
+    
 	sdRootDirLength = strlen_asm(sdRootDir);
 
 	lastSdOperation = SD_OP_OPEN_DIR;
 
 	if ((lastSdError = p_pf_opendir(&sdDir, sdRootDir)) == FR_OK)
 	{
-		games.count = count_games_on_sd_card();
+		
+        games.count = count_games_on_sd_card();
 		games.firstShown = games.highlighted = 0;
 	}
 	else

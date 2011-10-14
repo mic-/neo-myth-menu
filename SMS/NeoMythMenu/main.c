@@ -21,6 +21,9 @@
 #define INSTRUCTIONS_Y 20
 
 extern FATFS sdFatFs; 
+extern unsigned char pfmountbuf[36];
+extern WCHAR LfnBuf[_MAX_LFN + 1];
+
 
 /*
  * Use the plain single-colored background instead of the pattered one.
@@ -321,28 +324,53 @@ void puts_active_list()
     {
         clear_list_surface();
         row = 0;
-        show = (games.count < NUMBER_OF_GAMES_TO_SHOW) ? games.count : NUMBER_OF_GAMES_TO_SHOW;
-
+        show = games.count - games.firstShown;
+        show = (show < NUMBER_OF_GAMES_TO_SHOW) ? show : NUMBER_OF_GAMES_TO_SHOW;
+    
  		praddr = games.firstShown;
 		praddr <<= 6;
 		proffs = praddr & 0x3FFF;
 		prbank = praddr >> 14;
-		prbank += 0; //0x20;
-        fi = (FileInfoEntry*)0xD600;
-  
+		prbank += 0x20;
+        fi = (FileInfoEntry*)LfnBuf;
+        highlightedIsDir = 0;
+        
         while (show)
         {
             offs = row*32*2;
             pfn_neo2_psram_to_ram((BYTE *)fi, prbank, proffs, 64);
-            
-            for (col=0; col<22; col++)
+  
+            if (fi->fattrib & AM_DIR)
+			{
+                temp[offs + 2] = '[' - 32;
+                if (games.highlighted == (games.firstShown + row))
+                {
+                    highlightedIsDir = 1;
+                    memcpy_asm(highlightedFileName, fi->sfn, 13);
+                    temp[offs + 3] = PALETTE0<<1;
+                }
+                else
+                {
+                    temp[offs + 3] = PALETTE1<<1;
+                }
+                offs += 2;
+			}  
+            for (col=0; col<13; col++)
             {
                 if (!fi->sfn[col])
                     break;
                 temp[offs + col*2 + 2] = fi->sfn[col] - 32;
                 temp[offs + col*2 + 3] = (games.highlighted == (games.firstShown + row)) ? PALETTE0<<1 : PALETTE1<<1;
             }
-
+            if (fi->fattrib & AM_DIR)
+			{
+                temp[offs + col*2 + 2] = ']' - 32;
+                if (games.highlighted == (games.firstShown + row))
+                    temp[offs + col*2 + 3] = PALETTE0<<1;
+                else
+                    temp[offs + col*2 + 3] = PALETTE1<<1;
+			}  
+ 
             row++;
             show--;
             proffs += 64;
@@ -354,6 +382,7 @@ void puts_active_list()
         }
 
         present_list_surface();
+        print_hex(highlightedIsDir, 10, 3); // DEBUG
     }    
     else if(MENU_STATE_OPTIONS == menu_state)
     {
@@ -715,22 +744,33 @@ void handle_action_button(BYTE button)
         BYTE fm = options_get_state(&options[fm_enabled_option_idx]);
         BYTE reset = options_get_state(&options[reset_to_menu_option_idx]);
 
-        // Copy the game info data to somewhere in RAM
-        gameData = (volatile GbacGameData*)0xC800;
-        p = (volatile BYTE*)0xB000;
-        p += games.highlighted << 5;
+        if (MENU_STATE_GAME_GBAC == menu_state)
+        {
+            // Copy the game info data to somewhere in RAM
+            gameData = (volatile GbacGameData*)0xC800;
+            p = (volatile BYTE*)0xB000;
+            p += games.highlighted << 5;
 
-        gameData->mode = GDF_RUN_FROM_FLASH;
-        gameData->type = flash_mem_type;
-        gameData->size = p[2] >> 4;
-        gameData->bankHi = p[2] & 0x0F;
-        gameData->bankLo = p[3];
-        gameData->sramBank = p[4] >> 4;
-        gameData->sramSize = p[4] & 0x0F;
-        gameData->cheat[0] = p[5];
-        gameData->cheat[1] = p[6];
-        gameData->cheat[2] = p[7];
-        pfn_neo2_run_game_gbac(fm,reset); // never returns
+            gameData->mode = GDF_RUN_FROM_FLASH;
+            gameData->type = flash_mem_type;
+            gameData->size = p[2] >> 4;
+            gameData->bankHi = p[2] & 0x0F;
+            gameData->bankLo = p[3];
+            gameData->sramBank = p[4] >> 4;
+            gameData->sramSize = p[4] & 0x0F;
+            gameData->cheat[0] = p[5];
+            gameData->cheat[1] = p[6];
+            gameData->cheat[2] = p[7];
+            pfn_neo2_run_game_gbac(fm,reset); // never returns
+        } 
+        else if (MENU_STATE_GAME_SD == menu_state)
+        {
+            if (highlightedIsDir)
+            {
+                change_directory(highlightedFileName);
+                return;
+            }
+        }
     }
     else if(button == PAD_SW2)
     {

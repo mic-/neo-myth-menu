@@ -76,6 +76,11 @@ _numSectors = 0xC2BA
 ; Exported functions
 .globl _disk_initialize2
 .globl _disk_readp2
+.globl _disk_read_sector2
+.globl neo2_enable_sd
+.globl neo2_disable_sd
+.globl neo2_pre_sd
+.globl neo2_post_sd
 
 ;**********************************************************************************************
 
@@ -1220,11 +1225,46 @@ disk_readp_calc_sector:
 1$:
         ret
 
+        
+; Reads an entire sector into a destination in RAM
+; No extra buffers are used, and no data is cached
+_disk_read_sector2:
+;     void* dest,         /* Pointer to the destination object */
+;     DWORD sector,       /* Sector number (LBA) */
 
-.globl neo2_enable_sd
-.globl neo2_disable_sd
-.globl neo2_pre_sd
-.globl neo2_post_sd
+        push    ix
+        di
+        ld      ix,#4                                       
+        add     ix,sp
+        
+        ; read sector
+        call    neo2_pre_sd
+        call    disk_readp_calc_sector
+        ld      l,0(ix)
+        ld      h,1(ix)
+        call    sdReadSingleBlock
+        cp      a,#1
+        jp      z,3$
+        ; read failed, retry once
+        call    disk_readp_calc_sector
+        ld      l,0(ix)
+        ld      h,1(ix)
+        call    sdReadSingleBlock
+        cp      a,#1
+        jp      z,3$
+        call    neo2_post_sd
+        pop     ix
+        ld      hl,#RES_ERROR
+        ei
+        ret
+3$:
+        call    neo2_post_sd  
+        ld      hl,#RES_OK
+_disk_read_sector_return:
+        pop     ix
+        ei
+        ret
+        
 
 neo2_enable_sd:
         ret
@@ -1241,7 +1281,7 @@ neo2_pre_sd:
         ret
     
 neo2_disable_sd:
-    ret
+        ret
     
 neo2_post_sd:
         ld      a,#0x0
@@ -1337,138 +1377,6 @@ neo2_recv_sd:
 
         ret
 
-
-; Read to PSRAM
-;
-; 59.625 cycles/byte
-;
-; In:
-;   HL = buf
-neo2_recv_sd_psram:
-        ld      b,#64
-        ld      de,#MYTH_NEO2_RD_DAT4
-        ; Read one sector (512 bytes)
-1$:
-        ld      a,(de)   ; 7
-        add     a,a      ; 4
-        add     a,a      ; 4
-        add     a,a      ; 4
-        add     a,a      ; 4
-        ld      c,a      ; 4
-        ld      a,(de)   ; 7
-        and     #0x0F    ; 7
-        or      a,c      ; 4
-        ld      (hl),a   ; 7
-        inc     hl       ; 6
-
-; 2nd byte
-        ld      a,(de)
-        add     a,a
-        add     a,a
-        add     a,a
-        add     a,a
-        ld      c,a
-        ld      a,(de)
-        and     #0x0F
-        or      a,c
-        ld      (hl),a
-        inc     hl
-; 3rd byte
-        ld      a,(de)
-        add     a,a
-        add     a,a
-        add     a,a
-        add     a,a
-        ld      c,a
-        ld      a,(de)
-        and     #0x0F
-        or      a,c
-        ld      (hl),a
-        inc     hl
-; 4th byte
-        ld      a,(de)
-        add     a,a
-        add     a,a
-        add     a,a
-        add     a,a
-        ld      c,a
-        ld      a,(de)
-        and     #0x0F
-        or      a,c
-        ld      (hl),a
-        inc     hl
-; 5th byte
-        ld      a,(de)
-        add     a,a
-        add     a,a
-        add     a,a
-        add     a,a
-        ld      c,a
-        ld      a,(de)
-        and     #0x0F
-        or      a,c
-        ld      (hl),a
-        inc     hl
-; 6th byte
-        ld      a,(de)
-        add     a,a
-        add     a,a
-        add     a,a
-        add     a,a
-        ld      c,a
-        ld      a,(de)
-        and     #0x0F
-        or      a,c
-        ld      (hl),a
-        inc     hl
-; 7th byte
-        ld      a,(de)
-        add     a,a
-        add     a,a
-        add     a,a
-        add     a,a
-        ld      c,a
-        ld      a,(de)
-        and     #0x0F
-        or      a,c
-        ld      (hl),a
-        inc     hl
-; 8th byte
-        ld      a,(de)
-        add     a,a
-        add     a,a
-        add     a,a
-        add     a,a
-        ld      c,a
-        ld      a,(de)
-        and     #0x0F
-        or      a,c
-        ld      (hl),a
-        inc     hl
-
-        djnz    1$       ; 13
-
-        ; Read 8 CRC bytes (16 nybbles)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-        ld      a,(de)
-
-        ld      a,(de)   ; end bit
-
-        ret
 
 
 _sec_buf = 0xD900  ;: .ds 520

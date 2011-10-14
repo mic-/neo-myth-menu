@@ -157,7 +157,7 @@ void neo2_disable_sram()
 void neo2_enable_psram()
 {
     neo2_asic_begin();
-    neo2_asic_cmd(0xE0,0x1500); // set flash and psram write enable
+    neo2_asic_cmd(0xE2,0x1500); // set flash and psram write enable
     neo2_asic_cmd(0x37,0x2203|neoMode_); // select game flash
     neo2_asic_cmd(0xDA,0xAF44); // select psram (works for both Neo2-SD and Pro)
     neo2_asic_end();
