@@ -265,7 +265,7 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
 		return;
 	}
 
-	if ((GAME_MODE_NORMAL_ROM == fi->ftype) && ((fi->fsize & 0x200) == 0x200))
+	if ((GAME_MODE_NORMAL_ROM == fi->ftype) && ((fi->fsize & 0x3FF) == 0x200))
 	{
 		// strip header
 		pfn_pf_read_sector(0xDA08);
