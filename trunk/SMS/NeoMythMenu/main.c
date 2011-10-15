@@ -165,8 +165,6 @@ void dump_hex(WORD addr)
     BYTE *p = (BYTE*)addr;
     BYTE row,col,c,d;
 
-    vdp_wait_vblank();
-
     row = 7;
     for (; row < 15; row++)
     {
@@ -273,7 +271,6 @@ void puts_active_list()
     uint16_t prbank, proffs;
     FileInfoEntry *fi;
     
-    vdp_wait_vblank();
     puts("                          ", 3, 7, PALETTE1);
 
     if(MENU_STATE_GAME_GBAC == menu_state)
@@ -666,23 +663,19 @@ void sync_state()
 	{
 		case MENU_STATE_GAME_GBAC:
 			games.highlighted = 0;
-			vdp_wait_vblank();
 			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
 			puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
 		break;
 		case MENU_STATE_OPTIONS:
 			options_highlighted = 0;
-			vdp_wait_vblank();
 			puts("[L/R] Change option ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
 			puts("[I] Run [II] SD card", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
 		break;
 		case MENU_STATE_GAME_SD:
-			vdp_wait_vblank();
 			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
 			puts("[I] Run [II] Media  ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
 		break;
 		case MENU_STATE_MEDIA_PLAYER:
-			vdp_wait_vblank();
 			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
 			puts("[I] Play [II] Flash ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
 		break;
@@ -769,6 +762,7 @@ void handle_action_button(BYTE button)
             {
                 change_directory(highlightedFileName);
                 Frame2 = BANK_RAM_CODE; // reset Frame2, since change_directory modifies it
+                puts_active_list();
                 return;
             }
         }
@@ -954,7 +948,6 @@ void main()
     vdpSpeed = vdp_check_speed();
 
     // Print the console model (japanese, us, european)
-    vdp_wait_vblank();
     if (region == JAPANESE)
         puts("/Jap", 25, 2, PALETTE1);
     else if (vdpSpeed == NTSC)
@@ -978,7 +971,6 @@ void main()
         pfn_neo2_ram_to_sram(0x03, 0xC800, test1, 16);
         pfn_neo2_sram_to_ram(test2, 0x03, 0xC800, 16);
         test2[15] = 0;
-        vdp_wait_vblank();
         puts(test2, 9, 17, PALETTE1);
     }
     #endif
@@ -991,7 +983,6 @@ void main()
         pfn_neo2_ram_to_psram(0x12, 0x8800, test1, 16);
         pfn_neo2_psram_to_ram(test2, 0x12, 0x8800, 16);
         test2[15] = 0;
-        vdp_wait_vblank();
         puts(test2, 9, 18, PALETTE1);
     }
     #endif
