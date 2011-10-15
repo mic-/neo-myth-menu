@@ -125,6 +125,7 @@ uint16_t count_games_on_sd_card()
                 buf->fattrib = sdFileInfo.fattrib;
 
                 if ((strstri(".SMS", sdFileInfo.fname) > 0) ||
+                    (strstri(".SG", sdFileInfo.fname) > 0) ||
                     (strstri(".BIN", sdFileInfo.fname) > 0))
                 {
                     buf->ftype = GAME_MODE_NORMAL_ROM;

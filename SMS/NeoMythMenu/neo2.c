@@ -382,16 +382,13 @@ void neo2_debug_dump_hex(WORD addr)
 
 void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu)
 {
-    volatile GbacGameData* gameData = (volatile GbacGameData*)0xC800;
+    volatile GbacGameData* gameData = (volatile GbacGameData*)0xDC00;
     WORD wtemp;
 
     __asm
     di
     __endasm;
 
-    neo2_asic_begin();
-    neo2_asic_cmd(0x37, 0x2203); // enable game flash
-    neo2_asic_end();
     if (gameData->mode == GDF_RUN_FROM_FLASH)
     {
         // run from game flash
@@ -407,14 +404,10 @@ void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu)
     else
     {
         // run from psram
-        if (gameData->type == 0)
-            wtemp = 0xAF44; // 0 = Neo2-SD
-        else if (gameData->type == 1)
-            wtemp = 0x674E; // 1 = Neo2-Pro
-        else
-            wtemp = 0xAF44; // ?? use Neo2-SD setting
+		wtemp = 0xAF44; // select psram (works for both Neo2-SD and Pro)
     }
     neo2_asic_begin();
+    neo2_asic_cmd(0x37, 0x2203); // enable game flash
     neo2_asic_cmd(0xDA, wtemp);
     neo2_asic_end();
 

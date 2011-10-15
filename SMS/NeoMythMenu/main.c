@@ -743,7 +743,7 @@ void handle_action_button(BYTE button)
         if (MENU_STATE_GAME_GBAC == menu_state)
         {
             // Copy the game info data to somewhere in RAM
-            gameData = (volatile GbacGameData*)diskioResp;
+            gameData = (volatile GbacGameData*)0xDC00;
             p = (volatile BYTE*)0xB000;
             p += games.highlighted << 5;
 
@@ -784,13 +784,15 @@ void handle_action_button(BYTE button)
                 read_file_to_psram(fi, 0x00, 0x0000);
                 Frame2 = BANK_RAM_CODE;
                 // Copy the game info data to somewhere in RAM
-                gameData = (volatile GbacGameData*)diskioResp;
+                gameData = (volatile GbacGameData*)0xDC00;
  
                 gameData->mode = GDF_RUN_FROM_PSRAM;
                 gameData->type = flash_mem_type;
                 gameData->size = fi->fsize >> 17;
                 if (fi->fsize & 0x1FFFF)
                     gameData->size <<= 1;
+                else if (!gameData->size)
+					gameData->size = 1;
                 gameData->bankHi = 0;
                 gameData->bankLo = 0;
                 gameData->sramBank = 0;
