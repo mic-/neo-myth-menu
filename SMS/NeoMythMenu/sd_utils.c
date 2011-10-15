@@ -242,8 +242,6 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
     sectorsInFile = fi->fsize >> 9;
     if (fi->fsize & 511) sectorsInFile++;
     
-    sectorsPerUpdate = sectorsInFile >> 3;
-    
 	strcpy_asm(fullPath, sdRootDir);
 	if (sdRootDirLength > 1)
 	{
@@ -267,11 +265,17 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
 		return;
 	}
 
-    vdp_wait_vblank();
-    puts("Reading", 3, 10, PALETTE1);
+	if ((GAME_MODE_NORMAL_ROM == fi->ftype) && ((fi->fsize & 0x200) == 0x200))
+	{
+		// strip header
+		pfn_pf_read_sector(0xDA08);
+		sectorsInFile--;
+	}
 
+    sectorsPerUpdate = sectorsInFile >> 3;
     sectorsToNextUpdate = sectorsPerUpdate;;
     
+    puts("Reading", 3, 10, PALETTE1);
     while (sectorsInFile)
     {
         pfn_pf_read_sector(0xDA08); // Note: hardcoded
@@ -282,17 +286,16 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
         if (--sectorsToNextUpdate == 0)
         {
             sectorsToNextUpdate = sectorsPerUpdate;
-            vdp_wait_vblank();
             puts(".", dotPos++, 10, PALETTE1);
         }
         sectorsInFile--;
     }
     
     // DEBUG
-    sectorsInFile = fi->fsize >> 9;
-    vdp_wait_vblank();
-    print_hex(sectorsInFile>>8, 3, 12);
-    print_hex(sectorsInFile, 5, 12); 
+    //sectorsInFile = fi->fsize >> 9;
+    //vdp_wait_vblank();
+    //print_hex(sectorsInFile>>8, 3, 12);
+    //print_hex(sectorsInFile, 5, 12); 
 }
 
 int init_sd()
