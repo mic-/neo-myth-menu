@@ -1378,8 +1378,7 @@ neo2_recv_sd:
         ret
 
 
-
-_sec_buf = 0xD800  ;: .ds 520
-_sec_cache = 0xDA08 ;: .ds 2*512 + 8
+_sec_cache = 0xD800 ;: .ds 520
+_sec_buf = 0xDA08  ;: .ds 520
 
 

@@ -10,6 +10,7 @@
 #include "pff.h"
 #include "pff_map.h"
 #include "sd_utils.h"
+#include "vgm_player_map.h"
 
 #undef TEST_CHEAT_INPUTBOX
 #define MENU_VERSION_STRING "0.17"
@@ -326,8 +327,8 @@ void puts_active_list()
     
  		praddr = games.firstShown;
 		praddr <<= 6;
-		proffs = praddr & 0x3FFF;
-		prbank = praddr >> 14;
+		proffs = praddr & 0xFFFF;
+		prbank = praddr >> 16;
 		prbank += 0x20;
         fi = (FileInfoEntry*)LfnBuf;
         highlightedIsDir = 0;
@@ -336,14 +337,16 @@ void puts_active_list()
         {
             offs = row*32*2;
             pfn_neo2_psram_to_ram((BYTE *)fi, prbank, proffs, 64);
-  
+
+            if (games.highlighted == (games.firstShown + row))
+                memcpy_asm(highlightedFileName, fi->sfn, 13);
+
             if (fi->fattrib & AM_DIR)
 			{
                 temp[offs + 2] = '[' - 32;
                 if (games.highlighted == (games.firstShown + row))
                 {
                     highlightedIsDir = 1;
-                    memcpy_asm(highlightedFileName, fi->sfn, 13);
                     temp[offs + 3] = PALETTE0<<1;
                 }
                 else
@@ -371,11 +374,8 @@ void puts_active_list()
             row++;
             show--;
             proffs += 64;
-            if (proffs == 0x4000)
-            {
+            if (proffs == 0)
                 prbank++;
-                proffs = 0;
-            }
         }
 
         present_list_surface();
@@ -683,6 +683,10 @@ void sync_state()
 }
 void handle_action_button(BYTE button)
 {
+    FileInfoEntry *fi;
+    DWORD praddr;
+    uint16_t prbank, proffs;
+    
     if (MENU_STATE_OPTIONS == menu_state)
     {
         // in the options state, the controls are
@@ -732,14 +736,14 @@ void handle_action_button(BYTE button)
 
     if(button == PAD_SW1)
     {
+        volatile GbacGameData* gameData;
+        volatile BYTE* p;
+        BYTE fm = options_get_state(&options[fm_enabled_option_idx]);
+        BYTE reset = options_get_state(&options[reset_to_menu_option_idx]);
+
         if (MENU_STATE_GAME_GBAC == menu_state)
         {
-            volatile GbacGameData* gameData;
-            volatile BYTE* p;
-            BYTE fm = options_get_state(&options[fm_enabled_option_idx]);
-            BYTE reset = options_get_state(&options[reset_to_menu_option_idx]);
-
-        // Copy the game info data to somewhere in RAM
+            // Copy the game info data to somewhere in RAM
             gameData = (volatile GbacGameData*)0xC800;
             p = (volatile BYTE*)0xB000;
             p += games.highlighted << 5;
@@ -765,6 +769,30 @@ void handle_action_button(BYTE button)
                 puts_active_list();
                 return;
             }
+            
+            // The highlighted entry is not a directory
+            
+            // Retrieve the file info struct for the highlighted file
+            fi = (FileInfoEntry*)LfnBuf;
+            praddr = games.highlighted;
+            praddr <<= 6;
+            proffs = praddr & 0xFFFF;
+            prbank = praddr >> 16;            
+            pfn_neo2_psram_to_ram((BYTE *)fi, prbank+0x20, proffs, 64);
+            
+            if (GAME_MODE_NORMAL_ROM == fi->ftype)
+            {
+                read_file_to_psram(fi, 0x00, 0x0000);
+                while(1); // DEBUG
+            }
+            else if (GAME_MODE_VGM == fi->ftype)
+            {
+                read_file_to_psram(fi, 0x00, 0x0000);
+                Frame2 = BANK_RAM_CODE;
+                Frame1 = 6;
+                memcpy_asm(0xD600, 0x4000, 0x1F0);
+                pfn_vgm_play();
+            }         
         }
     }
     else if(button == PAD_SW2)
