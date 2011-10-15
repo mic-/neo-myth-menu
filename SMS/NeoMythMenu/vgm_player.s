@@ -58,12 +58,12 @@ _vgm_play:
 	ld	    l,0x1C(ix)
 	ld	    h,0x1D(ix)
 	ld	    bc,#VGMBASE+0x1C
-	add	    hl,bc
     ld      a,l
     or      a,h
     jr      nz,1$
-    ld      hl,#VGMBASE+0x40    ; The loop point is zero, use 0x40
+    ld      bc,#VGMBASE+0x40    ; The loop point is zero, use 0x40
 1$:
+	add	    hl,bc
 	ld	    a,l
 	ld	    (VREGS+0),a
 	ld	    a,h
