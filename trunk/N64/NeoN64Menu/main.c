@@ -2379,7 +2379,7 @@ void init_n64(void)
     // Initialize display
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     rdp_init();
-    rdp_set_texture_flush(0);
+    rdp_set_texture_flush(FLUSH_STRATEGY_NONE);
     register_VI_handler(vblCallback);
 
     // Initialize controllers
