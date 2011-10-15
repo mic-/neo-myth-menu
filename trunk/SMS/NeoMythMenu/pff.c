@@ -864,6 +864,8 @@ FRESULT pf_read_sector (
         return (dr == RES_WRPRT/*STRERR*/) ? FR_STREAM_ERR : FR_DISK_ERR;
     }
 
+    fs->fptr += 512;
+    
     return FR_OK;
 }
 

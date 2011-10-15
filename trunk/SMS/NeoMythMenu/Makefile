@@ -12,7 +12,7 @@ CFLAGS = -mz80 --data-loc 0xC001
 BANK0OBJS = vdp_asm.rel vdp.rel util.rel pad.rel font.rel crt0.rel
 SHARED = shared.rel
 
-all: tools/map2h tools/bin16k tools/hex2bin tools/smshdr diskio_ram.rel ramcode.bin $(SHARED) pffromcode.bin $(BANK0OBJS) bank0.bin bank1.bin menu.sms NEOSEGA4.BIN
+all: tools/map2h tools/bin16k tools/hex2bin tools/smshdr diskio_ram.rel ramcode.bin vgmcode.bin $(SHARED) pffromcode.bin $(BANK0OBJS) bank0.bin bank1.bin menu.sms NEOSEGA4.BIN
 
 
 tools/map2h:
@@ -28,14 +28,21 @@ tools/smshdr:
 	gcc tools/smshdr.c -o tools/smshdr
   
 ramcode.bin:
-	$(AS) -o vgm_player.s
 	$(AS) -o diskio_asm.s
-	$(CC) $(CFLAGS) -c testvgm.c
 	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0xC800 neo2.c diskio_ram.rel diskio_asm.rel
 	$(HEX2BIN) neo2.ihx
 	$(PADTRIM) neo2.bin ramcode.bin
-	$(MAP2H) neo2.map neo2.h vgm_player.h diskio.h
+	$(MAP2H) neo2.map neo2.h diskio.h
+	$(MAP2H) neo2.map --output-asm neo2.h
 	$(RM) neo2.bin neo2.ihx *.noi *.lnk *.rst
+
+vgmcode.bin:
+	$(AS) -o vgm_player.s
+	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0xD600 vgm_player.rel
+	$(HEX2BIN) vgm_player.ihx
+	$(PADTRIM) vgm_player.bin vgmcode.bin
+	$(MAP2H) vgm_player.map vgm_player.h
+	$(RM) vgm_player.bin vgm_player.ihx *.noi *.lnk *.rst
 
 pffromcode.bin:
 	$(CC) $(CFLAGS) --no-std-crt0 --oldralloc --no-peep --code-loc 0x8000 pff.c $(SHARED)
@@ -58,7 +65,7 @@ bank1.bin:
 	$(RM) bank1.bin bank1.ihx *.noi *.lnk *.rst
 
 menu.sms:
-	cat bank0.bin bank_1.bin ramcode.bin bank0.bin bank0.bin pffromcode.bin bank0.bin bank0.bin > menu.sms
+	cat bank0.bin bank_1.bin ramcode.bin bank0.bin bank0.bin pffromcode.bin vgmcode.bin bank0.bin > menu.sms
 	$(SMSHDR) menu.sms
 	$(RM) main.ihx *.noi *.lnk *.rst *.sym *.rel
 
@@ -73,7 +80,7 @@ NEOSEGA4.BIN:
 
 
 clean:
-	$(RM) NEOSEGA4.BIN main_map.h neo2_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
+	$(RM) NEOSEGA4.BIN main_map.h neo2_map.h neo2_map.inc pff_map.h vgm_player_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
 
 distclean:
 	$(RM) tools/map2h tools/bin16k tools/hex2bin tools/smshdr NEOSEGA4.BIN main_map.h neo2_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map

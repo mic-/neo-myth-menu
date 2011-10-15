@@ -99,7 +99,8 @@ uint16_t count_games_on_sd_card()
     prbank = 0x20;
     proffs = 0x0000;
 
-    puts("Getting file info..", 3, 10, PALETTE0);
+    vdp_wait_vblank();
+    puts("Getting file info..", 3, 10, PALETTE1);
     
     buf = (FileInfoEntry*)LfnBuf;
 
@@ -148,11 +149,8 @@ uint16_t count_games_on_sd_card()
                 pfn_neo2_ram_to_psram(prbank, proffs, (BYTE *)buf, 64);
 
                 proffs += 64;
-                if (proffs == 0x4000)
-                {
+                if (proffs == 0)
                     prbank++;
-                    proffs = 0;
-                }
 			} else
 			{
 				break;
@@ -182,7 +180,7 @@ void change_directory(char *path)
 	}
 
     cls();
-    puts("Changing dir..", 3, 9, PALETTE0);
+    puts("Changing dir..", 3, 9, PALETTE1);
 
 	if (strcmp(path, "..") == 0)
 	{
@@ -231,6 +229,71 @@ void change_directory(char *path)
 }
 
 
+void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
+{
+    WORD sectorsPerUpdate, sectorsToNextUpdate;
+    WORD sectorsInFile;
+    BYTE dotPos = 10;
+    char *fullPath = (char *)0xD700;    // Note: hardcoded
+   
+    Frame2 = BANK_PFF;
+   
+    sectorsInFile = fi->fsize >> 9;
+    if (fi->fsize & 511) sectorsInFile++;
+    
+    sectorsPerUpdate = sectorsInFile >> 3;
+    
+	strcpy_asm(fullPath, sdRootDir);
+	if (sdRootDirLength > 1)
+	{
+		strcpy_asm(&fullPath[sdRootDirLength], "/");
+		strcpy_asm(&fullPath[sdRootDirLength+1], highlightedFileName);
+		fullPath[sdRootDirLength+1+strlen_asm(highlightedFileName)] = 0;
+	}
+	else
+	{
+		strcpy_asm(&fullPath[sdRootDirLength], highlightedFileName);
+		fullPath[sdRootDirLength+strlen_asm(highlightedFileName)] = 0;
+	}
+ 
+    cls();
+    puts("Opening ", 3, 9, PALETTE1);
+    puts(highlightedFileName, 11, 9, PALETTE1);
+
+	if ((lastSdError = pfn_pf_open(fullPath)) != FR_OK)
+	{
+		lastSdOperation = SD_OP_OPEN_FILE;
+		return;
+	}
+
+    vdp_wait_vblank();
+    puts("Reading", 3, 10, PALETTE1);
+
+    sectorsToNextUpdate = sectorsPerUpdate;;
+    
+    while (sectorsInFile)
+    {
+        pfn_pf_read_sector(0xDA08); // Note: hardcoded
+        pfn_neo2_ram_to_psram(prbank, proffs, 0xDA08, 512);
+        proffs += 512;
+        if (proffs == 0)
+            prbank++;
+        if (--sectorsToNextUpdate == 0)
+        {
+            sectorsToNextUpdate = sectorsPerUpdate;
+            vdp_wait_vblank();
+            puts(".", dotPos++, 10, PALETTE1);
+        }
+        sectorsInFile--;
+    }
+    
+    // DEBUG
+    sectorsInFile = fi->fsize >> 9;
+    vdp_wait_vblank();
+    print_hex(sectorsInFile>>8, 3, 12);
+    print_hex(sectorsInFile, 5, 12); 
+}
+
 int init_sd()
 {
 	int mountResult = 0;
@@ -248,7 +311,7 @@ int init_sd()
     lastSdOperation = SD_OP_MOUNT;
 
     cls();
-    puts("Mounting SD card..", 3, 9, PALETTE0);
+    puts("Mounting SD card..", 3, 9, PALETTE1);
     
     mountResult = pfn_pf_mount(&sdFatFs);
     if (mountResult)
