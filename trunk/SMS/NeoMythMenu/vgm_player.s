@@ -108,6 +108,7 @@ vgm_play_loop:
     jp      (hl)        ; 4
 	
 vgm_play_return:
+    call    neo2_disable_psram
 	pop	    iy
 	pop	    ix
 	; mute the PSG
@@ -249,15 +250,15 @@ vgm_wait2:
 	
 vgm_wait_pal:
 	in	    a,(0xDC)
-	and	    a,#0x10
-	;jp	    nz,vgm_play_return
+	and	    a,#0x20
+	jp	    z,vgm_play_return   ; return to the menu if button2 is pressed
 	ld	    de,#882
 	jp	    vgm_wait2
 	
 vgm_wait_ntsc:
 	in	    a,(0xDC)
-	and	    a,#0x10
-	;jp	    nz,vgm_play_return
+	and	    a,#0x20
+	jp	    z,vgm_play_return
 	ld	    de,#735
 	jp	    vgm_wait2
 
