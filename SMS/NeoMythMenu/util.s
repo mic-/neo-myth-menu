@@ -41,6 +41,8 @@
         jp      z,puts_asm_output_done  ;;zero
         sub     #0x20       ;;-=' '
         out     (c),a       ;;w
+		push	ix
+		pop		ix
         out     (c),b       ;;attr
         inc     hl          ;;++str
         jp      puts_asm_output ;;busy
@@ -81,6 +83,8 @@
         jp      z,putsn_asm_output_done
         sub     a,#0x20     ;;-=' '
         out     (c),a       ;;w
+		push	ix
+		pop		ix
         out     (c),b       ;;w
         inc     hl          ;;++str
         dec     c           ;;--left
