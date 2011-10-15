@@ -783,7 +783,23 @@ void handle_action_button(BYTE button)
             if (GAME_MODE_NORMAL_ROM == fi->ftype)
             {
                 read_file_to_psram(fi, 0x00, 0x0000);
-                while(1); // DEBUG
+                Frame2 = BANK_RAM_CODE;
+                // Copy the game info data to somewhere in RAM
+                gameData = (volatile GbacGameData*)0xC800;
+ 
+                gameData->mode = GDF_RUN_FROM_PSRAM;
+                gameData->type = flash_mem_type;
+                gameData->size = fi->fsize >> 17;
+                if (fi->fsize & 0x1FFFF)
+                    gameData->size++;
+                gameData->bankHi = 0;
+                gameData->bankLo = 0;
+                gameData->sramBank = 0;
+                gameData->sramSize = 0;
+                gameData->cheat[0] = 0;
+                gameData->cheat[1] = 0;
+                gameData->cheat[2] = 0;
+                pfn_neo2_run_game_gbac(fm, reset); // never returns
             }
             else if (GAME_MODE_VGM == fi->ftype)
             {
