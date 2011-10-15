@@ -379,7 +379,6 @@ void puts_active_list()
         }
 
         present_list_surface();
-        print_hex(highlightedIsDir, 10, 3); // DEBUG
     }    
     else if(MENU_STATE_OPTIONS == menu_state)
     {
@@ -744,7 +743,7 @@ void handle_action_button(BYTE button)
         if (MENU_STATE_GAME_GBAC == menu_state)
         {
             // Copy the game info data to somewhere in RAM
-            gameData = (volatile GbacGameData*)0xC800;
+            gameData = (volatile GbacGameData*)diskioResp;
             p = (volatile BYTE*)0xB000;
             p += games.highlighted << 5;
 
@@ -785,13 +784,13 @@ void handle_action_button(BYTE button)
                 read_file_to_psram(fi, 0x00, 0x0000);
                 Frame2 = BANK_RAM_CODE;
                 // Copy the game info data to somewhere in RAM
-                gameData = (volatile GbacGameData*)0xC800;
+                gameData = (volatile GbacGameData*)diskioResp;
  
                 gameData->mode = GDF_RUN_FROM_PSRAM;
                 gameData->type = flash_mem_type;
                 gameData->size = fi->fsize >> 17;
                 if (fi->fsize & 0x1FFFF)
-                    gameData->size++;
+                    gameData->size <<= 1;
                 gameData->bankHi = 0;
                 gameData->bankLo = 0;
                 gameData->sramBank = 0;
@@ -804,10 +803,16 @@ void handle_action_button(BYTE button)
             else if (GAME_MODE_VGM == fi->ftype)
             {
                 read_file_to_psram(fi, 0x00, 0x0000);
+                Frame1 = BANK_VGM_PLAYER;
                 Frame2 = BANK_RAM_CODE;
-                Frame1 = 6;
-                memcpy_asm(0xD600, 0x4000, 0x1F0);
+                memcpy_asm(0xD600, 0x4000, 0x1F0); // copy the vgm player code to ram
                 pfn_vgm_play();
+                Frame1 = BANK_BG_GFX;
+                Frame2 = BANK_RAM_CODE;
+                // SW2 being pressed is what causes the vgm player
+                // to return. so mark it as pressed
+                padLast |= PAD_SW2;             
+                puts_active_list();
             }         
         }
     }
@@ -1038,9 +1043,9 @@ void main()
     /*diskioTemp[6] = numSectors & 0xFF;
     diskioTemp[7] = numSectors >> 8;
     dump_hex((WORD)&diskioPacket[0]);*/
-    print_hex(cardType, 2, 3);
+    /*print_hex(cardType, 2, 3);
     print_hex(temp, 4, 3);
-    print_hex(games.count, 6, 3);
+    print_hex(games.count, 6, 3);*/
     /**********************/
     
     puts_active_list();

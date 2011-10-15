@@ -84,6 +84,7 @@ enum
     //
     BANK_DISKIO = 4,
     BANK_PFF = 5,
+    BANK_VGM_PLAYER = 6,
 };
 
 /*
