@@ -175,8 +175,8 @@ void neo2_disable_psram()
     neo2_asic_cmd(0xDA,0x0044); // deselect psram
     neo2_asic_end();
 }
-
-
+          
+    
 void neo2_ram_to_sram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
 {
     dsthi, dstlo, src, len; // suppress warning
@@ -348,8 +348,33 @@ void neo2_psram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
     __endasm;
 }
 
+// Returns non-zero if the cart has psram
+BYTE neo2_test_psram()
+{
+    char test[] = "Test1234";
+    char *pRam = (char *)0xDC00;
+    BYTE i;
+    
+    for (i=0; i<8; i++)
+        pRam[i] = test[i];
+    neo2_ram_to_psram(0, 0x0000, pRam, 8);
+    for (i=0; i<8; i++)
+        pRam[i] = 0;
+    neo2_psram_to_ram(pRam, 0, 0x0000, 8);
+    for (i=0; i<8; i++)
+    {
+        if (pRam[i] != test[i])
+        {
+            i = 0;
+            break;
+        }
+    }
+    return i;
+}
+    
+    
 
-void neo2_debug_dump_hex(WORD addr)
+/*void neo2_debug_dump_hex(WORD addr)
 {
     BYTE *p = (BYTE*)addr;
     WORD vaddr = MENU_NAMETABLE;
@@ -377,7 +402,7 @@ void neo2_debug_dump_hex(WORD addr)
         }
         vaddr += 64;
     }
-}
+}*/
 
 
 void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu)
