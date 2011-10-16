@@ -246,6 +246,8 @@ int main(int argc, char **argv)
     bool saveCode;
     bool outputConsts = false;
     bool outputAsm = false;
+    int symbolOffset = 0;
+    bool isSymFile = false;
 	int i, j, varOffs, varSize, varsMoved, bytesMoved, ch, currSection;
 
 	if (argc < 3)
@@ -260,6 +262,9 @@ int main(int argc, char **argv)
         if (shortFn.rfind(".") > 0)
             shortFn = shortFn.substr(0, shortFn.rfind("."));
     }
+    if (strstr(argv[1], ".sym") != NULL)
+        isSymFile = true;
+        
     hFileName = shortFn + "_map.h";
     cFileName = shortFn + "_map.c";
     incFileName = shortFn + "_map.inc";

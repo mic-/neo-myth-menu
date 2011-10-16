@@ -806,11 +806,19 @@ void handle_action_button(BYTE button)
             else if (GAME_MODE_VGM == fi->ftype)
             {
                 read_file_to_psram(fi, 0x00, 0x0000);
+                Frame1 = BANK_VGM_PLAYER;
                 Frame2 = BANK_RAM_CODE;
-                Frame1 = 6;
-                memcpy_asm(0xD600, 0x4000, 0x1F0);
-                pfn_vgm_play();
+                puts("[II] Back           ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+                puts("                    ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);                
+                memcpy_asm(0xD600, 0x4000, 0x1F0); // copy the vgm player code to ram
+                pfn_vgm_play();                     // the player will return when the user presses SW2
+                
+                Frame1 = BANK_BG_GFX;
+                Frame2 = BANK_RAM_CODE;
+                // SW2 being pressed is what causes the vgm player
+                // to return. so mark it as pressed
                 padLast |= PAD_SW2;
+                sync_state();       // print SD browser instructions again
                 puts_active_list();
             }         
         }
