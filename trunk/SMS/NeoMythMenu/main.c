@@ -1023,7 +1023,7 @@ void main()
     if (region == JAPANESE)
         puts("/Jap", 25, 2, PALETTE1);
     else if (vdpSpeed == NTSC)
-        puts("/U.S", 25, 2, PALETTE1);
+        puts("/Usa", 25, 2, PALETTE1);
     else
         puts("/Eur", 25, 2, PALETTE1);
 
