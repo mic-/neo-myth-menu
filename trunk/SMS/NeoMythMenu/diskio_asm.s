@@ -62,13 +62,13 @@ MYTH_NEO2_RD_DAT4 = 0x6061          ; 0x87,1
 ;.globl _sec_tags
 ;.globl _sec_last
 
-_vregs = 0xC006
-_cardType = 0xC016
-_diskioPacket   = 0xC27D                
-_diskioResp  = 0xC284                   
+_vregs      = 0xC006
+_cardType   = 0xC016
+_diskioPacket = 0xC27D                
+_diskioResp = 0xC284                   
 _diskioTemp = 0xC295                  
-_sd_csd   = 0xC29D                       
-_sec_tags  = 0xC2AE                      
+_sd_csd     = 0xC29D                       
+_sec_tags   = 0xC2AE                      
 _sec_last   = 0xC2B6                      
 _numSectors = 0xC2BA  
      

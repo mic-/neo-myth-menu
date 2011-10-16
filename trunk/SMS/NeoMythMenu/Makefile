@@ -9,7 +9,7 @@ SMSHDR = tools/smshdr
 CFLAGS = -mz80 --data-loc 0xC001
 #CFLAGS = -mz80 --data-loc 0xC001 -DEMULATOR
 
-BANK0OBJS = vdp_asm.rel vdp.rel util.rel pad.rel font.rel crt0.rel
+BANK0OBJS = vdp_asm.rel vdp.rel util.rel pad.rel font3.rel crt0.rel
 SHARED = shared.rel
 
 all: tools/map2h tools/bin16k tools/hex2bin tools/smshdr diskio_ram.rel ramcode.bin vgmcode.bin $(SHARED) pffromcode.bin $(BANK0OBJS) bank0.bin bank1.bin menu.sms NEOSEGA4.BIN
@@ -67,7 +67,7 @@ bank1.bin:
 menu.sms:
 	cat bank0.bin bank_1.bin ramcode.bin bank0.bin bank0.bin pffromcode.bin vgmcode.bin bank0.bin > menu.sms
 	$(SMSHDR) menu.sms
-	$(RM) main.ihx *.noi *.lnk *.rst *.sym *.rel
+	$(RM) main.ihx *.noi *.lnk *.rst *.rel *.sym
 
 NEOSEGA4.BIN:
 	cp menu.sms NEOSEGA4.BIN
