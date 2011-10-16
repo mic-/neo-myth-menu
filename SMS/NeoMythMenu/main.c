@@ -13,7 +13,7 @@
 #include "vgm_player_map.h"
 
 #undef TEST_CHEAT_INPUTBOX
-#define MENU_VERSION_STRING "0.17"
+#define MENU_VERSION_STRING "0.20"
 #define KEY_REPEAT_INITIAL_DELAY 15
 #define KEY_REPEAT_DELAY 7
 #define SD_DEFAULT_INFO_FETCH_TIMEOUT 30
@@ -669,11 +669,11 @@ void sync_state()
 		case MENU_STATE_OPTIONS:
 			options_highlighted = 0;
 			puts("[L/R] Change option ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-			puts("[I] Run [II] SD card", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
+			puts("[I] Run [II] Back   ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
 		break;
 		case MENU_STATE_GAME_SD:
 			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-			puts("[I] Run [II] Media  ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
+			puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
 		break;
 		case MENU_STATE_MEDIA_PLAYER:
 			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
@@ -825,8 +825,20 @@ void handle_action_button(BYTE button)
     }
     else if(button == PAD_SW2)
     {
-        ++menu_state;
-
+        //++menu_state;
+        if (MENU_STATE_OPTIONS != menu_state)
+        {
+            menu_state = MENU_STATE_OPTIONS;
+        }
+        else if (neoMode == 0x480)
+        {
+            menu_state = MENU_STATE_GAME_SD;
+        }
+        else
+        {
+            menu_state = MENU_STATE_GAME_GBAC;
+        }
+        
         if(menu_state > MENU_STATES-1)
             menu_state = MENU_STATE_TOP;
 
@@ -948,7 +960,8 @@ void main()
     memcpy_asm(0xC800, 0x4000, 0xE00);
 
     temp = pfn_neo2_check_card();
-
+    hasZipram = pfn_neo2_test_psram();
+    
     Frm2Ctrl = FRAME2_AS_ROM;
 
     Frame1 = 3;
@@ -986,7 +999,7 @@ void main()
     // Print software (menu) and firmware versions
     puts(MENU_VERSION_STRING, 20, 1, PALETTE1);
     puts("/", 24, 1, PALETTE1);
-    puts("1.05", 25, 1, PALETTE1);  // TODO: read version from CPLD
+    puts("1.00", 25, 1, PALETTE1);  // TODO: read version from CPLD
 
     puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
     puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
@@ -1043,11 +1056,14 @@ void main()
     }
     #endif
 
-    /**********************/
-    temp = init_sd();
-    Frame1 = BANK_BG_GFX;
-    Frame2 = BANK_RAM_CODE;
-    /**********************/
+    // No point in trying to mount an SD card if the cart doesn't have
+    // zipram (e.g. normal GBAC or Neo3-SD)
+    if (hasZipram)
+    {
+        temp = init_sd();
+        Frame1 = BANK_BG_GFX;
+        Frame2 = BANK_RAM_CODE;
+    }
     
     puts_active_list();
 

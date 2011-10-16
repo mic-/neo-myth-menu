@@ -76,6 +76,7 @@ extern void neo2_enable_sram(WORD offset);
 extern void neo2_disable_sram();
 extern void neo2_enable_psram();
 extern void neo2_disable_psram();
+extern BYTE neo2_test_psram();
 
 extern void neo2_ram_to_sram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len);
 extern void neo2_sram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len);
