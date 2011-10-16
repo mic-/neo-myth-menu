@@ -1,4 +1,6 @@
 
+#undef __DEBUG_PSRAM__
+
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
@@ -121,12 +123,13 @@ extern void drawImage(display_context_t dcon, sprite_t *sprite);
 extern void disk_io_set_mode(int mode,int dat_swap);
 extern void neo2_enable_sd(void);
 extern void neo2_disable_sd(void);
+extern volatile void neo_sync_bus(void);
 extern DSTATUS MMC_disk_initialize(void);
 
 extern void neo_select_menu(void);
 extern void neo_select_game(void);
 extern void neo_select_psram(void);
-extern void neo_psram_offset(int offset);
+extern void neo_psram_offset(int offs);
 
 extern unsigned int neo_id_card(void);
 extern unsigned int neo_get_cpld(void);
@@ -1136,87 +1139,380 @@ void copyGF2Psram(int bselect, int bfill)
     delay(30);
 }
 
-/* Our new fast copy routine (works with native binaries only)*/
+void sync_sd_stream(FIL* f,XCHAR* s)
+{
+    char tmp[2048];
+
+	neo2_disable_sd();
+	neo2_enable_sd();
+	getSDInfo(-1);
+	memset(f,0,sizeof(FIL));
+
+	if(f_open(f,s,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    {
+        w2cstrcpy(tmp,s);
+        debugText("Couldn't open file: ", 2, 2, 0);
+        debugText(tmp, 22, 2, 180);
+    }
+}
+
+void copyfrom_sd_to_psram(FIL* f,int len,int disk_mode,int swap,int bfill,const char* msg,const char* fn)
+{
+	const int read = 256*1024;
+	int i;
+	UINT ts;
+
+	if(len <= 0)
+		return;
+
+    progress_screen(msg,fn, 0, 100, bfill);
+    disk_io_set_mode(disk_mode,swap);				//Also resets PSRAM pointer
+
+	for(i = 0; i<len; i+=read)
+	{
+		progress_screen(NULL,NULL, 100*i/len, 100,-1);
+		f_read_dummy(f,read,&ts);
+	}
+
+	progress_screen(NULL,NULL,100,100,-1);
+	delay(5);
+}
+
+#ifdef __DEBUG_PSRAM__
+#define MYTH_IO_BASE (0xA8040000)
+#define ROM_BANK  *(vu32*)(MYTH_IO_BASE | 0x0C*2)
+#define ROM_SIZE  *(vu32*)(MYTH_IO_BASE | 0x08*2) 
+
+void test_psram(int m,const char* s)
+{
+	char* p,*p2;
+	int l,k;
+ 
+	l = strlen(s);
+	p2 = (char*)&tmpBuf[1024];
+
+	if( l & 3 )
+	{
+		//align 
+		k = (l + 4) & (~3);
+		p = (char*)tmpBuf;
+		memcpy(p,s,l);
+		memset(p + l,0,k-l);
+		l = k;
+	}
+	else
+		p = s;
+
+	neo_psram_offset((m*1024*1024) / (32*1024));
+	neo_copyto_psram(p,0,l);
+	neo_copyfrom_psram(p2,0,l);
+	debugText(p2,5,18,1);
+	while(1){}
+}
+
+void test_psram2(const char* s)
+{
+	char* p,*p2;
+	int l,k;
+ 	int m = 48;
+	display_context_t ctx;
+
+	l = strlen(s);
+	p2 = (char*)&tmpBuf[1024];
+
+	if( l & 3 )
+	{
+		//align 
+		k = (l + 4) & (~3);
+		p = (char*)tmpBuf;
+		memcpy(p,s,l);
+		memset(p + l,0,k-l);
+		l = k;
+	}
+	else
+		p = s;
+
+	ctx = lockVideo(1);
+	graphics_fill_screen(ctx,0);
+	unlockVideo(ctx);
+
+	neo_psram_offset((48*1024*1024) / (32*1024));
+	neo_copyto_psram(p,0,l);
+	neo_copyfrom_psram(p2,0,l);
+	debugText(p2,4,4,1);
+
+	//Now check to see if its getting "mirrored" (caused by range wrapping)
+	neo_psram_offset(0);
+	neo_copyfrom_psram(p2,0,l);
+	debugText(p2,4,5,1);
+
+	neo_psram_offset((32*1024*1024) / (32*1024));
+	neo_copyfrom_psram(p2,0,l);
+	debugText(p2,4,6,1);
+
+	neo_psram_offset((16*1024*1024) / (32*1024));
+	neo_copyfrom_psram(p2,0,l);
+	debugText(p2,4,7,1);
+
+	while(1){}
+}
+
+const char* align_text(char* s,char* back_buff,int* dl)
+{
+	int l,k;
+	char* p;
+
+	l = strlen(s);
+
+	if( l & 3 )
+	{
+		//align 
+		k = (l + 4) & (~3);
+		p = (char*)back_buff;
+		memcpy(p,s,l);
+		memset(p + l,0,k-l);
+
+		*dl = k;
+		return p;
+	}
+
+	*dl = l;
+	return s;
+}
+
+#define MYTH_IO_BASE (0xA8040000)
+#define ROM_BANK  *(vu32*)(MYTH_IO_BASE | 0x0C*2)
+
+void test_psram3(const char* a,const char* b,const char* c,const char* d)
+{
+	display_context_t	ctx;
+	int 				ia,ib,ic,id;
+	const char			*pa,*pb,*pc,*pd,*pe;
+	char				*pf;
+
+	//set up strings
+	pa = align_text(a,&tmpBuf[0],&ia);
+	pb = align_text(b,&tmpBuf[128],&ib);
+	pc = align_text(c,&tmpBuf[256],&ic);
+	pd = align_text(d,&tmpBuf[384],&id);
+	pf = &tmpBuf[512];
+
+	//Write each to its own region:bank
+	ROM_BANK = 0; neo_sync_bus();
+	neo_psram_offset(0);
+	neo_copyto_psram(pa,0,ia);
+	neo_psram_offset((16*1024*1024) / (32*1024));
+	neo_copyto_psram(pb,0,ib);
+
+	ROM_BANK = 0x00010001; neo_sync_bus();
+	neo_psram_offset(0);
+	neo_copyto_psram(pc,0,ic);
+	neo_psram_offset((16*1024*1024) / (32*1024));
+	neo_copyto_psram(pd,0,id);
+
+	//clean up framebuffer
+	ctx = lockVideo(1);
+	graphics_fill_screen(ctx,0);
+	unlockVideo(ctx);
+
+	//Read each one and print it
+	ROM_BANK = 0; neo_sync_bus();
+	neo_psram_offset(0);
+	neo_copyfrom_psram(pf,0,ia);
+	debugText(pf,4,4,1);
+	neo_psram_offset((16*1024*1024) / (32*1024));
+	neo_copyfrom_psram(pf,0,ib);
+	debugText(pf,4,5,1);
+
+	ROM_BANK = 0x00010001; neo_sync_bus();
+	neo_psram_offset(0);
+	neo_copyfrom_psram(pf,0,ic);
+	debugText(pf,4,6,1);
+	neo_psram_offset((16*1024*1024) / (32*1024));
+	neo_copyfrom_psram(pf,0,id);
+	debugText(pf,4,7,1);
+
+	while(1){}
+}
+
+int last_psram_addr = -1; 				//to avoid wasting cycles with asic ops
+
+int neo_psram_offset_addr(unsigned int addr,int force)
+{
+	const int mb = 1024*1024;
+
+	last_psram_addr = (force) ? -1 : last_psram_addr;
+
+	
+	if(addr <= (16*mb))//0..16MB				
+	{
+		if(last_psram_addr == 0)
+			return 0;
+
+		last_psram_addr = 0;
+		neo_psram_offset(0);
+
+		return 0;	//special case
+	}
+	else if(addr <= (32*mb))//16..32MB
+	{
+		if(last_psram_addr == 16)
+			return 0;
+
+		last_psram_addr = 16;
+	}
+	else if(addr <= (48*mb))//32..48MB
+	{
+		if(last_psram_addr == 32)
+			return 0;
+
+		last_psram_addr = 32;
+	}
+	else if(addr <= (64*mb))//48..64MB
+	{
+		if(last_psram_addr == 48)
+			return 0;
+
+		last_psram_addr = 48;
+	}
+	else	
+		return 0;
+
+	neo_psram_offset((last_psram_addr*mb) >> 15);
+
+	//Yeah! we've just updated flash offset
+	//The result returned allows you to decide when to reset PSRAM address :)
+	return 1;
+}
+#endif
+
 void fastCopySD2Psram(int bselect,int bfill)
 {
-    FIL lSDFile;
-    UINT ts;
-    u32 romsize, gamelen, copylen;
+    FIL f;
+    u32 gamelen,rem,addr,a;
     XCHAR fpath[1280];
     char temp[256];
-    const int read = 256 * 1024;
+	int swp;
+	int unit;
 
+	#ifdef __DEBUG_PSRAM__
+	test_psram3("Haha","Hehe","Hihi","Hoho");
+	test_psram2("Can you see this ???");
+	#endif
     disk_io_set_mode(0,0);
 
-    // load rom info if not already loaded
     if (gTable[bselect].type == 127)
         get_sd_info(bselect);
-
-    romsize = (gTable[bselect].options[3]<<8) | gTable[bselect].options[4];
-    // for SD card file, romsize is number of Mbits in rom
-    gamelen = romsize*128*1024;
-
+	
+	swp = gTable[bselect].swap;
     strcpy(temp, gTable[bselect].name);
-
     c2wstrcpy(fpath, path);
+
     if (path[strlen(path)-1] != '/')
         c2wstrcat(fpath, "/");
 
     c2wstrcat(fpath, gTable[bselect].name);
-    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+
+    if(f_open(&f, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
     {
-        char temp[1536];
-        // couldn't open file
-        w2cstrcpy(temp, fpath);
+        char temp2[1536];
+
+        w2cstrcpy(temp2, fpath);
         debugText("Couldn't open file: ", 2, 2, 0);
-        debugText(temp, 22, 2, 180);
+        debugText(temp2, 22, 2, 180);
+
         return;
     }
 
-    if (gamelen > (16*1024*1024))
-        copylen = 16*1024*1024;
-    else
-        copylen = gamelen;
+	gamelen = f.fsize;
+	neo_psram_offset(0);
 
-    disk_io_set_mode(1,gTable[bselect].swap);
+	#if 1
+	unit = 16*1024*1024;
 
-    progress_screen("Loading", temp, 0, 100, bfill);
+	#if 0
 
-    {
-        for(int ic=0; ic<copylen; ic+=read)
-        {
-            progress_screen(NULL,NULL, 100*ic/gamelen, 100,-1);
-            f_read_dummy(&lSDFile,read,&ts);
-        }
-    }
+	//Just to make sure 
+	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp); 		//0-16
+	neo_psram_offset((16*1024*1024) / (32*1024));
+	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);		//16-32
+	neo_psram_offset((32*1024*1024) / (32*1024));			
+	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);		//32-48
+	neo_psram_offset((48*1024*1024) / (32*1024));
+	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);		//48-64
 
-    if (gamelen <= (16*1024*1024))
-    {
-        f_close(&lSDFile);
-        progress_screen(NULL,NULL,100,100,-1);
-        delay(5);
-        return;
-    }
+	#else
+	if(gamelen > (32 * 1024 * 1024))//Up to 512Mbit --- XXX READ XXX:DOES NOT WORK YET. The core wraps around anything > 32MB
+	{
+		//Write 1/2
+		copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);
 
-    // change the psram offset and copy the rest
-    neo_psram_offset(copylen/(32*1024));
+		//Switch offset
+		neo_psram_offset((16*1024*1024) / (32*1024));
 
-    disk_io_set_mode(1,gTable[bselect].swap);//will reset psram addr
+		//Write 2/2
+		copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);
 
-    {
-        const int target = (gamelen-copylen);
-        for(int ic=0; ic<target; ic+=read)
-        {
-            progress_screen(NULL,NULL,100*(copylen+ic)/gamelen,100,-1);
-            f_read_dummy(&lSDFile,read,&ts);
-        }
-    }
+		//Switch offset
+		neo_psram_offset((32*1024*1024) / (32*1024));
 
-    neo_psram_offset(0);
+		//Subtract 32MB from count
+		gamelen -= 32*1024*1024;
 
-    f_close(&lSDFile);
-    progress_screen(NULL,NULL,100,100,-1);
-    delay(5);
+		if(gamelen <= unit)//Just up to 48MB ?
+			copyfrom_sd_to_psram(&f,gamelen,1,swp,bfill,"Loading",temp);
+		else//Image contains at least 1x16MB block
+		{
+			//Write 1/2 
+			copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);
+
+			//Switch offset
+			neo_psram_offset((48*1024*1024) / (32*1024));
+
+			//Write 2/2 and subtract unit from count
+			copyfrom_sd_to_psram(&f,gamelen-unit,1,swp,bfill,"Loading",temp);
+		}
+	}
+	else//Up to 256Mbit
+	{
+		if(gamelen <= unit)
+			copyfrom_sd_to_psram(&f,gamelen,1,swp,bfill,"Loading",temp);
+		else
+		{
+			//Write 1/2 
+			copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading 1/2",temp);
+
+			//Switch offset
+			neo_psram_offset((16*1024*1024) / (32*1024));
+
+			//Write 2/2 and subtract unit from count
+			copyfrom_sd_to_psram(&f,gamelen-unit,1,swp,bfill,"Loading 2/2",temp);
+		}
+	}
+	#endif
+	#else
+	disk_io_set_mode(1,swp);
+	u32 i;
+	UINT ts;
+
+	neo_psram_offset_addr(0,1);
+
+	for(i = 0;i<gamelen;i+=ONCE_SIZE)
+	{
+		if(neo_psram_offset_addr(i,0))
+		{
+			//reset psram addr
+			disk_io_set_mode(1,swp);
+		}
+
+		progress_screen(NULL,NULL, 100*i/gamelen, 100,-1);
+		f_read_dummy(&f,ONCE_SIZE,&ts);
+	}
+
+	#endif
+	neo_psram_offset(0);
+	disk_io_set_mode(0,0);
+    f_close(&f);
 }
 
 /* Load neon64 emulator and append NES file in psram */
@@ -2379,7 +2675,7 @@ void init_n64(void)
     // Initialize display
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     rdp_init();
-    rdp_set_texture_flush(FLUSH_STRATEGY_NONE);
+   // rdp_set_texture_flush(FLUSH_STRATEGY_NONE);
     register_VI_handler(vblCallback);
 
     // Initialize controllers
