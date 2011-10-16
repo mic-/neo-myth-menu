@@ -80,7 +80,7 @@ NEOSEGA4.BIN:
 
 
 clean:
-	$(RM) NEOSEGA4.BIN main_map.h neo2_map.h neo2_map.inc pff_map.h vgm_player_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
+	$(RM) NEOSEGA4.BIN main_map.h neo2_map.h neo2_map.inc pff_map.h vgm_player_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lk *.lst *.map
 
 distclean:
 	$(RM) tools/map2h tools/bin16k tools/hex2bin tools/smshdr NEOSEGA4.BIN main_map.h neo2_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
