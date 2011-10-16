@@ -810,6 +810,8 @@ void handle_action_button(BYTE button)
                 Frame1 = 6;
                 memcpy_asm(0xD600, 0x4000, 0x1F0);
                 pfn_vgm_play();
+                padLast |= PAD_SW2;
+                puts_active_list();
             }         
         }
     }
