@@ -13,7 +13,7 @@
 #include "vgm_player_map.h"
 
 #undef TEST_CHEAT_INPUTBOX
-#define MENU_VERSION_STRING "0.20"
+#define MENU_VERSION_STRING "1.00"
 #define KEY_REPEAT_INITIAL_DELAY 15
 #define KEY_REPEAT_DELAY 7
 #define SD_DEFAULT_INFO_FETCH_TIMEOUT 30
