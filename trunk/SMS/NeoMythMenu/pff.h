@@ -48,7 +48,7 @@ typedef WORD WCHAR;
 /* To enable pf_opendir and pf_readdir function, set _USE_DIR to 1. */
 
 
-#define _USE_LSEEK  1
+#define _USE_LSEEK  0
 /* To enable pf_lseek function, set _USE_LSEEK to 1. */
 
 
@@ -57,7 +57,7 @@ typedef WORD WCHAR;
 
 #define _FS_RPATH 1
 
-#define _USE_LFN  0
+#define _USE_LFN  1
 
 #define _MAX_LFN 64
 
@@ -233,18 +233,6 @@ FRESULT pf_readdir (DIR*, FILINFO*);    /* Read a directory item */
 
 #define MBR_Table           446
 
-/*
-#define DIR_Name            0
-#define DIR_Attr            11
-#define DIR_NTres           12
-#define DIR_CrtTime         14
-#define DIR_CrtDate         16
-#define DIR_FstClusHI       20
-#define DIR_WrtTime         22
-#define DIR_WrtDate         24
-#define DIR_FstClusLO       26
-#define DIR_FileSize        28
-*/
 #define DIR_Name            0
 #define DIR_Attr            11
 #define DIR_NTres           12

@@ -330,17 +330,20 @@ void puts_active_list()
 		proffs = praddr & 0xFFFF;
 		prbank = praddr >> 16;
 		prbank += 0x20;
-        fi = (FileInfoEntry*)LfnBuf;
+        fi = (FileInfoEntry*)0xD700;
         highlightedIsDir = 0;
         
         while (show)
         {
             offs = row*32*2;
             pfn_neo2_psram_to_ram((BYTE *)fi, prbank, proffs, 64);
-
+            p = fi->sfn;
+            
             if (games.highlighted == (games.firstShown + row))
+            {
                 memcpy_asm(highlightedFileName, fi->sfn, 13);
-
+                p = fi->lfn;
+            }
             if (fi->fattrib & AM_DIR)
 			{
                 temp[offs + 2] = '[' - 32;
@@ -355,11 +358,11 @@ void puts_active_list()
                 }
                 offs += 2;
 			}  
-            for (col=0; col<13; col++)
+            for (col=0; col<20; col++)
             {
-                if (!fi->sfn[col])
+                if (!p[col])
                     break;
-                temp[offs + col*2 + 2] = fi->sfn[col] - 32;
+                temp[offs + col*2 + 2] = p[col] - 32;
                 temp[offs + col*2 + 3] = (games.highlighted == (games.firstShown + row)) ? PALETTE0<<1 : PALETTE1<<1;
             }
             if (fi->fattrib & AM_DIR)
@@ -773,7 +776,7 @@ void handle_action_button(BYTE button)
             // The highlighted entry is not a directory
             
             // Retrieve the file info struct for the highlighted file
-            fi = (FileInfoEntry*)LfnBuf;
+            fi = (FileInfoEntry*)0xD700;
             praddr = games.highlighted;
             praddr <<= 6;
             proffs = praddr & 0xFFFF;
