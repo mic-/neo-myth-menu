@@ -169,7 +169,7 @@ uint16_t count_games_on_sd_card()
 //
 void change_directory(char *path)
 {
-	int i,j;
+	int i;
     FRESULT (*p_pf_opendir)(DIR*, const char*) = pfn_pf_opendir;
 
     Frame2 = BANK_PFF;
