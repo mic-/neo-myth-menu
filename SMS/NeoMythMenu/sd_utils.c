@@ -82,10 +82,10 @@ int strcmp(char *a, char *b)
 //
 uint16_t count_games_on_sd_card()
 {
-	uint16_t cnt = 0, i = 0;
+	uint16_t cnt = 0, i = 0, j;
     uint16_t prbank, proffs;     // PSRAM bank/offset
     FileInfoEntry *buf;
-    //char *fn;
+    char *fn;
     FRESULT (*p_pf_opendir)(DIR*, const char*) = pfn_pf_opendir;
     FRESULT (*p_pf_readdir)(DIR*, FILINFO*) = pfn_pf_readdir;
     
@@ -102,7 +102,7 @@ uint16_t count_games_on_sd_card()
     vdp_wait_vblank();
     puts("Getting file info..", 3, 10, PALETTE1);
     
-    buf = (FileInfoEntry*)LfnBuf;
+    buf = (FileInfoEntry*)0xD700;
 
 	while (cnt < 1024)
 	{
@@ -111,16 +111,16 @@ uint16_t count_games_on_sd_card()
 			if (cdDir.sect != 0)
 			{
 				cnt++;
-                //fn = sdFileInfo.fname;
-/*#ifdef _USE_LFN
+                fn = sdFileInfo.fname;
+#ifdef _USE_LFN
                 sdFileInfo.lfname[_MAX_LFN - 1] = 0;
                 if (sdFileInfo.lfname[0]) fn = sdFileInfo.lfname;
-#endif*/
-                //i = strlen_asm(fn);
-                //if (i > 31) i = 31;
+#endif
+                i = strlen_asm(fn);
+                if (i > 31) i = 31;
+                for (j=0; j<i; j++) buf->lfn[j] = fn[j];    //memcpy_asm(buf->lfn, fn, 31);  // SDCC doesn't like this memcpy
                 memcpy_asm(buf->sfn, sdFileInfo.fname, 13);
-                 //memcpy_asm(buf->lfn, fn, i);
-                buf->lfn[0] = 0; //buf->lfn[i] = 0;
+                buf->lfn[i] = 0;
                 buf->fsize = sdFileInfo.fsize;
                 buf->fattrib = sdFileInfo.fattrib;
 
@@ -307,10 +307,10 @@ int init_sd()
 	menu_state = MENU_STATE_GAME_SD;
     Frame2 = BANK_PFF;
     
-/*#ifdef _USE_LFN
-	sdFileInfo.lfname = sdLfnBuf;
-	sdFileInfo.lfsize = 80;
-#endif*/
+#ifdef _USE_LFN
+	sdFileInfo.lfname = (char*)LfnBuf;
+	sdFileInfo.lfsize = _MAX_LFN;
+#endif
 
     lastSdOperation = SD_OP_MOUNT;
 

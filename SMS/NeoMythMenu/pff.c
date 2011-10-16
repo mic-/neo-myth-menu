@@ -31,12 +31,17 @@
 extern FATFS *FatFs;   /* Pointer to the file system object (logical drive) */
 extern WCHAR LfnBuf[_MAX_LFN + 1];
 
-//const DSTATUS (*p_disk_readp)(void*, DWORD, WORD, WORD) = pfn_disk_readp;
-//const DSTATUS (*p_disk_initialize)(void) = pfn_disk_initialize;
-
-
 #define NAMEBUF(sp,lp)  BYTE sp[12]; WCHAR *lp = LfnBuf
 #define INITBUF(dj,sp,lp)   dj.fn = sp; dj.lfn = lp
+
+/* Name status flags */
+#define NS			11		/* Offset of name status byte */
+#define NS_LOSS		0x01	/* Out of 8.3 format */
+#define NS_LFN		0x02	/* Force to create LFN entry */
+#define NS_LAST		0x04	/* Last segment */
+#define NS_BODY		0x08	/* Lower case flag (body) */
+#define NS_EXT		0x10	/* Lower case flag (ext) */
+#define NS_DOT		0x20	/* Dot entry */
 
 /*--------------------------------------------------------------------------
 
@@ -72,7 +77,7 @@ int chk_chr (const char* str, int chr) {
     return *str;
 }
 
-
+/*
 void waste_time()
 {
    *(BYTE*)0xC000 = *(BYTE*)0xC000;
@@ -92,7 +97,7 @@ void pff_debug_print(BYTE val)
     VdpData = hi; waste_time(); VdpData = 0; waste_time();
     VdpData = lo; waste_time(); VdpData = 0; waste_time();
 }
-
+*/
 
 /*-----------------------------------------------------------------------*/
 /* FAT access - Read value of a FAT entry                                */
@@ -165,6 +170,8 @@ DWORD clust2sect (    /* !=0: Sector number, 0: Failed - invalid cluster# */
 
 #if _USE_LFN
 
+#define ff_convert(wc, x) ((char)wc)
+
 static WCHAR ff_wtoupper(WCHAR wc) {
     char c = (char)wc;
     if (c >= 'a' && c <= 'z') wc -= ' ';
@@ -172,8 +179,8 @@ static WCHAR ff_wtoupper(WCHAR wc) {
 }
 
 
-//static
-//const BYTE LfnOfs[] = {1,3,5,7,9,14,16,18,20,22,24,28,30};  /* Offset of LFN chars in the directory entry */
+static
+const BYTE LfnOfs[] = {1,3,5,7,9,14,16,18,20,22,24,28,30};  /* Offset of LFN chars in the directory entry */
 
 
 static
@@ -332,29 +339,59 @@ FRESULT dir_next (  /* FR_OK:Succeeded, FR_NO_FILE:End of table, FR_DENIED:EOT a
 
 static
 FRESULT dir_find (
-    DIR *dj         /* Pointer to the directory object linked to the file name */
+	DIR *dj			/* Pointer to the directory object linked to the file name */
 )
 {
-    FRESULT res;
-    BYTE c, *dir;
+	FRESULT res;
+	BYTE c, *dir;
+#if _USE_LFN
+	BYTE a, ord, sum;
+#endif
     DSTATUS (*p_disk_readp)(void*, DWORD, WORD, WORD) = pfn_disk_readp;
+    
+	res = dir_rewind(dj);			/* Rewind directory object */
+	if (res != FR_OK) return res;
 
-    res = dir_rewind(dj);           /* Rewind directory object */
-    if (FR_OK != res) return res;
+	dir = FatFs->buf;
+#if _USE_LFN
+	ord = sum = 0xFF;
+#endif
+	do {
+		res = p_disk_readp(dir, dj->sect, (WORD)((dj->index & 15) << 5), 32)	/* Read an entry */
+			? FR_DISK_ERR : FR_OK;
+		if (res != FR_OK) break;
+		c = dir[DIR_Name];	/* First character */
+		if (c == 0) { res = FR_NO_FILE; break; }	/* Reached to end of table */
 
-    dir = FatFs->buf;
-    do {
-        res = p_disk_readp(dir, dj->sect, (WORD)((dj->index & 15) << 5), 32)  /* Read an entry */
-            ? FR_DISK_ERR : FR_OK;
-        if (res != FR_OK) break;
-        c = dir[DIR_Name];  /* First character */
-        if (c == 0) { res = FR_NO_FILE; break; }    /* Reached to end of table */
-        if (!(dir[DIR_Attr] & AM_VOL) && !mem_cmp(dir, dj->fn, 11)) /* Is it a valid entry? */
-            break;
-        res = dir_next(dj);                         /* Next entry */
-    } while (res == FR_OK);
+#if _USE_LFN	/* LFN configuration */
+		a = dir[DIR_Attr] & AM_MASK;
+		if (c == 0xE5 || ((a & AM_VOL) && a != AM_LFN)) {	/* An entry without valid data */
+			ord = 0xFF;
+		} else {
+			if (a == AM_LFN) {			/* An LFN entry is found */
+				if (dj->lfn) {
+					if (c & 0x40) {		/* Is it start of LFN sequence? */
+						sum = dir[LDIR_Chksum];
+						c &= 0xBF; ord = c;	/* LFN start order */
+						dj->lfn_idx = dj->index;
+					}
+					/* Check validity of the LFN entry and compare it with given name */
+					ord = (c == ord && sum == dir[LDIR_Chksum] && cmp_lfn(dj->lfn, dir)) ? ord - 1 : 0xFF;
+				}
+			} else {					/* An SFN entry is found */
+				if (!ord && sum == sum_sfn(dir)) break;	/* LFN matched? */
+				ord = 0xFF; dj->lfn_idx = 0xFFFF;	/* Reset LFN sequence */
+				if (!(dj->fn[NS] & NS_LOSS) && !mem_cmp(dir, dj->fn, 11)) break;	/* SFN matched? */
+			}
+		}
+#else
+		if (!(dir[DIR_Attr] & AM_VOL) && !mem_cmp(dir, dj->fn, 11)) /* Is it a valid entry? */
+			break;
+#endif
+		res = dir_next(dj);							/* Next entry */
+	} while (res == FR_OK);
 
-    return res;
+	return res;
 }
 
 
@@ -429,37 +466,161 @@ FRESULT dir_read (
 
 static
 FRESULT create_name (
-    DIR *dj,            /* Pointer to the directory object */
-    const char **path   /* Pointer to pointer to the segment in the path string */
+	DIR *dj,			/* Pointer to the directory object */
+	const XCHAR **path	/* Pointer to pointer to the segment in the path string */
 )
 {
-    BYTE c, ni, si, i, *sfn;
-    const char *p;
 
-    /* Create file name in directory form */
-    sfn = dj->fn;
-    mem_set(sfn, ' ', 11);
-    si = i = 0; ni = 8;
-    p = *path;
-    for (;;) {
-        c = p[si++];
-        if (c < (BYTE)' ' || c == (BYTE)'/') break; /* Break on end of segment */
-        if (c == (BYTE)'.' || i >= ni) {
-            if (ni != 8 || c != (BYTE)'.') return FR_INVALID_NAME;
-            i = 8; ni = 11;
-            continue;
-        }
-        if (c >= 0x7F || chk_chr(" +,;[=\\]\"*:<>\?|", c))  /* Reject unallowable chrs for SFN */
-            return FR_INVALID_NAME;
-        if (c >= (BYTE)'a' && c <= (BYTE)'z') c -= 0x20;
-        sfn[i++] = c;
-    }
-    if (!i) return FR_INVALID_NAME;     /* Reject null string */
-    *path = &p[si];                     /* Rerurn pointer to the next segment */
+#if _USE_LFN	/* LFN configuration */
+	BYTE b, cf;
+	WCHAR w, *lfn;
+	int i, ni, si, di;
+	const XCHAR *p;
 
-    sfn[11] = (c < (BYTE)' ') ? 1 : 0;        /* Set last segment flag if end of path */
+	/* Create LFN in Unicode */
+	si = di = 0;
+	p = *path;
+	lfn = dj->lfn;
+	for (;;) {
+		w = p[si++];					/* Get a character */
+		if (w < ' ' || w == '/' || w == '\\') break;	/* Break on end of segment */
+		if (di >= _MAX_LFN)				/* Reject too long name */
+			return FR_INVALID_NAME;
+//#if !_LFN_UNICODE
+		w &= 0xFF;
+		if (IsDBCS1(w)) {				/* If it is a DBC 1st byte */
+			b = p[si++];				/* Get 2nd byte */
+			if (!IsDBCS2(b))			/* Reject invalid code for DBC */
+				return FR_INVALID_NAME;
+			w = (w << 8) + b;
+		}
+		w = ff_convert(w, 1);			/* Convert OEM to Unicode */
+		if (!w) return FR_INVALID_NAME;	/* Reject invalid code */
+//#endif
+		if (w < 0x80 && chk_chr("\"*:<>\?|\x7F", w)) /* Reject illegal chars for LFN */
+			return FR_INVALID_NAME;
+		lfn[di++] = w;					/* Store the Unicode char */
+	}
+	*path = &p[si];						/* Rerurn pointer to the next segment */
+	cf = (w < ' ') ? NS_LAST : 0;		/* Set last segment flag if end of path */
+#if _FS_RPATH
+	if ((di == 1 && lfn[di - 1] == '.') || /* Is this a dot entry? */
+		(di == 2 && lfn[di - 1] == '.' && lfn[di - 2] == '.')) {
+		lfn[di] = 0;
+		for (i = 0; i < 11; i++)
+			dj->fn[i] = (i < di) ? '.' : ' ';
+		dj->fn[i] = cf | NS_DOT;		/* This is a dot entry */
+		return FR_OK;
+	}
+#endif
+	while (di) {						/* Strip trailing spaces and dots */
+		w = lfn[di - 1];
+		if (w != ' ' && w != '.') break;
+		di--;
+	}
+	if (!di) return FR_INVALID_NAME;	/* Reject null string */
 
-    return FR_OK;
+	lfn[di] = 0;						/* LFN is created */
+
+	/* Create SFN in directory form */
+	mem_set(dj->fn, ' ', 11);
+	for (si = 0; lfn[si] == ' ' || lfn[si] == '.'; si++) ;	/* Strip leading spaces and dots */
+	if (si) cf |= NS_LOSS | NS_LFN;
+	while (di && lfn[di - 1] != '.') di--;	/* Find extension (di<=si: no extension) */
+
+	b = i = 0; ni = 8;
+	for (;;) {
+		w = lfn[si++];					/* Get an LFN char */
+		if (!w) break;					/* Break on enf of the LFN */
+		if (w == ' ' || (w == '.' && si != di)) {	/* Remove spaces and dots */
+			cf |= NS_LOSS | NS_LFN; continue;
+		}
+
+		if (i >= ni || si == di) {		/* Extension or end of SFN */
+			if (ni == 11) {				/* Long extension */
+				cf |= NS_LOSS | NS_LFN; break;
+			}
+			if (si != di) cf |= NS_LOSS | NS_LFN;	/* Out of 8.3 format */
+			if (si > di) break;			/* No extension */
+			si = di; i = 8; ni = 11;	/* Enter extension section */
+			b <<= 2; continue;
+		}
+
+		if (w >= 0x80) {				/* Non ASCII char */
+#ifdef _EXCVT
+			w = ff_convert(w, 0);		/* Unicode -> OEM code */
+			if (w) w = cvt[w - 0x80];	/* Convert extended char to upper (SBCS) */
+#else
+			w = ff_convert(ff_wtoupper(w), 0);	/* Upper converted Unicode -> OEM code */
+#endif
+			cf |= NS_LFN;				/* Force create LFN entry */
+		}
+
+		if (_DF1S && w >= 0x100) {		/* Double byte char */
+			if (i >= ni - 1) {
+				cf |= NS_LOSS | NS_LFN; i = ni; continue;
+			}
+			dj->fn[i++] = (BYTE)(w >> 8);
+		} else {						/* Single byte char */
+			if (!w || chk_chr("+,;[=]", w)) {		/* Replace illegal chars for SFN */
+				w = '_'; cf |= NS_LOSS | NS_LFN;	/* Lossy conversion */
+			} else {
+				if (IsUpper(w)) {		/* ASCII large capital */
+					b |= 2;
+				} else {
+					if (IsLower(w)) {	/* ASCII small capital */
+						b |= 1; w -= 0x20;
+					}
+				}
+			}
+		}
+		dj->fn[i++] = (BYTE)w;
+	}
+
+	if (dj->fn[0] == 0xE5) dj->fn[0] = 0x05;	/* If the first char collides with deleted mark, replace it with 0x05 */
+
+	if (ni == 8) b <<= 2;
+	if ((b & 0x0C) == 0x0C || (b & 0x03) == 0x03)	/* Create LFN entry when there are composite capitals */
+		cf |= NS_LFN;
+	if (!(cf & NS_LFN)) {						/* When LFN is in 8.3 format without extended char, NT flags are created */
+		if ((b & 0x03) == 0x01) cf |= NS_EXT;	/* NT flag (Extension has only small capital) */
+		if ((b & 0x0C) == 0x04) cf |= NS_BODY;	/* NT flag (Filename has only small capital) */
+	}
+
+	dj->fn[NS] = cf;	/* SFN is created */
+
+	return FR_OK;
+
+
+#else	/* Non-LFN configuration */
+	BYTE c, ni, si, i, *sfn;
+	const char *p;
+
+	/* Create file name in directory form */
+	sfn = dj->fn;
+	mem_set(sfn, ' ', 11);
+	si = i = 0; ni = 8;
+	p = *path;
+	for (;;) {
+		c = p[si++];
+		if (c < ' ' || c == '/') break;	/* Break on end of segment */
+		if (c == '.' || i >= ni) {
+			if (ni != 8 || c != '.') return FR_INVALID_NAME;
+			i = 8; ni = 11;
+			continue;
+		}
+		if (c >= 0x7F || chk_chr(" +,;[=\\]\"*:<>\?|", c))	/* Reject unallowable chrs for SFN */
+			return FR_INVALID_NAME;
+		if (c >='a' && c <= 'z') c -= 0x20;
+		sfn[i++] = c;
+	}
+	if (!i) return FR_INVALID_NAME;		/* Reject null string */
+	*path = &p[si];						/* Rerurn pointer to the next segment */
+
+	sfn[11] = (c < ' ') ? 1 : 0;		/* Set last segment flag if end of path */
+
+	return FR_OK;
+#endif
 }
 
 
@@ -469,8 +630,6 @@ FRESULT create_name (
 /* Get file information from directory entry                             */
 /*-----------------------------------------------------------------------*/
 #if _USE_DIR
-
-#define ff_convert(wc, x) ((char)wc)
 
 
 static
@@ -732,16 +891,18 @@ FRESULT pf_open (
 {
     FRESULT res;
     DIR dj;
-    BYTE sp[12], dir[32];
+    BYTE dir[32];
+    NAMEBUF(sfn, lfn);
     FATFS *fs = FatFs;
 
 
     if (!fs)                        /* Check file system */
         return FR_NOT_ENABLED;
 
+    INITBUF(dj, sfn, lfn);
     fs->flag = 0;
     fs->buf = dir;
-    dj.fn = sp;
+    dj.fn = sfn; //sp;
     res = follow_path(&dj, path);   /* Follow the file path */
     if (res != FR_OK) return res;   /* Follow failed */
     if (!dir[0] || (dir[DIR_Attr] & AM_DIR))    /* It is a directory */
@@ -963,14 +1124,16 @@ FRESULT pf_opendir (
 )
 {
     FRESULT res;
-    BYTE sp[12], dir[32];
+    BYTE dir[32];
+    NAMEBUF(sfn, lfn);
     FATFS *fs = FatFs;
 
     if (!fs) {              /* Check file system */
         res = FR_NOT_ENABLED;
     } else {
+        INITBUF((*dj), sfn, lfn);
         fs->buf = dir;
-        dj->fn = sp;  
+        dj->fn = sfn; //sp;  
         res = follow_path(dj, path);            /* Follow the path to the directory */
         if (res == FR_OK) {                     /* Follow completed */
             if (dir[0]) {                       /* It is not the root dir */
@@ -1007,15 +1170,16 @@ FRESULT pf_readdir (
 )
 {
     FRESULT res;
-    BYTE sp[12], dir[32];
+    BYTE dir[32];
+    NAMEBUF(sfn,lfn);
     FATFS *fs = FatFs;
-
 
     if (!fs) {              /* Check file system */
         res = FR_NOT_ENABLED;
     } else {
+        INITBUF((*dj), sfn, lfn);
         fs->buf = dir;
-        dj->fn = sp;
+        dj->fn = sfn; //sp;
         if (!fno) {
             res = dir_rewind(dj);
         } else {
