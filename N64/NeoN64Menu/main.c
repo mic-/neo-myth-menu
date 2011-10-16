@@ -163,6 +163,37 @@ extern void checksum_psram(void);
 extern int doOSKeyb(char *title, char *deflt, char *buffer, int max, int bfill);
 extern int RequestFile (char *title, char *initialPath, int bfill);
 
+int f_force_open(FIL* f,XCHAR* s,unsigned int flags,int retries)
+{
+	int i,j,k;
+
+	if( !(flags&FA_WRITE) )
+		return f_open(f,s,flags) == FR_OK;
+
+	i = j = 0;
+	k = retries;
+	disk_io_force_wdl = 0;
+
+	while(i++ < k)
+	{
+		memset(f,0,sizeof(FIL));
+		neo2_disable_sd();
+		neo2_enable_sd();
+		getSDInfo(-1);
+
+		if(f_open(f,s,flags) == FR_OK)
+		{
+			j = 1;
+			break;
+		}
+
+		disk_io_force_wdl += 200;
+	}
+
+	disk_io_force_wdl = 0;
+	return j;
+}
+
 void w2cstrcpy(void *dst, void *src)
 {
     int ix = 0;
@@ -1954,7 +1985,7 @@ void loadSaveState(int bsel, int bfill) //cleanup later
 	if(ix)
 	{
         c2wstrcpy(wname, "/menu/n64/save/last.run");
-        f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
+        f_force_open(&lSDFile,wname,FA_CREATE_ALWAYS | FA_WRITE,64);//f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
 		f_write(&lSDFile,&flags,8,&ts);			
         c2wstrcpy(wname, "/menu/n64/save/");
         c2wstrcat(wname, temp);
@@ -2117,38 +2148,14 @@ void saveSaveState()
 
     if(gSdDetected)
     {
-        if(f_open(&out, wname, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
+        if(f_force_open(&out,wname,FA_CREATE_ALWAYS | FA_WRITE,64) == 0)
 		{
 		    char temp[512];
-			int i = 0,j = 0;
-			const int retries = 32;
 
-			disk_io_force_wdl = 0;
-
-			while(i++ < retries)
-			{
-				memset(&out,0,sizeof(FIL));
-				neo2_disable_sd();
-				neo2_enable_sd();
-				getSDInfo(-1);
-				if(f_open(&out, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
-				{
-					j = 1;
-					break;
-				}
-				disk_io_force_wdl += 200;
-			}
-
-			disk_io_force_wdl = 0;
-
-			if(!j)
-			{
-				w2cstrcpy(temp,wname);
-				debugText("Couldn't open file: ", 2, 2, 0);
-				debugText(temp, 4, 8, 500);
-
-				return;
-			}
+			w2cstrcpy(temp,wname);
+			debugText("Couldn't open file: ", 2, 2, 0);
+			debugText(temp, 4, 8, 500);
+			return;
 		}
 
         f_write(&out,tmpBuf,ssize[flags & 15], &ts);
