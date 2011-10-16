@@ -675,28 +675,30 @@ void neo2_disable_sd(void)
 void neo2_pre_sd(void)
 {
     // set the PI for myth sd
-    if (!sd_speed)
-        switch(fast_flag)
-        {
-            case 1:
-                PI_BSD_DOM1_LAT_REG = 0x00000010;
-                PI_BSD_DOM1_RLS_REG = 0x00000003;
-                PI_BSD_DOM1_PWD_REG = 0x00000003;
-                PI_BSD_DOM1_PGS_REG = 0x00000007;
-                break;
+    if (sd_speed)
+		return;
 
-            case 2:
-                PI_BSD_DOM1_LAT_REG = 0x00000000;
-                PI_BSD_DOM1_RLS_REG = 0x00000000;
-                PI_BSD_DOM1_PWD_REG = 0x00000003;
-                PI_BSD_DOM1_PGS_REG = 0x00000000;
-                break;
-        }
+	switch(fast_flag)
+	{
+		case 1:
+			PI_BSD_DOM1_LAT_REG = 0x00000010;
+			PI_BSD_DOM1_RLS_REG = 0x00000003;
+			PI_BSD_DOM1_PWD_REG = 0x00000003;
+			PI_BSD_DOM1_PGS_REG = 0x00000007;
+		break;
+
+		case 2:
+			PI_BSD_DOM1_LAT_REG = 0x00000000;
+			PI_BSD_DOM1_RLS_REG = 0x00000000;
+			PI_BSD_DOM1_PWD_REG = 0x00000003;
+			PI_BSD_DOM1_PGS_REG = 0x00000000;
+		break;
+	}
 }
 
 void neo2_post_sd(void)
 {
-    if (!sd_speed && fast_flag)
+    if ((!sd_speed) && (fast_flag))
     {
         // restore the PI for rom
         PI_BSD_DOM1_LAT_REG = 0x00000040;
@@ -1232,6 +1234,7 @@ void neo_run_psram(u8 *option, int reset)
     u32 gamelen;
     u32 runcic;
     u32 mythaware;
+	int wait;
 
     romsize = (option[3]<<8) + option[4];
     romsize += (romsize<<16);
@@ -1239,11 +1242,12 @@ void neo_run_psram(u8 *option, int reset)
     romsave = (option[5]<<16) + option[5];
     romcic  = (option[6]<<16) + option[6];
     rommode = (option[7]<<16) + option[7];
+	gamelen = (romsize & 0xFFFF)*128*1024;
 
-    if ((romsize & 0xFFFF) > 0x000F)
+	if(gamelen > (32*1024*1024))
+		romsize = 0x00000000;				//extended mode(WIP)
+	else if ((romsize & 0xFFFF) > 0x000F)
     {
-        // romsize is number of Mbits in rom
-        gamelen = (romsize & 0xFFFF)*128*1024;
         if (gamelen <= (8*1024*1024))
             romsize = 0x000F000F;
         else if (gamelen <= (16*1024*1024))
@@ -1269,6 +1273,7 @@ void neo_run_psram(u8 *option, int reset)
     neo_sync_bus();
     SAVE_IO  = romsave;
     neo_sync_bus();
+
     // if set to use card cic, figure out cic for simulated start
     if (romcic == 0)
         runcic = get_cic((unsigned char *)0xB0000040);
@@ -1276,6 +1281,7 @@ void neo_run_psram(u8 *option, int reset)
         runcic = romcic & 7;
     if (!reset && (runcic != 2))
         reset = 1;                      // reset back to menu since cannot reset to game in hardware
+
     CIC_IO   = romcic; //reset ? 0x00020002 : romcic;
     neo_sync_bus();
     RST_IO = reset ? 0xFFFFFFFF : 0x00000000;
@@ -1285,7 +1291,16 @@ void neo_run_psram(u8 *option, int reset)
     neo_sync_bus();
 
     // start cart
+	while (dma_busy()){} //sanity check
+
     disable_interrupts();
+
+	for(wait = 0;wait < 200;wait++)
+	{
+		//Just waste a little time until any interrupts that have been triggered BEFORE ints where disabled have jumped back to their caller
+		asm("nop\nnop\n");
+	}
+
     simulate_pif_boot(runcic);          // should never return
     enable_interrupts();
 }

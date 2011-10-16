@@ -153,6 +153,7 @@ extern void neo_copyfrom_fram(void *dst, int sstart, int len, int mode);
 extern void neo_get_rtc(unsigned char *rtc);
 extern void neo2_cycle_sd(void);
 
+extern int disk_io_force_wdl;
 extern int get_cic(unsigned char *buffer);
 extern int get_swap(unsigned char *buffer);
 extern int get_cic_save(char *cartid, int *cic, int *save);
@@ -1913,11 +1914,13 @@ int selectGBASlot(int sel, u8 *blk, int stype, int bfill)
 void byte_swap_buf(u8 *buf, int size)
 {
     u32 *ptr = (u32*)buf;
+
     for (int ix=0; ix<(size/4); ix++)
         ptr[ix] = SWAPLONG(ptr[ix]);
 }
 
-void loadSaveState(int bsel, int bfill)
+ 
+void loadSaveState(int bsel, int bfill) //cleanup later
 {
     int ix, ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144, 0, 0, 0, 0, 0, 0, 0 };
     char *sext[16] = { 0, ".sra",  ".sra",  ".sra", ".fla", ".eep", ".eep", 0, ".sra", 0, 0, 0, 0, 0, 0, 0 };
@@ -1945,6 +1948,25 @@ void loadSaveState(int bsel, int bfill)
     // check for SD card
     neo2_enable_sd();
     ix = getSDInfo(-1);             // try to get root
+
+	flags = 0xAA550100LL | entry.options[5];
+
+	if(ix)
+	{
+        c2wstrcpy(wname, "/menu/n64/save/last.run");
+        f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
+		f_write(&lSDFile,&flags,8,&ts);			
+        c2wstrcpy(wname, "/menu/n64/save/");
+        c2wstrcat(wname, temp);
+        f_write(&lSDFile,wname,280*2,&ts); //waste space for alignment porpuses
+        f_close(&lSDFile);
+		memset(&lSDFile,0,sizeof(FIL));
+	}
+	else
+	{
+		neo_copyto_sram(temp, 0x3FE00, 256);
+		neo_copyto_sram(&flags, 0x3FF00, 8);
+	}
 
     if (!ix)
     {
@@ -1993,72 +2015,83 @@ void loadSaveState(int bsel, int bfill)
     {
         // init save ram to 0x00 or 0xFF in case there's no save file, or only a partial file
         memset(tmpBuf, (entry.options[5] == 4) ? 0xFF : 0x00, ssize[entry.options[5]]);
-        // load save state from SD card
-        c2wstrcpy(wname, "/menu/n64/save/");
-        c2wstrcat(wname, temp);
-        if (f_open(&lSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+
+        if(f_open(&lSDFile, wname, FA_OPEN_EXISTING | FA_READ) == FR_OK)
         {
-            f_read(&lSDFile, tmpBuf, ssize[entry.options[5]], &ts);
+            f_read(&lSDFile, tmpBuf, ssize[flags & 0xf], &ts);
             f_close(&lSDFile);
         }
     }
     neo2_disable_sd();
 
-    switch(entry.options[5])
+    switch(flags&15)
     {
         case 1:
         case 2:
         case 3:
             byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
             neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]], 8);
-            break;
+		break;
+
         case 4:
             byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
             neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]], 8);
-            break;
+		break;
+
         case 5:
         case 6:
             neo_copyto_eeprom(tmpBuf, 0, ssize[entry.options[5]], entry.options[5]);
-            break;
+		break;
+
         case 8:
             byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
             neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]], 8);
-            break;
+		break;
     }
-    flags = 0xAA550100LL | entry.options[5];
-
-    neo_copyto_sram(temp, 0x3FE00, 256);
-    neo_copyto_sram(&flags, 0x3FF00, 8);
 
     memcpy(&gTable[bsel], &entry, sizeof(selEntry_t)); // restore the entry
 }
 
-void saveSaveState(void)
+void saveSaveState()
 {
     int ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144, 0, 0, 0, 0, 0, 0, 0 };
     char temp[256];
     XCHAR wname[280];
+	XCHAR wname2[280];
     u64 flags;
-    FIL lSDFile;
+    FIL in,out;
     UINT ts;
-    int bmax;
 
     flags = 0;
+	if(gSdDetected)
+	{
+        c2wstrcpy(wname2, "/menu/n64/save/last.run");
+        if(f_open(&in, wname2, FA_OPEN_EXISTING | FA_READ) == FR_OK)
+		{
+			f_read(&in,&flags,8,&ts);	
+            f_read(&in,wname,280*2,&ts);	
+			f_close(&in);
+		}
+		else
+		{
+			//oops
+			return;
+		}
+	}
+	else
+	{
+		neo_copyfrom_sram(temp, 0x3FE00, 256);
+		neo_copyfrom_sram(&flags, 0x3FF00, 8);
+		neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
 
-    /*dummy write to unlock sram*/
-    neo_copyto_psram((void*)&flags,0,8);
-
-    neo_copyfrom_sram(temp, 0x3FE00, 256);
-    neo_copyfrom_sram(&flags, 0x3FF00, 8);
-    neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
-
-    if ((flags & 0xFFFFFF00) != 0xAA550100)
-    {
-        neo2_enable_sd();
-        getSDInfo(-1);
-        neo2_disable_sd();
-        return; // auto-save sram not needed
-    }
+		if ((flags & 0xFFFFFF00) != 0xAA550100)
+		{
+		    neo2_enable_sd();
+		    getSDInfo(-1);
+		    neo2_disable_sd();
+		    return; // auto-save sram not needed
+		}
+	}
 
     switch(flags & 15)
     {
@@ -2082,10 +2115,50 @@ void saveSaveState(void)
             break;
     }
 
-    // check for SD card
-    neo2_enable_sd();
-    bmax = getSDInfo(-1);               // try to get root
-    if (!bmax)
+    if(gSdDetected)
+    {
+        if(f_open(&out, wname, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
+		{
+		    char temp[512];
+			int i = 0,j = 0;
+			const int retries = 32;
+
+			disk_io_force_wdl = 0;
+
+			while(i++ < retries)
+			{
+				memset(&out,0,sizeof(FIL));
+				neo2_disable_sd();
+				neo2_enable_sd();
+				getSDInfo(-1);
+				if(f_open(&out, wname, FA_CREATE_ALWAYS | FA_WRITE) == FR_OK)
+				{
+					j = 1;
+					break;
+				}
+				disk_io_force_wdl += 200;
+			}
+
+			disk_io_force_wdl = 0;
+
+			if(!j)
+			{
+				w2cstrcpy(temp,wname);
+				debugText("Couldn't open file: ", 2, 2, 0);
+				debugText(temp, 4, 8, 500);
+
+				return;
+			}
+		}
+
+        f_write(&out,tmpBuf,ssize[flags & 15], &ts);
+        f_close(&out);
+		f_unlink(wname2);
+        neo2_disable_sd();
+        neo2_enable_sd();
+        getSDInfo(-1);
+    }
+	else
     {
         // no SD card, use GBA SRAM
         u8 blk[32];
@@ -2123,29 +2196,10 @@ void saveSaveState(void)
         else
             neo_copyto_sram(tmpBuf, soffs[ix], ssize[flags & 15]);
 
-        neo2_disable_sd();
-        neo2_enable_sd();
-        getSDInfo(-1);
+		// turn off auto-save
+		flags = 0;
+		neo_copyto_sram(&flags, 0x3FF00, 8);
     }
-    else
-    {
-        c2wstrcpy(wname, "/menu/n64/save/");
-        c2wstrcat(wname, temp);
-        f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
-        f_write(&lSDFile, tmpBuf, ssize[flags & 15], &ts);
-        f_close(&lSDFile);
-
-    }
-    neo2_disable_sd();
-
-    // turn off auto-save
-    flags = 0;
-
-    neo_copyto_sram(&flags, 0x3FF00, 8);
-
-    neo2_enable_sd();
-    getSDInfo(-1);
-    neo2_disable_sd();
 }
 
 void saveBrowserFlags(int brwsr, int bopt, int bfill)
@@ -2762,9 +2816,9 @@ int main(void)
     sprite_t *stemp;
 
     init_n64();
-
+	gSdDetected = 0;
+	disk_io_force_wdl = 0;
     gBootCic = get_cic((unsigned char *)0xB0000040);
-
     gCpldVers = neo_get_cpld();         // get Myth CPLD ID
     gCardID = neo_id_card();            // check for Neo Flash card
 
@@ -2800,6 +2854,8 @@ int main(void)
         neo_run_menu();
 #endif
 
+	disk_io_set_mode(0,0);
+
 #ifndef RUN_FROM_SD
     // check for boot rom on SD card
     neo2_enable_sd();
@@ -2810,7 +2866,6 @@ int main(void)
         FIL lSDFile;
         XCHAR fpath[32];
 
-        disk_io_set_mode(0,0);
         check_fast();                   // let SD read at full speed if allowed
 
         strcpy(path, "/menu/n64/");
@@ -2864,11 +2919,14 @@ int main(void)
     }
 #endif
 
-    neo2_enable_sd();
-    bmax = getSDInfo(-1);
+	if(gSdDetected == 0)
+	{
+		neo2_enable_sd();
+		bmax = getSDInfo(-1);
+	}
+
     if (bmax)
-    {
-        disk_io_set_mode(0,0);
+    {        
         check_fast();                   // let SD read at full speed if allowed
 
         // try for images on the SD card
@@ -2900,7 +2958,6 @@ int main(void)
             loading = stemp;
         }
     }
-    neo2_disable_sd();
 
     if (splash)
     {
@@ -2912,10 +2969,8 @@ int main(void)
         delay(120);
     }
 
+	saveSaveState();
     neo_select_game();
-
-    // save save state if needed
-    saveSaveState();
 
     if ((back_flags & 0xFFFFF000) == 0xAA550000)
     {

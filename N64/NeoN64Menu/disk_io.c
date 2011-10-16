@@ -1002,6 +1002,8 @@ DRESULT MMC_disk_read_multi(BYTE* buff,DWORD sector,UINT count)
 /* Write Sector(s)                                                       */
 /*-----------------------------------------------------------------------*/
 
+int disk_io_force_wdl = 0;
+
 DRESULT MMC_disk_write (
     const BYTE *buff,    /* Data to be written */
     DWORD sector,        /* Sector address (LBA) */
@@ -1010,7 +1012,7 @@ DRESULT MMC_disk_write (
 {
     unsigned int ix, iy;
 
-    sd_speed = 1;                       // no fast access on writes
+    sd_speed = disk_io_force_wdl + 1;                      // no fast access on writes
     for (ix=0; ix<count; ix++)
     {
         iy = (sector + ix) & (CACHE_SIZE - 1);    // really simple hash
@@ -1021,12 +1023,16 @@ DRESULT MMC_disk_write (
         neo2_pre_sd();
         if (!sdWriteSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
         {
-            // write failed, retry once
+            // write failed, retry 2/3
             if (!sdWriteSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
             {
-                neo2_post_sd();
-                sd_speed = 0;           // allow fast access on reads
-                return RES_ERROR;
+				//retry 3/3
+				if (!sdWriteSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
+				{
+		            neo2_post_sd();
+		            sd_speed = 0; 
+		            return RES_ERROR;
+				}
             }
         }
         neo2_post_sd();
