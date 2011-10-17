@@ -667,6 +667,9 @@ void sync_state()
 void handle_action_button(BYTE button)
 {
     FileInfoEntry *fi;
+    WORD *gd3;
+    WORD i;
+    BYTE col;
     DWORD praddr;
     uint16_t prbank, proffs;
     
@@ -788,10 +791,55 @@ void handle_action_button(BYTE button)
             }
             else if (GAME_MODE_VGM == fi->ftype)
             {
-                read_file_to_psram(fi, 0x00, 0x0000);
-                
+                read_file_to_psram(fi, 0x00, 0x0000);             
+                cls();
+                puts("Now playing: ", LEFT_MARGIN, 9, PALETTE1);
+                pfn_neo2_psram_to_ram(0xD600, 0, 0x0000, 0x20);
+                praddr = *(DWORD *)0xD614;  // GD3 offset field in the VGM header
+                if (praddr == 0)
+                {
+                    // No GD3
+                    puts(highlightedFileName, LEFT_MARGIN, 11, PALETTE1);
+                }
+                else
+                {
+                    praddr += 0x14 + 12;
+                    proffs = praddr & 0xFFFF;
+                    prbank = praddr >> 16;
+                    // ToDo: handle cases where the GD3 tag crosses a 16 kB boundary and/or
+                    // is larger than 256 bytes
+                    gd3 = (WORD *)0xD600;
+                    pfn_neo2_psram_to_ram((BYTE *)gd3, prbank, proffs, 256);
+                    col = LEFT_MARGIN;
+                    for (i=0; gd3[i]!=0; i++)
+                    {
+                        if (col < 25)
+                            puts((char*)&gd3[i], col, 11, PALETTE1);  // english title
+                        col++;
+                    }
+                    for (i=i+1; gd3[i]!=0; i++) ; // skip the japanese title
+                    col = LEFT_MARGIN;
+                    for (i=i+1; gd3[i]!=0; i++)
+                    {
+                        if (col < 25)
+                            puts((char*)&gd3[i], col, 12, PALETTE1);  // english game name
+                        col++;
+                    }                    
+                    for (i=i+1; gd3[i]!=0; i++) ; // skip the japanese game name
+                    for (i=i+1; gd3[i]!=0; i++) ; // skip the english system name
+                    for (i=i+1; gd3[i]!=0; i++) ; // skip the japanese system name
+                    col = LEFT_MARGIN;
+                    for (i=i+1; gd3[i]!=0; i++)
+                    {
+                        if (col < 25)
+                            puts((char*)&gd3[i], col, 13, PALETTE1);  // english author name
+                        col++;
+                    }                    
+                }           
+ 
                 Frame1 = BANK_VGM_PLAYER;
                 Frame2 = BANK_RAM_CODE;
+ 
                 puts("[II] Back           ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
                 puts("                    ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);                
                 memcpy_asm(0xD600, 0x4000, 0x1F0); // copy the vgm player code to ram
