@@ -1,3 +1,7 @@
+/*
+ * DiskIO helper routines for the SMS Myth menu
+ * Acts as a bridge between pff and diskio_asm
+ */
 #include "diskio.h"
 #include "neo2.h"
 #include "sms.h"

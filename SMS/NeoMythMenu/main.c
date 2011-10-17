@@ -1,3 +1,6 @@
+/*
+ * Enhanced menu for the Neoflash SMS/MKIII Myth
+ */
 #include "util.h"
 #include "sms.h"
 #include "vdp.h"
@@ -25,13 +28,6 @@ extern FATFS sdFatFs;
 extern unsigned char pfmountbuf[36];
 extern WCHAR LfnBuf[_MAX_LFN + 1];
 
-
-/*
- * Use the plain single-colored background instead of the pattered one.
- * If you remove this define you should also modify the Makefile to
- * link against font2.rel instead of font.rel.
- */
-#define PLAIN_BG
 
 void mute_sound()
 {
@@ -72,21 +68,12 @@ void load_font()
 
     for (i = 0; i < 960; i++)
     {
-#ifdef PLAIN_BG
         BYTE b,c;
         b = font[i] ^ 0xFF;
         c = ~b;
         VdpData = c;
         VdpData = c;
         VdpData = c;
-#else
-        BYTE b,c;
-        b = font[i+i];      // Bitplane 0
-        VdpData = b;
-        c = font[i+i+1];    // Bitplane 1
-        VdpData = c;
-        VdpData = b & c;
-#endif
         VdpData = b; //0;
     }
     enable_ints;
@@ -124,16 +111,9 @@ void setup_vdp()
     vdp_set_reg(REG_LINE_COUNT, 0xFF);      // Line ints off
     vdp_set_reg(REG_SAT_ADDR, 0x71);        // Sprite attribute table at 0x3800
 
-#ifdef PLAIN_BG
     vdp_set_color(16, 0, 0, 0);             // Backdrop color
     vdp_set_color(23, 0, 0, 0);
     vdp_set_color(24, 3, 3, 3);
-#else
-    vdp_set_color(16, 1, 0, 0);             // Color 16 (maroon)
-    vdp_set_color(17, 1, 0, 0);             // Color 17 (maroon)
-    vdp_set_color(18, 1, 0, 0);             // Color 18 (maroon)
-    vdp_set_color(23, 3, 3, 3);             // Color 23 (white)
-#endif
 
     enable_ints();
 }
@@ -358,7 +338,7 @@ void puts_active_list()
                 }
                 offs += 2;
 			}  
-            for (col=0; col<20; col++)
+            for (col=0; col<22; col++)
             {
                 if (!p[col])
                     break;
@@ -809,6 +789,7 @@ void handle_action_button(BYTE button)
             else if (GAME_MODE_VGM == fi->ftype)
             {
                 read_file_to_psram(fi, 0x00, 0x0000);
+                
                 Frame1 = BANK_VGM_PLAYER;
                 Frame2 = BANK_RAM_CODE;
                 puts("[II] Back           ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
@@ -991,13 +972,9 @@ void main()
 
     load_font();
 
-#ifdef PLAIN_BG
     bank1_dispatcher(TASK_LOAD_BG);
     puts("Neo SMS Menu", LEFT_MARGIN, 1, PALETTE1);
     puts("(c) NeoTeam 2011", LEFT_MARGIN, 2, PALETTE1);
-#else
-    bank1_dispatcher(TASK_LOAD_BG);
-#endif
 
     // Print software (menu) and firmware versions
     puts(MENU_VERSION_STRING, 20, 1, PALETTE1);

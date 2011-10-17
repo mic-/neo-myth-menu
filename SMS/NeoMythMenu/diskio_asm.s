@@ -499,6 +499,7 @@ sdReadSingleBlock:
         ld      a,#0            ; return FALSE (timeout on start bit)
         ret
 4$:
+
         pop hl
         call    neo2_recv_sd
 
