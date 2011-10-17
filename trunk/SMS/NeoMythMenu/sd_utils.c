@@ -1,3 +1,6 @@
+/*
+ * SD utility functions for the SMS Myth menu
+ */
 #include "shared.h"
 #include "sd_utils.h"
 #include "pff_map.h"
@@ -235,7 +238,7 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
     WORD sectorsPerUpdate, sectorsToNextUpdate;
     WORD sectorsInFile;
     BYTE dotPos = 10;
-    char *fullPath = (char *)0xD700;    // Note: hardcoded
+    char *fullPath = (char *)0xD600;    // Note: hardcoded
    
     Frame2 = BANK_PFF;
    
@@ -290,12 +293,6 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
         }
         sectorsInFile--;
     }
-    
-    // DEBUG
-    //sectorsInFile = fi->fsize >> 9;
-    //vdp_wait_vblank();
-    //print_hex(sectorsInFile>>8, 3, 12);
-    //print_hex(sectorsInFile, 5, 12); 
 }
 
 int init_sd()
