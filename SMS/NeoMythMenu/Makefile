@@ -34,7 +34,7 @@ ramcode.bin:
 	$(PADTRIM) neo2.bin ramcode.bin
 	$(MAP2H) neo2.map neo2.h diskio.h
 	$(MAP2H) neo2.map --output-asm neo2.h
-	$(RM) neo2.bin neo2.ihx *.noi *.lnk *.rst
+	$(RM) neo2.bin neo2.ihx neo2.asm *.noi *.lnk *.rst
 
 vgmcode.bin:
 	$(AS) -o vgm_player.s
@@ -49,7 +49,7 @@ pffromcode.bin:
 	$(HEX2BIN) pff.ihx
 	$(PADTRIM) pff.bin pffromcode.bin
 	$(MAP2H) pff.map pff.h
-	$(RM) pff.bin pff.ihx *.noi *.lnk *.rst
+	$(RM) pff.bin pff.ihx pff.asm *.noi *.lnk *.rst
     
 bank0.bin:
 	$(CC) $(CFLAGS) --no-peep -c sd_utils.c
@@ -57,12 +57,13 @@ bank0.bin:
 	$(HEX2BIN) main.ihx
 	$(PADTRIM) main.bin bank0.bin
 	$(MAP2H) main.map vdp.h pad.h util.h
-
+	$(RM) main.asm
+    
 bank1.bin:
 	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0x4000 bank1.c $(SHARED)
 	$(HEX2BIN) bank1.ihx
 	$(PADTRIM) bank1.bin bank_1.bin
-	$(RM) bank1.bin bank1.ihx *.noi *.lnk *.rst
+	$(RM) bank1.bin bank1.ihx bank1.asm *.noi *.lnk *.rst
 
 menu.sms:
 	cat bank0.bin bank_1.bin ramcode.bin bank0.bin bank0.bin pffromcode.bin vgmcode.bin bank0.bin > menu.sms
