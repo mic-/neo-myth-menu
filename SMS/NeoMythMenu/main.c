@@ -795,6 +795,10 @@ void handle_action_button(BYTE button)
                 cls();
                 puts("Now playing: ", LEFT_MARGIN, 9, PALETTE1);
                 pfn_neo2_psram_to_ram(0xDD00, 0, 0x0000, 0x20);
+                
+                if ((*(DWORD *)0xDD10) != 0)
+                    Neo2FmOn = 0x00;        // enable FM if the YM2413 clock is non-zero
+                    
                 praddr = *(DWORD *)0xDD14;  // GD3 offset field in the VGM header
                 if (praddr == 0)
                 {
@@ -842,8 +846,10 @@ void handle_action_button(BYTE button)
  
                 puts("[II] Back           ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
                 puts("                    ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);                
-                memcpy_asm(0xDD00, 0x4000, 0x1F0); // copy the vgm player code to ram
+                memcpy_asm(0xDD00, 0x4000, 0x240); // copy the vgm player code to ram
                 pfn_vgm_play();                     // the player will return when the user presses SW2
+                
+                mute_sound();
                 
                 Frame1 = BANK_BG_GFX;
                 Frame2 = BANK_RAM_CODE;

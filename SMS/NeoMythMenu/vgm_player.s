@@ -17,6 +17,8 @@
 
 
 SNPORT = 0x7F
+FMADDRPORT = 0xF0
+FMDATAPORT = 0xF1
 VDPSPEED = 0xC005
 VREGS = 0xC006
 VGMBASE = 0x4000
@@ -145,9 +147,46 @@ vgm_psg_write:
 
 	
 vgm_fm_write:
-	; TODO: handle this
+    bit     7,b
+    jr      z,1$
+    ld      b,#0x40
+    ld      a,(VREGS+10)
+    inc     a
+    ld      (VREGS+10),a
+    ld      d,a
+    and     a,#7
+    ld      (0xFFFE),a
+    ld      a,d
+    srl     a
+    srl     a
+    srl     a
+    ld      (0xBFC0),a
+1$:
+	ld	    a,(bc)
 	inc	    bc
+	out     (FMADDRPORT),a
+    nop
+    nop
+    nop
+    nop
+    bit     7,b
+    jr      z,2$
+    ld      b,#0x40
+    ld      a,(VREGS+10)
+    inc     a
+    ld      (VREGS+10),a
+    ld      d,a
+    and     a,#7
+    ld      (0xFFFE),a
+    ld      a,d
+    srl     a
+    srl     a
+    srl     a
+    ld      (0xBFC0),a
+2$:    
+	ld	    a,(bc)
 	inc	    bc
+    out     (FMDATAPORT),a
 	jp	    vgm_play_loop
 	
 	
