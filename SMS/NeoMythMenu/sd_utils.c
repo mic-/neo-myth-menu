@@ -235,10 +235,12 @@ void change_directory(char *path)
 
 void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
 {
-    WORD sectorsPerUpdate, sectorsToNextUpdate;
+    int sectorsPerUpdate, sectorsToNextUpdate;
     WORD sectorsInFile;
+    WORD sectorsToRead;
     BYTE dotPos = 10;
-    char *fullPath = (char *)0xD600;    // Note: hardcoded
+    char *fullPath = (char *)0xDD00;    // Note: hardcoded
+    FRESULT fr;
    
     Frame2 = BANK_PFF;
    
@@ -277,21 +279,34 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
 
     sectorsPerUpdate = sectorsInFile >> 3;
     sectorsToNextUpdate = sectorsPerUpdate;;
-    
+            
     puts("Reading", 3, 10, PALETTE1);
     while (sectorsInFile)
     {
-        pfn_pf_read_sector(0xDA08); // Note: hardcoded
-        pfn_neo2_ram_to_psram(prbank, proffs, 0xDA08, 512);
-        proffs += 512;
+        //pfn_pf_read_sector(0xDA08); // Note: hardcoded
+        //pfn_neo2_ram_to_psram(prbank, proffs, 0xDA08, 512);
+        
+        sectorsToRead = 16;  // try to read at most 16 sectors at a time
+        
+        if (sectorsToRead > sectorsInFile)
+            sectorsToRead = sectorsInFile;
+        
+        fr = pfn_pf_read_sectors(proffs, (WORD)prbank, sectorsToRead);
+
+        if (fr != FR_OK)
+            sectorsToRead = 0;
+        
+        proffs += sectorsToRead << 9;
         if (proffs == 0)
             prbank++;
-        if (--sectorsToNextUpdate == 0)
+              
+        sectorsToNextUpdate -= sectorsToRead;
+        if (sectorsToNextUpdate <= 0)
         {
-            sectorsToNextUpdate = sectorsPerUpdate;
+            sectorsToNextUpdate += sectorsPerUpdate;
             puts(".", dotPos++, 10, PALETTE1);
         }
-        sectorsInFile--;
+        sectorsInFile -= sectorsToRead;
     }
 }
 

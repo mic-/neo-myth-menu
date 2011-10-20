@@ -38,7 +38,7 @@ ramcode.bin:
 
 vgmcode.bin:
 	$(AS) -o vgm_player.s
-	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0xD600 vgm_player.rel
+	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0xDD00 vgm_player.rel
 	$(HEX2BIN) vgm_player.ihx
 	$(PADTRIM) vgm_player.bin vgmcode.bin
 	$(MAP2H) vgm_player.map vgm_player.h
@@ -53,7 +53,7 @@ pffromcode.bin:
     
 bank0.bin:
 	$(CC) $(CFLAGS) --no-peep -c sd_utils.c
-	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3000 --no-std-crt0 --no-peep --oldralloc main.c $(BANK0OBJS) sd_utils.rel $(SHARED)
+	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3400 --no-std-crt0 --no-peep --oldralloc main.c $(BANK0OBJS) sd_utils.rel $(SHARED)
 	$(HEX2BIN) main.ihx
 	$(PADTRIM) main.bin bank0.bin
 	$(MAP2H) main.map vdp.h pad.h util.h
