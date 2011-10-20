@@ -71,12 +71,15 @@ _sd_csd     = 0xC29D
 _sec_tags   = 0xC2AE                      
 _sec_last   = 0xC2B6                      
 _numSectors = 0xC2BA  
-     
+
+.globl _neo2_ram_to_psram
+
                
 ; Exported functions
 .globl _disk_initialize2
 .globl _disk_readp2
 .globl _disk_read_sector2
+.globl _disk_read_sectors2
 .globl neo2_enable_sd
 .globl neo2_disable_sd
 .globl neo2_pre_sd
@@ -1226,6 +1229,77 @@ disk_readp_calc_sector:
 1$:
         ret
 
+
+; Reads multiple sectors into PSRAM (going through RAM)
+_disk_read_sectors2:
+;     WORD destLo,         
+;     DWORD sector,       /* Sector number (LBA) */
+;     WORD destHi,
+;     WORD count
+
+        push    ix
+        di
+        ld      ix,#4                                       
+        add     ix,sp
+        
+        ; read sector
+        call    neo2_pre_sd
+        call    disk_readp_calc_sector  
+        call    sdReadStartMulti
+        cp      a,#1
+        jp      z,3$
+        ; read failed, retry once
+        call    disk_readp_calc_sector
+        call    sdReadStartMulti
+        cp      a,#1
+        jp      z,3$
+        call    neo2_post_sd
+        pop     ix
+        ld      hl,#RES_ERROR
+        ei
+        ret
+3$:
+        ld      c,8(ix)     ; count
+        ld      b,6(ix)     ; destHi
+        ld      e,0(ix)     ; destLo
+        ld      d,1(ix)     ; ...
+        call    neo2_recv_multi_sd
+        ld      a,#RES_OK
+        cp      a,l
+        jr      z,4$
+        ; reading sector data fail, try again
+        call    disk_readp_calc_sector
+        call    sdReadStartMulti
+        cp      a,#1
+        jp      z,5$
+        call    neo2_post_sd
+        pop     ix
+        ld      hl,#RES_ERROR
+        ei
+        ret
+5$:
+        ld      c,8(ix)     ; count
+        ld      b,6(ix)     ; destHi
+        ld      e,0(ix)     ; destLo
+        ld      d,1(ix)     ; ...
+        call    neo2_recv_multi_sd
+        ld      a,#RES_OK
+        cp      a,l
+        jr      z,4$
+        call    neo2_post_sd
+        pop     ix
+        ld      hl,#RES_ERROR
+        ei
+        ret
+4$:        
+        call    sdReadStopMulti
+        call    neo2_post_sd  
+        ld      hl,#RES_OK
+_disk_read_sectors_return:
+        pop     ix
+        ei
+        ret
+
         
 ; Reads an entire sector into a destination in RAM
 ; No extra buffers are used, and no data is cached
@@ -1265,7 +1339,8 @@ _disk_read_sector_return:
         pop     ix
         ei
         ret
-        
+
+       
 
 neo2_enable_sd:
         ret
@@ -1378,8 +1453,158 @@ neo2_recv_sd:
 
         ret
 
+        
+; Read to RAM/SRAM (multiple sectors)
+;
+; 46.625 cycles/byte
+;
+; In:
+;   C = number of sectors
+;   B = PSRAM bank
+;   DE = PSRAM offset
+neo2_recv_multi_sd:
+        push    bc
+        push    de
+ 
+        ld      a,#1
+        ld      (0xFFFE),a      ; Frame1 = 1
+        ld      a,#0x87
+        ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x87
+        
+        ; Wait for start bit
+        ld      de,#1024
+3$:     ; while ((rdMmcDatBit4()&1) != 0)
+        ld      a,(MYTH_NEO2_RD_DAT4)
+        and     a,#1
+        jr      z,4$
+        dec     de
+        ld      a,d
+        or      a,e
+        jp      nz,3$
+        pop     de
+        pop     bc
+        ld      hl,#RES_ERROR
+        jp      neo2_recv_multi_sd_return
+4$:
+        ld      b,#64
+        ld      de,#MYTH_NEO2_RD_DAT4
+        ld      hl,#_sec_buf
+        ; Read one sector (512 bytes)
+1$:
+        ld      a,(de)   ; 7
+        ld      (hl),a   ; 7
+        ld      a,(de)   ; 7
+        rld              ; 18.  (hl) = (hl)<<4 + a&0x0F
+        inc     hl       ; 6
+; 2nd byte
+        ld      a,(de)
+        ld      (hl),a
+        ld      a,(de)
+        rld
+        inc     hl
+; 3rd byte
+        ld      a,(de)
+        ld      (hl),a
+        ld      a,(de)
+        rld
+        inc     hl
+; 4th byte
+        ld      a,(de)
+        ld      (hl),a
+        ld      a,(de)
+        rld
+        inc     hl
+; 5th byte
+        ld      a,(de)
+        ld      (hl),a
+        ld      a,(de)
+        rld
+        inc     hl
+; 6th byte
+        ld      a,(de)
+        ld      (hl),a
+        ld      a,(de)
+        rld
+        inc     hl
+; 7th byte
+        ld      a,(de)
+        ld      (hl),a
+        ld      a,(de)
+        rld
+        inc     hl
+; 8th byte
+        ld      a,(de)
+        ld      (hl),a
+        ld      a,(de)
+        rld
+        inc     hl
 
-_sec_cache = 0xD800 ;: .ds 520
+        djnz    1$       ; 13
+
+        ; Read 8 CRC bytes (16 nybbles)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+        ld      a,(de)
+
+        ld      a,(de)   ; end bit
+
+        pop     de      ; PSRAM offset
+        pop     bc      ; PSRAM bank / number of sectors
+        push    bc
+        push    de
+    
+        ; neo2_ram_to_psram(b, de, _sec_buf, 512)
+        ld      hl,#512
+        push    hl
+        ld      hl,#_sec_buf
+        push    hl
+        push    de
+        push    bc
+        inc     sp
+        call    _neo2_ram_to_psram
+        di
+        inc     sp
+        pop     af
+        pop     af
+        pop     af
+      
+        ; reset registers modified by neo2_ram_to_psram
+        call    neo2_pre_sd
+        
+        pop     de
+        pop     bc
+        ; PSRAM offset += 512
+        ld      hl,#512
+        and     a,a     ; clear carry
+        adc     hl,de
+        ex      de,hl
+        ; if (offset == 0) bank++
+        jr      nz,5$
+        inc     b
+5$:
+        ; numSectors--
+        dec     c
+        jp      nz,neo2_recv_multi_sd
+        ld      hl,#RES_OK
+neo2_recv_multi_sd_return:
+        call    neo2_pre_sd
+        ret
+        
+
+_sec_cache = 0xC580 ;: .ds 520
 _sec_buf = 0xDA08  ;: .ds 520
 
 

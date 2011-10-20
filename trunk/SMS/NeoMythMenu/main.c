@@ -16,7 +16,7 @@
 #include "vgm_player_map.h"
 
 #undef TEST_CHEAT_INPUTBOX
-#define MENU_VERSION_STRING "1.00"
+#define MENU_VERSION_STRING "1.10"
 #define KEY_REPEAT_INITIAL_DELAY 15
 #define KEY_REPEAT_DELAY 7
 #define SD_DEFAULT_INFO_FETCH_TIMEOUT 30
@@ -794,8 +794,8 @@ void handle_action_button(BYTE button)
                 read_file_to_psram(fi, 0x00, 0x0000);             
                 cls();
                 puts("Now playing: ", LEFT_MARGIN, 9, PALETTE1);
-                pfn_neo2_psram_to_ram(0xD600, 0, 0x0000, 0x20);
-                praddr = *(DWORD *)0xD614;  // GD3 offset field in the VGM header
+                pfn_neo2_psram_to_ram(0xDD00, 0, 0x0000, 0x20);
+                praddr = *(DWORD *)0xDD14;  // GD3 offset field in the VGM header
                 if (praddr == 0)
                 {
                     // No GD3
@@ -808,7 +808,7 @@ void handle_action_button(BYTE button)
                     prbank = praddr >> 16;
                     // ToDo: handle cases where the GD3 tag crosses a 16 kB boundary and/or
                     // is larger than 256 bytes
-                    gd3 = (WORD *)0xD600;
+                    gd3 = (WORD *)0xDD00;
                     pfn_neo2_psram_to_ram((BYTE *)gd3, prbank, proffs, 256);
                     col = LEFT_MARGIN;
                     for (i=0; gd3[i]!=0; i++)
@@ -842,7 +842,7 @@ void handle_action_button(BYTE button)
  
                 puts("[II] Back           ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
                 puts("                    ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);                
-                memcpy_asm(0xD600, 0x4000, 0x1F0); // copy the vgm player code to ram
+                memcpy_asm(0xDD00, 0x4000, 0x1F0); // copy the vgm player code to ram
                 pfn_vgm_play();                     // the player will return when the user presses SW2
                 
                 Frame1 = BANK_BG_GFX;
@@ -988,8 +988,7 @@ void main()
 
     // Copy neo2 code from ROM to RAM
     Frame1 = BANK_RAM_CODE;
-    //memcpy_asm(0xD000, 0x4000, 0x700);
-    memcpy_asm(0xC800, 0x4000, 0xE00);
+    memcpy_asm(0xC800, 0x4000, 0xF00);
 
     temp = pfn_neo2_check_card();
     hasZipram = pfn_neo2_test_psram();

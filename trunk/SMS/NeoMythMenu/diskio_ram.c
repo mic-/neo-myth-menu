@@ -10,6 +10,7 @@
 extern DSTATUS disk_initialize2(void);
 extern DRESULT disk_readp2(void* dest, DWORD sector, WORD sofs, WORD count);
 extern DRESULT disk_read_sector2(void* dest, DWORD sector);
+extern DRESULT disk_read_sectors2(WORD destLo, DWORD sector, WORD destHi, WORD count);
 
 DSTATUS disk_initialize(void)
 {
@@ -35,13 +36,32 @@ DSTATUS disk_initialize(void)
 DRESULT disk_readp(void* dest, DWORD sector, WORD sofs, WORD count)
 {
     DSTATUS res;
-
+   
    __asm
     di
     __endasm;
 
     neo2_disable_sram();
     res = disk_readp2(dest, sector, sofs, count);
+    Frame2 = 5;
+
+    __asm
+    ei
+    __endasm;
+
+    return res;        
+}
+
+DRESULT disk_read_sectors(WORD destLo, DWORD sector, WORD destHi, WORD count)
+{
+    DSTATUS res;
+    
+   __asm
+    di
+    __endasm;
+
+    neo2_disable_sram();
+    res = disk_read_sectors2(destLo, sector, destHi, count);
     Frame2 = 5;
 
     __asm
@@ -69,3 +89,5 @@ DRESULT disk_read_sector(void* dest, DWORD sector)
 
     return res;        
 }
+
+

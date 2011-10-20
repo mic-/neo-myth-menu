@@ -82,10 +82,10 @@ void waste_time()
 {
    *(BYTE*)0xC000 = *(BYTE*)0xC000;
 }
-void pff_debug_print(BYTE val)
+void pff_debug_print(BYTE val, BYTE x)
 {
     BYTE lo,hi;
-    WORD vaddr = 0x3000 + (3 << 1) + (4 << 6);
+    WORD vaddr = 0x3000 + (x << 1) + (4 << 6);
     VdpCtrl = (vaddr & 0xFF);
     VdpCtrl = (vaddr >> 8) | 0x40;
         
@@ -1026,6 +1026,66 @@ FRESULT pf_read_sector (
     }
 
     fs->fptr += 512;
+    
+    return FR_OK;
+}
+
+FRESULT pf_read_sectors (
+    WORD destLo,
+    WORD destHi,
+    WORD count
+)
+{
+    DRESULT dr;
+    CLUST clst;
+    DWORD sect;
+    WORD remSectInClust, sectorsToRead;
+    FATFS *fs = FatFs;
+    DSTATUS (*p_disk_read_sectors)(WORD, DWORD, WORD, WORD) = pfn_disk_read_sectors;
+
+    if (!fs) return FR_NOT_ENABLED;     /* Check file system */
+    if (!(fs->flag & FA_READ))
+        return FR_INVALID_OBJECT;
+
+    while (count)
+    {  
+        if ((fs->fptr & 511) == 0) {                /* On the sector boundary? */
+            if (((fs->fptr >> 9) & (fs->csize - 1)) == 0) { /* On the cluster boundary? */
+                clst = (fs->fptr == 0) ?            /* On the top of the file? */
+                    fs->org_clust : get_fat(fs->curr_clust);
+                if (clst <= 1) {
+                    fs->flag = 0; return FR_DISK_ERR;
+                }
+                fs->curr_clust = clst;              /* Update current cluster */
+                fs->csect = 0;                      /* Reset sector offset in the cluster */
+            }
+            sect = clust2sect(fs->curr_clust);      /* Get current sector */
+            if (!sect) {
+                fs->flag = 0; return FR_DISK_ERR;
+            }
+            sect += fs->csect;
+            fs->dsect = sect;
+            fs->csect++;                            /* Next sector address in the cluster */
+        }
+
+        remSectInClust = fs->csize + 1 - fs->csect;
+        sectorsToRead = count;
+        if (sectorsToRead > remSectInClust)
+            sectorsToRead = remSectInClust;
+                       
+        dr = p_disk_read_sectors(destLo, fs->dsect, destHi, sectorsToRead);
+        if (dr) {
+            fs->flag = 0;
+            return (dr == RES_WRPRT/*STRERR*/) ? FR_STREAM_ERR : FR_DISK_ERR;
+        }
+
+        fs->fptr += sectorsToRead << 9;
+        fs->csect += sectorsToRead-1;
+        destLo += sectorsToRead << 9;
+        if (destLo == 0)
+            destHi++;
+        count -= sectorsToRead;
+    }
     
     return FR_OK;
 }
