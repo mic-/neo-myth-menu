@@ -744,7 +744,7 @@ void handle_action_button(BYTE button)
             gameData->cheat[0] = p[5];
             gameData->cheat[1] = p[6];
             gameData->cheat[2] = p[7];
-            pfn_neo2_run_game_gbac(fm,reset); // never returns
+            pfn_neo2_run_game_gbac(fm,reset,0x0000); // never returns
         } 
         else if (MENU_STATE_GAME_SD == menu_state)
         {
@@ -787,7 +787,7 @@ void handle_action_button(BYTE button)
                 gameData->cheat[0] = 0;
                 gameData->cheat[1] = 0;
                 gameData->cheat[2] = 0;
-                pfn_neo2_run_game_gbac(fm, reset); // never returns
+                pfn_neo2_run_game_gbac(fm,reset,0x0000); // never returns
             }
             else if (GAME_MODE_VGM == fi->ftype)
             {

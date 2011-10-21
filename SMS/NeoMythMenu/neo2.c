@@ -5,7 +5,6 @@
 // Since we're not linking this code against shared.rel
 #define neoMode_ (*(WORD *)0xC003)
 
-    
 void neo2_asic_begin()
 {
     Neo2FlashBankSize = FLASH_SIZE_1M;
@@ -19,7 +18,6 @@ void neo2_asic_end()
     Neo2FlashBankSize = 0;
     Neo2Frame0We = 0;
 }
-
 
 void neo2_asic_unlock()
 {
@@ -51,7 +49,6 @@ void neo2_asic_unlock()
     dummy = *(volatile BYTE *)0x6A00;
 }
 
-
 void neo2_asic_cmd(BYTE cmd, WORD data)
 {
     volatile BYTE dummy;
@@ -62,8 +59,6 @@ void neo2_asic_cmd(BYTE cmd, WORD data)
     Frame1 = data >> 13;
     dummy = *(volatile BYTE *)(0x4000 | ((data & 0x1FFF) << 1));
 }
-
-
 
 BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
 {
@@ -134,7 +129,6 @@ BYTE neo2_check_card() /*Returns 0 if no NEO2/3 cart found*/
     return 1;
 }
 
-
 void neo2_enable_sram(WORD offset)
 {
     neo2_asic_begin();
@@ -144,7 +138,6 @@ void neo2_enable_sram(WORD offset)
     Frm2Ctrl = 0x80 | FRAME2_AS_SRAM; // enable sram in Frame 2
 }
 
-
 void neo2_disable_sram()
 {
     Frm2Ctrl = FRAME2_AS_ROM; // disable sram in Frame 2
@@ -152,7 +145,6 @@ void neo2_disable_sram()
     neo2_asic_cmd(0x37, 0x2003|neoMode_); // select menu flash
     neo2_asic_end();
 }
-
 
 void neo2_enable_psram()
 {
@@ -164,7 +156,6 @@ void neo2_enable_psram()
     Neo2Frame1We = 0x01;
 }
 
-
 void neo2_disable_psram()
 {
     Frame1 = 1;
@@ -174,8 +165,7 @@ void neo2_disable_psram()
     neo2_asic_cmd(0x37,0x2003|neoMode_); // select menu flash
     neo2_asic_cmd(0xDA,0x0044); // deselect psram
     neo2_asic_end();
-}
-          
+}    
     
 void neo2_ram_to_sram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
 {
@@ -264,7 +254,6 @@ void neo2_sram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
     ret
     __endasm;
 }
-
 
 void neo2_ram_to_psram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
 {
@@ -405,7 +394,7 @@ BYTE neo2_test_psram()
 }*/
 
 
-void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu)
+void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu,WORD jump_addr)
 {
     volatile GbacGameData* gameData = (volatile GbacGameData*)0xDC00;
     WORD wtemp;
@@ -477,8 +466,9 @@ void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu)
 
     Frame1 = 1;
     Frame2 = 2;
+	wtemp = jump_addr;
 
-    ((void (*)())0x0000)(); // RESET => jump to address 0
+    ((void (*)())wtemp)(); // RESET => jump to address 0
 }
 
 
