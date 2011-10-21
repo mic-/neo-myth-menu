@@ -3,7 +3,7 @@ AS = $(SMSDEV)sdasz80
 RM = rm -rf
 PADTRIM = tools/bin16k
 HEX2BIN = tools/hex2bin
-MAP2H = tools/map2h
+MAP2H = $(TOOLS_BASE)tools/map2h
 SMSHDR = tools/smshdr
 
 CFLAGS = -mz80 --data-loc 0xC001

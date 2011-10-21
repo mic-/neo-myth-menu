@@ -1453,11 +1453,67 @@ neo2_recv_sd:
 
         ret
 
-        
+;neo2_fill_sector_buffer
+;Desc:Fills partially a sector buffer
+;In:
+;	DE = rdmmcdatbyte4
+;	HL = dest buffer
+;	B = 8BYTE units
+neo2_fill_sector_buffer:
+
+	;ld		a,b
+	;or		a
+	;ret	z
+	push	hl
+
+neo2_fill_sector_buffer_loop:
+	ld      a,(de)	; 7
+	ld      (hl),a	; 7
+	ld      a,(de)	; 7
+	rld				; 18.  (hl) = (hl)<<4 + a&0x0F
+	inc     l		; 4
+	ld      a,(de)	; 2nd byte
+	ld      (hl),a
+	ld      a,(de)
+	rld
+	inc     l	
+	ld      a,(de)	; 3rd byte
+	ld      (hl),a
+	ld      a,(de)
+	rld
+	inc     l		
+	ld      a,(de)	; 4th byte
+	ld      (hl),a
+	ld      a,(de)
+	rld
+	inc     l      
+	ld      a,(de)	; 5th byte
+	ld      (hl),a
+	ld      a,(de)
+	rld
+	inc     l	
+	ld      a,(de)	; 6th byte
+	ld      (hl),a
+	ld      a,(de)
+	rld
+	inc     l       
+	ld      a,(de)	; 7th byte
+	ld      (hl),a
+	ld      a,(de)
+	rld
+	inc     l		
+	ld      a,(de)	; 8th byte
+	ld      (hl),a
+	ld      a,(de)
+	rld
+	inc     l
+	djnz    neo2_fill_sector_buffer_loop       ; 13
+
+neo2_fill_sector_buffer_return:
+	pop		hl
+	ret
+
 ; Read to RAM/SRAM (multiple sectors)
-;
-; 46.625 cycles/byte
-;
 ; In:
 ;   C = number of sectors
 ;   B = PSRAM bank
@@ -1472,74 +1528,34 @@ neo2_recv_multi_sd:
         ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x87
         
         ; Wait for start bit
-        ld      de,#1024
-3$:     ; while ((rdMmcDatBit4()&1) != 0)
-        ld      a,(MYTH_NEO2_RD_DAT4)
-        and     a,#1
-        jr      z,4$
-        dec     de
-        ld      a,d
-        or      a,e
-        jp      nz,3$
+		ld		hl,#MYTH_NEO2_RD_DAT4
+
+		;timeout = 64x64
+		ld		c,#64
+		ld		b,#64
+3$:
+        bit		0,(hl)			;12
+        jp      z,4$			;10
+		djnz	3$				;13
+		ld		b,c
+		dec		c
+		ld		a,b
+		or		a
+		jp		nz,3$
         pop     de
         pop     bc
         ld      hl,#RES_ERROR
         jp      neo2_recv_multi_sd_return
 4$:
-        ld      b,#64
-        ld      de,#MYTH_NEO2_RD_DAT4
-        ld      hl,#_sec_buf
-        ; Read one sector (512 bytes)
-1$:
-        ld      a,(de)   ; 7
-        ld      (hl),a   ; 7
-        ld      a,(de)   ; 7
-        rld              ; 18.  (hl) = (hl)<<4 + a&0x0F
-        inc     hl       ; 6
-; 2nd byte
-        ld      a,(de)
-        ld      (hl),a
-        ld      a,(de)
-        rld
-        inc     hl
-; 3rd byte
-        ld      a,(de)
-        ld      (hl),a
-        ld      a,(de)
-        rld
-        inc     hl
-; 4th byte
-        ld      a,(de)
-        ld      (hl),a
-        ld      a,(de)
-        rld
-        inc     hl
-; 5th byte
-        ld      a,(de)
-        ld      (hl),a
-        ld      a,(de)
-        rld
-        inc     hl
-; 6th byte
-        ld      a,(de)
-        ld      (hl),a
-        ld      a,(de)
-        rld
-        inc     hl
-; 7th byte
-        ld      a,(de)
-        ld      (hl),a
-        ld      a,(de)
-        rld
-        inc     hl
-; 8th byte
-        ld      a,(de)
-        ld      (hl),a
-        ld      a,(de)
-        rld
-        inc     hl
-
-        djnz    1$       ; 13
+		ex		de,hl
+		ld      hl,#_sec_buf
+		ld		b,#32
+		call	neo2_fill_sector_buffer
+		;ld		bc,#256
+		;add	hl,bc
+		inc		h
+		ld		b,#32
+		call	neo2_fill_sector_buffer
 
         ; Read 8 CRC bytes (16 nybbles)
         ld      a,(de)
@@ -1558,7 +1574,6 @@ neo2_recv_multi_sd:
         ld      a,(de)
         ld      a,(de)
         ld      a,(de)
-
         ld      a,(de)   ; end bit
 
         pop     de      ; PSRAM offset
@@ -1605,6 +1620,6 @@ neo2_recv_multi_sd_return:
         
 
 _sec_cache = 0xC580 ;: .ds 520
-_sec_buf = 0xDA08  ;: .ds 520
+_sec_buf = 0xdb00  ;: .ds 520
 
 
