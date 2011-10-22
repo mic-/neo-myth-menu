@@ -338,7 +338,7 @@ void puts_active_list()
                 }
                 offs += 2;
 			}  
-            for (col=0; col<22; col++)
+            for (col=0; col<25; col++)
             {
                 if (!p[col])
                     break;
