@@ -796,9 +796,6 @@ FRESULT pf_mount (
     DSTATUS (*p_disk_initialize)(void) = pfn_disk_initialize;
     DSTATUS (*p_disk_readp)(void*, DWORD, WORD, WORD) = pfn_disk_readp;
     
-// DEBUG
-//pfMountFmt = 0xAB;
-
     FatFs = 0;
     if (!fs) return FR_OK;              /* Unregister fs object */
 
@@ -809,9 +806,6 @@ FRESULT pf_mount (
     /* Search FAT partition on the drive */
     bsect = 0;
     fmt = check_fs(buf, bsect);         /* Check sector 0 as an SFD format */
-
-//DEBUG
-//memcpy(pfmountbuf, buf, 36);
 
     if (fmt == 1) {                     /* Not an FAT boot record, it may be FDISK format */
         /* Check a partition listed in top of the partition table */
@@ -849,9 +843,6 @@ FRESULT pf_mount (
 
     fmt = FS_FAT12;                         /* Determine the FAT sub type */
     if (mclst >= 0xFF7) fmt = FS_FAT16;     /* Number of clusters >= 0xFF5 */
-
-// DEBUG
-//pfMountFmt = fmt;
 
     if (mclst >= 0xFFF7)                    /* Number of clusters >= 0xFFF5 */
     {
@@ -1097,10 +1088,10 @@ volatile FRESULT pf_read_sectors (
     DRESULT dr;
     CLUST clst;
     DWORD sect;
-	volatile DWORD* adr_stack = (volatile DWORD*)0xda08;			/*HARDCODED : 26 longs (only 3bytes/entry are required though)*/
-	volatile BYTE*  len_stack = (volatile BYTE*)0xda70;				/*HARDCODED : 26 bytes*/
-	volatile WORD*  lo_stack  = (volatile WORD*)0xda8a;				/*HARDCODED : 26 words*/
-	volatile WORD*  hi_stack  = (volatile WORD*)0xdabe;				/*HARDCODED : 26 words*/
+	volatile DWORD* adr_stack = (volatile DWORD*)0xDA08;			/*HARDCODED : 26 longs (only 3bytes/entry are required though)*/
+	volatile BYTE*  len_stack = (volatile BYTE*)0xDA70;				/*HARDCODED : 26 bytes*/
+	volatile WORD*  lo_stack  = (volatile WORD*)0xDA8A;				/*HARDCODED : 26 words*/
+	volatile WORD*  hi_stack  = (volatile WORD*)0xDABE;				/*HARDCODED : 26 words*/
 	volatile WORD sptr;
 	WORD remSectInClust, sectorsToRead;
     FATFS *fs = FatFs;
@@ -1170,8 +1161,6 @@ volatile FRESULT pf_read_sectors (
 }
 
 
-//extern DWORD pffbcs;
-//extern WORD pffclst;
 
 #if _USE_LSEEK
 /*-----------------------------------------------------------------------*/

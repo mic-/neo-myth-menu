@@ -308,7 +308,7 @@ rdMmcDatByte:
 crc7:
         ld      a,#0x80         ; r0 = 0x80808080
         ld      iy,#_vregs
-        ld      0(iy),a
+        ld      h,a
         ld      1(iy),a
         ld      2(iy),a
         ld      3(iy),a
@@ -318,17 +318,15 @@ crc7:
         ld      4(iy),a         ; x = 0
         ld      c,a             ; crc = 0
 1$:
-        ld      a,(_vregs+0)    ; if (r0 & 0x80) x = *buf++;
-        and     a,#0x80
+        bit     7,h             ; if (r0 & 0x80) x = *buf++;
         jr      z,2$
         ld      a,(de)
         inc     de
         ld      (_vregs+4),a
 2$:
         sla     c               ; crc <<= 1
-
-        bit     7,c            ; if (crc & 0x80) crc ^= 9;
-        jr      z,3$
+          
+        jp      p,3$            ; if (crc & 0x80) crc ^= 9;
         ld      a,#9
         xor     a,c
         ld      c,a
@@ -343,13 +341,13 @@ crc7:
         xor     a,c
         ld      c,a
 4$:
-        ld      a,0(iy)
+        ; r0 = (r0 >> 1) | (r0 << 31);
+        ld      a,h
         srl     a
-        ;srl     0(iy)           ; r0 = (r0 >> 1) | (r0 << 31);
         rr      3(iy)
         rr      2(iy)
         rr      1(iy)
-        rr      0(iy)
+        rr      h
 
         djnz    1$
         ld      a,c
@@ -1573,6 +1571,7 @@ neo2_recv_multi_sd:
         ld      a,(de)
         ld      a,(de)
         ld      a,(de)
+        
         ld      a,(de)   ; end bit
 
         pop     de      ; PSRAM offset
@@ -1606,7 +1605,7 @@ neo2_recv_multi_sd:
         adc     hl,de
         ex      de,hl
         ; if (offset == 0) bank++
-        jr      nz,5$
+        jr      nc,5$
         inc     b
 5$:
         ; numSectors--
@@ -1619,6 +1618,6 @@ neo2_recv_multi_sd_return:
         
 
 _sec_cache = 0xC580 ;: .ds 520
-_sec_buf = 0xdb00  ;: .ds 520
+_sec_buf = 0xDB00  ;: .ds 520
 
 

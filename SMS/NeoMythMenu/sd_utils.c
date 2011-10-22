@@ -127,9 +127,13 @@ uint16_t count_games_on_sd_card()
                 buf->fsize = sdFileInfo.fsize;
                 buf->fattrib = sdFileInfo.fattrib;
 
-                if ((strstri(".SMS", sdFileInfo.fname) > 0) ||
-                    (strstri(".SG", sdFileInfo.fname) > 0) ||
-                    (strstri(".BIN", sdFileInfo.fname) > 0))
+                if (sdFileInfo.fattrib & AM_DIR)
+                {
+                    buf->ftype = 0;
+                }
+                else if ((strstri(".SMS", sdFileInfo.fname) > 0) ||
+                         (strstri(".SG", sdFileInfo.fname) > 0) ||
+                         (strstri(".BIN", sdFileInfo.fname) > 0))
                 {
                     buf->ftype = GAME_MODE_NORMAL_ROM;
                 }
@@ -273,7 +277,7 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
 	if ((GAME_MODE_NORMAL_ROM == fi->ftype) && ((fi->fsize & 0x3FF) == 0x200))
 	{
 		// strip header
-		pfn_pf_read_sector(0xdb00);
+		pfn_pf_read_sector(0xDB00);
 		sectorsInFile--;
 	}
 
@@ -286,7 +290,7 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
         //pfn_pf_read_sector(0xDA08); // Note: hardcoded
         //pfn_neo2_ram_to_psram(prbank, proffs, 0xDA08, 512);
         
-        sectorsToRead = 32;  // try to read at most 16 sectors at a time
+        sectorsToRead = 32;  // try to read at most 32 sectors at a time
         
         if (sectorsToRead > sectorsInFile)
             sectorsToRead = sectorsInFile;
