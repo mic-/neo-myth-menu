@@ -1457,14 +1457,14 @@ neo2_recv_sd:
 ;Desc:Fills partially a sector buffer
 ;In:
 ;	DE = rdmmcdatbyte4
-;	HL = dest buffer
-;	B = 8BYTE units
+;	HL = dest buffer				(Destroys LSB)
+;	B = 8BYTE units					(Destroys it)
 neo2_fill_sector_buffer:
 
 	;ld		a,b
 	;or		a
 	;ret	z
-	push	hl
+	;push	hl
 
 neo2_fill_sector_buffer_loop:
 	ld      a,(de)	; 7
@@ -1510,7 +1510,7 @@ neo2_fill_sector_buffer_loop:
 	djnz    neo2_fill_sector_buffer_loop       ; 13
 
 neo2_fill_sector_buffer_return:
-	pop		hl
+	;pop		hl
 	ret
 
 ; Read to RAM/SRAM (multiple sectors)
@@ -1551,9 +1551,8 @@ neo2_recv_multi_sd:
 		ld      hl,#_sec_buf
 		ld		b,#32
 		call	neo2_fill_sector_buffer
-		;ld		bc,#256
-		;add	hl,bc
 		inc		h
+		ld		l,#0x00			;JUST in case
 		ld		b,#32
 		call	neo2_fill_sector_buffer
 

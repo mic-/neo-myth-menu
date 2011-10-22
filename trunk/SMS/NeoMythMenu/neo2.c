@@ -468,7 +468,7 @@ void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu,WORD jump_addr)
     Frame2 = 2;
 	wtemp = jump_addr;
 
-    ((void (*)())wtemp)(); // RESET => jump to address 0
+    ((void (*)())wtemp)(); // RESET => jump to address
 }
 
 
