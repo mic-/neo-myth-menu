@@ -1030,7 +1030,65 @@ FRESULT pf_read_sector (
     return FR_OK;
 }
 
-FRESULT pf_read_sectors (
+/*
+	Submit as many sectors together
+*/
+
+volatile void pf_submit_quee(DWORD* adr_stack,BYTE* len_stack,WORD* lo_stack,WORD* hi_stack,WORD count)
+{
+	volatile WORD i,j,run;
+	volatile BYTE k;
+	volatile DWORD a,b,c;
+	volatile DSTATUS (*p_disk_read_sectors)(WORD, DWORD, WORD, WORD) = pfn_disk_read_sectors;
+
+	i = 0;
+
+	while(i < count)
+	{
+		if(i >= (count-1)) { goto ___skip; }					/*Near end?*/
+
+		j = i;
+		run = 0;
+		a = adr_stack[j];
+		b = adr_stack[j+1];
+
+		if(b < a) { goto ___skip; }								/* Node[a] > Node[b] -- branch out */
+		if( ((b - a) != len_stack[j] ) ) { goto ___skip; }		/* diff(depth(Node[a]) - depth(Node[b])) != path-depth? -- branch out */	
+
+		run += len_stack[j];	j += 1;							/*make sure that SDCC will emit proper code*/
+		run += len_stack[j];	j += 1; 						/*make sure that SDCC will emit proper code*/
+
+		while(j < count)										/*Follow path*/
+		{
+			a = adr_stack[j];
+		
+			if(a < b) { goto ___skip2; }						/* Node[a] < Node[b] -- branch out */
+			c = 0;												/*make sure that SDCC will emit proper code*/
+			k = len_stack[j];
+			c += k;												/*make sure that SDCC will emit proper code*/
+			if( (a - b) != c ) { goto ___skip2; }				/* diff(depth(Node[a]) - depth(Node[b])) != path-depth? -- branch out */
+
+			run += k;
+			b = a;
+			++j;
+		}
+
+		if(!run)
+		{
+			___skip:											/*No run , write child*/
+			if(p_disk_read_sectors(lo_stack[i],adr_stack[i],hi_stack[i],len_stack[i])) { return; }
+			
+			++i;
+			continue;
+		}
+
+		___skip2:												/*Follow this node from parent to child*/
+		if(p_disk_read_sectors(lo_stack[i],adr_stack[i],hi_stack[i],run)) { return; }
+		i = j;
+	}
+}
+
+volatile FRESULT pf_read_sectors (
     WORD destLo,
     WORD destHi,
     WORD count
@@ -1039,13 +1097,20 @@ FRESULT pf_read_sectors (
     DRESULT dr;
     CLUST clst;
     DWORD sect;
-    WORD remSectInClust, sectorsToRead;
+	volatile DWORD* adr_stack = (volatile DWORD*)0xda08;			/*HARDCODED : 26 longs (only 3bytes/entry are required though)*/
+	volatile BYTE*  len_stack = (volatile BYTE*)0xda70;				/*HARDCODED : 26 bytes*/
+	volatile WORD*  lo_stack  = (volatile WORD*)0xda8a;				/*HARDCODED : 26 words*/
+	volatile WORD*  hi_stack  = (volatile WORD*)0xdabe;				/*HARDCODED : 26 words*/
+	volatile WORD sptr;
+	WORD remSectInClust, sectorsToRead;
     FATFS *fs = FatFs;
-    DSTATUS (*p_disk_read_sectors)(WORD, DWORD, WORD, WORD) = pfn_disk_read_sectors;
+    /*DSTATUS (*p_disk_read_sectors)(WORD, DWORD, WORD, WORD) = pfn_disk_read_sectors;*/
 
     if (!fs) return FR_NOT_ENABLED;     /* Check file system */
     if (!(fs->flag & FA_READ))
         return FR_INVALID_OBJECT;
+
+	sptr = 0;
 
     while (count)
     {  
@@ -1072,21 +1137,35 @@ FRESULT pf_read_sectors (
         sectorsToRead = count;
         if (sectorsToRead > remSectInClust)
             sectorsToRead = remSectInClust;
-                       
-        dr = p_disk_read_sectors(destLo, fs->dsect, destHi, sectorsToRead);
-        if (dr) {
-            fs->flag = 0;
-            return (dr == RES_WRPRT/*STRERR*/) ? FR_STREAM_ERR : FR_DISK_ERR;
-        }
+                     
+		if(sectorsToRead > 0)
+		{
+			if(sptr >= 26)							/*Up to 26 can be cached up*/
+			{
+				pf_submit_quee(adr_stack,len_stack,lo_stack,hi_stack,sptr);
+				sptr = 0;
+			}
+
+			adr_stack[sptr] = fs->dsect;
+			len_stack[sptr] = sectorsToRead;
+			lo_stack[sptr]  = destLo;
+			hi_stack[sptr]  = destHi;
+			sptr++;
+		}  
 
         fs->fptr += sectorsToRead << 9;
         fs->csect += sectorsToRead-1;
         destLo += sectorsToRead << 9;
-        if (destLo == 0)
-            destHi++;
+        if (destLo == 0) { destHi++; }
         count -= sectorsToRead;
     }
     
+	if(sptr != 0)
+	{
+		/*FLUSH!*/
+		pf_submit_quee(adr_stack,len_stack,lo_stack,hi_stack,sptr);
+	}
+
     return FR_OK;
 }
 

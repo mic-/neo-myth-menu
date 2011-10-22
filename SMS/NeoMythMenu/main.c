@@ -886,19 +886,33 @@ void handle_action_button(BYTE button)
 }
 
 #ifdef TEST_CHEAT_INPUTBOX
-void cheat_inputbox(char* dst_buf,BYTE* dst_size,const char* title)
+
+void cheat_clean_ptr(BYTE x1,BYTE x2,BYTE y)
+{
+	vdp_delay(1);
+	while(x1 < x2)
+	{
+		puts(" ",x1,y,PALETTE1);
+		x1++;
+	}
+	vdp_delay(1);
+}
+
+
+volatile void cheat_inputbox(char* dst_buf,BYTE* dst_size,const char* title)
 {
 	BYTE key;
 	BYTE addr;
+	BYTE h,l,a;
 	BYTE abs_addr;
 
 	//clear list surf
 	clear_list_surface();
 	present_list_surface();
 
-	//set default str
-	memset_asm(dst_buf,'_',10);													//TODO make this an argument
-	dst_buf[10] = '\0';
+	//set default str : hhlllldd( NOTE : Addressing in nybbles )
+	memset_asm(dst_buf,0xff,8);	
+	dst_buf[8] = '\0';
 	addr = 0;
 
 	//Render title
@@ -906,8 +920,11 @@ void cheat_inputbox(char* dst_buf,BYTE* dst_size,const char* title)
 
 	//Render default str
 	abs_addr = LEFT_MARGIN + (((22/2) - (strlen_asm(dst_buf)/2))) + 1;
-	puts(dst_buf,abs_addr,12,PALETTE1);
-	putsn(dst_buf + addr,abs_addr + addr,12,PALETTE1,1);
+	cheat_clean_ptr(abs_addr-4,abs_addr+8,13);
+	puts("^",abs_addr,13,PALETTE1);
+
+	for(h=0;h<7;h++)
+		print_hex(dst_buf[h],abs_addr + h,12);
 
 	while(1)
 	{
@@ -919,47 +936,84 @@ void cheat_inputbox(char* dst_buf,BYTE* dst_size,const char* title)
 			break;
 		else if (pad & PAD_UP)
 		{
-			++dst_buf[addr];
-			putsn(dst_buf + addr,abs_addr + addr,12,PALETTE1,1);
+			a = addr >> 1;
+			h = dst_buf[a];
+			l = h & 0x0f;
+			h = (h>>4)&0x0f;
+			
+			if(a & 1)
+			{
+				print_hex(1,abs_addr,16);
+				if(l < 0x0f) { l--; }
+			}
+			else
+			{
+				print_hex(0,abs_addr,16);
+				if(h < 0x0f) { h++; }
+			}
+ 
+			dst_buf[a] = (h<<4) | l;
+			print_hex(dst_buf[a],abs_addr + addr,12);
+			vdp_delay(1);
 		}
 		else if (pad & PAD_DOWN)
 		{
-			--dst_buf[addr];
-			putsn(dst_buf + addr,abs_addr + addr,12,PALETTE1,1);
+			a = addr >> 1;
+			h = dst_buf[a];
+			l = h & 0x0f;
+			h = (h>>4)&0x0f;
+			
+			if(a & 1)
+			{
+				print_hex(1,abs_addr,16);
+				if(l) { l--; }
+			}
+			else
+			{
+				print_hex(0,abs_addr,16);
+				if(h) { h--; }
+			}
+ 
+			dst_buf[a] = (h<<4) | l;
+			print_hex(dst_buf[a],abs_addr + addr,12);
+			vdp_delay(1);
 		}
 		else if (pad & PAD_RIGHT)
 		{
-			if(addr < 9)
+			if(addr <= 6)
 			{
 				++addr;
-				puts(dst_buf,abs_addr,12,PALETTE1);
-				putsn(dst_buf + addr,abs_addr + addr,12,PALETTE0,1);	
+				cheat_clean_ptr(abs_addr-4,abs_addr+8,13);
+				puts("^",abs_addr + addr,13,PALETTE1);
+				vdp_delay(1);
 			}
 		}
 		else if (pad & PAD_LEFT)
 		{
-			if(addr)
+			if(addr > 0)
 			{
 				--addr;
-				puts(dst_buf,abs_addr,12,PALETTE1);
-				putsn(dst_buf + addr,abs_addr + addr,12,PALETTE0,1);
+				cheat_clean_ptr(abs_addr-4,abs_addr+8,13);
+				puts("^",abs_addr + addr,13,PALETTE1);
+				vdp_delay(1);
 			}
 		}
 	}
-	*dst_size = addr;
 
 	addr = 0;
-	while(addr < 10)
+
+	while(addr < 8)
 	{
-		if(addr == '_')
+		if(dst_buf[addr] == '\0')
 			break;
 
 		++addr;
 	}
 
+	*dst_size = addr;
 	dst_buf[addr] = '\0';
 
-	puts("                      ",LEFT_MARGIN,8,PALETTE1);
+	puts("                       ",LEFT_MARGIN,8,PALETTE1);
 	clear_list_surface();
 	sync_state();
 	vdp_delay(2);
@@ -975,8 +1029,6 @@ void import_std_options()
     reset_to_menu_option_idx = options_count;
     options_add("Reset to menu : ","off","on",OPTION_TYPE_SETTING,1);
 }
-
-
 
 void main()
 {
@@ -1181,24 +1233,20 @@ BYTE options_get_state(Option* option)
     return (option->encoded_info & 0x0F);
 }
 
-
 BYTE options_get_type(Option* option)
 {
     return (option->encoded_info >> 4);
 }
-
 
 volatile void options_set_state(Option* option,BYTE new_state)
 {
     option->encoded_info = (option->encoded_info & 0xF0) | (new_state & 0x0F);
 }
 
-
 volatile void options_set_type(Option* option,BYTE new_type)
 {
     option->encoded_info = (new_type << 4) | (option->encoded_info & 0x0F);
 }
-
 
 Option* options_add(const char* name,const char* cond0_bhv,const char* cond1_bhv,BYTE type,BYTE state)
 {
@@ -1217,7 +1265,6 @@ Option* options_add(const char* name,const char* cond0_bhv,const char* cond1_bhv
     return option;
 }
 
-
 Option* options_add_ex(const char* name,const char* cond0_bhv,const char* cond1_bhv,BYTE type,BYTE state,WORD user_data0,WORD user_data1)
 {
     Option* option = options_add(name,cond0_bhv,cond1_bhv,type,state);
@@ -1230,7 +1277,6 @@ Option* options_add_ex(const char* name,const char* cond0_bhv,const char* cond1_
 
     return option;
 }
-
 
 void options_init()
 {

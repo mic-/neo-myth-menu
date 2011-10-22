@@ -286,7 +286,7 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
         //pfn_pf_read_sector(0xDA08); // Note: hardcoded
         //pfn_neo2_ram_to_psram(prbank, proffs, 0xDA08, 512);
         
-        sectorsToRead = 16;  // try to read at most 16 sectors at a time
+        sectorsToRead = 32;  // try to read at most 16 sectors at a time
         
         if (sectorsToRead > sectorsInFile)
             sectorsToRead = sectorsInFile;

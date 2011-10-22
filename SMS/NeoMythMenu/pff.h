@@ -159,7 +159,7 @@ FRESULT pf_open (const char*);          /* Open a file */
 
 FRESULT pf_read (void*, WORD, WORD*);   /* Read data from a file */
 FRESULT pf_read_sector (void*);
-FRESULT pf_read_sectors (WORD, WORD, WORD);
+volatile FRESULT pf_read_sectors (WORD, WORD, WORD);
 
 FRESULT pf_lseek (DWORD);               /* Move file pointer of a file object */
 FRESULT pf_opendir (DIR*, const char*); /* Open an existing directory */
