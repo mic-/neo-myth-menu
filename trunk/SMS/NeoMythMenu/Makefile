@@ -45,7 +45,7 @@ vgmcode.bin:
 	$(RM) vgm_player.bin vgm_player.ihx *.noi *.lnk *.rst
 
 pffromcode.bin:
-	$(CC) $(CFLAGS) --no-std-crt0 --oldralloc --no-peep --code-loc 0x8000 pff.c $(SHARED)
+	$(CC) $(CFLAGS) --no-std-crt0 --oldralloc --code-loc 0x8000 pff.c $(SHARED)
 	$(HEX2BIN) pff.ihx
 	$(PADTRIM) pff.bin pffromcode.bin
 	$(MAP2H) pff.map pff.h
@@ -53,7 +53,7 @@ pffromcode.bin:
     
 bank0.bin:
 	$(CC) $(CFLAGS) --no-peep -c sd_utils.c
-	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3400 --no-std-crt0 --no-peep --oldralloc main.c $(BANK0OBJS) sd_utils.rel $(SHARED)
+	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3400 --no-std-crt0 --oldralloc main.c $(BANK0OBJS) sd_utils.rel $(SHARED)
 	$(HEX2BIN) main.ihx
 	$(PADTRIM) main.bin bank0.bin
 	$(MAP2H) main.map vdp.h pad.h util.h

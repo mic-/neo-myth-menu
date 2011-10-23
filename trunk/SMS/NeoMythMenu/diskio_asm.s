@@ -51,16 +51,7 @@ MYTH_NEO2_RD_DAT4 = 0x6061          ; 0x87,1
 
 ;**********************************************************************************************
 
-; External variables
-;.globl _vregs
-;.globl _diskioPacket
-;.globl _diskioResp
-;.globl _diskioTemp
-;.globl _cardType
-;.globl _sd_csd
-;.globl _numSectors
-;.globl _sec_tags
-;.globl _sec_last
+; External variables (hardcoded)
 
 _vregs      = 0xC006
 _cardType   = 0xC016

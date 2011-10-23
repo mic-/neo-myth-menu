@@ -64,11 +64,6 @@ extern void neo2_asic_cmd(BYTE cmd, WORD data);
 /*Returns 0 if no NEO2/3 cart found*/
 extern BYTE neo2_check_card();
 
-/*
- * Returns 1 if the cart has zipram
- */
-//extern BYTE neo2_check_zipram();
-
 extern void neo2_asic_begin();
 extern void neo2_asic_end();
 
