@@ -5,9 +5,9 @@
 #include <stdint.h>
 
 #define NUMBER_OF_GAMES_TO_SHOW 7
-#define MAX_OPTIONS 8
+#define MAX_OPTIONS 4
 
-#define MENU_NAMETABLE 0x3000 //0x1800
+#define MENU_NAMETABLE 0x3000 
 
 #define GAME_MODE_NORMAL_ROM 4
 #define GAME_MODE_SPC 32
