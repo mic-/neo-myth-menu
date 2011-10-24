@@ -45,7 +45,7 @@ vgmcode.bin:
 	$(RM) vgm_player.bin vgm_player.ihx *.noi *.lnk *.rst
 
 pffromcode.bin:
-	$(CC) $(CFLAGS) --no-std-crt0 --oldralloc --code-loc 0x8000 pff.c $(SHARED)
+	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --oldralloc --code-loc 0x8000 pff.c $(SHARED)
 	$(HEX2BIN) pff.ihx
 	$(PADTRIM) pff.bin pffromcode.bin
 	$(MAP2H) pff.map pff.h

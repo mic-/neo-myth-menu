@@ -54,19 +54,19 @@ typedef WORD WCHAR;
 
 #define _FS_FAT32   1
 /* To enable FAT32 support, set _FS_FAT32 to 1. */
-
+/*
 #define _FS_RPATH 1
-
+*/
 #define _USE_LFN  1
 
 #define _MAX_LFN 64
 
-#define _DF1S 0
+/*#define _DF1S 0
 #define IsDBCS1(c)  0
 #define IsDBCS2(c)  0
 #define IsUpper(c)  (((c)>='A')&&((c)<='Z'))
 #define IsLower(c)  (((c)>='a')&&((c)<='z'))
-
+*/
 /* End of configuration options. Do not change followings without care.     */
 /*--------------------------------------------------------------------------*/
 
@@ -158,9 +158,8 @@ FRESULT pf_mount (FATFS*);              /* Mount/Unmount a logical drive */
 FRESULT pf_open (const char*);          /* Open a file */
 
 FRESULT pf_read (void*, WORD, WORD*);   /* Read data from a file */
-FRESULT pf_read_sector (void*);
 volatile FRESULT pf_read_sectors (WORD, WORD, WORD);
-
+FRESULT pf_write (const void*, WORD, WORD*);	/* Write data to the open file */
 FRESULT pf_lseek (DWORD);               /* Move file pointer of a file object */
 FRESULT pf_opendir (DIR*, const char*); /* Open an existing directory */
 FRESULT pf_readdir (DIR*, FILINFO*);    /* Read a directory item */
@@ -174,8 +173,10 @@ FRESULT pf_readdir (DIR*, FILINFO*);    /* Read a directory item */
 #define FA_READ     0x01
 #define FA_STREAM   0x40
 #define FA__ERROR   0x80
-
-
+/*FA_STREAM*/
+#define	FA__WIP		0x40
+#define	FA_OPENED	0x01
+#define FR_NOT_OPENED 0x00
 /* FAT sub type (FATFS.fs_type) */
 
 #define FS_FAT12    1
