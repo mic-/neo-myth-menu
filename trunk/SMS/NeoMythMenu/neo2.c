@@ -11,7 +11,6 @@ void neo2_asic_begin()
     Neo2Frame0We = 1;
 }
 
-
 void neo2_asic_end()
 {
     Neo2FlashBankLo = 0;
@@ -337,6 +336,47 @@ void neo2_psram_to_ram(BYTE* dst, BYTE srchi, WORD srclo, WORD len) __naked
     __endasm;
 }
 
+/*
+void neo2_sd_crc16(unsigned char *p_crc, unsigned char *data, int len)
+{
+    int i;
+    unsigned char nybble;
+
+    unsigned long long poly = 0x0001000000100001LL;
+    unsigned long long crc = 0;
+    unsigned long long n_crc; // This can probably be unsigned int
+
+    // Load crc from array
+    for (i = 0; i < 8; i++)
+    {
+        crc <<= 8;
+        crc |= p_crc[i];
+    }
+
+    for (i = 0; i < (len << 1); i++)
+    {
+        if (i & 1)
+            nybble = (data[i >> 1] & 0x0F);
+        else
+            nybble = (data[i >> 1] >> 4);
+
+        n_crc = (crc >> 60);
+        crc <<= 4;
+        if ((nybble ^ n_crc) & 1) crc ^= (poly << 0);
+        if ((nybble ^ n_crc) & 2) crc ^= (poly << 1);
+        if ((nybble ^ n_crc) & 4) crc ^= (poly << 2);
+        if ((nybble ^ n_crc) & 8) crc ^= (poly << 3);
+    }
+
+    // Output crc to array
+    for (i = 7; i >= 0; i--)
+    {
+        p_crc[i] = crc;
+        crc >>= 8;
+    }
+}
+*/
+
 // Returns non-zero if the cart has psram
 BYTE neo2_test_psram()
 {
@@ -361,8 +401,6 @@ BYTE neo2_test_psram()
     return i;
 }
     
-    
-
 /*void neo2_debug_dump_hex(WORD addr)
 {
     BYTE *p = (BYTE*)addr;

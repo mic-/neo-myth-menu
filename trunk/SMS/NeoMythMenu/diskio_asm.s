@@ -30,6 +30,7 @@ SEND_IF_COND = 8
 STOP_TRANSMISSION = 12
 READ_SINGLE_BLOCK = 17
 READ_MULTIPLE_BLOCK = 18
+WRITE_SINGLE_BLOCK = 24
 SD_SEND_OP_COND = 41
 APP_CMD = 55
 
@@ -71,6 +72,7 @@ _numSectors = 0xC2BA
 .globl _disk_readp2
 .globl _disk_read_sector2
 .globl _disk_read_sectors2
+.globl _sdWriteSingleBlock
 .globl neo2_enable_sd
 .globl neo2_disable_sd
 .globl neo2_pre_sd
@@ -693,6 +695,7 @@ sdInit:
         jr      sdInit_loop_end
 7$:
 5$:
+
         pop     bc
         dec     b
         jp      nz,4$
@@ -1607,8 +1610,13 @@ neo2_recv_multi_sd_return:
         call    neo2_pre_sd
         ret
         
-
 _sec_cache = 0xC580 ;: .ds 520
 _sec_buf = 0xDB00  ;: .ds 520
+
+; DRESULT sdWriteSingleBlock(void* src,DWORD addr)
+_sdWriteSingleBlock:
+        ret
+
+
 
 

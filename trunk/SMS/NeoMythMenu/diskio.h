@@ -43,7 +43,7 @@ DRESULT disk_read(BYTE*, DWORD, BYTE);
 DRESULT disk_readp(void* dest, DWORD sector, WORD sofs, WORD count);
 DRESULT disk_read_sector(void* dest, DWORD sector);
 DRESULT disk_read_sectors(WORD destLo, DWORD sector, WORD destHi, WORD count);
-
+DRESULT disk_writep (BYTE* buff,DWORD sc);
 extern void diskio_init();
 
 /* Disk Status Bits (DSTATUS) */
