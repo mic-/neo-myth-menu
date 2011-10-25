@@ -208,21 +208,25 @@ rdMmcDatBit4:
 ;
 ;  A = num
 rdMmcCmdBits:
-        push    bc
-        ld      b,a
-        ld      c,#0
+        push    bc						;11
+		push	hl						;11
+        ld      b,a						;4
+		ld		c,#0x01					;7
+		xor		a						;4
+		ld		hl,#MYTH_NEO2_RD_CMD1	;10
+0$:
+		rla								;4
+		bit		4,(hl)					;12
+		jp		z,1$					;10
+		or		a,c						;4
+		djnz    0$						;13
+		jr		2$
 1$:
-        ld      a,(MYTH_NEO2_RD_CMD1)
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        rl      c     ; c = (c << 1) | rdMmcCmdBit()
-        djnz    1$
-        ld      a,c
-        pop     bc
-        ret
+		djnz    0$
+2$:
+		pop		hl						;10
+        pop     bc						;10
+        ret								;10
 
 ;**********************************************************************************************
 
@@ -356,39 +360,46 @@ crc7:
 ;   A = cmd
 ;   DE:BC = arg
 sendMmcCmd:
+		push	hl	
+		ld		hl,#_diskioPacket
+
         or      a,#0x40         ; b7 = 0 => start bit, b6 = 1 => host command
-        ld      (_diskioPacket),a
+        ld      (hl),a		
         call    wrMmcCmdByte
+		inc		l
 
         ld      a,d             ; arg >> 24
-        ld      (_diskioPacket+1),a
+        ld      (hl),a
         call    wrMmcCmdByte
+		inc		l
 
         ld      a,e             ; arg >> 16
-        ld      (_diskioPacket+2),a
+        ld      (hl),a
         call    wrMmcCmdByte
+		inc		l
 
         ld      a,b             ; arg >> 8
-        ld      (_diskioPacket+3),a
+        ld      (hl),a
         call    wrMmcCmdByte
+		inc		l
 
         ld      a,c             ; arg
-        ld      (_diskioPacket+4),a
+        ld      (hl),a
         call    wrMmcCmdByte
+		inc		l
 
-        ld      de,#_diskioPacket
+		ld		de,#_diskioPacket
         call    crc7
         sla     a
         or      a,#1            ; b0 = 1 => stop bit
     ; -- DEBUG --
-        ld      (_diskioPacket+5),a
+        ld      (hl),a
     ; -----------
         call    wrMmcCmdByte    ; wrMmcCmdByte( (crc7(diskioPacket) << 1) | 1 )
-
+		pop		hl
         ret
 
 ;**********************************************************************************************
-
 
 ; BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
 ;
@@ -399,46 +410,46 @@ sendMmcCmd:
 ; Out:
 ;   A = 0 (failure) or 1 (success)
 recvMmcCmdResp:
-        ld      hl,#1024
+		push	bc
+		ld		hl,#MYTH_NEO2_RD_CMD1
+
+		;timeout 256x4
+		ld		b,#0
+		ld		c,#4
+0$:
+		bit		4,(hl)
+		jp		z,1$
+		djnz	0$
+		ld		b,c
+		dec		c
+		jp		nz,0$
+		pop		bc
+		xor		a
+		ret
 1$:
-        ld      a,(MYTH_NEO2_RD_CMD1)
-        srl     a
-        srl     a
-        srl     a
-        srl     a
-        and     a,#1
-
-        jr      nz,2$
-        ld      a,#7
-        call    rdMmcCmdBits
-        ld      (de),a          ; *resp++ = rdMmcCmdBits(7);
-        inc     de
-
-        djnz    3$              ; while (--len)
-        jr      4$
-3$:
-        call    rdMmcCmdByte
-        ld      (de),a          ; *resp++ = rdMmcCmdByte();
-        inc     de
-        djnz    3$
-4$:
-
-        ld      a,c             ; cflag
-        and     a,c
-        jr      z,5$
-        ld      a,#0xFF
-        call    wrMmcCmdByte
-5$:
-        ld      a,#1            ; return TRUE
-        ret
+		pop		bc
+		ld		a,#0x07
+		call	rdMmcCmdBits
+		ld		(de),a
+		inc		de
+		dec		b
+		ld		a,b
+		or		a
+		jr		z,3$
 2$:
-        dec     hl
-        ld      a,h
-        or      a,l
-        jp      nz,1$
+		call    rdMmcCmdByte
+	  	ld      (de),a
+		inc     de
+		djnz    2$
 
-        ld      a,#0            ; return FALSE
-        ret
+		ld		a,c
+		dec		a				; 1->0 , 0->ff
+		jr		nz,3$
+		cpl						; a = ~a
+		call    wrMmcCmdByte	; wrMmcCmdByte(0xff)
+3$:
+		ld		a,#0x01
+		ret
 
 
 ;**********************************************************************************************
@@ -460,7 +471,7 @@ sdReadSingleBlock:
         ld      a,(_cardType+1)
         ; cardType & 0x8000 ?
         and     a,#0x80
-        jp      nz,1$
+        jr      nz,1$
         ld      de,#_diskioResp
         ld      b,#R1_LEN
         ld      c,#0
@@ -469,10 +480,10 @@ sdReadSingleBlock:
         jr      z,2$
         ld      a,(_diskioResp+0)
         cp      a,#READ_SINGLE_BLOCK
-        jp      z,1$
+        jr      z,1$
 2$:
         pop hl
-        ld      a,#0            ; return FALSE
+        xor		a;ld      a,#0            ; return FALSE
         ret
 1$:
 
@@ -490,7 +501,7 @@ sdReadSingleBlock:
         jp      nz,3$
 
         pop hl
-        ld      a,#0            ; return FALSE (timeout on start bit)
+        xor		a;ld      a,#0            ; return FALSE (timeout on start bit)
         ret
 4$:
 
@@ -523,7 +534,7 @@ sdReadStartMulti:
         ld      a,(_cardType+1)
         ; cardType & 0x8000 ?
         and     a,#0x80
-        jp      nz,1$
+        jr		nz,1$
         ld      de,#_diskioResp
         ld      b,#R1_LEN
         ld      c,#0
@@ -532,9 +543,9 @@ sdReadStartMulti:
         jr      z,2$
         ld      a,(_diskioResp+0)
         cp      a,#READ_MULTIPLE_BLOCK
-        jp      z,1$
+        jr      z,1$
 2$:
-        ld      a,#0            ; return FALSE
+        xor		a;ld      a,#0            ; return FALSE
         ret
 1$:
 
@@ -549,8 +560,12 @@ sdReadStartMulti:
 ; Out:
 ;   A = 0 (failure) or 1 (success)
 sdReadStopMulti:
-        ld      bc,#0
-        ld      de,#0
+        ;ld      bc,#0
+        ;ld      de,#0
+		ld		b,#0x00
+		ld		c,b
+		ld		d,b
+		ld		e,b
         ld      a,#STOP_TRANSMISSION
         call    sendMmcCmd
 
@@ -567,9 +582,9 @@ sdReadStopMulti:
         jr      z,2$
         ld      a,(_diskioResp+0)
         cp      a,#STOP_TRANSMISSION
-        jp      z,1$
+        jr      z,1$
 2$:
-        ld      a,#0            ; return FALSE
+        xor		a;ld      a,#0            ; return FALSE
         ret
 1$:
 
@@ -591,8 +606,13 @@ sdInit:
         call    wrMmcCmdBit             ; wrMmcCmdBit(1)
         djnz    1$
           
-        ld      bc,#0
-        ld      de,#0
+        ;ld      bc,#0
+        ;ld      de,#0
+		ld		b,#0x00
+		ld		c,b
+		ld		d,b
+		ld		e,b
+
         ld      a,#GO_IDLE_STATE
         call    sendMmcCmd
         
@@ -688,7 +708,7 @@ sdInit:
         and     a,#0x30
         jr      nz,9$
         pop     bc
-        ld      a,#0                ; if (!(diskioResp[2] & 0x30)) return FALSE
+        xor		a;ld      a,#0                ; if (!(diskioResp[2] & 0x30)) return FALSE
         ret
 9$:
         pop     bc
@@ -775,7 +795,7 @@ sdInit_loop_end:
         jp      z,sdInit_failed
         ld      a,(_diskioResp+0)
         cp      a,#7
-        jp      nz,sdInit_failed
+        jr      nz,sdInit_failed
 
         ld      a,(_diskioTemp+0)
         ld      e,a
@@ -794,7 +814,7 @@ sdInit_loop_end:
         jp      z,sdInit_failed
         ld      a,(_diskioResp+0)
         and     #0x20
-        jp      z,sdInit_failed
+        jr      z,sdInit_failed
 
         ; SET_BUS_WIDTH (to 4 bits)
         ld      bc,#2
@@ -811,14 +831,14 @@ sdInit_loop_end:
         jp      z,sdInit_failed
         ld      a,(_diskioResp+0)
         cp      a,#6
-        jp      nz,sdInit_failed
+        jr      nz,sdInit_failed
 
         ld      a,#1               ; return TRUE
         ret
 
 sdInit_failed:
         call    neo2_disable_sd
-        ld      a,#0               ; return FALSE
+        xor		a               ; return FALSE
         ret
 
 
@@ -1020,14 +1040,14 @@ _disk_readp2:
         and     a,#0x7F
         ld      h,a
         or      a,l
-        jp      z,disk_readp_invalid_count
+        jr      z,disk_readp_invalid_count
         push	hl
         ld	    de,#513
         and	    a,a                 ; clear carry
         sbc	    hl,de
         pop	    hl
-        jp	    nc,disk_readp_invalid_count
-        jp      disk_readp_count_ok
+        jr	    nc,disk_readp_invalid_count
+        jr      disk_readp_count_ok
 disk_readp_invalid_count:        
         pop     ix
         ld      hl,#RES_PARERR
@@ -1039,20 +1059,20 @@ disk_readp_count_ok:
         and	    a,a                 ; clear carry
         sbc	    hl,de
         pop	    hl
-        jp	    c,disk_readp_small_read
+        jr	    c,disk_readp_small_read
         ; too big for anything but a file read, don't fetch to cache
         ld      l,2(ix)             ; sector (lo)
         ld      h,3(ix)             ; ...
         ld      de,(_sec_last)
         and     a,a                 ; clear carry
         sbc     hl,de
-        jp      nz,2$
+        jr      nz,2$
         ld      l,4(ix)             ; sector (hi)
         ld      h,5(ix)             ; ...
         ld      de,(_sec_last+2)
         and     a,a                 ; clear carry
         sbc     hl,de
-        jp      z,disk_readp_sector_in_buffer
+        jr      z,disk_readp_sector_in_buffer
 2$:
         ; read sector
         call    neo2_pre_sd
@@ -1066,7 +1086,7 @@ disk_readp_count_ok:
         ld      hl,#_sec_buf
         call    sdReadSingleBlock
         cp      a,#1
-        jp      z,3$
+        jr      z,3$
         call    neo2_post_sd
         ld      hl,#0xFFFF
         ld      (_sec_last),hl
@@ -1099,15 +1119,15 @@ disk_readp_small_read:
         add     hl,bc               ; hl = &sec_tags[sector & DISKIO_CACHE_SIZE-1]
         ld      a,(hl)
         cp      2(ix)               ; sector
-        jp      nz,disk_readp_fetch_single
+        jr      nz,disk_readp_fetch_single
         inc     hl
         ld      a,(hl)
         cp      3(ix)               ; sector
-        jp      nz,disk_readp_fetch_single
+        jr      nz,disk_readp_fetch_single
         inc     hl
         ld      a,(hl)
         cp      4(ix)               ; sector
-        jp      nz,disk_readp_fetch_single
+        jr      nz,disk_readp_fetch_single
         inc     hl
         ld      a,(hl)
         cp      5(ix)               ; sector
@@ -1127,24 +1147,25 @@ disk_readp_fetch_single:
         call    disk_readp_calc_sector
         call    sdReadSingleBlock
         cp      a,#1
-        jp      z,4$
+        jr      z,4$
         ; read failed, retry once    
         call    disk_readp_calc_sector
         ld      hl,(_vregs+10)
         call    sdReadSingleBlock
         cp      a,#1
-        jp      z,4$
+        jr      z,4$
         call    neo2_post_sd
         ld      hl,#_sec_tags
         ld      bc,(_vregs+8)
         add     hl,bc
-        ld      (hl),#0xFF
+		ld		a,#0xff
+        ld      (hl),a
         inc     hl
-        ld      (hl),#0xFF
+        ld      (hl),a
         inc     hl
-        ld      (hl),#0xFF
+        ld      (hl),a
         inc     hl
-        ld      (hl),#0xFF
+        ld      (hl),a
         pop     ix
         ld      hl,#RES_ERROR
         ei
@@ -1338,29 +1359,32 @@ neo2_enable_sd:
         ret
 
 neo2_pre_sd:
-        ld      a,#0x87
-        ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x87
-        ld      a,#0x0F
-        ld      (0xBFC1),a      ; Neo2FlashBankSize = FLASH_SIZE_1M
-        ld      a,#1
-        ld      (0xBFD0),a      ; Neo2Frame0We = 1
+		push	hl
+		ld		hl,#0xBFC0
+        ld      (hl),#0x87     		 ; Neo2FlashBankLo = 0x87
+		inc		l
+        ld      (hl),#0x0F      	; Neo2FlashBankSize = FLASH_SIZE_1M
+		ld		l,#0xD0
+        ld      (hl),#0x01      	; Neo2Frame0We = 1
         ld      a,#7
-        ld      (0xFFFE),a      ; Frame1 = 7
+        ld      (0xFFFE),a     		 ; Frame1 = 7
+		pop		hl
         ret
     
 neo2_disable_sd:
         ret
     
 neo2_post_sd:
-        ld      a,#0x0
-        ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x0
-        ld      a,#0x00
-        ld      (0xBFC1),a      ; Neo2FlashBankSize = FLASH_SIZE_16M
-        ld      a,#0
-        ld      (0xBFD0),a      ; Neo2Frame0We = 0
+		push	hl
+		ld		hl,#0xBFC0
+		xor		a
+        ld      (hl),a      	; Neo2FlashBankLo = 0x0
+		inc		l
+        ld      (hl),a     		 ; Neo2FlashBankSize = FLASH_SIZE_16M
+		ld		l,#0xD0
+        ld      (hl),a      	; Neo2Frame0We = 0
+		pop		hl
         ret
-
-
 
 ; Read to RAM/SRAM
 ;
@@ -1453,11 +1477,6 @@ neo2_recv_sd:
 ;	B = 8BYTE units					(Destroys it)
 neo2_fill_sector_buffer:
 
-	;ld		a,b
-	;or		a
-	;ret	z
-	;push	hl
-
 neo2_fill_sector_buffer_loop:
 	ld      a,(de)	; 7
 	ld      (hl),a	; 7
@@ -1502,7 +1521,6 @@ neo2_fill_sector_buffer_loop:
 	djnz    neo2_fill_sector_buffer_loop       ; 13
 
 neo2_fill_sector_buffer_return:
-	;pop		hl
 	ret
 
 ; Read to RAM/SRAM (multiple sectors)
@@ -1522,17 +1540,15 @@ neo2_recv_multi_sd:
         ; Wait for start bit
 		ld		hl,#MYTH_NEO2_RD_DAT4
 
-		;timeout = 64x64
-		ld		c,#64
-		ld		b,#64
+		;timeout = 256x16
+		ld		b,#0
+		ld		c,#16
 3$:
         bit		0,(hl)			;12
         jp      z,4$			;10
 		djnz	3$				;13
 		ld		b,c
 		dec		c
-		ld		a,b
-		or		a
 		jp		nz,3$
         pop     de
         pop     bc
