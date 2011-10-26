@@ -798,9 +798,6 @@ BYTE check_fs ( /* 0:The FAT boot record, 1:Valid boot record but not an FAT, 2:
 /* Mount/Unmount a Locical Drive                                         */
 /*-----------------------------------------------------------------------*/
 
-//extern unsigned char pfmountbuf[36];
-//extern unsigned char pfMountFmt;
-
 FRESULT pf_mount (
     FATFS *fs       /* Pointer to new file system object (NULL: Unmount) */
 )
@@ -834,8 +831,6 @@ FRESULT pf_mount (
         }
     }
 
-    //pfMountFmt = fmt;
-
     if (fmt == 3) return FR_DISK_ERR;
     if (fmt) return FR_NO_FILESYSTEM;   /* No valid FAT patition is found */
 
@@ -864,7 +859,6 @@ FRESULT pf_mount (
 #if _FS_FAT32
         fmt = FS_FAT32;
 #else
-//pfMountFmt = 0xAC;
         return FR_NO_FILESYSTEM;
 #endif
     }
@@ -999,15 +993,24 @@ FRESULT pf_read_sectors (
 {
     DRESULT dr;
     CLUST clst;
+    CLUST prevClst;
+    DWORD firstSector;
     DWORD sect;
+    DWORD praddr;
     WORD remSectInClust, sectorsToRead;
+    WORD adjacentSectors;
     FATFS *fs = FatFs;
     DSTATUS (*p_disk_read_sectors)(WORD, DWORD, WORD, WORD) = pfn_disk_read_sectors;
-
+    BYTE doRead;
+    
     if (!fs) return FR_NOT_ENABLED;     /* Check file system */
     if (!(fs->flag & FA_READ))
         return FR_INVALID_OBJECT;
 
+    prevClst = 0xFFFF;
+    adjacentSectors = 0;
+    praddr = (((DWORD)destHi) << 16) | destLo;
+    
     while (count)
     {  
         if ((fs->fptr & 511) == 0) {                /* On the sector boundary? */
@@ -1028,24 +1031,50 @@ FRESULT pf_read_sectors (
             fs->dsect = sect;
             fs->csect++;                            /* Next sector address in the cluster */
         }
-
+    
+        if (prevClst == 0xFFFF) firstSector = fs->dsect;
+        
         remSectInClust = fs->csize + 1 - fs->csect;
         sectorsToRead = count;
         if (sectorsToRead > remSectInClust)
             sectorsToRead = remSectInClust;
-                       
-        dr = p_disk_read_sectors(destLo, fs->dsect, destHi, sectorsToRead);
-        if (dr) {
-            fs->flag = 0;
-            return (dr == RES_WRPRT/*STRERR*/) ? FR_STREAM_ERR : FR_DISK_ERR;
+ 
+        doRead = 0;
+        if ((fs->curr_clust != prevClst + 1) &&
+            (prevClst != 0xFFFF))
+        {
+            doRead = 1;
         }
-
+        else if ((sectorsToRead + adjacentSectors) > 0x100)  // diskio_asm doesn't handle requests for more than 256 sectors
+        {
+            doRead = 1;
+        }
+        prevClst = fs->curr_clust;
+   
+        // Execute the sectors read when we've accumulated 256 sectors or
+        // the cluster linearity has been broken
+        if (doRead) 
+        {
+            dr = p_disk_read_sectors(praddr&0xFFFF, firstSector, praddr>>16, adjacentSectors);
+            if (dr) {
+                fs->flag = 0;
+                return (dr == RES_WRPRT/*STRERR*/) ? FR_STREAM_ERR : FR_DISK_ERR;
+            }
+            firstSector = fs->dsect;
+            praddr += (DWORD)adjacentSectors << 9;           
+            adjacentSectors = 0;
+        }
+        
+        adjacentSectors += sectorsToRead;
+        
         fs->fptr += sectorsToRead << 9;
         fs->csect += sectorsToRead-1;
-        destLo += sectorsToRead << 9;
-        if (destLo == 0)
-            destHi++;
         count -= sectorsToRead;
+    }
+
+    if (adjacentSectors)
+    {
+        dr = p_disk_read_sectors(praddr&0xFFFF, firstSector, praddr>>16, adjacentSectors);
     }
     
     return FR_OK;
@@ -1112,8 +1141,6 @@ fw_abort:
 	fs->flag = 0;
 	return FR_DISK_ERR;
 }
-//extern DWORD pffbcs;
-//extern WORD pffclst;
 
 
 #if _USE_LSEEK

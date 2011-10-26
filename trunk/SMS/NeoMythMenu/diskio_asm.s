@@ -74,24 +74,6 @@ _numSectors = 0xC2BA
 
 ;**********************************************************************************************
 
-
-
-; void wrMmcCmdBit( unsigned int bit );
-;
-;   A = bit
-wrMmcCmdBit:
-        and a,#1
-        jr  z,1$
-        ld  a,(MYTH_NEO2_WR_CMD1_SET13)
-        ret
-1$:
-        ld  a,(MYTH_NEO2_WR_CMD1_CLR13)
-        ret
-
-
-;**********************************************************************************************
-
-
 ; void wrMmcDatBit( unsigned int bit )
 ;
 ;   A = bit
@@ -132,11 +114,17 @@ wrMmcDatBit4:
 wrMmcCmdByte:
         push    bc
         ld      b,#8
-1$:
-        rlc     a               ; cf = a.7, a = [a << 1] + cf
         ld      c,a
-        call    wrMmcCmdBit     ; write  (byte >> (7-i)) & 1
-        ld      a,c
+1$:
+        ; write  (byte >> (7-i)) & 1
+        sla     c
+        jr      nc,2$
+        ld      a,(MYTH_NEO2_WR_CMD1_SET13)
+        djnz    1$
+        pop     bc
+        ret
+2$:
+        ld      a,(MYTH_NEO2_WR_CMD1_CLR13)    
         djnz    1$
         pop     bc
         ret
@@ -215,7 +203,7 @@ rdMmcCmdBits:
 		or		a,c						;4
 1$:
 		djnz    0$						;13
-2$:
+;2$:
 		pop		hl						;10
         pop     bc						;10
         ret								;10
@@ -352,43 +340,35 @@ crc7:
 ;   A = cmd
 ;   DE:BC = arg
 sendMmcCmd:
-		push	hl	
-		ld		hl,#_diskioPacket
-
         or      a,#0x40         ; b7 = 0 => start bit, b6 = 1 => host command
-        ld      (hl),a		
+        ld      (_diskioPacket),a
         call    wrMmcCmdByte
-		inc		l
 
         ld      a,d             ; arg >> 24
-        ld      (hl),a
+        ld      (_diskioPacket+1),a
         call    wrMmcCmdByte
-		inc		l
 
         ld      a,e             ; arg >> 16
-        ld      (hl),a
+        ld      (_diskioPacket+2),a
         call    wrMmcCmdByte
-		inc		l
 
         ld      a,b             ; arg >> 8
-        ld      (hl),a
+        ld      (_diskioPacket+3),a
         call    wrMmcCmdByte
-		inc		l
 
         ld      a,c             ; arg
-        ld      (hl),a
+        ld      (_diskioPacket+4),a
         call    wrMmcCmdByte
 
-		ld		de,#_diskioPacket
+        ld      de,#_diskioPacket
         call    crc7
         sla     a
         or      a,#1            ; b0 = 1 => stop bit
     ; -- DEBUG --
-		ld		l,#0x82
-        ld      (hl),a
+    ;    ld      (_diskioPacket+5),a
     ; -----------
         call    wrMmcCmdByte    ; wrMmcCmdByte( (crc7(diskioPacket) << 1) | 1 )
-		pop		hl
+
         ret
 
 ;**********************************************************************************************
@@ -402,46 +382,42 @@ sendMmcCmd:
 ; Out:
 ;   A = 0 (failure) or 1 (success)
 recvMmcCmdResp:
-		push	bc
-		ld		hl,#MYTH_NEO2_RD_CMD1
-
-		;timeout 256x4
-		ld		b,#0
-		ld		c,#4
-0$:
-		bit		4,(hl)
-		jp		z,1$
-		djnz	0$
-		ld		b,c
-		dec		c
-		jr		nz,0$
-		pop		bc
-		xor		a
-		ret
+        ld      hl,#1024
 1$:
-		pop		bc
-		ld		a,#0x07
-		call	rdMmcCmdBits
-		ld		(de),a
-		inc		de
-		dec		b
-		ld		a,b
-		or		a
-		jr		z,3$
-2$:
-		call    rdMmcCmdByte
-	  	ld      (de),a
-		inc     de
-		djnz    2$
+        ld      a,(MYTH_NEO2_RD_CMD1)
+        and     a,#0x10
 
-		ld		a,c
-		dec		a				; 1->0 , 0->ff
-		jr		nz,3$
-		cpl						; a = ~a
-		call    wrMmcCmdByte	; wrMmcCmdByte(0xff)
+        jr      nz,2$
+        ld      a,#7
+        call    rdMmcCmdBits
+        ld      (de),a          ; *resp++ = rdMmcCmdBits(7);
+        inc     de
+
+        djnz    3$              ; while (--len)
+        jr      4$
 3$:
-		ld		a,#0x01
-		ret
+        call    rdMmcCmdByte
+        ld      (de),a          ; *resp++ = rdMmcCmdByte();
+        inc     de
+        djnz    3$
+4$:
+
+        ld      a,c             ; cflag
+        and     a,c
+        jr      z,5$
+        ld      a,#0xFF
+        call    wrMmcCmdByte
+5$:
+        ld      a,#1            ; return TRUE
+        ret
+2$:
+        dec     hl
+        ld      a,h
+        or      a,l
+        jp      nz,1$
+
+        ld      a,#0            ; return FALSE
+        ret
 
 
 ;**********************************************************************************************
@@ -592,19 +568,14 @@ sdReadStopMulti:
 ;   A = 0 (failure) or 1 (success)
 sdInit:
         ; Send 80 clks on to initialize the card
-        ld      b,#80
+        ld      b,#10
 1$:
-        ld      a,#1
-        call    wrMmcCmdBit             ; wrMmcCmdBit(1)
+        ld      a,#0xFF
+        call    wrMmcCmdByte             ; wrMmcCmdBit(0xFF)
         djnz    1$
           
-        ;ld      bc,#0
-        ;ld      de,#0
-		ld		b,#0x00
-		ld		c,b
-		ld		d,b
-		ld		e,b
-
+        ld      bc,#0
+        ld      de,#0
         ld      a,#GO_IDLE_STATE
         call    sendMmcCmd
         
@@ -718,12 +689,8 @@ sdInit_loop_end:
         jp      z,sdInit_failed     ; timed out
 
         ; ALL_SEND_CID
-        ;ld      bc,#0xFFFF
-        ;ld      de,#0xFFFF
-		ld		b,#0xFF
-		ld		c,b
-		ld		d,b
-		ld		e,b
+        ld      bc,#0xFFFF
+        ld      de,#0xFFFF
         ld      a,#2
         call    sendMmcCmd
 
@@ -1352,31 +1319,26 @@ neo2_enable_sd:
         ret
 
 neo2_pre_sd:
-		;push	hl
-		ld		hl,#0xBFC0
-        ld      (hl),#0x87     		 ; Neo2FlashBankLo = 0x87
-		inc		l
-        ld      (hl),#0x0F      	; Neo2FlashBankSize = FLASH_SIZE_1M
-		ld		l,#0xD0
-        ld      (hl),#0x01      	; Neo2Frame0We = 1
+        ld      a,#0x87
+        ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x87
+        ld      a,#0x0F
+        ld      (0xBFC1),a      ; Neo2FlashBankSize = FLASH_SIZE_1M
+        ld      a,#1
+        ld      (0xBFD0),a      ; Neo2Frame0We = 1
         ld      a,#7
-        ld      (0xFFFE),a     		 ; Frame1 = 7
-		;pop		hl
+        ld      (0xFFFE),a      ; Frame1 = 7
         ret
     
 neo2_disable_sd:
         ret
     
 neo2_post_sd:
-		;push	hl
-		ld		hl,#0xBFC0
-		xor		a
-        ld      (hl),a      	; Neo2FlashBankLo = 0x0
-		inc		l
-        ld      (hl),a     		 ; Neo2FlashBankSize = FLASH_SIZE_16M
-		ld		l,#0xD0
-        ld      (hl),a      	; Neo2Frame0We = 0
-		;pop		hl
+        ld      a,#0x0
+        ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x0
+        ld      a,#0x00
+        ld      (0xBFC1),a      ; Neo2FlashBankSize = FLASH_SIZE_16M
+        ld      a,#0
+        ld      (0xBFD0),a      ; Neo2Frame0We = 0
         ret
 
 ; Read to RAM/SRAM
