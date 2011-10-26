@@ -285,7 +285,7 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
 	}
  
     puts("Reading...", 3, 10, PALETTE1);
-	pfn_pf_read_sectors(proffs, (WORD)prbank,sectorsInFile);
+	pfn_pf_read_sectors(proffs, (WORD)prbank, sectorsInFile);
 	/*
     sectorsPerUpdate = sectorsInFile >> 3;
     sectorsToNextUpdate = sectorsPerUpdate;
