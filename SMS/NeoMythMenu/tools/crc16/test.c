@@ -151,13 +151,13 @@ int main()
 
 	quada = malloc(8);
 	quadb = malloc(8);
+	sector = malloc(512);
 	f = fopen(filename,"rb");
 
 	for(i = 0;i < sectors_to_read;i++)
 	{
 		printf("Applying crc on sector %d.....\n",i);
 		memset(quada,0,8);
-		sector = malloc(512);
 		fread(sector,1,512,f);
 		crc16_orig(quada,sector,512);
 		dump_crc("crc16 original  :",quada);
