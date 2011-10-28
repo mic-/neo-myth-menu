@@ -123,12 +123,14 @@ CLUST get_fat ( /* 1:IO error, Else:Cluster status */
 {
     //WORD wc, bc, ofs;
     BYTE buf[4];
+	DWORD db;
     FATFS *fs = FatFs;
     DSTATUS (*p_disk_readp)(void*, DWORD, WORD, WORD) = pfn_disk_readp;
 
     if (clst < 2 || clst >= fs->max_clust)  /* Range check */
         return 1;
 
+	db = fs->fatbase;/*cache it to reduce code size*/
     switch (fs->fs_type) {
     case FS_FAT12 :
         /*bc = (WORD)clst;
@@ -136,20 +138,20 @@ CLUST get_fat ( /* 1:IO error, Else:Cluster status */
         ofs = bc & 511;
         bc >>= 9;
         if (ofs != 511) {
-            if (disk_readp(buf, fs->fatbase + bc, ofs, 2)) break;
+            if (disk_readp(buf, db + bc, ofs, 2)) break;
         } else {
-            if (disk_readp(buf, fs->fatbase + bc, 511, 1)) break;
-            if (disk_readp(buf+1, fs->fatbase + bc + 1, 0, 1)) break;
+            if (disk_readp(buf, db + bc, 511, 1)) break;
+            if (disk_readp(buf+1, db + bc + 1, 0, 1)) break;
         }
         wc = LD_WORD(buf);*/
         return 0; //(clst & 1) ? (wc >> 4) : (wc & 0xFFF);
 
     case FS_FAT16 :
-        if (p_disk_readp(buf, fs->fatbase + (clst >> 8), (WORD)(((WORD)clst & 255) << 1), 2)) break;
+        if (p_disk_readp(buf, db + (clst >> 8), (WORD)(((WORD)clst & 255) << 1), 2)) break;
         return LD_WORD(buf);
 #if _FS_FAT32
     case FS_FAT32 :
-        if (p_disk_readp(buf, fs->fatbase + (clst >> 7), (WORD)(((WORD)clst & 127) << 2), 4)) break;
+        if (p_disk_readp(buf, db + (clst >> 7), (WORD)(((WORD)clst & 127) << 2), 4)) break;
         return LD_DWORD(buf) & 0x0FFFFFFF;
 #endif
     }
@@ -745,6 +747,10 @@ FRESULT follow_path (   /* FR_OK(0): successful, !=0: error code */
                 res = FR_NO_PATH; break;
             }
             dj->sclust =
+
+
+
+
 #if _FS_FAT32
                 ((DWORD)LD_WORD(dir+DIR_FstClusHI) << 16) |
 #endif
@@ -904,7 +910,7 @@ FRESULT pf_open (
     fs->buf = dir;
     dj.fn = sfn; //sp;
     res = follow_path(&dj, path);   /* Follow the file path */
-    if (res != FR_OK) return res;   /* Follow failed */
+    if (res != FR_OK) {return res;}/*return 64 + res;*/   /* Follow failed */
     if (!dir[0] || (dir[DIR_Attr] & AM_DIR))    /* It is a directory */
         return FR_NO_FILE;
 
@@ -1010,7 +1016,8 @@ FRESULT pf_read_sectors (
     prevClst = 0xFFFF;
     adjacentSectors = 0;
     praddr = (((DWORD)destHi) << 16) | destLo;
-    
+    firstSector = 0;
+
     while (count)
     {  
         if ((fs->fptr & 511) == 0) {                /* On the sector boundary? */
@@ -1080,6 +1087,160 @@ FRESULT pf_read_sectors (
     return FR_OK;
 }
 
+/*See tools/crc16/ for more*/
+#define BIT_CHAR(in)         ((in) >> 3)
+#define BITS_TO_CHARS(in)   ((((in) - 1) >> 3) + 1)
+const short b7_set = 128;			/*patch over sdcc's symbol resolving bug*/
+const short num_bits = 64;			/*patch over sdcc's symbol resolving bug*/
+
+void ba_shr(unsigned char* a,short shifts)
+{
+    short i,j,k;
+    short mask;
+    short chars;
+
+	chars = shifts >> 3;   
+    shifts = shifts & 7;
+	k = BIT_CHAR(num_bits - 1);
+
+    if(chars > 0)
+    {
+        #if 0
+		short i,j;
+		i = k;
+		while(1)
+		{
+			j = i - chars;
+			if(!j) { break; }
+			a[i] = a[j];
+			--i;
+		}
+		#else
+		for(i = k; (i - chars) >= 0; i--) { a[i] = a[i - chars]; }
+		#endif
+        for(; chars > 0; chars--) { a[chars - 1] = 0; }
+    }
+
+    for(i = 0; i < shifts; i++)
+    {
+        for(j = k; j > 0; j--)
+        {
+            a[j] >>= 1;
+            if (a[j - 1] & 0x01) { a[j] |= b7_set; }
+        }
+
+        a[0] >>= 1;
+    }
+
+    i = num_bits & 7;
+	if(0 == i) { return; }
+
+	mask = 255 << (unsigned char)((short)(8 - i));
+	a[k] &= mask;
+}
+
+void ba_shl(unsigned char* a,unsigned char shifts)
+{
+    short i,j,k;
+	short chars;
+
+	chars = shifts >> 3;  
+    shifts = shifts & 7;    
+
+    if(chars)
+    {
+		k = BITS_TO_CHARS(num_bits);
+		#if 1
+        for(i = 0; (i + chars) <  k; i++) { a[i] = a[i + chars]; }
+		#else
+		for(i = 0,j = chars; j <  k; i++,j++) { a[i] = a[j]; }
+		#endif
+        for(i = BITS_TO_CHARS(num_bits); chars > 0; chars--) { a[i - chars] = 0; }
+    }
+
+	k = BIT_CHAR(num_bits - 1);
+
+    for(i = 0; i < shifts; i++)
+    {
+        for(j = 0; j < k; j++)
+        {
+            a[j] <<= 1;
+
+            if (a[j + 1] & b7_set) { a[j] |= 0x01; }
+        }
+
+        a[k] <<= 1;
+    }
+}
+
+void ba_xor(unsigned char* a,const unsigned char* b,const unsigned char* c)
+{
+    short i,j;
+
+	j = BITS_TO_CHARS(num_bits);
+    for(i = 0; i < j; i++) { a[i] = b[i] ^ c[i]; }
+}
+
+/************* BIT STREAM CODE BEGIN *************/
+void poly_set(unsigned char* poly,short a_in)
+{	
+	unsigned char a = (unsigned char)a_in;
+	/*poly[0] = 0x00;*/ poly[1] = a;					/*000a*/
+	/*poly[2] = 0x00;   poly[3] = 0x00;	*/				/*0000*/
+	/*poly[4] = 0x00;*/ poly[5] = a << 4;				/*00a0*/
+	/*poly[6] = 0x00;*/ poly[7] = a;					/*000a*/
+}
+
+void bc_xori(unsigned char* bca,unsigned char* bcd,short imm0,short imm1,short imm2)
+{
+	if( (imm0 ^ imm1) & imm2 )						/*(00 00 00 00 00 00 00 aa ^ 00 00 00 00 00 00 00 0b) & 00 00 00 00 00 00 00 0c*/
+	{
+		poly_set(bcd,imm2);							/*d = p[imm2]*/
+		ba_xor(bca,bca,bcd);						/*a = (a ^ d)*/
+	}
+}
+
+void crc16_bc(const unsigned char* sector)
+{
+	short i,j,nybble;
+	short lsb;
+	unsigned short len;
+	unsigned char* bca;
+	unsigned char* bcb;
+	unsigned char* bcd;
+
+	bca = (unsigned char*)0XDA08;	/*output*/
+	bcb = (unsigned char*)0xDA10;
+	bcd = (unsigned char*)0xDA18;
+
+	mem_set(bca,0,8);				/*reset*/
+	mem_set(bcd,0,8);				/*optimize poly_set*/
+
+	len = 1024;
+
+	for(i = 0;i<len;i++)
+	{
+        if(i & 1) 
+			{ nybble = (sector[i >> 1] & 0x0f); }
+        else
+            { nybble = (sector[i >> 1] >> 4); }
+
+		memcpy(bcb,bca,8);
+		ba_shr(bcb,60);
+		ba_shl(bca,4);
+
+		lsb = bcb[7];/*00 00 00 00 00 00 00 aa*/
+		j = 1;
+		do
+		{
+			bc_xori(bca,bcd,lsb,nybble,j);
+			j <<= 1;
+		}
+		while(j <= 8);
+	}
+}
+/************* BIT STREAM CODE END *************/
+
 FRESULT pf_write (
 	const void* buff,	/* Pointer to the data to be written */
 	WORD btw,			/* Number of bytes to write (0:Finalize the current write operation) */
@@ -1098,19 +1259,12 @@ FRESULT pf_write (
 	if (!fs) { return FR_NOT_ENABLED; }
 	if (!(fs->flag & FA_OPENED)) { return FR_NOT_OPENED; }
 
-	if (!btw) {		/* Finalize request */
-		if ((fs->flag & FA__WIP) && (p_disk_writep((BYTE*)0, 0))) { goto fw_abort; }
-		fs->flag &= ~FA__WIP;
-		return FR_OK;
-	} else {		/* Write data request */
-		/* Round-down fptr to the sector boundary */
-		if (!(fs->flag & FA__WIP)){ fs->fptr &= 0xFFFFFE00; }
-	}
+	if (!(fs->flag & FA__WIP)){ fs->fptr &= 0xFFFFFE00; }
 	remain = fs->fsize - fs->fptr;
 	if (btw > remain) {btw = (WORD)remain;}			/* Truncate btw by remaining bytes */
 
 	while (btw)	{									/* Repeat until all data transferred */
-		if (((WORD)(fs->fptr & 511)) == 0) {			/* On the sector boundary? */
+		if ((fs->fptr & 511) == 0) {			/* On the sector boundary? */
 			cs = (BYTE)((fs->fptr >> 9) & (fs->csize - 1));	/* Sector offset in the cluster */
 			if (!cs) {								/* On the cluster boundary? */
 				clst = (fs->fptr == 0) ?			/* On the top of the file? */
@@ -1121,18 +1275,16 @@ FRESULT pf_write (
 			sect = clust2sect(fs->curr_clust);		/* Get current sector */
 			if (!sect) { goto fw_abort; }
 			fs->dsect = sect + cs;
-			if (p_disk_writep((BYTE*)0, fs->dsect)) { goto fw_abort; }	/* Initiate a sector write operation */
-			fs->flag |= FA__WIP;
+
+			crc16_bc(p);
+			if(p_disk_writep((void*)p, fs->dsect)) { goto fw_abort; }	/* Send data to the sector */
+			if(fs->flag & FA__WIP){ fs->flag &= ~FA__WIP; }
 		}
 		wcnt = 512 -  (WORD)(fs->fptr & 511);		/* Number of bytes to write to the sector */
 		if (wcnt > btw) wcnt = btw;
-		if (p_disk_writep((void*)p, wcnt)) { goto fw_abort; }	/* Send data to the sector */
-		fs->fptr += wcnt; p += wcnt;				/* Update pointers and counters */
+
+		fs->fptr += (DWORD)wcnt; p += wcnt;				/* Update pointers and counters */
 		btw -= wcnt; *bw += wcnt;
-		if (((WORD)fs->fptr & 511) == 0) {
-			if (p_disk_writep((BYTE*)0, 0)) { goto fw_abort;	}/* Finalize the currtent secter write operation */
-			fs->flag &= ~FA__WIP;
-		}
 	}
 
 	return FR_OK;

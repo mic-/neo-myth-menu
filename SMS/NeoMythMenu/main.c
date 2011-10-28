@@ -15,6 +15,7 @@
 #include "sd_utils.h"
 #include "vgm_player_map.h"
 
+#undef TEST_SD_BLOCK_WRITE
 #undef TEST_CHEAT_INPUTBOX
 #define MENU_VERSION_STRING "1.10"
 #define KEY_REPEAT_INITIAL_DELAY 15
@@ -310,7 +311,7 @@ void puts_active_list()
 		proffs = praddr & 0xFFFF;
 		prbank = praddr >> 16;
 		prbank += 0x20;
-        fi = (FileInfoEntry*)0xD700;
+        fi = (FileInfoEntry*)0xDA20;
         highlightedIsDir = 0;
         
         while (show)
@@ -759,7 +760,7 @@ void handle_action_button(BYTE button)
             // The highlighted entry is not a directory
             
             // Retrieve the file info struct for the highlighted file
-            fi = (FileInfoEntry*)0xD700;
+            fi = (FileInfoEntry*)0xDA20;
             praddr = games.highlighted;
             praddr <<= 6;
             proffs = praddr & 0xFFFF;
@@ -1030,6 +1031,44 @@ void import_std_options()
     options_add("Reset to menu : ","off","on",OPTION_TYPE_SETTING,1);
 }
 
+#ifdef TEST_SD_BLOCK_WRITE
+void test_w_mode()
+{
+	FRESULT (*f_write)(const void*,WORD,WORD*) = pfn_pf_write;
+	FRESULT (*f_open)(const char*) = pfn_pf_open;
+	unsigned char* p = (unsigned char*)0xc580;
+	WORD w;
+	FRESULT r;
+
+	cls();
+
+	Frame2 = BANK_PFF;
+
+	r = f_open("/DUMMY.BIN");
+
+	if(r != FR_OK)
+	{
+		puts("Failed to open /DUMMY.BIN", 2, 4, PALETTE1);
+		while(1){}
+	}
+	else
+		{puts("Openned /DUMMY.BIN", 2, 4, PALETTE1);}
+	
+	memset_asm(p,'A',256);
+	memset_asm(p+256,'B',256);
+	puts("WRITE BEGIN", 2, 9, PALETTE1);
+	Frame2 = BANK_PFF;
+
+	if(f_write((const void*)p,512,&w) != FR_OK)
+		puts("WRITE : PASSED!", 2, 10, PALETTE1);
+	else
+		puts("WRITE : FAILED!", 2, 10, PALETTE1);
+
+	puts("WRITE END", 2, 11, PALETTE1);
+	while(1){}
+}
+#endif
+
 void main()
 {
     BYTE temp;
@@ -1046,7 +1085,7 @@ void main()
 
     // Copy neo2 code from ROM to RAM
     Frame1 = BANK_RAM_CODE;
-    memcpy_asm(0xC800, 0x4000, 0xF00);
+    memcpy_asm(0xC800, 0x4000, 0xF38);
 
     temp = pfn_neo2_check_card();
     hasZipram = pfn_neo2_test_psram();
@@ -1157,6 +1196,9 @@ void main()
     padDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
 
     import_std_options();
+	#ifdef TEST_SD_BLOCK_WRITE
+	test_w_mode();
+	#endif
 
     while (1)
     {
@@ -1284,5 +1326,97 @@ void options_init()
     options_count = 0;
 }
 
+#if 0
+void patch_ips_apply()
+{
+	DWORD save;
+	int written;
+	int size;
+	unsigned char prbank,a;
+	WORD wr,proffs,len,step;
+	unsigned char* buf;
+	unsigned char c;
+	FATFS* fs = 0;/*todo*/
 
+	buf = (unsigned char*)0xDB00;
+	size = fs->fsize - 8; /*patch + eof*/
+	written = 0;
+	prbank = 0;
+	proffs = 0;
+	save = fs->fptr;		/*patch*/
+	pf_read(buf,5,&wr);
+	pf_lseek(save + 5);
+
+	while(written < size)
+	{
+		/*
+			This is SLOW actually.For every N bytes a whole sector is read
+			A better solution would be to copy the WHOLE patch to some psram offset and then proccess it from there
+		*/
+		save = fs->fptr;
+		pf_read(buf,5,&wr);
+		pf_lseek(save + 5);
+		written += 5;
+	
+		prbank = buf[2];
+		#if 0
+		proffs = buf[1] << 8;
+		proffs |= buf[0];
+		len = buf[4] << 8;
+		len |= buf[3];
+		#else
+		proffs = *(WORD*)&buf[0];
+		len = *(WORD*)&buf[2];
+		#endif
+
+		if(len)
+		{
+			written += len;
+			pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,len);
+			continue;
+		}
+		else	/*run length encoded*/
+		{
+			save = fs->fptr;
+			pf_read(buf,3,&wr);
+			pf_lseek(save + 3);
+			written += 3;
+
+			#if 0
+			len = buf[1] << 8;
+			len |= buf[0];
+			#else
+			len = *(WORD*)&buf[0];
+			#endif
+
+			c = buf[2];
+			memset_asm(buf,c,(len >= 128) ? 128 : len);/*largest step*/
+			while(len > 0)
+			{
+				step = (len > 128) ? 128 : len;
+				len -= step;
+
+				if(step&1)
+				{
+					while(step > 0)
+					{
+						pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,1);
+						step--;
+						proffs++;
+						if(0==proffs){prbank++;}
+						if(/*(step) && */(!(step&1))){goto patch_ips_apply_aligned_block_found;}
+					}
+				}
+				else
+				{
+					patch_ips_apply_aligned_block_found:
+					pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,step);
+					proffs += step;
+					if(0==proffs){prbank++;}
+				}
+			}
+		}
+	}
+}
+#endif
 

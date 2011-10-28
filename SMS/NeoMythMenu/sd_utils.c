@@ -105,7 +105,7 @@ uint16_t count_games_on_sd_card()
     vdp_wait_vblank();
     puts("Getting file info..", 3, 10, PALETTE1);
     
-    buf = (FileInfoEntry*)0xD700;
+    buf = (FileInfoEntry*)0xDA20;
 
 	while (cnt < 1024)
 	{

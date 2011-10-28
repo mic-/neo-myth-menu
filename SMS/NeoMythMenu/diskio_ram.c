@@ -85,27 +85,7 @@ DRESULT disk_writep (
 	DRESULT res;
 
 	diskio_bridge_prologue();
-	#if 0
-	if (!buff) {
-		if (sc) {
-
-			// Initiate write process
-
-		} else {
-
-			// Finalize write process
-
-		}
-	} else {
-	#endif
-		// Send data to the disk
-		if(buff)
-			res = sdWriteSingleBlock(buff,sc);
-		else
-			res = 0;
-	#if 0
-	}
-	#endif
+	res = sdWriteSingleBlock(buff,sc);
 	diskio_bridge_epilogue();
 
 	return res;
