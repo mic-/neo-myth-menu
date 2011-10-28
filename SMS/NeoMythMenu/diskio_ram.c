@@ -58,9 +58,15 @@ DRESULT disk_readp(void* dest, DWORD sector, WORD sofs, WORD count)
 DRESULT disk_read_sectors(WORD destLo, DWORD sector, WORD destHi, WORD count)
 {
     DSTATUS res;
-    
-	diskio_bridge_prologue();
+ 
+   __asm
+    di
+    __endasm;
+    neo2_enable_psram();
+
     res = disk_read_sectors2(destLo, sector, destHi, count);
+    
+    neo2_disable_psram();
 	diskio_bridge_epilogue();
 
     return res;        
