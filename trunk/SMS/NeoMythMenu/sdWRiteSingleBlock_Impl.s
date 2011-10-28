@@ -21,22 +21,9 @@ _sdWriteSingleBlock:
 2$:
 		call    neo2_post_sd
 		pop		ix
-        ld      hl,#0            ; return FALSE
+        ld      hl,#1            ; return FR_DISK_ERR
         ret
 1$:	
-		;READ : make sure that filesystem(ROM Section) writes sector's crc at 0xDA08...0XDA08+8
-		;ld		hl,#512
-		;push	hl
-		;ld		h,1(ix)
-		;ld		l,0(ix)
-		;push	hl
-		;ld		hl,#0xDA08		; HARDCODED - 8bytes -> crc
-		;push	hl
-		;call	neo2_sd_crc16 ;(unsigned char *p_crc, unsigned char *data, int len)
-		;pop	hl
-		;pop	hl
-		;pop	hl
-
 		;wrMmcDatByte4(0xff)
 		ld		a,#0xff
 		call	wrMmcDatByte4
@@ -55,7 +42,7 @@ _sdWriteSingleBlock:
 		jp		nz,3$
 
 		;Write crc
-		ld		hl,#0xDA08	
+		ld		hl,#0xDA08		; crc @0xda08
 		ld		b,#8
 4$:
 		ld		a,(hl)
@@ -93,7 +80,7 @@ _sdWriteSingleBlock:
 
 		;crc status has to be 0B10
 		bit		1,c
-		jp		nz,2$
+		jp		z,2$
 
 		;wait for start bit
 6$:
@@ -106,7 +93,7 @@ _sdWriteSingleBlock:
 7$:
 		call	rdMmcDatBit4
 		and		a,#0x01
-		jr		nz,8$
+		jr		z,8$
 		dec		bc
 		ld		a,b
 		or		a,c
@@ -119,6 +106,6 @@ _sdWriteSingleBlock:
 
 		call    neo2_post_sd
 		pop		ix
-        ld      hl,#1        ; return TRUE
+        ld      hl,#0        ; FR_OK
         ret
 
