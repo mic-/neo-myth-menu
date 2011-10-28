@@ -1475,7 +1475,8 @@ neo2_fill_sector_buffer_loop:
 neo2_fill_sector_buffer_return:
 	ret
 
-; Read to RAM/SRAM (multiple sectors)
+; Read to PSRAM (multiple sectors)
+; Approx 62.25 cycles/byte
 ; In:
 ;   C = number of sectors
 ;   B = PSRAM bank
@@ -1562,9 +1563,21 @@ neo2_recv_multi_sd:
         or      a,#0x40     ; address in frame 1
         ld      d,a
         ld      hl,#_sec_buf
-        ld      bc,#512     ; len
-        ldir                ; block move
-      
+        ld bc,  #0x4200    ; bc = 512 + (512/8)*256
+        ; 8 bytes moved/iteration
+        ; 141 cycles per/iteration
+        ; => 17.625 cycles/byte
+6$:
+        ldi
+        ldi
+        ldi
+        ldi
+        ldi
+        ldi
+        ldi
+        ldi
+        djnz    6$
+        
         ; reset neo2 registers
         call    neo2_pre_sd
         
