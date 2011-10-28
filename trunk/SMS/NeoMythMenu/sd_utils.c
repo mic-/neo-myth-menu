@@ -286,29 +286,6 @@ void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
  
     puts("Reading...", 3, 10, PALETTE1);
 	pfn_pf_read_sectors(proffs, (WORD)prbank, sectorsInFile);
-	/*
-    sectorsPerUpdate = sectorsInFile >> 3;
-    sectorsToNextUpdate = sectorsPerUpdate;
-    puts("Reading", 3, 10, PALETTE1);   
-    while (sectorsInFile)
-    {
-        sectorsToRead = 32;  // try to read at most 32 sectors at a time
-        if (sectorsToRead > sectorsInFile) { sectorsToRead = sectorsInFile; }
-        fr = pfn_pf_read_sectors(proffs, (WORD)prbank, sectorsToRead);
-        if (fr != FR_OK) { sectorsToRead = 0; }
-        proffs += sectorsToRead << 9;
-        if (proffs == 0) { prbank++; }
-        sectorsToNextUpdate -= sectorsToRead;
-
-        if (sectorsToNextUpdate <= 0)
-        {
-            sectorsToNextUpdate += sectorsPerUpdate;
-            puts(".", dotPos++, 10, PALETTE1);
-        }
-
-        sectorsInFile -= sectorsToRead;
-    }
-	*/
 }
 
 int init_sd()

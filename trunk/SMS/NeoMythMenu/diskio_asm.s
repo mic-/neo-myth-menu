@@ -1214,7 +1214,6 @@ _disk_read_sectors2:
 ;     WORD count
 
         push    ix
-        di
         ld      ix,#4                                       
         add     ix,sp
         
@@ -1232,7 +1231,6 @@ _disk_read_sectors2:
         call    neo2_post_sd
         pop     ix
         ld      hl,#RES_ERROR
-        ei
         ret
 3$:
         ld      c,8(ix)     ; count
@@ -1251,7 +1249,6 @@ _disk_read_sectors2:
         call    neo2_post_sd
         pop     ix
         ld      hl,#RES_ERROR
-        ei
         ret
 5$:
         ld      c,8(ix)     ; count
@@ -1265,7 +1262,6 @@ _disk_read_sectors2:
         call    neo2_post_sd
         pop     ix
         ld      hl,#RES_ERROR
-        ei
         ret
 4$:        
         call    sdReadStopMulti
@@ -1273,7 +1269,6 @@ _disk_read_sectors2:
         ld      hl,#RES_OK
 _disk_read_sectors_return:
         pop     ix
-        ei
         ret
 
 ; Reads an entire sector into a destination in RAM
@@ -1319,6 +1314,8 @@ neo2_enable_sd:
         ret
 
 neo2_pre_sd:
+        ld      a,#0
+        ld      (0xBFC5),a      ; Neo2Frame1We = 0
         ld      a,#0x87
         ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x87
         ld      a,#0x0F
@@ -1545,21 +1542,30 @@ neo2_recv_multi_sd:
         push    de
     
         ; neo2_ram_to_psram(b, de, _sec_buf, 512)
-        ld      hl,#512
-        push    hl
+        ld      a,#1
+        ld      (0xBFC5),a  ; Neo2Frame1We = 1    
+        ld      a,#0x00
+        ld      (0xBFC1),a  ; Neo2FlashBankSize = FLASH_SIZE_16M
+        ld      a,#0
+        ld      (0xBFD0),a  ; Neo2Frame0We = 0    
+        ld      a,b         ; destHi
+        srl     a           ; bank is for word bus, lsb -> CF
+        ld      (0xBFC0),a  ; bank lo
+        ld      a,d         ; dstlo MSB
+        rla
+        rla
+        rla
+        and     a,#0x07
+        ld      (0xFFFE),a   ; Frame1 = ((dsthi & 1) << 2) | (dstlo MSB >> 14)
+        ld      a,d          ; dstlo MSB
+        and     a,#0x3F
+        or      a,#0x40     ; address in frame 1
+        ld      d,a
         ld      hl,#_sec_buf
-        push    hl
-        push    de
-        push    bc
-        inc     sp
-        call    _neo2_ram_to_psram
-        di
-        inc     sp
-        pop     af
-        pop     af
-        pop     af
+        ld      bc,#512     ; len
+        ldir                ; block move
       
-        ; reset registers modified by neo2_ram_to_psram
+        ; reset neo2 registers
         call    neo2_pre_sd
         
         pop     de
@@ -1575,7 +1581,7 @@ neo2_recv_multi_sd:
 5$:
         ; numSectors--
         dec     c
-        jr      nz,neo2_recv_multi_sd
+        jp      nz,neo2_recv_multi_sd
         ld      hl,#RES_OK
 neo2_recv_multi_sd_return:
 		push	hl

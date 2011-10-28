@@ -1085,7 +1085,7 @@ void main()
 
     // Copy neo2 code from ROM to RAM
     Frame1 = BANK_RAM_CODE;
-    memcpy_asm(0xC800, 0x4000, 0xF38);
+    memcpy_asm(0xC800, 0x4000, 0xF80);
 
     temp = pfn_neo2_check_card();
     hasZipram = pfn_neo2_test_psram();
