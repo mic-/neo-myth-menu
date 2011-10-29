@@ -1020,10 +1020,10 @@ void import_std_options()
 #ifdef TEST_SD_BLOCK_WRITE
 void test_w_mode()
 {
+	#if 0
 	FRESULT (*f_write)(void*) = pfn_pf_write_sector;
 	FRESULT (*f_open)(const char*) = pfn_pf_open;
 	unsigned char* p = (unsigned char*)0xdb00;
-	WORD w;
 	FRESULT r;
 
 	cls();
@@ -1056,13 +1056,16 @@ void test_w_mode()
 		puts("WRITE : FAILED!", 2, 10, PALETTE1);
 		if(0x0002 == r){puts("CRC ERROR!", 2, 11, PALETTE1);}
 		if(0x0003 == r){puts("START BIT ERROR!", 2, 11, PALETTE1);}
-		print_hex((r>>8)&0xff,2,12);
+		//print_hex((r>>8)&0xff,2,12);
 		print_hex(r&0xff,4,12);
 		print_hex(diskioResp[0],6,12);
 	}
 
 	puts("WRITE END", 2, 13, PALETTE1);
 	while(1){}
+	#else
+	sdutils_sram_to_sd("/DUMMY.BIN");
+	#endif
 }
 #endif
 
@@ -1323,7 +1326,7 @@ void options_init()
 }
 
 #if 0
-void patch_ips_apply()
+void patch_ips_apply(const char* filename)
 {
 	DWORD save;
 	int written;
@@ -1333,10 +1336,12 @@ void patch_ips_apply()
 	unsigned char* buf;
 	unsigned char c;
 	FATFS (*grab_fs)(void) = pfn_pf_grab;
+	FRESULT (*f_open)(const char*) = pfn_pf_open;
 	FATFS* fs;
 
 	fs = grab_fs();
 	if(!fs){return;}
+	if(f_open(filename) != FR_OK){return;}
 
 	buf = (unsigned char*)0xDB00;
 	size = fs->fsize - 8; /*patch + eof*/

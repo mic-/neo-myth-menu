@@ -163,7 +163,7 @@ FRESULT pf_write_sector(void* src);
 FRESULT pf_lseek (DWORD);               /* Move file pointer of a file object */
 FRESULT pf_opendir (DIR*, const char*); /* Open an existing directory */
 FRESULT pf_readdir (DIR*, FILINFO*);    /* Read a directory item */
-FATFS* pf_grab();
+void pf_grab(FATFS**);
 
 /*--------------------------------------------------------------*/
 /* Flags and offset address                                     */
