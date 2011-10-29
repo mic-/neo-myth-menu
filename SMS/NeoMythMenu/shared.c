@@ -24,7 +24,7 @@ BYTE fm_enabled_option_idx;
 BYTE flash_mem_type;
 BYTE hasZipram;
 BYTE menu_state;
-BYTE sd_fetch_info_timeout;
+
 FileList games;
 BYTE region;
 BYTE pad, padLast;

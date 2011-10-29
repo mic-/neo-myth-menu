@@ -118,8 +118,6 @@ extern BYTE options_highlighted;
 extern BYTE reset_to_menu_option_idx;
 extern BYTE fm_enabled_option_idx;
 
-extern BYTE sd_fetch_info_timeout;
-
 extern BYTE menu_state;
 extern FileList games;
 extern BYTE region;

@@ -578,20 +578,6 @@ BYTE check_sms_region()
     return JAPANESE;
 }
 
-
-BYTE is_time_to_fetch_sd_file_info()
-{
-    if(sd_fetch_info_timeout > 0)
-    {
-        --sd_fetch_info_timeout;
-        return 0;
-    }
-
-    sd_fetch_info_timeout = SD_DEFAULT_INFO_FETCH_TIMEOUT;
-    return 1;
-}
-
-
 #if 0
 void test_strings()
 {
@@ -1034,9 +1020,9 @@ void import_std_options()
 #ifdef TEST_SD_BLOCK_WRITE
 void test_w_mode()
 {
-	FRESULT (*f_write)(const void*,WORD,WORD*) = pfn_pf_write;
+	FRESULT (*f_write)(void*) = pfn_pf_write_sector;
 	FRESULT (*f_open)(const char*) = pfn_pf_open;
-	unsigned char* p = (unsigned char*)0xc580;
+	unsigned char* p = (unsigned char*)0xdb00;
 	WORD w;
 	FRESULT r;
 
@@ -1048,23 +1034,31 @@ void test_w_mode()
 
 	if(r != FR_OK)
 	{
-		puts("Failed to open /DUMMY.BIN", 2, 4, PALETTE1);
+		puts("Failed to open /DUMMY.BIN", 2, 8, PALETTE1);
 		while(1){}
 	}
 	else
-		{puts("Openned /DUMMY.BIN", 2, 4, PALETTE1);}
+		{puts("Openned /DUMMY.BIN", 2, 8, PALETTE1);}
 	
 	memset_asm(p,'A',256);
 	memset_asm(p+256,'B',256);
 	puts("WRITE BEGIN", 2, 9, PALETTE1);
 	Frame2 = BANK_PFF;
 
-	if(f_write((const void*)p,512,&w) != FR_OK)
+	r = f_write((void*)p);
+
+	if(r == FR_OK)
 		puts("WRITE : PASSED!", 2, 10, PALETTE1);
 	else
+	{
 		puts("WRITE : FAILED!", 2, 10, PALETTE1);
+		if(0x02 == r){puts("CRC ERROR!", 2, 11, PALETTE1);}
+		if(0x03 == r){puts("START BIT ERROR!", 2, 11, PALETTE1);}
+		print_hex((r>>8)&0xff,2,12);
+		print_hex(r&0xff,4,12);
+	}
 
-	puts("WRITE END", 2, 11, PALETTE1);
+	puts("WRITE END", 2, 13, PALETTE1);
 	while(1){}
 }
 #endif
@@ -1080,12 +1074,11 @@ void main()
 
     MemCtrl = 0xA8;
     menu_state = MENU_STATE_GAME_GBAC;  //start off with gbac game state
-    sd_fetch_info_timeout = SD_DEFAULT_INFO_FETCH_TIMEOUT;
     neoMode = 0;
 
     // Copy neo2 code from ROM to RAM
     Frame1 = BANK_RAM_CODE;
-    memcpy_asm(0xC800, 0x4000, 0xF80);
+    memcpy_asm(0xC800, 0x4000, 0xF99);
 
     temp = pfn_neo2_check_card();
     hasZipram = pfn_neo2_test_psram();
@@ -1336,7 +1329,11 @@ void patch_ips_apply()
 	WORD wr,proffs,len,step;
 	unsigned char* buf;
 	unsigned char c;
-	FATFS* fs = 0;/*todo*/
+	FATFS (*grab_fs)(void) = pfn_pf_grab;
+	FATFS* fs;
+
+	fs = grab_fs();
+	if(!fs){return;}
 
 	buf = (unsigned char*)0xDB00;
 	size = fs->fsize - 8; /*patch + eof*/
@@ -1400,11 +1397,11 @@ void patch_ips_apply()
 				{
 					while(step > 0)
 					{
+						if( (!(step&1))){goto patch_ips_apply_aligned_block_found;}
 						pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,1);
 						step--;
 						proffs++;
 						if(0==proffs){prbank++;}
-						if(/*(step) && */(!(step&1))){goto patch_ips_apply_aligned_block_found;}
 					}
 				}
 				else
@@ -1419,4 +1416,5 @@ void patch_ips_apply()
 	}
 }
 #endif
+
 
