@@ -1099,11 +1099,11 @@ FRESULT pf_read_sectors (
 const short b7_set = 128;			/*patch over sdcc's symbol resolving bug*/
 const short num_bits = 64;			/*patch over sdcc's symbol resolving bug*/
 
-void ba_shr(unsigned char* a,short shifts)
+void ba_shr(unsigned char* a,char shifts)
 {
-    short i,j,k;
-    short mask;
-    short chars;
+    char i,j,k;
+    unsigned char mask;
+    char chars;
 
 	chars = shifts >> 3;   
     shifts = shifts & 7;
@@ -1145,10 +1145,10 @@ void ba_shr(unsigned char* a,short shifts)
 	a[k] &= mask;
 }
 
-void ba_shl(unsigned char* a,unsigned char shifts)
+void ba_shl(unsigned char* a,char shifts)
 {
-    short i,j,k;
-	short chars;
+    char i,j,k;
+	char chars;
 
 	chars = shifts >> 3;  
     shifts = shifts & 7;    
@@ -1204,7 +1204,7 @@ void poly_set(unsigned char* poly,short a_in)
 	/*poly[6] = 0x00;*/ poly[7] = a;					/*000a*/
 }
 
-void bc_xori(unsigned char* bca,unsigned char* bcd,short imm0,short imm1,short imm2)
+void bc_xori(unsigned char* bca,unsigned char* bcd,unsigned char imm0,unsigned char imm1,unsigned char imm2)
 {
 	if( (imm0 ^ imm1) & imm2 )						/*(00 00 00 00 00 00 00 aa ^ 00 00 00 00 00 00 00 0b) & 00 00 00 00 00 00 00 0c*/
 	{
@@ -1215,9 +1215,9 @@ void bc_xori(unsigned char* bca,unsigned char* bcd,short imm0,short imm1,short i
 
 void crc16_bc(const unsigned char* sector)
 {
-	short i,j,nybble;
-	short lsb;
-	unsigned short len;
+	unsigned char j,nybble;
+	unsigned char lsb;
+	short i,len;
 	unsigned char* bca;
 	unsigned char* bcb;
 	unsigned char* bcd;

@@ -341,7 +341,7 @@ void sdutils_sram_cls()
 	while(blocks < 16)
 	{
 		++blocks;
-		puts(".", 11+(blocks>>1), 12, PALETTE1);vdp_wait_vblank();
+		puts(".", 10+(blocks>>1), 12, PALETTE1);vdp_wait_vblank();
 		pfn_neo2_sram_to_ram(p, 0x00, 0xC800 + addr,512);
 		addr += 512;
 	}
@@ -377,7 +377,7 @@ void sdutils_sram_to_sd(const char* filename)
 	while(blocks < 16)
 	{
 		++blocks;
-		puts(".", 10+(blocks>>1), 12, PALETTE1);vdp_wait_vblank();
+		puts(".", 10+(blocks>>1), 11, PALETTE1);vdp_wait_vblank();
 		pfn_neo2_sram_to_ram(p, 0x00, base + addr,512);
 		Frame2 = BANK_PFF;
 		f_write(p);
