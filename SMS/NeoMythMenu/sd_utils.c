@@ -19,7 +19,7 @@ extern unsigned char pfmountbuf[36];
 extern WCHAR LfnBuf[_MAX_LFN + 1];
 extern void cls();
 extern void print_hex(BYTE val, BYTE x, BYTE y);
-
+extern void puts_active_list();
 
 char toupper(char c)
 {
@@ -325,5 +325,67 @@ int init_sd()
     }
     
     return mountResult;
+}
+
+void sdutils_sram_cls()
+{
+	BYTE* p = (BYTE*)0xdb00;
+	BYTE blocks;
+	WORD addr;
+
+	cls();vdp_wait_vblank();
+	puts("Clearing SRAM...", 3, 9, PALETTE1); vdp_wait_vblank();
+	blocks = 0;
+	memset_asm(p,0,512);
+
+	while(blocks < 16)
+	{
+		++blocks;
+		puts(".", 11+(blocks>>1), 12, PALETTE1);vdp_wait_vblank();
+		pfn_neo2_sram_to_ram(p, 0x00, 0xC800 + addr,512);
+		addr += 512;
+	}
+	cls();vdp_wait_vblank();
+
+	if(menu_state == MENU_STATE_GAME_SD){Frame2 = BANK_PFF;}
+}
+
+void sdutils_sram_to_sd(const char* filename)
+{
+	FRESULT (*f_write)(void*) = pfn_pf_write_sector;
+	void (*grab_fs)(FATFS**) = pfn_pf_grab;
+	FRESULT (*f_open)(const char*) = pfn_pf_open;
+	BYTE* p = (BYTE*)0xdb00;
+	FATFS* fs;
+	BYTE blocks;
+	WORD addr;
+	WORD base = 0xc800;
+
+	cls();
+	
+	Frame2 = BANK_PFF;
+	grab_fs(&fs);
+	if(!fs){return;}
+	if(f_open(filename) != FR_OK){return;}
+
+	blocks = 0;
+	addr = 0;
+
+	puts("DUMPING SRAM TO SD", 8, 9, PALETTE1); vdp_wait_vblank();
+	puts("Working", 8, 11, PALETTE1); vdp_wait_vblank();
+
+	while(blocks < 16)
+	{
+		++blocks;
+		puts(".", 10+(blocks>>1), 12, PALETTE1);vdp_wait_vblank();
+		pfn_neo2_sram_to_ram(p, 0x00, base + addr,512);
+		Frame2 = BANK_PFF;
+		f_write(p);
+		addr += 512;
+	}
+
+	cls();vdp_wait_vblank();
+	change_directory("/");
+	puts_active_list();
 }
 

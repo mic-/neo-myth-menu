@@ -115,7 +115,11 @@ void pff_debug_print(BYTE val, BYTE x)
 /*-----------------------------------------------------------------------*/
 /* FAT access - Read value of a FAT entry                                */
 /*-----------------------------------------------------------------------*/
-FATFS* pf_grab() { return FatFs; }
+
+void pf_grab(FATFS** fs)
+{
+	*fs = FatFs;
+}
 
 //static
 CLUST get_fat ( /* 1:IO error, Else:Cluster status */
@@ -1260,6 +1264,8 @@ FRESULT pf_write_sector(void* src)
 
     if(!fs) {return FR_NOT_ENABLED;}
     if(!(fs->flag & FA_READ)){return FR_INVALID_OBJECT;}
+
+	dr = FR_OK;/*Remove warnings*/
 
 	if((fs->fptr & 511) == 0) {                /* On the sector boundary? */
         if(((fs->fptr >> 9) & (fs->csize - 1)) == 0) { /* On the cluster boundary? */
