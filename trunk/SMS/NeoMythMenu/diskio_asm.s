@@ -1618,9 +1618,9 @@ _sdWriteSingleBlock_retry:
 		call	disk_readp_calc_sector
         ld      a,#WRITE_SINGLE_BLOCK
         call    sendMmcCmd
-        ld      a,(_cardType+1)
-        and     a,#0x80
-        jr      nz,1$
+        ;ld      a,(_cardType+1)
+        ;and     a,#0x80
+        ;jr      nz,1$
         ld      de,#_diskioResp
         ld      b,#R1_LEN
         ld      c,#0
@@ -1645,9 +1645,13 @@ _sdWriteSingleBlock_retry:
         ld      hl,#1            ; return FR_DISK_ERR
         ret
 1$:	
-		;wrMmcDatByte4(0xff)
+		;minimum 2 P bits
 		ld		a,#0xff
 		call	wrMmcDatByte4
+		
+		;write start bit
+		xor		a
+		call	wrMmcDatBit4
 
 		;Write sector data
 		ld		bc,#512

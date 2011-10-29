@@ -15,7 +15,7 @@
 #include "sd_utils.h"
 #include "vgm_player_map.h"
 
-#undef TEST_SD_BLOCK_WRITE
+#define TEST_SD_BLOCK_WRITE
 #undef TEST_CHEAT_INPUTBOX
 #define MENU_VERSION_STRING "1.10"
 #define KEY_REPEAT_INITIAL_DELAY 15
@@ -1052,10 +1052,11 @@ void test_w_mode()
 	else
 	{
 		puts("WRITE : FAILED!", 2, 10, PALETTE1);
-		if(0x02 == r){puts("CRC ERROR!", 2, 11, PALETTE1);}
-		if(0x03 == r){puts("START BIT ERROR!", 2, 11, PALETTE1);}
+		if(0x0002 == r){puts("CRC ERROR!", 2, 11, PALETTE1);}
+		if(0x0003 == r){puts("START BIT ERROR!", 2, 11, PALETTE1);}
 		print_hex((r>>8)&0xff,2,12);
 		print_hex(r&0xff,4,12);
+		print_hex(diskioResp[0],6,12);
 	}
 
 	puts("WRITE END", 2, 13, PALETTE1);
