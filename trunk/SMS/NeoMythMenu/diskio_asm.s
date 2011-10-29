@@ -1610,7 +1610,7 @@ _sdWriteSingleBlock:
 		push	ix
 		ld		ix,#4
 		add		ix,sp
-		ld		a,#0x01
+		ld		a,#127
 		ld		(_vregs+15),a
 
 _sdWriteSingleBlock_retry:
@@ -1632,6 +1632,7 @@ _sdWriteSingleBlock_retry:
         jr      z,1$
 2$:
 		ld		a,(_vregs+15)
+
 		ld		b,a
 		dec		a
 		ld		(_vregs+15),a

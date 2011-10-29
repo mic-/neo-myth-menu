@@ -1293,7 +1293,7 @@ FRESULT pf_write_sector(void* src)
 pf_write_sector_abort:
 	fs->flag = 0;
 	pff_debug_print(0xff,2);
-	return FR_DISK_ERR;
+	return dr;
 }
 
 #if 0
