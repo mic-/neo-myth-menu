@@ -159,11 +159,11 @@ FRESULT pf_open (const char*);          /* Open a file */
 
 FRESULT pf_read (void*, WORD, WORD*);   /* Read data from a file */
 volatile FRESULT pf_read_sectors (WORD, WORD, WORD);
-FRESULT pf_write (const void*, WORD, WORD*);	/* Write data to the open file */
+FRESULT pf_write_sector(void* src);
 FRESULT pf_lseek (DWORD);               /* Move file pointer of a file object */
 FRESULT pf_opendir (DIR*, const char*); /* Open an existing directory */
 FRESULT pf_readdir (DIR*, FILINFO*);    /* Read a directory item */
-
+FATFS* pf_grab();
 
 /*--------------------------------------------------------------*/
 /* Flags and offset address                                     */

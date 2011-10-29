@@ -90,7 +90,7 @@ WORD chk_chr (const char* str, WORD chr) {
     return *str;
 }
 
-/*
+
 void waste_time()
 {
    *(BYTE*)0xC000 = *(BYTE*)0xC000;
@@ -110,11 +110,12 @@ void pff_debug_print(BYTE val, BYTE x)
     VdpData = hi; waste_time(); VdpData = 0; waste_time();
     VdpData = lo; waste_time(); VdpData = 0; waste_time();
 }
-*/
+
 
 /*-----------------------------------------------------------------------*/
 /* FAT access - Read value of a FAT entry                                */
 /*-----------------------------------------------------------------------*/
+FATFS* pf_grab() { return FatFs; }
 
 //static
 CLUST get_fat ( /* 1:IO error, Else:Cluster status */
@@ -751,6 +752,7 @@ FRESULT follow_path (   /* FR_OK(0): successful, !=0: error code */
 
 
 
+
 #if _FS_FAT32
                 ((DWORD)LD_WORD(dir+DIR_FstClusHI) << 16) |
 #endif
@@ -1181,6 +1183,13 @@ void ba_xor(unsigned char* a,const unsigned char* b,const unsigned char* c)
     for(i = 0; i < j; i++) { a[i] = b[i] ^ c[i]; }
 }
 
+void ba_assign(unsigned char* a,unsigned char* b)
+{
+	unsigned char i;
+
+	for(i = 0;i<8;i++){*(a++) = *(b++);}
+}
+
 /************* BIT STREAM CODE BEGIN *************/
 void poly_set(unsigned char* poly,short a_in)
 {	
@@ -1225,7 +1234,7 @@ void crc16_bc(const unsigned char* sector)
         else
             { nybble = (sector[i >> 1] >> 4); }
 
-		memcpy(bcb,bca,8);
+		ba_assign(bcb,bca);
 		ba_shr(bcb,60);
 		ba_shl(bca,4);
 
@@ -1241,59 +1250,81 @@ void crc16_bc(const unsigned char* sector)
 }
 /************* BIT STREAM CODE END *************/
 
-FRESULT pf_write (
-	const void* buff,	/* Pointer to the data to be written */
-	WORD btw,			/* Number of bytes to write (0:Finalize the current write operation) */
-	WORD* bw			/* Pointer to number of bytes written */
-)
+FRESULT pf_write_sector(void* src)
 {
-	CLUST clst;
-	DWORD sect, remain;
-	const BYTE *p = buff;
-	BYTE cs;
-	WORD wcnt;
-	FATFS *fs = FatFs;
-	DRESULT (*p_disk_writep)(BYTE*,DWORD) = pfn_disk_writep;
+    DRESULT dr;
+    CLUST clst;
+    DWORD sect;
+    FATFS* fs = FatFs;
+    DRESULT (*p_disk_writep)(BYTE*,DWORD) = pfn_disk_writep;
 
-	*bw = 0;
-	if (!fs) { return FR_NOT_ENABLED; }
-	if (!(fs->flag & FA_OPENED)) { return FR_NOT_OPENED; }
+	pff_debug_print(0x0a,2);
+    if(!fs) {return FR_NOT_ENABLED;}
+    if(!(fs->flag & FA_READ)){return FR_INVALID_OBJECT;}
+	pff_debug_print(0x0b,2);
+	if((fs->fptr & 511) == 0) {                /* On the sector boundary? */
+	pff_debug_print(0x0c,2);
+        if(((fs->fptr >> 9) & (fs->csize - 1)) == 0) { /* On the cluster boundary? */
+	pff_debug_print(0x0d,2);
+            clst = (fs->fptr == 0) ?            /* On the top of the file? */
+                fs->org_clust : get_fat(fs->curr_clust);
+            if (clst <= 1) {goto pf_write_sector_abort;}
+            fs->curr_clust = clst;              /* Update current cluster */
+            fs->csect = 0;                      /* Reset sector offset in the cluster */
+	pff_debug_print(0x0e,2);
+        }
+	pff_debug_print(0x0f,2);
+        sect = clust2sect(fs->curr_clust);      /* Get current sector */
+        if (!sect) {goto pf_write_sector_abort;}
+        sect += fs->csect;
+        fs->dsect = sect;
+        fs->csect++;                            /* Next sector address in the cluster */
+	pff_debug_print(0xa0,2);
+    }
+	pff_debug_print(0xb0,2);
+	crc16_bc((const unsigned char*)src);
+	pff_debug_print(0xc0,2);
+    dr = p_disk_writep((BYTE*)src,fs->dsect);
+	pff_debug_print(0xd0,2);
+    fs->fptr += 512;
 
-	if (!(fs->flag & FA__WIP)){ fs->fptr &= 0xFFFFFE00; }
-	remain = fs->fsize - fs->fptr;
-	if (btw > remain) {btw = (WORD)remain;}			/* Truncate btw by remaining bytes */
+    if(FR_OK == dr) { return FR_OK; }
 
-	while (btw)	{									/* Repeat until all data transferred */
-		if ((fs->fptr & 511) == 0) {			/* On the sector boundary? */
-			cs = (BYTE)((fs->fptr >> 9) & (fs->csize - 1));	/* Sector offset in the cluster */
-			if (!cs) {								/* On the cluster boundary? */
-				clst = (fs->fptr == 0) ?			/* On the top of the file? */
-					fs->org_clust : get_fat(fs->curr_clust);
-				if (clst <= 1) { goto fw_abort; }
-				fs->curr_clust = clst;				/* Update current cluster */
-			}
-			sect = clust2sect(fs->curr_clust);		/* Get current sector */
-			if (!sect) { goto fw_abort; }
-			fs->dsect = sect + cs;
-
-			crc16_bc(p);
-			if(p_disk_writep((void*)p, fs->dsect)) { goto fw_abort; }	/* Send data to the sector */
-			if(fs->flag & FA__WIP){ fs->flag &= ~FA__WIP; }
-		}
-		wcnt = 512 -  (WORD)(fs->fptr & 511);		/* Number of bytes to write to the sector */
-		if (wcnt > btw) wcnt = btw;
-
-		fs->fptr += (DWORD)wcnt; p += wcnt;				/* Update pointers and counters */
-		btw -= wcnt; *bw += wcnt;
-	}
-
-	return FR_OK;
-
-fw_abort:
+pf_write_sector_abort:
 	fs->flag = 0;
+	pff_debug_print(0xff,2);
 	return FR_DISK_ERR;
 }
 
+#if 0
+FRESULT pf_write_sectors(void* src,WORD count)
+{
+	DWORD addr;
+	FATFS *fs = FatFs;
+	FRESULT fr;
+	BYTE* p;
+
+	if(!fs) {return FR_NOT_ENABLED;}
+
+	p = src;
+	addr = fs->fptr;
+	if(addr >= fs->fsize){return FR_DISK_ERR;}
+
+	while(count > 0)
+	{
+		fr = pf_write_sector((void*)p);
+		if(fr != FR_OK){return fr;}
+		p += 512;
+		addr += 512;
+		if(addr >= fs->fptr){pf_lseek(fs->fsize);break;}
+		fr = pf_lseek(addr);
+		if(fr != FR_OK){return fr;}
+		count--;
+	}
+
+	return FR_OK;
+}
+#endif
 
 #if _USE_LSEEK
 /*-----------------------------------------------------------------------*/
@@ -1464,7 +1495,6 @@ FRESULT pf_readdir (
 }
 
 #endif /* _FS_DIR */
-
 /*
 	Required for hacked-in file creation
 	This is a modified FF version
@@ -1502,7 +1532,8 @@ FRESULT move_window (
 }
 
 FRESULT pf_dir_register_sfn (	/* FR_OK:Successful, FR_DENIED:No free entry or too many SFN collision, FR_DISK_ERR:Disk error */
-	DIR *dj				/* Target directory with object name to be created */
+	DIR *dj,				/* Target directory with object name to be created */
+	BYTE force
 )
 {
 	FRESULT res;
@@ -1531,6 +1562,15 @@ FRESULT pf_dir_register_sfn (	/* FR_OK:Successful, FR_DENIED:No free entry or to
 		}
 	}
 
+	if(force)
+	{
+		dir[DIR_Attr] = 0;					/* Reset attribute */
+		ps = get_fattime();
+		ST_DWORD(dir+DIR_CrtTime, ps);		/* Created time */
+		dj.fs->wflag = 1;
+		dj->flag |= FA__WIP;/*FA__WRITTEN;*/
+	}
+
 	return res;
 }
 
@@ -1540,16 +1580,17 @@ FRESULT pf_file_exists(const char* path)
 	return follow_path(&entry,path) != FR_NO_FILE;
 }
 
-FRESULT pf_file_register_sfn (const char* path)/*Haaaaaack*/
+FRESULT pf_file_register_sfn (const char* path,BYTE force)/*Haaaaaack*/
 {
 	FRESULT res;
 	DIR entry;
+
 	BYTE* dir;
 
 	res = follow_path(&entry,path);
 	if(res == FR_NO_FILE)
 	{
-		res = dir_register_sfn(&entry);
+		res = dir_register_sfn(&entry,force);
 		if(res != FR_OK) {return res;}
 		dir = dj.dir;
 	}

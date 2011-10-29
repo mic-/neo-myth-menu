@@ -1610,11 +1610,17 @@ _sdWriteSingleBlock:
 		push	ix
 		ld		ix,#4
 		add		ix,sp
+		ld		a,#0x01
+		ld		(_vregs+15),a
 
+_sdWriteSingleBlock_retry:
 		call    neo2_pre_sd
 		call	disk_readp_calc_sector
         ld      a,#WRITE_SINGLE_BLOCK
         call    sendMmcCmd
+        ld      a,(_cardType+1)
+        and     a,#0x80
+        jr      nz,1$
         ld      de,#_diskioResp
         ld      b,#R1_LEN
         ld      c,#0
@@ -1625,6 +1631,14 @@ _sdWriteSingleBlock:
         cp      a,#WRITE_SINGLE_BLOCK
         jr      z,1$
 2$:
+		ld		a,(_vregs+15)
+		ld		b,a
+		dec		a
+		ld		(_vregs+15),a
+		ld		a,b
+		or		a
+		jp		nz,_sdWriteSingleBlock_retry
+
 		call    neo2_post_sd
 		pop		ix
         ld      hl,#1            ; return FR_DISK_ERR
@@ -1640,22 +1654,30 @@ _sdWriteSingleBlock:
 		ld		l,0(ix)
 3$:
 		ld		a,(hl)
+		push	hl
+		push	bc
 		call	wrMmcDatByte4
+		pop		bc
+		pop		hl
 		inc		hl
 		dec		bc
 		ld		a,b
 		or		a,c
-		jR		nz,3$
+		jr		nz,3$
 
 		;Write crc
 		ld		hl,#0xDA08		; crc @0xda08
 		ld		b,#8
 4$:
 		ld		a,(hl)
+		push	hl
+		push	bc
 		call	wrMmcDatByte4
+		pop		bc
+		pop		hl
 		inc		hl
 		djnz	4$
-
+	
 		;end bit
 		ld		a,#0x0f
 		call	wrMmcDatBit4
@@ -1666,7 +1688,7 @@ _sdWriteSingleBlock:
 		;check for start bit
 		call	rdMmcDatBit4
 		and		a,#0x01
-		jR		nz,2$
+		jr		nz,10$
 
 		;crc status
 		ld		c,#0x00
@@ -1686,7 +1708,7 @@ _sdWriteSingleBlock:
 
 		ld		a,c
 		cp		a,#0x02
-		jr		nz,2$
+		jr		nz,9$
 
 		;wait for start bit
 6$:
@@ -1695,7 +1717,7 @@ _sdWriteSingleBlock:
 		jr		nz,6$
 
 		;wait for write to finish
-		ld		bc,#60*1024
+		ld		bc,#8192
 7$:
 		call	rdMmcDatBit4
 		and		a,#0x01
@@ -1713,5 +1735,16 @@ _sdWriteSingleBlock:
 		call    neo2_post_sd
 		pop		ix
         ld      hl,#0        ; FR_OK
+        ret
+9$:
+		call    neo2_post_sd
+		pop		ix
+        ld      hl,#0x02        ; crc error
+        ret
+
+10$:
+		call    neo2_post_sd
+		pop		ix
+        ld      hl,#0x03        ; start bit error
         ret
 
