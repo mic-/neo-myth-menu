@@ -1039,9 +1039,11 @@ void test_w_mode()
 	}
 	else
 		{puts("Openned /DUMMY.BIN", 2, 8, PALETTE1);}
-	
-	memset_asm(p,'A',256);
-	memset_asm(p+256,'B',256);
+		
+	memset_asm(p,'A',512);
+	strcpy_asm(p,"Neo SMS Myth Menu...");
+	//memset_asm(p,'A',256);
+	//memset_asm(p+256,'B',256);
 	puts("WRITE BEGIN", 2, 9, PALETTE1);
 	Frame2 = BANK_PFF;
 
