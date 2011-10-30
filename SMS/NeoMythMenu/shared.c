@@ -19,6 +19,7 @@ WORD cardType;      // C016
 
 // The rest can be in any order..
 
+BYTE options_sync;
 BYTE reset_to_menu_option_idx;
 BYTE fm_enabled_option_idx;
 BYTE flash_mem_type;

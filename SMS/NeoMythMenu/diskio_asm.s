@@ -1722,7 +1722,7 @@ _sdWriteSingleBlock_retry:
 		jr		nz,6$
 
 		;wait for write to finish
-		ld		bc,#8192
+		ld		bc,#60*1024
 7$:
 		call	rdMmcDatBit4
 		and		a,#0x01

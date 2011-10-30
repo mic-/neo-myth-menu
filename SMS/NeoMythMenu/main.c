@@ -241,6 +241,7 @@ void cls()
 {
     clear_list_surface();
     present_list_surface();
+	vdp_wait_vblank();
 }
     
 void puts_active_list()
@@ -672,6 +673,8 @@ void handle_action_button(BYTE button)
         {
             if(options_highlighted < options_count)//sanity check
             {
+				options_sync = 1;
+
                 if(OPTION_TYPE_SETTING == options_get_type(&options[options_highlighted]))
                 {
                     if(options_get_state(&options[options_highlighted]))
@@ -753,6 +756,8 @@ void handle_action_button(BYTE button)
             prbank = praddr >> 16;            
             pfn_neo2_psram_to_ram((BYTE *)fi, prbank+0x20, proffs, 64);
             
+			if(options_sync){sdutils_save_cfg();}
+
             if (GAME_MODE_NORMAL_ROM == fi->ftype)
             {
                 read_file_to_psram(fi, 0x00, 0x0000);
@@ -1186,6 +1191,7 @@ void main()
         temp = init_sd();
         Frame1 = BANK_BG_GFX;
         Frame2 = BANK_RAM_CODE;
+		sdutils_load_cfg();
     }
     
     puts_active_list();
@@ -1323,6 +1329,7 @@ void options_init()
 {
     options_highlighted = 0;
     options_count = 0;
+	options_sync = 0;
 }
 
 #if 0
