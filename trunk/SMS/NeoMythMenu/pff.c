@@ -1093,166 +1093,67 @@ FRESULT pf_read_sectors (
     return FR_OK;
 }
 
-/*See tools/crc16/ for more*/
-#define BIT_CHAR(in)         ((in) >> 3)
-#define BITS_TO_CHARS(in)   ((((in) - 1) >> 3) + 1)
-const short b7_set = 128;			/*patch over sdcc's symbol resolving bug*/
-const short num_bits = 64;			/*patch over sdcc's symbol resolving bug*/
-
-void ba_shr(unsigned char* a,char shifts)
+void xor_poly(unsigned char* a,unsigned char m)/*LE order*/
 {
-    char i,j,k;
-    unsigned char mask;
-    char chars;
+	unsigned char q;
 
-	chars = shifts >> 3;   
-    shifts = shifts & 7;
-	k = BIT_CHAR(num_bits - 1);
+	q = 0x01 << m;
+	//a[3] ^= 0x00;						
+	a[2] ^= q << 4;
+	//a[1] ^= 0x00;
+	a[0] ^= q;
+	//a[7] ^= 0x00;
+	a[6] ^= q;
+	//a[5] ^= 0x00;
+	//a[4] ^= 0x00;
+}
 
-    if(chars > 0)
+void rotate_left_crc(unsigned char* crc)	/*Z80 port optimization : use rotate ops?*/
+{
+	unsigned char q,q2;
+
+	q2 = crc[6]; crc[7] = (crc[7] << 4) | ((q2 >> 4) );
+	q = crc[5]; crc[6] = (q2 << 4) | ((q >> 4));
+	q2 = crc[4]; crc[5] = (q << 4) | ((q2 >> 4));
+	q = crc[3]; crc[4] = (q2 << 4) | ((q >> 4));
+	q2 = crc[2]; crc[3] = (q << 4) | ((q2 >> 4));
+	q = crc[1]; crc[2] = (q2 << 4) | ((q >> 4));
+	q2 = crc[0]; crc[1] = (q << 4) | ((q2 >> 4));
+	crc[0] = (q2 << 4);
+}
+
+void accumulate_crc(unsigned char* crc,unsigned char nybble,unsigned char lsb)
+{
+	unsigned char a = nybble ^ lsb;
+	
+	if(a & 1){xor_poly(crc,0);}
+	if(a & 2){xor_poly(crc,1);}
+	if(a & 4){xor_poly(crc,2);}
+	if(a & 8){xor_poly(crc,3);}
+}
+
+void crc16_quadless(unsigned char* out,const unsigned char* data)
+{
+    short i;
+    unsigned char nybble,tmp;
+	unsigned char* crc;
+	unsigned char* crc_lsb;
+
+	crc = (unsigned char*)0xDA10;		/*Temp*/
+	memset(crc,0,8);
+	crc_lsb = (unsigned char*)0xDA17;
+	i = 0;
+
+    do
     {
-        #if 0
-		short i,j;
-		i = k;
-		while(1)
-		{
-			j = i - chars;
-			if(!j) { break; }
-			a[i] = a[j];
-			--i;
-		}
-		#else
-		for(i = k; (i - chars) >= 0; i--) { a[i] = a[i - chars]; }
-		#endif
-        for(; chars > 0; chars--) { a[chars - 1] = 0; }
-    }
+		nybble = (i&1) ? ((*(data++)) & 0x0f) : ((*data) >> 4);
+		tmp = crc_lsb[0]>>4;
+		rotate_left_crc(crc);
+		accumulate_crc(crc,nybble,tmp);
+	}while(++i < 1024);
 
-    for(i = 0; i < shifts; i++)
-    {
-        for(j = k; j > 0; j--)
-        {
-            a[j] >>= 1;
-            if (a[j - 1] & 0x01) { a[j] |= b7_set; }
-        }
-
-        a[0] >>= 1;
-    }
-
-    i = num_bits & 7;
-	if(0 == i) { return; }
-
-	mask = 255 << (unsigned char)((short)(8 - i));
-	a[k] &= mask;
+    for(i = 7; i >= 0; i--) { out[i] = crc[7-i]; }
 }
-
-void ba_shl(unsigned char* a,char shifts)
-{
-    char i,j,k;
-	char chars;
-
-	chars = shifts >> 3;  
-    shifts = shifts & 7;    
-
-    if(chars)
-    {
-		k = BITS_TO_CHARS(num_bits);
-		#if 1
-        for(i = 0; (i + chars) <  k; i++) { a[i] = a[i + chars]; }
-		#else
-		for(i = 0,j = chars; j <  k; i++,j++) { a[i] = a[j]; }
-		#endif
-        for(i = BITS_TO_CHARS(num_bits); chars > 0; chars--) { a[i - chars] = 0; }
-    }
-
-	k = BIT_CHAR(num_bits - 1);
-
-    for(i = 0; i < shifts; i++)
-    {
-        for(j = 0; j < k; j++)
-        {
-            a[j] <<= 1;
-
-            if (a[j + 1] & b7_set) { a[j] |= 0x01; }
-        }
-
-        a[k] <<= 1;
-    }
-}
-
-void ba_xor(unsigned char* a,const unsigned char* b,const unsigned char* c)
-{
-    short i,j;
-
-	j = BITS_TO_CHARS(num_bits);
-    for(i = 0; i < j; i++) { a[i] = b[i] ^ c[i]; }
-}
-
-void ba_assign(unsigned char* a,unsigned char* b)
-{
-	unsigned char i;
-
-	for(i = 0;i<8;i++){*(a++) = *(b++);}
-}
-
-/************* BIT STREAM CODE BEGIN *************/
-void poly_set(unsigned char* poly,short a_in)
-{	
-	unsigned char a = (unsigned char)a_in;
-	/*poly[0] = 0x00;*/ poly[1] = a;					/*000a*/
-	/*poly[2] = 0x00;   poly[3] = 0x00;	*/				/*0000*/
-	/*poly[4] = 0x00;*/ poly[5] = a << 4;				/*00a0*/
-	/*poly[6] = 0x00;*/ poly[7] = a;					/*000a*/
-}
-
-void bc_xori(unsigned char* bca,unsigned char* bcd,unsigned char imm0,unsigned char imm1,unsigned char imm2)
-{
-	if( (imm0 ^ imm1) & imm2 )						/*(00 00 00 00 00 00 00 aa ^ 00 00 00 00 00 00 00 0b) & 00 00 00 00 00 00 00 0c*/
-	{
-		poly_set(bcd,imm2);							/*d = p[imm2]*/
-		ba_xor(bca,bca,bcd);						/*a = (a ^ d)*/
-	}
-}
-
-void crc16_bc(const unsigned char* sector)
-{
-	unsigned char j,nybble;
-	unsigned char lsb;
-	short i,len;
-	unsigned char* bca;
-	unsigned char* bcb;
-	unsigned char* bcd;
-
-	bca = (unsigned char*)0XDA08;	/*output*/
-	bcb = (unsigned char*)0xDA10;
-	bcd = (unsigned char*)0xDA18;
-
-	mem_set(bca,0,8);				/*reset*/
-	mem_set(bcd,0,8);				/*optimize poly_set*/
-
-	len = 1024;
-
-	for(i = 0;i<len;i++)
-	{
-        if(i & 1) 
-			{ nybble = (sector[i >> 1] & 0x0f); }
-        else
-            { nybble = (sector[i >> 1] >> 4); }
-
-		ba_assign(bcb,bca);
-		ba_shr(bcb,60);
-		ba_shl(bca,4);
-
-		lsb = bcb[7];/*00 00 00 00 00 00 00 aa*/
-		j = 1;
-		do
-		{
-			bc_xori(bca,bcd,lsb,nybble,j);
-			j <<= 1;
-		}
-		while(j <= 8);
-	}
-}
-/************* BIT STREAM CODE END *************/
 
 FRESULT pf_write_sector(void* src)
 {
@@ -1281,7 +1182,8 @@ FRESULT pf_write_sector(void* src)
         fs->dsect = sect;
         fs->csect++;                            /* Next sector address in the cluster */
     }
-	crc16_bc((const unsigned char*)src);
+
+	crc16_quadless((unsigned char*)0xda08,(const unsigned char*)src);
     dr = p_disk_writep((BYTE*)src,fs->dsect);
     fs->fptr += 512;
 

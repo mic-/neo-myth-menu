@@ -113,6 +113,7 @@ extern void options_init();
 extern BYTE flash_mem_type;
 
 extern Option options[MAX_OPTIONS];
+extern BYTE options_sync;
 extern BYTE options_count;
 extern BYTE options_highlighted;
 extern BYTE reset_to_menu_option_idx;
