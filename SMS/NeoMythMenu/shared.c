@@ -20,8 +20,12 @@ WORD cardType;      // C016
 // The rest can be in any order..
 
 BYTE options_sync;
+BYTE options_sram_bank;
 BYTE reset_to_menu_option_idx;
+BYTE sram_set_option_idx;
+BYTE sram_cls_option_idx;
 BYTE fm_enabled_option_idx;
+BYTE import_ips_option_idx;
 BYTE flash_mem_type;
 BYTE hasZipram;
 BYTE menu_state;
@@ -29,11 +33,11 @@ BYTE menu_state;
 FileList games;
 BYTE region;
 BYTE pad, padLast;
-
+BYTE options_cheat_ptr;
 BYTE options_count;
 BYTE options_highlighted;
-Option options[MAX_OPTIONS];
-
+//Option options[MAX_OPTIONS];
+Option* options = (Option*)0xDA18;
 BYTE generic_list_buffer[LIST_BUFFER_SIZE];
 
 BYTE diskioPacket[7];

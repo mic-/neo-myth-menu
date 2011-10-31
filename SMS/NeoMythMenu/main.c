@@ -15,7 +15,7 @@
 #include "sd_utils.h"
 #include "vgm_player_map.h"
 
-#define TEST_SD_BLOCK_WRITE
+#undef TEST_SD_BLOCK_WRITE
 #undef TEST_CHEAT_INPUTBOX
 #define MENU_VERSION_STRING "1.10"
 #define KEY_REPEAT_INITIAL_DELAY 15
@@ -28,7 +28,15 @@
 extern FATFS sdFatFs; 
 extern unsigned char pfmountbuf[36];
 extern WCHAR LfnBuf[_MAX_LFN + 1];
+void option_cb_inc_sram_bank();
+void option_cb_dec_sram_bank();
+void option_cb_add_cheat();
 
+void bank1_call(WORD task,char* user_data)
+{
+	void (*dispatch)(WORD,char*) = (void (*)(WORD,char*))0x4000;
+	dispatch(task,user_data);
+}
 
 void mute_sound()
 {
@@ -119,52 +127,21 @@ void setup_vdp()
     enable_ints();
 }
 
-void waste_time()
-{
-   *(BYTE*)0xC000 = *(BYTE*)0xC000;
-}
 /*
  * Prints the value val in hexadecimal form at position x,y
  */
-void print_hex(BYTE val, BYTE x, BYTE y)
+
+void print_hex(BYTE val, BYTE x, BYTE y) 
 {
-    BYTE lo,hi;
-
-    vdp_set_vram_addr(MENU_NAMETABLE + (x << 1) + (y << 6));
-
-    hi = (val >> 4);
-    lo = val & 0x0F;
-    lo += 16; hi += 16;
-    if (lo > 25) lo += 7;
-    if (hi > 25) hi += 7;
-    VdpData = hi; waste_time(); VdpData = 0; waste_time();
-    VdpData = lo; waste_time(); VdpData = 0; waste_time();
+	val=val,x=x,y=y;
+	bank1_call(TASK_PRINT_HEX,&val);	/*Pass in the stack offset L->R from R->L*/
 }
-
 
 void dump_hex(WORD addr)
 {
-    BYTE *p = (BYTE*)addr;
-    BYTE row,col,c,d;
-
-    row = 7;
-    for (; row < 15; row++)
-    {
-        vdp_set_vram_addr(MENU_NAMETABLE + (row << 6) + 8);
-        for (col = 0; col < 8; col++)
-        {
-            c = *p++;
-            d = (c >> 4);
-            c &= 0x0F;
-            c += 16; d += 16;
-            if (c > 25) c += 7;
-            if (d > 25) d += 7;
-            VdpData = d; waste_time(); VdpData = 0; waste_time();
-            VdpData = c; waste_time(); VdpData = 0; waste_time();
-        }
-    }
+	addr=addr;
+	bank1_call(TASK_DUMP_HEX,(char*)&addr);
 }
-
 
 void vdp_delay(BYTE count)
 {
@@ -172,7 +149,6 @@ void vdp_delay(BYTE count)
     while(count--)
         vdp_wait_vblank();
 }
-
 
 void clear_list_surface() __naked
 {
@@ -195,7 +171,6 @@ void clear_list_surface() __naked
     ret
     __endasm;
 }
-
 
 void present_list_surface()
 {
@@ -388,7 +363,29 @@ void puts_active_list()
                 ix++;
             }
 
-            if(OPTION_TYPE_SETTING == options_get_type(&options[show]))
+			if(OPTION_TYPE_ROUTINE == options_get_type(&options[show]))
+			{
+				if(OPTION_CB_SET_SRAM_BANK == options[show].user_data)
+				{
+		            temp[offs + col*2 + 2] = ('0'+options_sram_bank)-32;
+		            temp[offs + col*2 + 3] = attr;
+		            col++;
+				}
+				else if(OPTION_CB_CHEAT_MGR == options[show].user_data)
+				{
+					//col+=4;
+		            temp[offs + col*2 + 2] = '('-32;
+		            temp[offs + col*2 + 3] = attr;
+		            col++;
+		            temp[offs + col*2 + 2] = ('0'+(MAX_CHEATS-options_cheat_ptr))-32;
+		            temp[offs + col*2 + 3] = attr;
+		            col++;
+		            temp[offs + col*2 + 2] = ')'-32;
+		            temp[offs + col*2 + 3] = attr;
+		            col++;
+				}
+			}
+            else if(OPTION_TYPE_SETTING == options_get_type(&options[show]))
             {
                 if(0 == options_get_state(&options[show]))
                 {
@@ -652,6 +649,7 @@ void sync_state()
 		break;
 	}
 }
+
 void handle_action_button(BYTE button)
 {
     FileInfoEntry *fi;
@@ -660,9 +658,11 @@ void handle_action_button(BYTE button)
     BYTE col;
     DWORD praddr;
     uint16_t prbank, proffs;
-    
+    Option* option;
+
     if (MENU_STATE_OPTIONS == menu_state)
     {
+
         // in the options state, the controls are
         // [DOWN]/[UP] = next/prev option
         // [LEFT]/[RIGHT] = change option
@@ -674,19 +674,27 @@ void handle_action_button(BYTE button)
             if(options_highlighted < options_count)//sanity check
             {
 				options_sync = 1;
-
-                if(OPTION_TYPE_SETTING == options_get_type(&options[options_highlighted]))
+				option = &options[options_highlighted];
+                if(OPTION_TYPE_SETTING == options_get_type(option))
                 {
-                    if(options_get_state(&options[options_highlighted]))
-                        options_set_state(&options[options_highlighted],0);
+                    if(options_get_state(option))
+                        options_set_state(option,0);
                     else
-                        options_set_state(&options[options_highlighted],1);
+                        options_set_state(option,1);
+                }
+                else if(OPTION_TYPE_ROUTINE == options_get_type(option))
+                {
+					switch(option->user_data)
+					{
+						case OPTION_CB_SET_SRAM_BANK:
+							if(button == PAD_LEFT)
+								{option_cb_dec_sram_bank();}
+							else	
+								{option_cb_inc_sram_bank();}
+						break;
+					}
                 }
 #if 0
-                else if(OPTION_TYPE_ROUTINE == options_get_type(&options[options_highlighted]))
-                {
-                    //TODO
-                }
                 else if(OPTION_TYPE_CHEAT == options_get_type(&options[options_highlighted]))
                 {
                     //TODO
@@ -695,6 +703,30 @@ void handle_action_button(BYTE button)
                 puts_active_list();
             }
         }
+		else if(button == PAD_SW1)
+		{
+			if(options_highlighted >= options_count){return;}
+			option = &options[options_highlighted];
+			if(OPTION_TYPE_ROUTINE == options_get_type(option))
+			{
+				if(option->user_data == OPTION_CB_CHEAT_MGR)
+				{
+					option_cb_add_cheat();
+					puts_active_list();
+					return;
+				}
+				if(option->user_data == OPTION_CB_CLEAR_SRAM)
+				{
+					sdutils_sram_cls();
+					puts_active_list();
+					return;
+				}
+				else if(option->user_data == OPTION_CB_IMPORT_IPS)
+				{
+					return; //todo
+				}
+			}
+		}
 
     }
 #if 0
@@ -855,14 +887,32 @@ void handle_action_button(BYTE button)
     }
     else if(button == PAD_SW2)
     {
+		BYTE state = menu_state;
+
         //++menu_state;
         if (MENU_STATE_OPTIONS != menu_state)
         {
             menu_state = MENU_STATE_OPTIONS;
+
+			if(hasZipram)
+			{
+				//Save
+				pfn_neo2_ram_to_psram(0x00,2048, (BYTE*)0xDA00,256);
+				pfn_neo2_psram_to_ram((BYTE*)0xDA00,0x00,1024,256);
+			}
         }
         else if (neoMode == 0x480)
         {
             menu_state = MENU_STATE_GAME_SD;
+			if(state == MENU_STATE_OPTIONS)
+			{
+				if(hasZipram)
+				{
+					//Restore
+					pfn_neo2_ram_to_psram(0x00,1024, (BYTE*)0xDA00,256);
+					pfn_neo2_psram_to_ram((BYTE*)0xDA00,0x00,2048,256);
+				}
+			}
         }
         else
         {
@@ -877,149 +927,47 @@ void handle_action_button(BYTE button)
     }
 }
 
-#ifdef TEST_CHEAT_INPUTBOX
-
-void cheat_clean_ptr(BYTE x1,BYTE x2,BYTE y)
-{
-	vdp_delay(1);
-	while(x1 < x2)
-	{
-		puts(" ",x1,y,PALETTE1);
-		x1++;
-	}
-	vdp_delay(1);
-}
-
-
-volatile void cheat_inputbox(char* dst_buf,BYTE* dst_size,const char* title)
-{
-	BYTE key;
-	BYTE addr;
-	BYTE h,l,a;
-	BYTE abs_addr;
-
-	//clear list surf
-	clear_list_surface();
-	present_list_surface();
-
-	//set default str : hhlllldd( NOTE : Addressing in nybbles )
-	memset_asm(dst_buf,0xff,8);	
-	dst_buf[8] = '\0';
-	addr = 0;
-
-	//Render title
-	puts(title,LEFT_MARGIN + (((22/2) - (strlen_asm(title)/2))) + 1,8,PALETTE1);
-
-	//Render default str
-	abs_addr = LEFT_MARGIN + (((22/2) - (strlen_asm(dst_buf)/2))) + 1;
-	cheat_clean_ptr(abs_addr-4,abs_addr+8,13);
-	puts("^",abs_addr,13,PALETTE1);
-
-	for(h=0;h<7;h++)
-		print_hex(dst_buf[h],abs_addr + h,12);
-
-	while(1)
-	{
-        key = pad1_get_2button();
-        pad = key & ~padLast;
-        padLast = key;
-
-		if(pad&PAD_SW1)
-			break;
-		else if (pad & PAD_UP)
-		{
-			a = addr >> 1;
-			h = dst_buf[a];
-			l = h & 0x0f;
-			h = (h>>4)&0x0f;
-			
-			if(a & 1)
-			{
-				print_hex(1,abs_addr,16);
-				if(l < 0x0f) { l--; }
-			}
-			else
-			{
-				print_hex(0,abs_addr,16);
-				if(h < 0x0f) { h++; }
-			}
- 
-			dst_buf[a] = (h<<4) | l;
-			print_hex(dst_buf[a],abs_addr + addr,12);
-			vdp_delay(1);
-		}
-		else if (pad & PAD_DOWN)
-		{
-			a = addr >> 1;
-			h = dst_buf[a];
-			l = h & 0x0f;
-			h = (h>>4)&0x0f;
-			
-			if(a & 1)
-			{
-				print_hex(1,abs_addr,16);
-				if(l) { l--; }
-			}
-			else
-			{
-				print_hex(0,abs_addr,16);
-				if(h) { h--; }
-			}
- 
-			dst_buf[a] = (h<<4) | l;
-			print_hex(dst_buf[a],abs_addr + addr,12);
-			vdp_delay(1);
-		}
-		else if (pad & PAD_RIGHT)
-		{
-			if(addr <= 6)
-			{
-				++addr;
-				cheat_clean_ptr(abs_addr-4,abs_addr+8,13);
-				puts("^",abs_addr + addr,13,PALETTE1);
-				vdp_delay(1);
-			}
-		}
-		else if (pad & PAD_LEFT)
-		{
-			if(addr > 0)
-			{
-				--addr;
-				cheat_clean_ptr(abs_addr-4,abs_addr+8,13);
-				puts("^",abs_addr + addr,13,PALETTE1);
-				vdp_delay(1);
-			}
-		}
-	}
-
-	addr = 0;
-
-	while(addr < 8)
-	{
-		if(dst_buf[addr] == '\0')
-			break;
-
-		++addr;
-	}
-
-	*dst_size = addr;
-	dst_buf[addr] = '\0';
-
-	puts("                       ",LEFT_MARGIN,8,PALETTE1);
-	clear_list_surface();
-	sync_state();
-	vdp_delay(2);
-}
-#endif
-
 void import_std_options()
 {
-    options_init();
+	Option* opt;
 
+	if(hasZipram)
+	{
+		pfn_neo2_ram_to_psram(0x00,2048, (BYTE*)0xDA00,256);
+	}
+
+    options_init();
+	
     fm_enabled_option_idx = options_count;
-    options_add("FM : ","off","on",OPTION_TYPE_SETTING,1);
+    options_add("FM              : ","off","on",OPTION_TYPE_SETTING,1);
     reset_to_menu_option_idx = options_count;
-    options_add("Reset to menu : ","off","on",OPTION_TYPE_SETTING,1);
+    options_add("Reset to menu   : ","off","on",OPTION_TYPE_SETTING,1);
+    import_ips_option_idx = options_count;
+
+	if(hasZipram)
+	{
+		options_add("Import .ips     : ","off","on",OPTION_TYPE_SETTING,0);
+		sram_set_option_idx = options_count;
+		opt = options_add("SRAM Bank       : ","\0","\0",OPTION_TYPE_ROUTINE,0);
+		opt->user_data = OPTION_CB_SET_SRAM_BANK;
+		sram_cls_option_idx = options_count; 
+		opt = options_add("Cheat manager    ","\0","\0",OPTION_TYPE_ROUTINE,0);
+		opt->user_data = OPTION_CB_CHEAT_MGR;
+	}
+	else
+	{
+		opt = options_add("SRAM Bank       : ","\0","\0",OPTION_TYPE_ROUTINE,0);
+		opt->user_data = OPTION_CB_SET_SRAM_BANK;
+	}
+
+	opt = options_add("SRAM Clear","\0","\0",OPTION_TYPE_ROUTINE,0);
+	opt->user_data = OPTION_CB_CLEAR_SRAM;
+
+	if(hasZipram)
+	{
+		pfn_neo2_ram_to_psram(0x00,1024, (BYTE*)0xDA00,256);
+		pfn_neo2_psram_to_ram((BYTE*)0xDA00,0x00,2048,256);
+	}
 }
 
 #ifdef TEST_SD_BLOCK_WRITE
@@ -1074,14 +1022,14 @@ void test_w_mode()
 }
 #endif
 
+
+
 void main()
 {
     BYTE temp;
     BYTE padUpReptDelay;
     BYTE padDownReptDelay;
     char type[2];
-
-    void (*bank1_dispatcher)(WORD) = (void (*)(WORD))0x4000;
 
     MemCtrl = 0xA8;
     menu_state = MENU_STATE_GAME_GBAC;  //start off with gbac game state
@@ -1120,7 +1068,7 @@ void main()
 
     load_font();
 
-    bank1_dispatcher(TASK_LOAD_BG);
+    bank1_call(TASK_LOAD_BG,0);
     puts("Neo SMS Menu", LEFT_MARGIN, 1, PALETTE1);
     puts("(c) NeoTeam 2011", LEFT_MARGIN, 2, PALETTE1);
 
@@ -1155,10 +1103,6 @@ void main()
     #if 0
     test_strings();
     #endif
-	
-	#ifdef TEST_CHEAT_INPUTBOX
-	cheat_inputbox(generic_list_buffer,0,"Enter cheat code:");
-	#endif
 
     #if 0
     {
@@ -1273,7 +1217,6 @@ void main()
     }
 }
 
-
 /*should be moved to another bank?*/
 BYTE options_get_state(Option* option)
 {
@@ -1285,12 +1228,12 @@ BYTE options_get_type(Option* option)
     return (option->encoded_info >> 4);
 }
 
-volatile void options_set_state(Option* option,BYTE new_state)
+void options_set_state(Option* option,BYTE new_state)
 {
     option->encoded_info = (option->encoded_info & 0xF0) | (new_state & 0x0F);
 }
 
-volatile void options_set_type(Option* option,BYTE new_type)
+void options_set_type(Option* option,BYTE new_type)
 {
     option->encoded_info = (new_type << 4) | (option->encoded_info & 0x0F);
 }
@@ -1312,124 +1255,53 @@ Option* options_add(const char* name,const char* cond0_bhv,const char* cond1_bhv
     return option;
 }
 
-Option* options_add_ex(const char* name,const char* cond0_bhv,const char* cond1_bhv,BYTE type,BYTE state,WORD user_data0,WORD user_data1)
-{
-    Option* option = options_add(name,cond0_bhv,cond1_bhv,type,state);
-
-    if(option == 0)
-        return 0;
-
-    *(volatile WORD*)&option->user_data[0] = user_data0;
-    *(volatile WORD*)&option->user_data[2] = user_data1;
-
-    return option;
-}
-
 void options_init()
 {
+	options = (Option*)0xDA18;
     options_highlighted = 0;
     options_count = 0;
 	options_sync = 0;
+	options_cheat_ptr = 0;
+	options_sram_bank = 0;
 }
 
-#if 0
-void patch_ips_apply(const char* filename)
+void options_add_cheat(BYTE data,BYTE addr_hi,WORD addr_lo)
 {
-	DWORD save;
-	int written;
-	int size;
-	unsigned char prbank,a;
-	WORD wr,proffs,len,step;
-	unsigned char* buf;
-	unsigned char c;
-	FATFS (*grab_fs)(void) = pfn_pf_grab;
-	FRESULT (*f_open)(const char*) = pfn_pf_open;
-	FATFS* fs;
+	BYTE* base;
 
-	fs = grab_fs();
-	if(!fs){return;}
-	if(f_open(filename) != FR_OK){return;}
-
-	buf = (unsigned char*)0xDB00;
-	size = fs->fsize - 8; /*patch + eof*/
-	written = 0;
-	prbank = 0;
-	proffs = 0;
-	save = fs->fptr;		/*patch*/
-	pf_read(buf,5,&wr);
-	pf_lseek(save + 5);
-
-	while(written < size)
-	{
-		/*
-			This is SLOW actually.For every N bytes a whole sector is read
-			A better solution would be to copy the WHOLE patch to some psram offset and then proccess it from there
-		*/
-		save = fs->fptr;
-		pf_read(buf,5,&wr);
-		pf_lseek(save + 5);
-		written += 5;
+	if(options_cheat_ptr >= MAX_CHEATS){return;}
 	
-		prbank = buf[2];
-		#if 0
-		proffs = buf[1] << 8;
-		proffs |= buf[0];
-		len = buf[4] << 8;
-		len |= buf[3];
-		#else
-		proffs = *(WORD*)&buf[0];
-		len = *(WORD*)&buf[2];
-		#endif
+	base = (BYTE*)0xDACC;
+	base += options_cheat_ptr << 2;
+	base[0] = data;
+	base[1] = addr_hi;
+	*(volatile unsigned short*)&base[2] = addr_lo;
 
-		if(len)
-		{
-			written += len;
-			pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,len);
-			continue;
-		}
-		else	/*run length encoded*/
-		{
-			save = fs->fptr;
-			pf_read(buf,3,&wr);
-			pf_lseek(save + 3);
-			written += 3;
-
-			#if 0
-			len = buf[1] << 8;
-			len |= buf[0];
-			#else
-			len = *(WORD*)&buf[0];
-			#endif
-
-			c = buf[2];
-			memset_asm(buf,c,(len >= 128) ? 128 : len);/*largest step*/
-			while(len > 0)
-			{
-				step = (len > 128) ? 128 : len;
-				len -= step;
-
-				if(step&1)
-				{
-					while(step > 0)
-					{
-						if( (!(step&1))){goto patch_ips_apply_aligned_block_found;}
-						pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,1);
-						step--;
-						proffs++;
-						if(0==proffs){prbank++;}
-					}
-				}
-				else
-				{
-					patch_ips_apply_aligned_block_found:
-					pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,step);
-					proffs += step;
-					if(0==proffs){prbank++;}
-				}
-			}
-		}
-	}
+	++options_cheat_ptr;
 }
-#endif
 
+void option_cb_inc_sram_bank()
+{
+	if(options_sram_bank < 8){++options_sram_bank;}			//XXX how much space there is ? 2Mb(32banks?)
+}
+
+void option_cb_dec_sram_bank()
+{
+	if(options_sram_bank > 0){--options_sram_bank;}
+}
+
+void option_cb_add_cheat()
+{
+	BYTE tmp[4];
+	WORD valid;
+
+	if(options_cheat_ptr >= MAX_CHEATS){return;}
+
+	//bank1_call(TASK_EXEC_CHEAT_INPUTBOX,&tmp[0]); 
+
+	valid = tmp[0] + tmp[1] + tmp[2] + tmp[3];
+	if(valid == 0){return;}
+
+	options_add_cheat(tmp[0],tmp[1],*(volatile unsigned short*)&tmp[2]);
+}
 

@@ -474,6 +474,7 @@ void sdutils_load_cfg()
 	//Read one sector so that the data appear @ 0xdb00
 	pfn_pf_read_sectors(0,0,1);
 
+	options_count = 0;
     fm_enabled_option_idx = options_count;
     options_add("FM : ","off","on",OPTION_TYPE_SETTING,cfg[3]);
     reset_to_menu_option_idx = options_count;
@@ -528,4 +529,105 @@ void sdutils_save_cfg()
 	cls();
 	puts_active_list();
 }
+
+#if 0
+void sdutils_import_ips(const char* filename)
+{
+	DWORD save;
+	int written;
+	int size;
+	unsigned char prbank,a;
+	WORD wr,proffs,len,step;
+	unsigned char* buf;
+	unsigned char c;
+	FATFS (*grab_fs)(void) = pfn_pf_grab;
+	FRESULT (*f_open)(const char*) = pfn_pf_open;
+	FATFS* fs;
+
+	fs = grab_fs();
+	if(!fs){return;}
+	if(f_open(filename) != FR_OK){return;}
+
+	buf = (unsigned char*)0xDB00;
+	size = fs->fsize - 8; /*patch + eof*/
+	written = 0;
+	prbank = 0;
+	proffs = 0;
+	save = fs->fptr;		/*patch*/
+	pf_read(buf,5,&wr);
+	pf_lseek(save + 5);
+
+	while(written < size)
+	{
+		/*
+			This is SLOW actually.For every N bytes a whole sector is read
+			A better solution would be to copy the WHOLE patch to some psram offset and then proccess it from there
+		*/
+		save = fs->fptr;
+		pf_read(buf,5,&wr);
+		pf_lseek(save + 5);
+		written += 5;
+	
+		prbank = buf[2];
+		#if 0
+		proffs = buf[1] << 8;
+		proffs |= buf[0];
+		len = buf[4] << 8;
+		len |= buf[3];
+		#else
+		proffs = *(WORD*)&buf[0];
+		len = *(WORD*)&buf[2];
+		#endif
+
+		if(len)
+		{
+			written += len;
+			pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,len);
+			continue;
+		}
+		else	/*run length encoded*/
+		{
+			save = fs->fptr;
+			pf_read(buf,3,&wr);
+			pf_lseek(save + 3);
+			written += 3;
+
+			#if 0
+			len = buf[1] << 8;
+			len |= buf[0];
+			#else
+			len = *(WORD*)&buf[0];
+			#endif
+
+			c = buf[2];
+			memset_asm(buf,c,(len >= 128) ? 128 : len);/*largest step*/
+			while(len > 0)
+			{
+				step = (len > 128) ? 128 : len;
+				len -= step;
+
+				if(step&1)
+				{
+					while(step > 0)
+					{
+						if( (!(step&1))){goto patch_ips_apply_aligned_block_found;}
+						pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,1);
+						step--;
+						proffs++;
+						if(0==proffs){prbank++;}
+					}
+				}
+				else
+				{
+					patch_ips_apply_aligned_block_found:
+					pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,step);
+					proffs += step;
+					if(0==proffs){prbank++;}
+				}
+			}
+		}
+	}
+}
+#endif
+
 
