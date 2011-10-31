@@ -1,24 +1,44 @@
 #include "sms.h"
 #include "shared.h"
 #include "vdp.h"
+#include "util.h"
 #include "main_map.h"
 
 void bank1_load_bg();
-
+void bank1_options_apply_cheats(char* out);
+void bank1_cheat_inputbox(char* dst);
+void bank1_print_hex(char* in);
+void bank1_dump_hex(char* in);
 
 /*
  * Task dispatcher for this bank
  */
-void dispatch(WORD task)
+void dispatch(WORD task,char* user_data)
 {
     switch (task)
     {
         case TASK_LOAD_BG:
             bank1_load_bg();
-            break;
+		return;
+
+		case TASK_APPLY_OPTIONS:
+			bank1_options_apply_cheats(user_data);
+		return;
+
+		case TASK_EXEC_CHEAT_INPUTBOX:
+			bank1_cheat_inputbox(user_data);
+		return;
+
+		case TASK_PRINT_HEX:
+			bank1_print_hex(user_data);
+		return;
+
+		case TASK_DUMP_HEX:
+			bank1_dump_hex(user_data);
+		return;
 
         default:
-            break;
+		return;
     }
 }
 
@@ -578,7 +598,6 @@ const BYTE menu_pal[] =
 };
 
 
-
 void bank1_load_bg()
 {
     // The font patterns occupy the first 120 tiles, so load the
@@ -591,3 +610,179 @@ void bank1_load_bg()
     // Load the palette
     pfn_vdp_copy_to_cram(0, menu_pal, 16);
 }
+
+BYTE bank1_cheat_identify_type(BYTE addr_hi,WORD addr_lo)
+{
+	if(0x00 == addr_hi)
+	{
+		if((addr_lo >= 0xc000) && (addr_lo <= 0xdfff))//System ram
+			return CT_RAM;
+		else if((addr_lo >= 0xe000) /*&& (addr_lo <= 0xffff)*/)//Mirror ram
+			return CT_RAM;
+		else	//Should we allow these ?
+		{
+			if(0xfff8 == addr_lo)//3d glasses control
+				return CT_RAM;
+			else if((addr_lo >= 0xfff9) && (addr_lo <= 0xfffb))//3d glasses control - mirrors
+				return CT_RAM;
+			else if(0xfffc == addr_lo)//RAM mapper control
+				return CT_RAM;
+			else if(0xfffd == addr_lo)//Mapper slot 0
+				return CT_RAM;
+			else if(0xfffe == addr_lo)//Mapper slot 1
+				return CT_RAM;
+			else if(0xffff == addr_lo)//Mapper slot 2
+				return CT_RAM;
+		}
+	}
+
+	return CT_ROM;
+}
+
+/*
+	output :
+	$00:1 count
+	if(count > 128) first one is ram cheat
+*/
+void bank1_options_apply_cheats(char* out)
+{
+	BYTE i,j,ram;
+	BYTE* base;
+	BYTE valid[MAX_CHEATS];
+	
+	ram = MAX_CHEATS;
+	pfn_memset_asm(valid,0,options_cheat_ptr);
+
+	//look for ram cheats and allow one hw cheat
+	for(i = 0,j = 0;i<options_cheat_ptr;i++)
+	{
+		base = (BYTE*)0xDACC;
+		base += i << 2;
+
+		if(bank1_cheat_identify_type(base[0],*(unsigned short*)&base[2]) == CT_RAM)
+		{
+			if(ram != MAX_CHEATS)
+			{
+				ram = i;
+				valid[i] = 1;
+				++j;
+			}
+			else
+			{
+				valid[i] = 0;
+			}
+		}
+		else
+		{
+			valid[i] = 1;
+			++j;
+		}
+	}
+
+	//Reoder list
+	base = (BYTE*)0xDACC;
+
+	if(ram != MAX_CHEATS)
+	{
+		pfn_memcpy_asm(base,base + (ram << 2),4);
+		j = 1;
+	}
+	else
+	{
+		j = 0;
+	}
+
+	for(i = 0;i<options_cheat_ptr;i++)
+	{
+		if(i == ram){continue;}
+		else if(valid[i] == 0){continue;}
+		pfn_memcpy_asm(base + j,base + (i << 2),4);
+		j += 4;
+	}
+
+	*out = (ram != MAX_CHEATS) ? 128 | j : j;
+
+}
+
+#define LEFT_MARGIN 3
+#define INSTRUCTIONS_Y 20
+
+void waste_time()
+{
+   *(BYTE*)0xC000 = *(BYTE*)0xC000;
+}
+
+void bank1_print_hex(char* in)
+{
+    BYTE lo,hi;
+	BYTE val = in[0];
+	BYTE x = in[1];
+	BYTE y = in[2];
+
+    pfn_vdp_set_vram_addr(MENU_NAMETABLE + (x << 1) + (y << 6));
+
+    hi = (val >> 4);
+    lo = val & 0x0F;
+    lo += 16; hi += 16;
+    if (lo > 25) lo += 7;
+    if (hi > 25) hi += 7;
+    VdpData = hi; waste_time(); VdpData = 0; waste_time();
+    VdpData = lo; waste_time(); VdpData = 0; waste_time();
+}
+
+void bank1_dump_hex(char* in)
+{
+	WORD addr = *(WORD*)in;
+    BYTE *p = (BYTE*)addr;
+    BYTE row,col,c,d;
+
+    row = 7;
+    for (; row < 15; row++)
+    {
+        pfn_vdp_set_vram_addr(MENU_NAMETABLE + (row << 6) + 8);
+        for (col = 0; col < 8; col++)
+        {
+            c = *p++;
+            d = (c >> 4);
+            c &= 0x0F;
+            c += 16; d += 16;
+            if (c > 25) c += 7;
+            if (d > 25) d += 7;
+            VdpData = d; waste_time(); VdpData = 0; waste_time();
+            VdpData = c; waste_time(); VdpData = 0; waste_time();
+        }
+    }
+}
+
+void bank1_cheat_inputbox(char* dst)
+{
+	dst=dst;
+	#if 0
+	BYTE buf[4];
+	BYTE key;
+
+	cls();
+
+	memset_asm(buf,0,4);
+
+	while(1)
+	{
+        key = pad1_get_2button();
+        pad = key & ~padLast;
+        padLast = key;
+
+		if(pad&PAD_SW1)
+			break;
+	}
+
+	dst[0] = buf[3];	//data
+	dst[1] = buf[0];	//addr hi
+	dst[2] = buf[1];	//addr lo lsb
+	dst[3] = buf[2];	//addr lo msb
+
+	cls();
+	sync_state();	
+	puts_active_list();
+	#endif
+}
+

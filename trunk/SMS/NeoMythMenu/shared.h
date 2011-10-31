@@ -5,8 +5,8 @@
 #include <stdint.h>
 
 #define NUMBER_OF_GAMES_TO_SHOW 7
-#define MAX_OPTIONS 4
-
+#define MAX_OPTIONS 6
+#define MAX_CHEATS (9) //13
 #define MENU_NAMETABLE 0x3000 
 
 #define GAME_MODE_NORMAL_ROM 4
@@ -23,13 +23,13 @@ typedef struct
     WORD count;
 } FileList;
 
-typedef struct
+typedef struct		//30bytes x 6 options : 180bytes(  0xDA18(0xda08:16 : crc) ~ 0xDACC) ( 0xDB00 - 0xDACC : 52 bytes free ) (52/4 -> 13 cheat slots)
 {
     BYTE encoded_info;      /*msnyb = type,lsnyb = 0 or 1 (enabled/disabled)*/
     char name[20];
-    char cond0_bhv[6];
-    char cond1_bhv[6];
-    BYTE user_data[4];
+    char cond0_bhv[4];
+    char cond1_bhv[4];
+    BYTE user_data;
 }Option;
 
 typedef struct
@@ -51,6 +51,21 @@ enum
     OPTION_TYPE_ROUTINE,        /*A callback*/
 };
 
+
+enum
+{
+	OPTION_CB_SET_SRAM_BANK = 0xa0,
+	OPTION_CB_IMPORT_IPS    = 0xa1,
+	OPTION_CB_CLEAR_SRAM    = 0xa2,
+	OPTION_CB_CHEAT_MGR		= 0xa3,
+};
+
+enum
+{
+	CT_RAM = 0,
+	CT_ROM = 1
+};
+
 /*
  * Task enumerators for task dispatchers located in other
  * banks (obsolete?)
@@ -58,6 +73,10 @@ enum
 enum
 {
     TASK_LOAD_BG = 0,
+	TASK_APPLY_OPTIONS = 1,
+	TASK_EXEC_CHEAT_INPUTBOX = 2,
+	TASK_PRINT_HEX = 3,
+	TASK_DUMP_HEX = 4,
 };
 
 /*
@@ -112,13 +131,17 @@ extern void options_init();
 
 extern BYTE flash_mem_type;
 
-extern Option options[MAX_OPTIONS];
+extern Option* options;//extern Option options[MAX_OPTIONS];
+extern BYTE options_sram_bank;
 extern BYTE options_sync;
 extern BYTE options_count;
 extern BYTE options_highlighted;
 extern BYTE reset_to_menu_option_idx;
+extern BYTE options_cheat_ptr;
+extern BYTE sram_set_option_idx;
+extern BYTE sram_cls_option_idx;
 extern BYTE fm_enabled_option_idx;
-
+extern BYTE import_ips_option_idx;
 extern BYTE menu_state;
 extern FileList games;
 extern BYTE region;

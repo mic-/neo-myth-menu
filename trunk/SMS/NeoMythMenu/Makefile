@@ -52,7 +52,7 @@ pffromcode.bin:
 	$(RM) pff.bin pff.ihx pff.asm *.noi *.lnk *.rst
     
 bank0.bin:
-	$(CC) $(CFLAGS) --no-peep -c sd_utils.c
+	$(CC) $(CFLAGS) -c sd_utils.c
 	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3400 --no-std-crt0 --oldralloc main.c $(BANK0OBJS) sd_utils.rel $(SHARED)
 	$(HEX2BIN) main.ihx
 	$(PADTRIM) main.bin bank0.bin
@@ -63,6 +63,7 @@ bank1.bin:
 	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0x4000 bank1.c $(SHARED)
 	$(HEX2BIN) bank1.ihx
 	$(PADTRIM) bank1.bin bank_1.bin
+	$(MAP2H) bank1.map bank1.h
 	$(RM) bank1.bin bank1.ihx bank1.asm *.noi *.lnk *.rst
 
 menu.sms:
@@ -81,7 +82,7 @@ NEOSEGA4.BIN:
 
 
 clean:
-	$(RM) NEOSEGA4.BIN main_map.h neo2_map.h neo2_map.inc pff_map.h vgm_player_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lk *.lst *.map
+	$(RM) NEOSEGA4.BIN main_map.h neo2_map.h neo2_map.inc pff_map.h bank1_map.h vgm_player_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lk *.lst *.map
 
 distclean:
 	$(RM) tools/map2h tools/bin16k tools/hex2bin tools/smshdr NEOSEGA4.BIN main_map.h neo2_map.h menu.sms *.bin *.asm *.ihx *.rel *.sym *.rst *.noi *.lnk *.lst *.map
