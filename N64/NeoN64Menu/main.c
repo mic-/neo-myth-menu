@@ -1,5 +1,6 @@
 
 #undef __DEBUG_PSRAM__
+#undef HW_SELF_TEST
 
 #include <stdio.h>
 #include <malloc.h>
@@ -163,12 +164,16 @@ extern void checksum_psram(void);
 extern int doOSKeyb(char *title, char *deflt, char *buffer, int max, int bfill);
 extern int RequestFile (char *title, char *initialPath, int bfill);
 
+#ifdef HW_SELF_TEST
+void hw_self_test();
+#endif
+
 int f_force_open(FIL* f,XCHAR* s,unsigned int flags,int retries)
 {
 	int i,j,k;
 
-	if( !(flags&FA_WRITE) )
-		return f_open(f,s,flags) == FR_OK;
+	//if( !(flags&FA_WRITE) )
+		//return f_open(f,s,flags) == FR_OK;
 
 	i = j = 0;
 	k = retries;
@@ -343,7 +348,7 @@ void delay(int cnt)
 }
 
 /* debug helper function */
-void debugText(char *msg, int x, int y, int d)
+void debugText(const char *msg, int x, int y, int d)
 {
     display_context_t dcon = lockVideo(1);
     unlockVideo(dcon);
@@ -2852,7 +2857,6 @@ int main(void)
     }
     neo_select_game();
 
-
 #ifdef RUN_FROM_U2
     // check for boot rom in menu
     neo_select_menu();                  // enable menu flash in cart space
@@ -2924,6 +2928,10 @@ int main(void)
         }
         neo2_disable_sd();
     }
+#endif
+
+#ifdef HW_SELF_TEST
+	hw_self_test();
 #endif
 
 	if(gSdDetected == 0)
@@ -3415,3 +3423,165 @@ int main(void)
     config_shutdown();//will never reach here anyway
     return 0;
 }
+
+#ifdef HW_SELF_TEST
+int hw_self_test_dbg_scr_x,hw_self_test_dbg_scr_y;
+const int hw_self_test_dbg_scr_y_max = 240/8;
+
+void hw_self_test_follow(const char* msg,int dl)
+{
+	hw_self_test_dbg_scr_y = (hw_self_test_dbg_scr_y > hw_self_test_dbg_scr_y_max) ? 0 : hw_self_test_dbg_scr_y;
+	debugText(msg,hw_self_test_dbg_scr_x,hw_self_test_dbg_scr_y++,dl);
+}
+
+void hw_self_test_gen_pattern32(unsigned char* dst,int size,int* dir)
+{
+	int f = *dir;
+	unsigned char m;
+
+	m = (f) ? 0x80 : 0;
+
+	while(--size)
+	{
+		if(f)
+			dst[0]++;
+		else
+			dst[0]--;
+
+		dst[0] |= (m--);
+		f ^= 1;
+		++dst;
+	}
+	
+	*dir = f;
+}
+
+void hw_self_test_sram_read(int onboard)											//compare previous write
+{
+	const int sram_size = 2 * (128 * 1024);											//Test only 2Mbit
+	const int block_size = 128 * 1024;
+	unsigned char* a = &tmpBuf[0];
+	unsigned char* b = &tmpBuf[block_size];
+	int error;
+	int dir;
+	int addr;
+	int tmp0,tmp1;
+	unsigned char* tmp2;
+
+	hw_self_test_follow((onboard) ? "Checking ONBOARD SRAM..." : "Checking NEO2 SRAM..." ,0);
+
+	for(error = 0,dir = 0,addr = 0;addr < sram_size; addr += block_size)
+	{
+		hw_self_test_gen_pattern32(a,block_size,&dir);
+
+		if(onboard)
+			neo_copyfrom_nsram((void*)b,addr,block_size,8);
+		else
+		{
+			tmp0 = addr;
+			tmp1 = tmp0 + block_size;
+			tmp2 = b;
+
+			while(tmp0 < tmp1)
+			{
+				neo_copyfrom_sram((void*)tmp2,tmp0,32*1024);
+				tmp0 += 32*1024;
+				tmp2 += 32*1024;
+			}
+		}
+
+		if(memcmp(a,b,block_size) != 0)
+		{
+			error = 1;
+			hw_self_test_follow("FAILED!",0);
+			return;
+		}
+	}
+	hw_self_test_follow("PASSED!",0);
+}
+
+void hw_self_test_sram_write(int onboard)											//write and compare later (To test battery)
+{
+	const int sram_size = 2 * (128 * 1024);											//Test only 2Mbit
+	const int block_size = 128 * 1024;
+	unsigned char* a = &tmpBuf[0];
+	int dir,addr;
+	int tmp0,tmp1;
+	unsigned char* tmp2;
+
+	hw_self_test_follow((onboard) ? "Preparing ONBOARD SRAM..." : "Preparing NEO2 SRAM...",0);
+	for(dir = 0,addr = 0;addr < sram_size;addr += block_size)
+	{
+		hw_self_test_gen_pattern32(a,block_size,&dir);
+
+		if(onboard)
+			neo_copyto_nsram((void*)a,addr,block_size,8);
+		else
+		{
+			tmp0 = addr;
+			tmp1 = tmp0 + block_size;
+			tmp2 = a;
+
+			while(tmp0 < tmp1)
+			{
+				neo_copyto_sram((void*)tmp2,tmp0,32*1024);
+				tmp0 += 32*1024;
+				tmp2 += 32*1024;
+			}
+		}
+	}
+	hw_self_test_follow("FINISHED!",0);
+}
+
+void hw_self_test()
+{
+	int tst;
+	display_context_t ctx;
+
+	hw_self_test_dbg_scr_x = 8;
+	hw_self_test_dbg_scr_y = 10;
+	
+	ctx = lockVideo(1);
+	graphics_fill_screen(ctx,0);
+	unlockVideo(ctx);
+
+	hw_self_test_follow("Would you like to test SRAM?",0);
+	hw_self_test_follow("A => YES , B => NO",0);
+
+	if(0 == wait_confirm())
+	{
+		goto hw_self_test_finished;
+	}
+
+	ctx = lockVideo(1);
+	graphics_fill_screen(ctx,0);
+	unlockVideo(ctx);
+	hw_self_test_dbg_scr_x = 2;
+	hw_self_test_dbg_scr_y = 4;
+	hw_self_test_follow("**N64 MYTH HW SELF TEST**",0);
+	hw_self_test_follow(" ",0);
+	hw_self_test_follow("A => READ , B => WRITE",0);
+	tst = wait_confirm();
+	hw_self_test_follow("A => ONBOARD SRAM , B => NEO2 SRAM",0);
+
+	if(tst)
+	{
+	 	hw_self_test_sram_read(wait_confirm());
+	}
+	else
+	{
+		hw_self_test_sram_write(wait_confirm());
+	}
+
+	hw_self_test_follow("Job finished!",0);
+	hw_self_test_follow("Press B to exit",0);
+
+	while(wait_confirm()){}
+
+	hw_self_test_finished:
+	ctx = lockVideo(1);
+	graphics_fill_screen(ctx,0);
+	unlockVideo(ctx);
+}
+#endif
+
