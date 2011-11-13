@@ -1,6 +1,6 @@
 
 #undef __DEBUG_PSRAM__
-#undef HW_SELF_TEST
+#define HW_SELF_TEST
 
 #include <stdio.h>
 #include <malloc.h>
@@ -2931,7 +2931,25 @@ int main(void)
 #endif
 
 #ifdef HW_SELF_TEST
-	hw_self_test();
+	{
+		int i,j;
+
+		for(i = 0;i<256;i++)
+		{
+			buttons = getButtons(0);
+
+			if( (TL_BUTTON(buttons)) && (TR_BUTTON(buttons)) && (Z_BUTTON(buttons)) )
+			{
+				hw_self_test();
+				break;
+			}
+	
+			for(j = 0;j<32;j++)
+			{
+				asm("nop\n");
+			}
+		}
+	}
 #endif
 
 	if(gSdDetected == 0)
@@ -3535,12 +3553,16 @@ void hw_self_test_sram_write(int onboard)											//write and compare later (T
 
 void hw_self_test()
 {
-	int tst;
+	int tst,ix;
 	display_context_t ctx;
 
 	hw_self_test_dbg_scr_x = 8;
 	hw_self_test_dbg_scr_y = 10;
 	
+    neo2_enable_sd();
+    ix = getSDInfo(-1); 
+	if(!ix){delay(200);}
+
 	ctx = lockVideo(1);
 	graphics_fill_screen(ctx,0);
 	unlockVideo(ctx);
@@ -3564,6 +3586,7 @@ void hw_self_test()
 	tst = wait_confirm();
 	hw_self_test_follow("A => ONBOARD SRAM , B => NEO2 SRAM",0);
 
+
 	if(tst)
 	{
 	 	hw_self_test_sram_read(wait_confirm());
@@ -3579,6 +3602,8 @@ void hw_self_test()
 	while(wait_confirm()){}
 
 	hw_self_test_finished:
+	neo2_disable_sd();
+	gSdDetected = 0;
 	ctx = lockVideo(1);
 	graphics_fill_screen(ctx,0);
 	unlockVideo(ctx);
