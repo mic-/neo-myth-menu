@@ -885,6 +885,26 @@ BYTE cheat_inputbox(char* in)
 	return 1;
 }
 
+void bank1_sd_to_vram_aligned(WORD addr,WORD len)	//This can optimized by reading the WHOLE file to psram
+{
+	WORD bulk;
+	WORD head;
+
+	BYTE* p = (BYTE*)0xdb00;						//sector data go there
+
+	head = 0;
+
+	while(head < len)
+	{
+		if((head + 512) <= len) { bulk = 512; } else { bulk = len - head; }
+
+		//All 512byte aligned!
+		pfn_pf_read_sectors(0,0,1);
+		pfn_vdp_blockcopy_to_vram(addr + head,p,512);
+		head += bulk;
+	}	
+}
+
 BYTE bank1_import_skin(const char* filename)
 {
 	BYTE b,c;
