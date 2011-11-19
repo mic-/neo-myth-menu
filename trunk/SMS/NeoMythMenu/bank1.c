@@ -786,3 +786,259 @@ void bank1_cheat_inputbox(char* dst)
 	#endif
 }
 
+/*
+	I			: Exit
+	II			: Toggle addressing mode 8/4 bit
+	
+	4Bit 		addressing:
+	UP			: Increase High Nybble
+	DN			: Decrease High Nybble
+	RB			: Increase Lo Nybble
+	LB			: Decrease Lo Nybble
+
+	8Bit		addressing:
+	UP			: Increase
+	DN			: Decrease
+	LB			: Move left
+	RB			: Move right
+*/
+
+#if 0
+BYTE cheat_inputbox(char* in)
+{
+	const char* msg = "SMS MYTH CHEAT EDITOR 0.1a";
+	BYTE* field;
+	BYTE fieldc;
+	BYTE btn;
+	BYTE haddr,addr,selection,a,b,upd,addressing;
+
+	fieldc = *(in);
+	if(0 == fieldc){return 0;}
+
+	field = (BYTE*)in;
+	addr = selection = 0;
+	upd = 1;
+
+	pfn_memset_asm(field,0,fieldc);
+	puts_shared(msg,3 ,7,PALETTE1); 
+	haddr = LEFT_MARGIN + (((22/2) - (fieldc/*>>1*/))) + 1;				/*Don't divide it since we need 1tile/char in dec form*/
+	addressing = 0;														/*8bit mode*/
+
+	while(1)
+	{
+		btn = pfn_pad1_get_2button();
+		pad = btn & (~padLast);
+		padLast = btn;
+
+		if(pad&PAD_SW1){ break; }
+		else if(pad & PAD_SW2)
+		{
+			addressing ^= 1;
+			upd = 1;
+		}
+
+		switch(addressing)
+		{
+			case 0:
+				if(pad & PAD_RIGHT)		{ if(addr < fieldc){if(++addr >= fieldc){addr=fieldc-1;};upd = 1;}	}
+				else if(pad & PAD_LEFT) { if(addr > 0){--addr;upd = 1;}										}
+				else if(pad & PAD_UP)	{ ++field[addr]; upd = 1;											}
+				else if(pad & PAD_DOWN) { --field[addr]; upd = 1;											}
+			break;	
+			
+			case 1:
+				selection = field[addr];
+				a = (selection >> 4);
+				b = (selection & 0x0f);
+
+				if(pad & PAD_UP)		{ if(a < 0x0f){++a; upd = 1;}										}
+				if(pad & PAD_DOWN)		{ if(a > 0){--a;	upd = 1;}										}
+				if(pad & PAD_RIGHT)		{ if(b < 0x0f){++b;	upd = 1;}										}
+				if(pad & PAD_LEFT)		{ if(b > 0){--b;	upd = 1;}										}
+
+				field[addr] = (a << 4) | b;
+			break;
+		}
+
+		if(upd)
+		{
+			upd = 0;
+			for(a = 0;a<fieldc;a++)		{ print_hex(field[a],haddr + (a << 1),12); }
+			puts_shared("                       ",LEFT_MARGIN,13,PALETTE1); 
+			puts_shared("^",haddr + (addr << 1) ,13,(addressing) ? PALETTE0 : PALETTE1);		/*Show locked/unlocked state*/ 
+
+			if(addressing)
+			{
+				puts_shared(" I=EXIT UP/DN=INC/DEC HI 4Bit", LEFT_MARGIN-1, INSTRUCTIONS_Y, PALETTE1);
+				puts_shared("II=MODE LF/RT=INC/DEC LO 4Bit", LEFT_MARGIN-1, INSTRUCTIONS_Y+1, PALETTE1);
+			}
+			else
+			{
+				puts_shared(" I=EXIT UP/DN=INC/DEC 8Bit   ", LEFT_MARGIN-1, INSTRUCTIONS_Y, PALETTE1);
+				puts_shared("II=MODE LF/RT=MOVE CURSOR    ", LEFT_MARGIN-1, INSTRUCTIONS_Y+1, PALETTE1);
+			}
+		}
+	}
+	puts_shared("                             ", LEFT_MARGIN-1, INSTRUCTIONS_Y, PALETTE1);
+	puts_shared("                             ", LEFT_MARGIN-1, INSTRUCTIONS_Y+1, PALETTE1);
+	puts_shared("                         ",LEFT_MARGIN,16,PALETTE1);
+	return 1;
+}
+
+BYTE bank1_import_skin(const char* filename)
+{
+	BYTE b,c;
+	WORD j,k,l,pat_len,nam_len,pal_len,fnt_len;
+	BYTE* p = (BYTE*)0xdb00;						//sector data go there
+	void (*grab_fs)(FATFS**) = pfn_pf_grab;
+	FRESULT (*f_open)(const char*) = pfn_pf_open;
+	FATFS* fs;
+
+	Frame2 = BANK_PFF;
+
+	grab_fs(&fs);
+	if(!fs){return 0;}
+	if(f_open(filename) != FR_OK) {return 0;}
+
+	pfn_pf_read_sectors(0,0,1);
+	pat_len = *(WORD*)&p[34];
+	nam_len = *(WORD*)&p[36];
+	pal_len = *(WORD*)&p[38];
+	fnt_len = *(WORD*)&p[40];
+				
+	bank1_sd_to_vram_aligned(0x0F00,pat_len);
+	bank1_sd_to_vram_aligned(MENU_NAMETABLE,nam_len);
+
+	pfn_pf_read_sectors(0,0,1);
+	pfn_vdp_copy_to_cram(0,p,16);
+
+	pfn_disable_ints();
+	pfn_vdp_set_vram_addr(0x0000);
+
+	for(j = 0; j < fnt_len; j += 512)
+	{
+		if( (j + 512) <= fnt_len ) { k = 512; } else { k = fnt_len - j; }
+		pfn_pf_read_sectors(0,0,1);
+
+		for( l = 0; l < k; l++ )
+		{
+			b = p[l] ^ 0xFF;
+			c = ~b;
+
+			VdpData = c;
+			VdpData = c;
+			VdpData = c;
+			VdpData = b; //0;
+		}
+	}
+
+	pfn_enable_ints();
+	return 1;
+}
+
+void f_adjust_stream_ptr(BYTE* addr_hi,WORD* addr_lo,WORD len)
+{
+	BYTE h = *addr_hi;
+	WORD l = *addr_lo;
+
+	while( (len & 1) && (len > 0) )
+	{
+		--len;
+		++l;
+		if(l == 0){ ++h; }
+	}
+	
+	if(len > 0)
+	{
+		l += len;
+		if(l == 0){ ++h; }
+	}
+
+	*addr_hi = h;
+	*addr_lo = l;
+}
+
+void f_read_psram(BYTE* dst,BYTE* addr_hi,WORD* addr_lo,WORD len)
+{
+	pfn_neo2_psram_to_ram(dst,*addr_hi,*addr_lo,len);
+	f_adjust_stream_ptr(addr_hi,addr_lo,len);
+}
+
+void f_write_psram(BYTE* src,BYTE* addr_hi,WORD* addr_lo,WORD len)
+{
+	pfn_neo2_ram_to_psram(*addr_hi,*addr_lo,src,len);
+	f_adjust_stream_ptr(addr_hi,addr_lo,len);
+}
+
+BYTE bank1_import_ips(const char* filename)
+{
+	int ptr,end,send;
+	BYTE src_bank,dst_bank,rle;
+	WORD src_addr,dst_addr,len,bulk,head;
+	BYTE* buf;
+	void (*grab_fs)(FATFS**) = pfn_pf_grab;
+	FRESULT (*f_open)(const char*) = pfn_pf_open;
+	FATFS* fs;
+
+	Frame2 = BANK_PFF;
+
+	grab_fs(&fs);
+	if(!fs){return 0;}
+	if(f_open(filename) != FR_OK){return 0;}
+
+	buf = (BYTE*)0xDB00;
+
+	//Read Whole file to psram
+	end = fs->fsize;
+	send = end;
+	end = (end + 512) & (~511);
+	pfn_pf_read_sectors(0x02,0x0000,(end>>9));
+
+	ptr = 5;//PATCH
+	end = send - 3;//EOF
+
+	src_bank = 0x02;
+	src_addr = 0x0000;
+	dst_bank = 0x00;
+	dst_addr = 0x0000;
+
+	while(ptr < end)
+	{
+		f_read_psram(buf,&src_bank,&src_addr,5); ptr += 5;
+		dst_bank = buf[0];
+		dst_addr = *(WORD*)&buf[1];	
+		len = *(WORD*)&buf[3];	
+
+		if(len == 0x0000)//RLE
+		{
+			f_read_psram(buf,&src_bank,&src_addr,3); ptr += 3;
+			rle = buf[0];
+			len = *(WORD*)&buf[1];
+			pfn_memset_asm(buf,rle,(len >= 512) ? 512 : len);
+	
+			head = 0;
+			while(head < len)
+			{
+				if( (head + 512) <= len ) { bulk = 512; } else { bulk = len - head; }
+				f_write_psram(buf,&dst_bank,&dst_addr,bulk);
+				head += bulk;
+			}
+		}
+		else
+		{	
+			head = 0;
+			while(head < len)
+			{
+				if( (head + 512) <= len ) { bulk = 512; } else { bulk = len - head; }
+				f_read_psram(buf,&src_bank,&src_addr,bulk);
+				f_write_psram(buf,&dst_bank,&dst_addr,bulk);
+				head += bulk;
+			}
+			ptr += (int)len;
+		}
+	}
+
+	return 1;
+}
+#endif
+

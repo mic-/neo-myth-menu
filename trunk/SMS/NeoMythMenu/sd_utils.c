@@ -333,6 +333,7 @@ void sdutils_sram_cls()
 	BYTE blocks;
 	WORD addr;
 	WORD base;
+	BYTE frm2;
 
 	cls();
 	puts("CLEARING SRAM", 8, 9, PALETTE1); vdp_wait_vblank();
@@ -341,7 +342,8 @@ void sdutils_sram_cls()
 	addr = 0;
 	base = 0;	
 	memset_asm(p,0,512);
-
+	frm2 = Frame2;
+	Frame2 = BANK_RAM_CODE;
 	while(blocks < 16)
 	{
 		++blocks;
@@ -349,9 +351,9 @@ void sdutils_sram_cls()
 		pfn_neo2_ram_to_sram(0x00,base+addr,p,512);
 		addr += 512;
 	}
-
+	
 	cls();
-	if(menu_state == MENU_STATE_GAME_SD){Frame2 = BANK_PFF;}
+	Frame2 = frm2;
 }
 
 void sdutils_sd_to_sram(const char* filename)
@@ -385,6 +387,7 @@ void sdutils_sd_to_sram(const char* filename)
 		puts(".", 10+(blocks>>1), 11, PALETTE1);vdp_wait_vblank();
 		Frame2 = BANK_PFF;
 		pfn_pf_read_sectors(0,0,1);
+		Frame2 = BANK_RAM_CODE;
 		pfn_neo2_ram_to_sram(0x00,base+addr,p,512);
 		addr += 512;
 	}
@@ -431,6 +434,7 @@ void sdutils_sram_to_sd(const char* filename)
 	{
 		++blocks;
 		puts(".", 10+(blocks>>1), 11, PALETTE1);vdp_wait_vblank();
+		Frame2 = BANK_RAM_CODE;
 		pfn_neo2_sram_to_ram(p, 0x00, base + addr,512);
 		Frame2 = BANK_PFF;
 		f_write(p);
