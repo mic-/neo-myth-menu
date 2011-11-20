@@ -1322,6 +1322,7 @@ void get_fileinfo (		/* No return code */
 
 
 
+
 	p = fno->fname;
 	if (dj->sect) {
 		dir = dj->dir;
@@ -1862,6 +1863,7 @@ FRESULT f_read (
 	DWORD clst, sect, remain;
 	UINT rcnt, cc;
 	BYTE *rbuff = buff;
+	BYTE* sbuff = rbuff;
 	DWORD sector_base = 0;
 	DWORD sector_run = 0;
 	DWORD prev_cluster = 0;
@@ -1902,7 +1904,7 @@ FRESULT f_read (
 				{
 					if(sector_run)
 					{
-						if (disk_read_multi(fp->fs->drive, rbuff,sector_base,sector_run) != RES_OK)
+						if (disk_read_multi(fp->fs->drive, sbuff,sector_base,sector_run) != RES_OK)
 						{
 							ABORT(fp->fs, FR_DISK_ERR);
 						}
@@ -1918,6 +1920,7 @@ FRESULT f_read (
 				{
 					if(0 == sector_run)
 					{	
+						sbuff = rbuff;
 						sector_base = sect;
 					}
 					sector_run += (DWORD)cc;
@@ -1966,7 +1969,7 @@ FRESULT f_read (
 
 	if(sector_run)
 	{
-		if (disk_read_multi(fp->fs->drive, rbuff,sector_base,sector_run) != RES_OK)
+		if (disk_read_multi(fp->fs->drive, sbuff,sector_base,sector_run) != RES_OK)
 		{
 			ABORT(fp->fs, FR_DISK_ERR);
 		}
