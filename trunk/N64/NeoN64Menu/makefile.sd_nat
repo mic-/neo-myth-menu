@@ -46,5 +46,5 @@ $(PROG_NAME).dfs : ./filesystem/pattern0.sprite ./filesystem/pattern1.sprite ./f
 all: $(PROG_NAME).z64
 
 clean:
-	rm -f *.z64 *.elf *.o *.bin *.dfs ./filesystem/*.sprite
+	rm -f *.z64 *.elf *.o *.bin *.dfs output.map ./filesystem/*.sprite
 

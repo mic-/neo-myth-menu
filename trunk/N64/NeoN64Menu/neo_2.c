@@ -85,10 +85,13 @@ volatile void neo_sync_bus(void)
 {
 	asm
 	(
+		".set	push\n"
+		".set	noreorder\n"
 		"lui	$t0,0xb000\n"
-		"lw		$zero,($t0)\n" 
+		"lw		$zero,($t0)\n"
 		"jr		$ra\n"
 		"nop\n"
+		".set pop\n"
 	);
 }
 
