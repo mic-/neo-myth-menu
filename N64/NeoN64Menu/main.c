@@ -12,6 +12,9 @@
 #include "neo_2_asm.h"
 #include "configuration.h"
 #include "interrupts.h"
+#ifdef HW_SELF_TEST
+#include <stdlib.h>
+#endif
 
 typedef volatile unsigned short vu16;
 typedef volatile unsigned int vu32;
@@ -1426,7 +1429,7 @@ int neo_psram_offset_addr(unsigned int addr,int force)
 void fastCopySD2Psram(int bselect,int bfill)
 {
     FIL f;
-    u32 gamelen,rem,addr,a;
+    u32 gamelen;
     XCHAR fpath[1280];
     char temp[256];
 	int swp;
@@ -2799,11 +2802,11 @@ int main(void)
 #endif
     char temp[128];
 #if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v2.4 (U2)";
+    char *menu_title = "Neo N64 Myth Menu v2.5 (U2)";
 #elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v2.4 (SD)";
+    char *menu_title = "Neo N64 Myth Menu v2.5 (SD)";
 #else
-    char *menu_title = "Neo N64 Myth Menu v2.4 (MF)";
+    char *menu_title = "Neo N64 Myth Menu v2.5 (MF)";
 #endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad=Navigate     CPad=change option";
@@ -2932,9 +2935,10 @@ int main(void)
 
 #ifdef HW_SELF_TEST
 	{
+		srand(0);
 		int i,j;
 
-		for(i = 0;i<256;i++)
+		for(i = 0;i<384;i++)
 		{
 			buttons = getButtons(0);
 
@@ -3474,81 +3478,188 @@ void hw_self_test_gen_pattern32(unsigned char* dst,int size,int* dir)
 	*dir = f;
 }
 
+//http://en.literateprograms.org/Mersenne_twister_%28C%29
+#define MT_LEN 624
+#define MT_IA           397
+#define MT_IB           (MT_LEN - MT_IA)
+#define UPPER_MASK      (0x80000000)
+#define LOWER_MASK      (0x7FFFFFFF)
+#define MATRIX_A        (0x9908B0DF)
+#define TWIST(b,i,j)    ((b)[i] & UPPER_MASK) | ((b)[j] & LOWER_MASK)
+#define MAGIC(s)        (((s)&1)*MATRIX_A)
+
+void mt_init(unsigned int* mt_buffer,int* mt_index)
+{
+    int i;
+    for (i = 0; i < MT_LEN; i++)
+	{
+        mt_buffer[i] = (unsigned int)rand();
+	}
+    *mt_index = 0;
+}
+
+unsigned int mt_random(unsigned int* mt_buffer,int* mt_index) 
+{
+    unsigned int * b = mt_buffer;
+    int idx = *mt_index;
+    unsigned int s;
+    int i;
+	
+    if (idx == (MT_LEN*sizeof(unsigned int)) )
+    {
+        idx = 0;
+        i = 0;
+        for (; i < MT_IB; i++) {
+            s = TWIST(b, i, i+1);
+            b[i] = b[i + MT_IA] ^ (s >> 1) ^ MAGIC(s);
+        }
+        for (; i < MT_LEN-1; i++) {
+            s = TWIST(b, i, i+1);
+            b[i] = b[i - MT_IB] ^ (s >> 1) ^ MAGIC(s);
+        }
+        
+        s = TWIST(b, MT_LEN-1, 0);
+        b[MT_LEN-1] = b[MT_IA-1] ^ (s >> 1) ^ MAGIC(s);
+    }
+    *mt_index = idx + sizeof(unsigned int);
+    return *(unsigned int *)((unsigned char *)b + idx);
+}
+
 void hw_self_test_sram_read(int onboard)											//compare previous write
 {
-	const int sram_size = 2 * (128 * 1024);											//Test only 2Mbit
+	int sram_size = (1+onboard) * (128 * 1024);											
 	const int block_size = 128 * 1024;
 	unsigned char* a = &tmpBuf[0];
 	unsigned char* b = &tmpBuf[block_size];
-	int error;
 	int dir;
 	int addr;
-	int tmp0,tmp1;
-	unsigned char* tmp2;
 
 	hw_self_test_follow((onboard) ? "Checking ONBOARD SRAM..." : "Checking NEO2 SRAM..." ,0);
+	hw_self_test_follow(" ",0);
 
-	for(error = 0,dir = 0,addr = 0;addr < sram_size; addr += block_size)
+	if(onboard)
 	{
-		hw_self_test_gen_pattern32(a,block_size,&dir);
-
-		if(onboard)
-			neo_copyfrom_nsram((void*)b,addr,block_size,8);
-		else
+		for(dir = 0,addr = 0;addr < sram_size; addr += block_size)
 		{
-			tmp0 = addr;
-			tmp1 = tmp0 + block_size;
-			tmp2 = b;
+			hw_self_test_gen_pattern32(a,block_size,&dir);
+			neo_copyfrom_nsram((void*)b,addr,block_size,8);
 
-			while(tmp0 < tmp1)
+			if(memcmp(a,b,block_size) != 0)
 			{
-				neo_copyfrom_sram((void*)tmp2,tmp0,32*1024);
-				tmp0 += 32*1024;
-				tmp2 += 32*1024;
+				hw_self_test_follow("FAILED!",0);
+				return;
 			}
 		}
-
-		if(memcmp(a,b,block_size) != 0)
+	}
+	else
+	{
+		int error = 0;
+		dir = 0;
+		hw_self_test_gen_pattern32(a,128*1024,&dir);
+		neo_copyfrom_sram(b,0,65536);
+		if(memcmp(a,b,64*1024) != 0)
 		{
+			graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
+			hw_self_test_follow("1/2 BLOCK FAILED!",0);
 			error = 1;
-			hw_self_test_follow("FAILED!",0);
+		}
+		else
+		{
+			graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+			hw_self_test_follow("1/2 BLOCK PASSED!",0);
+		}
+
+		neo_copyfrom_sram(&b[65536],65536,65536);
+		neo_copyfrom_sram(&b[(128*1024)-16],0x3FFF0,16); // "fix" for sram quirk
+		if(memcmp(&a[64*1024],&b[64*1024],64*1024) != 0)
+		{
+			graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
+			hw_self_test_follow("2/2 BLOCK FAILED!",0);
+			graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+			return;
+		}
+		else
+		{
+			graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+			hw_self_test_follow("2/2 BLOCK PASSED!",0);
+		}
+
+		graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+
+		if(error)
+		{
 			return;
 		}
 	}
+            
 	hw_self_test_follow("PASSED!",0);
 }
 
 void hw_self_test_sram_write(int onboard)											//write and compare later (To test battery)
 {
-	const int sram_size = 2 * (128 * 1024);											//Test only 2Mbit
+	int sram_size = (1+onboard) * (128 * 1024);											 
 	const int block_size = 128 * 1024;
 	unsigned char* a = &tmpBuf[0];
 	int dir,addr;
-	int tmp0,tmp1;
-	unsigned char* tmp2;
 
 	hw_self_test_follow((onboard) ? "Preparing ONBOARD SRAM..." : "Preparing NEO2 SRAM...",0);
-	for(dir = 0,addr = 0;addr < sram_size;addr += block_size)
+	hw_self_test_follow(" ",0);
+
+	if(onboard)
 	{
-		hw_self_test_gen_pattern32(a,block_size,&dir);
-
-		if(onboard)
-			neo_copyto_nsram((void*)a,addr,block_size,8);
-		else
+		for(dir = 0,addr = 0;addr < sram_size;addr += block_size)
 		{
-			tmp0 = addr;
-			tmp1 = tmp0 + block_size;
-			tmp2 = a;
-
-			while(tmp0 < tmp1)
-			{
-				neo_copyto_sram((void*)tmp2,tmp0,32*1024);
-				tmp0 += 32*1024;
-				tmp2 += 32*1024;
-			}
+			hw_self_test_gen_pattern32(a,block_size,&dir);
+			neo_copyto_nsram((void*)a,addr,block_size,8);
 		}
 	}
+	else
+	{
+		dir = 0;
+		hw_self_test_gen_pattern32(a,128*1024,&dir);
+		neo_copyto_sram(a,0,65536);
+		neo_copyto_sram(&a[65536],65536,65536);
+		neo_copyto_sram(&a[(128*1024)-16],0x3FFF0,16); // "fix" for sram quirk
+	}
+
+	graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
 	hw_self_test_follow("FINISHED!",0);
+	graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+}
+
+void hw_self_test_zipram_block(int* m_idx,unsigned int* stack)
+{
+	unsigned char* a = &tmpBuf[0];
+	unsigned char* b = &tmpBuf[128*1024];
+	unsigned int* c;
+	int i,j;
+
+	for(j = 0;j < (16*1024*1024);j += 128*1024)
+	{
+		for(i = 0;i < 128 * 1024;i += 16)
+		{
+			c = (unsigned int*)&a[i];
+			c[0] = mt_random(stack,m_idx);
+			c[4] = mt_random(stack,m_idx);
+			c[8] = mt_random(stack,m_idx);
+			c[12] = mt_random(stack,m_idx);
+		}
+
+		neo_copyto_psram(a,j,128*1024);
+		neo_copyfrom_psram(b,j,128*1024);
+
+		if(memcmp(a,b,128*1024) != 0)
+		{
+			graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
+			hw_self_test_follow("BLOCK FAILED!",0);
+			graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+			return;
+		}
+	}
+
+	graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+	hw_self_test_follow("BLOCK PASSED!",0);
+	graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 }
 
 void hw_self_test()
@@ -3556,8 +3667,8 @@ void hw_self_test()
 	int tst,ix;
 	display_context_t ctx;
 
-	hw_self_test_dbg_scr_x = 8;
-	hw_self_test_dbg_scr_y = 10;
+	hw_self_test_dbg_scr_x = 5;
+	hw_self_test_dbg_scr_y = 20;
 	
     neo2_enable_sd();
     ix = getSDInfo(-1); 
@@ -3567,8 +3678,11 @@ void hw_self_test()
 	graphics_fill_screen(ctx,0);
 	unlockVideo(ctx);
 
-	hw_self_test_follow("Would you like to test SRAM?",0);
+	graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+	hw_self_test_follow("Would you like to test the cart?",0);
+	graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
 	hw_self_test_follow("A => YES , B => NO",0);
+	graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 
 	if(0 == wait_confirm())
 	{
@@ -3578,30 +3692,79 @@ void hw_self_test()
 	ctx = lockVideo(1);
 	graphics_fill_screen(ctx,0);
 	unlockVideo(ctx);
-	hw_self_test_dbg_scr_x = 2;
-	hw_self_test_dbg_scr_y = 4;
+
+	graphics_set_color(graphics_make_color(0x33,0x66, 0xff, 0xff), 0);
+	hw_self_test_dbg_scr_x = 8;
+	hw_self_test_dbg_scr_y = 3;
 	hw_self_test_follow("**N64 MYTH HW SELF TEST**",0);
-	hw_self_test_follow(" ",0);
-	hw_self_test_follow("A => READ , B => WRITE",0);
+	hw_self_test_dbg_scr_y = 5;
+	hw_self_test_dbg_scr_x = 4;
+
+	graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
+	hw_self_test_follow("A => TEST ZIPRAM , B => TEST SRAM",0);
+	graphics_set_color(graphics_make_color(0x66,0xff, 0x33, 0xff), 0);
 	tst = wait_confirm();
-	hw_self_test_follow("A => ONBOARD SRAM , B => NEO2 SRAM",0);
+	hw_self_test_follow(" ",0);
 
-
-	if(tst)
+	if(0 == tst)
 	{
-	 	hw_self_test_sram_read(wait_confirm());
+		hw_self_test_follow(">>TEST SRAM",0);
+		hw_self_test_follow(" ",0);
+		graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
+		hw_self_test_follow("A => READ , B => WRITE",0);
+		hw_self_test_follow(" ",0);
+		tst = wait_confirm();
+		graphics_set_color(graphics_make_color(0x66,0xff, 0xff, 0xff), 0);
+		hw_self_test_follow("A => ONBOARD SRAM , B => NEO2 SRAM",0);
+		graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+		if(tst)
+		{
+		 	hw_self_test_sram_read(wait_confirm());
+		}
+		else
+		{
+			hw_self_test_sram_write(wait_confirm());
+		}
 	}
 	else
 	{
-		hw_self_test_sram_write(wait_confirm());
+		int m_idx;
+		unsigned int stack[MT_LEN];
+
+		hw_self_test_follow(">>TEST ZIP RAM",0);
+		hw_self_test_follow(" ",0);
+		mt_init(stack,&m_idx);
+		graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+		hw_self_test_follow("TESTING BLOCK 0-16MB",0);
+		neo_psram_offset(0);
+		hw_self_test_zipram_block(&m_idx,stack);
+		hw_self_test_follow(" ",0);
+		hw_self_test_follow("TESTING BLOCK 16-32MB",0);
+		neo_psram_offset((16*1024*1024) / (32*1024));
+		hw_self_test_zipram_block(&m_idx,stack);
+		#if 0
+		hw_self_test_follow(" ",0);
+		hw_self_test_follow("TESTING BANK2..",0);
+		hw_self_test_follow(" ",0);
+		hw_self_test_follow("TESTING BLOCK 32-48MB",0);
+		neo_psram_offset((32*1024*1024) / (32*1024));
+		hw_self_test_zipram_block(&m_idx,stack);
+		hw_self_test_follow(" ",0);
+		hw_self_test_follow("TESTING BLOCK 48-64MB",0);
+		neo_psram_offset((48*1024*1024) / (32*1024));
+		hw_self_test_zipram_block(&m_idx,stack);
+		#endif
+		neo_psram_offset(0);
 	}
 
+	hw_self_test_follow(" ",0);
 	hw_self_test_follow("Job finished!",0);
+	graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
 	hw_self_test_follow("Press B to exit",0);
-
 	while(wait_confirm()){}
 
 	hw_self_test_finished:
+	graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 	neo2_disable_sd();
 	gSdDetected = 0;
 	ctx = lockVideo(1);
