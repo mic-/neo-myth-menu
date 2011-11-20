@@ -1321,6 +1321,7 @@ void get_fileinfo (		/* No return code */
 
 
 
+
 	p = fno->fname;
 	if (dj->sect) {
 		dir = dj->dir;
@@ -1762,7 +1763,7 @@ FRESULT f_open (
 /*-----------------------------------------------------------------------*/
 /* Read File                                                             */
 /*-----------------------------------------------------------------------*/
-
+#if 0
 FRESULT f_read (
 	FIL *fp, 		/* Pointer to the file object */
 	void *buff,		/* Pointer to data buffer */
@@ -1849,8 +1850,240 @@ FRESULT f_read (
 
 	LEAVE_FF(fp->fs, FR_OK);
 }
+#else
+FRESULT f_read (
+	FIL *fp, 		/* Pointer to the file object */
+	void *buff,		/* Pointer to data buffer */
+	UINT btr,		/* Number of bytes to read */
+	UINT *br		/* Pointer to number of bytes read */
+)
+{
+	FRESULT res;
+	DWORD clst, sect, remain;
+	UINT rcnt, cc;
+	BYTE *rbuff = buff;
+	DWORD sector_base = 0;
+	DWORD sector_run = 0;
+	DWORD prev_cluster = 0;
 
+	*br = 0;	/* Initialize bytes read */
 
+	res = validate(fp->fs, fp->id);					/* Check validity of the object */
+	if (res != FR_OK) LEAVE_FF(fp->fs, res);
+	if (fp->flag & FA__ERROR)						/* Check abort flag */
+		LEAVE_FF(fp->fs, FR_INT_ERR);
+	if (!(fp->flag & FA_READ)) 						/* Check access mode */
+		LEAVE_FF(fp->fs, FR_DENIED);
+	remain = fp->fsize - fp->fptr;
+	if (btr > remain) btr = (UINT)remain;			/* Truncate btr by remaining bytes */
+
+	for ( ;  btr;									/* Repeat until all data transferred */
+		rbuff += rcnt, fp->fptr += rcnt, *br += rcnt, btr -= rcnt) {
+		if ((fp->fptr & (SS(fp->fs)-1)) == 0) {			/* On the sector boundary? */
+			if (fp->csect >= fp->fs->csize) {		/* On the cluster boundary? */
+				clst = (fp->fptr == 0) ?			/* On the top of the file? */
+					fp->org_clust : get_fat(fp->fs, fp->curr_clust);
+				if (clst <= 1) ABORT(fp->fs, FR_INT_ERR);
+				if (clst == 0xFFFFFFFF) ABORT(fp->fs, FR_DISK_ERR);
+				fp->curr_clust = clst;				/* Update current cluster */
+				fp->csect = 0;						/* Reset sector offset in the cluster */
+			}
+			sect = clust2sect(fp->fs, fp->curr_clust);	/* Get current sector */
+			if (!sect) ABORT(fp->fs, FR_INT_ERR);
+			sect += fp->csect;
+			cc = btr / SS(fp->fs);					/* When remaining bytes >= sector size, */
+			if (cc) {								/* Read maximum contiguous sectors directly */
+				if (fp->csect + cc > fp->fs->csize)	/* Clip at cluster boundary */
+				{
+					cc = fp->fs->csize - fp->csect;
+				}
+
+				if((prev_cluster + 1) != fp->curr_clust)
+				{
+					if(sector_run)
+					{
+						if (disk_read_multi(fp->fs->drive, rbuff,sector_base,sector_run) != RES_OK)
+						{
+							ABORT(fp->fs, FR_DISK_ERR);
+						}
+						sector_run = 0;
+					}
+
+					if (disk_read_multi(fp->fs->drive, rbuff, sect, cc) != RES_OK)
+					{
+						ABORT(fp->fs, FR_DISK_ERR);
+					}
+				}
+				else
+				{
+					if(0 == sector_run)
+					{	
+						sector_base = sect;
+					}
+					sector_run += (DWORD)cc;
+				}
+
+#if !_FS_READONLY && _FS_MINIMIZE <= 2
+#if _FS_TINY
+				if (fp->fs->wflag && fp->fs->winsect - sect < cc)		/* Replace one of the read sectors with cached data if it contains a dirty sector */
+					mem_cpy(rbuff + ((fp->fs->winsect - sect) * SS(fp->fs)), fp->fs->win, SS(fp->fs));
+#else
+				if ((fp->flag & FA__DIRTY) && fp->dsect - sect < cc)	/* Replace one of the read sectors with cached data if it contains a dirty sector */
+					mem_cpy(rbuff + ((fp->dsect - sect) * SS(fp->fs)), fp->buf, SS(fp->fs));
+#endif
+#endif
+				fp->csect += (BYTE)cc;				/* Next sector address in the cluster */
+				rcnt = cc << 9;						/* Number of bytes transferred */
+				continue;
+			}
+			prev_cluster = fp->curr_clust;
+#if !_FS_TINY
+#if !_FS_READONLY
+			if (fp->flag & FA__DIRTY) {			/* Write sector I/O buffer if needed */
+				if (disk_write(fp->fs->drive, fp->buf, fp->dsect, 1) != RES_OK)
+					ABORT(fp->fs, FR_DISK_ERR);
+				fp->flag &= ~FA__DIRTY;
+			}
+#endif
+			if (fp->dsect != sect) {			/* Fill sector buffer with file data */
+				if (disk_read(fp->fs->drive, fp->buf, sect, 1) != RES_OK)
+					ABORT(fp->fs, FR_DISK_ERR);
+			}
+#endif
+			fp->dsect = sect;
+			fp->csect++;							/* Next sector address in the cluster */
+		}
+		rcnt = SS(fp->fs) - (fp->fptr & (SS(fp->fs)-1));	/* Get partial sector data from sector buffer */
+		if (rcnt > btr) rcnt = btr;
+#if _FS_TINY
+		if (move_window(fp->fs, fp->dsect))			/* Move sector window */
+			ABORT(fp->fs, FR_DISK_ERR);
+		mem_cpy(rbuff, &fp->fs->win[fp->fptr % SS(fp->fs)], rcnt);	/* Pick partial sector */
+#else
+		mem_cpy(rbuff, &fp->buf[fp->fptr % SS(fp->fs)], rcnt);	/* Pick partial sector */
+#endif
+	}
+
+	if(sector_run)
+	{
+		if (disk_read_multi(fp->fs->drive, rbuff,sector_base,sector_run) != RES_OK)
+		{
+			ABORT(fp->fs, FR_DISK_ERR);
+		}
+
+	}
+
+	LEAVE_FF(fp->fs, FR_OK);
+}
+#endif
+
+FRESULT f_read_psram (
+	FIL *fp, 		/* Pointer to the file object */
+	UINT btr,		/* Number of bytes to read */
+	UINT *br		/* Pointer to number of bytes read */
+)
+{
+	FRESULT res;
+	DWORD clst, sect, remain;
+	UINT rcnt, cc;
+	DWORD sector_base = 0;
+	DWORD sector_run = 0;
+	DWORD prev_cluster = 0;
+
+	*br = 0;	/* Initialize bytes read */
+
+	res = validate(fp->fs, fp->id);					/* Check validity of the object */
+	if (res != FR_OK) LEAVE_FF(fp->fs, res);
+	if (fp->flag & FA__ERROR)						/* Check abort flag */
+		LEAVE_FF(fp->fs, FR_INT_ERR);
+	if (!(fp->flag & FA_READ)) 						/* Check access mode */
+		LEAVE_FF(fp->fs, FR_DENIED);
+	remain = fp->fsize - fp->fptr;
+	if (btr > remain) btr = (UINT)remain;			/* Truncate btr by remaining bytes */
+
+	for ( ;  btr;									/* Repeat until all data transferred */
+		 fp->fptr += rcnt, *br += rcnt, btr -= rcnt) {
+		if ((fp->fptr & (SS(fp->fs)-1)) == 0) {			/* On the sector boundary? */
+			if (fp->csect >= fp->fs->csize) {		/* On the cluster boundary? */
+				clst = (fp->fptr == 0) ?			/* On the top of the file? */
+					fp->org_clust : get_fat(fp->fs, fp->curr_clust);
+				if (clst <= 1) ABORT(fp->fs, FR_INT_ERR);
+				if (clst == 0xFFFFFFFF) ABORT(fp->fs, FR_DISK_ERR);
+				fp->curr_clust = clst;				/* Update current cluster */
+				fp->csect = 0;						/* Reset sector offset in the cluster */
+			}
+			sect = clust2sect(fp->fs, fp->curr_clust);	/* Get current sector */
+			if (!sect) ABORT(fp->fs, FR_INT_ERR);
+			sect += fp->csect;
+			cc = btr / SS(fp->fs);					/* When remaining bytes >= sector size, */
+			if (cc) {								/* Read maximum contiguous sectors directly */
+				if (fp->csect + cc > fp->fs->csize)	/* Clip at cluster boundary */
+				{
+					cc = fp->fs->csize - fp->csect;
+				}
+
+				if((prev_cluster + 1) != fp->curr_clust)
+				{
+					if(sector_run)
+					{
+						if (disk_read_multi(fp->fs->drive, NULL,sector_base,sector_run) != RES_OK)
+						{
+							ABORT(fp->fs, FR_DISK_ERR);
+						}
+						sector_run = 0;
+					}
+
+					if (disk_read_multi(fp->fs->drive, NULL, sect, cc) != RES_OK)
+					{
+						ABORT(fp->fs, FR_DISK_ERR);
+					}
+				}
+				else
+				{
+					if(0 == sector_run)
+					{	
+						sector_base = sect;
+					}
+					sector_run += (DWORD)cc;
+				}
+
+				fp->csect += (BYTE)cc;				/* Next sector address in the cluster */
+				rcnt = cc << 9;
+				continue;
+			}
+			prev_cluster = fp->curr_clust;
+#if !_FS_TINY
+#if !_FS_READONLY
+			if (fp->flag & FA__DIRTY) {			/* Write sector I/O buffer if needed */
+				if (disk_write(fp->fs->drive, fp->buf, fp->dsect, 1) != RES_OK)
+					ABORT(fp->fs, FR_DISK_ERR);
+				fp->flag &= ~FA__DIRTY;
+			}
+#endif
+			if (fp->dsect != sect) {			/* Fill sector buffer with file data */
+				if (disk_read(fp->fs->drive, fp->buf, sect, 1) != RES_OK)
+					ABORT(fp->fs, FR_DISK_ERR);
+			}
+#endif
+			fp->dsect = sect;
+			fp->csect++;							/* Next sector address in the cluster */
+		}
+		rcnt = SS(fp->fs) - (fp->fptr & (SS(fp->fs)-1));	/* Get partial sector data from sector buffer */
+		if (rcnt > btr) rcnt = btr;
+	}
+
+	if(sector_run)
+	{
+		if (disk_read_multi(fp->fs->drive, NULL,sector_base,sector_run) != RES_OK)
+		{
+			ABORT(fp->fs, FR_DISK_ERR);
+		}
+
+	}
+
+	LEAVE_FF(fp->fs, FR_OK);
+}
+ 
 
 /*-----------------------------------------------------------------------*/
 /* Dummy read                                                  			*/
