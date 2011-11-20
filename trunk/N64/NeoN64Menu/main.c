@@ -1198,7 +1198,7 @@ void sync_sd_stream(FIL* f,XCHAR* s)
 
 void copyfrom_sd_to_psram(FIL* f,int len,int disk_mode,int swap,int bfill,const char* msg,const char* fn)
 {
-	const int read = 256*1024;
+	const int read = 256*1024;//1*1024*1024;
 	int i;
 	UINT ts;
 
@@ -1211,7 +1211,7 @@ void copyfrom_sd_to_psram(FIL* f,int len,int disk_mode,int swap,int bfill,const 
 	for(i = 0; i<len; i+=read)
 	{
 		progress_screen(NULL,NULL, 100*i/len, 100,-1);
-		f_read_dummy(f,read,&ts);
+		f_read_psram(f,read,&ts);
 	}
 
 	progress_screen(NULL,NULL,100,100,-1);
