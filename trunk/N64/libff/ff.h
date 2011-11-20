@@ -419,6 +419,11 @@ FRESULT f_mount (BYTE, FATFS*);						/* Mount/Unmount a logical drive */
 FRESULT f_open (FIL*, const XCHAR*, BYTE);			/* Open or create a file */
 FRESULT f_read (FIL*, void*, UINT, UINT*);			/* Read data from a file */
 FRESULT f_read_dummy (FIL*, UINT, UINT*);			/* Read data from a file without writing sector data */
+FRESULT f_read_psram (
+	FIL *fp, 		/* Pointer to the file object */
+	UINT btr,		/* Number of bytes to read */
+	UINT *br		/* Pointer to number of bytes read */
+);
 FRESULT f_write (FIL*, const void*, UINT, UINT*);	/* Write data to a file */
 FRESULT f_lseek (FIL*, DWORD);						/* Move file pointer of a file object */
 FRESULT f_close (FIL*);								/* Close an open file object */
