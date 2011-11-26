@@ -37,6 +37,7 @@
 #define MS_SD_ERROR_MENU_INSTRUCTIONS 81
 #define MS_SD_INFO_MENU_INSTRUCTIONS 82
 #define MS_VGM_PLAY_MENU_INSTRUCTIONS 83
+#define MS_CART_TEST_MENU_INSTRUCTIONS 84
 
 
 // Masks for the joypad data returned by read_joypad
@@ -154,6 +155,7 @@ extern sortOrder_t sortOrder;
 extern u8 freeCodeSlots;
 extern u8 snesRomInfo[0x40];
 extern u8 doRegionPatch;
+extern int sramBankOverride;
 extern u8 resetType;
 extern u16 hasGbacPsram,useGbacPsram;
 extern oamEntry_t marker;

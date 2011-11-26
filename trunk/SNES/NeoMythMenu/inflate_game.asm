@@ -111,8 +111,8 @@ inflate_game:
 
 	jsr.w _neo_select_psram
 	sep 	#$30
-    lda    	#$F0
-    sta.l  	MYTH_PRAM_ZIO	; PSRAM 16M SIZE
+    	lda    	#$F0
+    	sta.l  	MYTH_PRAM_ZIO	; PSRAM 16M SIZE
 	LDA    	#1 
 	STA.L  	MYTH_OPTION_IO
 	lda 	#1
@@ -120,10 +120,10 @@ inflate_game:
 	LDA    	#$00
 	STA.L  	MYTH_PRAM_BIO
 	
-	stz 	getBit_buffer
+	stz 		getBit_buffer
 
 	lda		#2
-	sta 	tcc__r0h
+	sta 		tcc__r0h
 
 	lda		#$D0
 	sta		inputPointer+2
@@ -135,17 +135,17 @@ inflate_game:
 	stz		outputPointer
 	
 	; Compressed bitstream starts at offset $1e + sizeof(filename) + sizeof(extra_field)
-	lda.l	INPUT_BASE+$1a		; filename length
+	lda.l		INPUT_BASE+$1a		; filename length
 	sta		tcc__r0
 	clc
-	adc.l	INPUT_BASE+$1c
+	adc.l		INPUT_BASE+$1c
 	clc
 	adc		#$1e
 	sta		inputPointer
 
  	
 	sep		#$20
-	lda.l	INPUT_BASE+8		; compression type
+	lda.l		INPUT_BASE+8		; compression type
 	cmp		#8			; deflate
 	beq		+
 	rep		#$20
@@ -153,7 +153,7 @@ inflate_game:
 	sta		tcc__r0
 	lda		#$8000
 	sta		tcc__r1
-	jmp.w	inflate_game_return
+	jmp.w		inflate_game_return
 	sep		#$20
 +:
 
@@ -161,7 +161,7 @@ inflate_game:
 	ldx		#$1e		; filename offset
 	ldy		#0
 -:
-	lda.l	INPUT_BASE,x
+	lda.l		INPUT_BASE,x
 	cmp		#'.'
 	beq		+
 	inx
@@ -177,38 +177,38 @@ inflate_game_not_smc:
 	sta		tcc__r0
 	lda		#$8000
 	sta		tcc__r1
-	jmp.w	inflate_game_return
+	jmp.w		inflate_game_return
 	sep		#$20
 +:	
-	lda.l	INPUT_BASE+1,x
+	lda.l		INPUT_BASE+1,x
 	cmp		#'s'
 	beq		+
 	cmp		#'S'
 	bne		inflate_game_not_smc
 +:	
-	lda.l	INPUT_BASE+2,x
+	lda.l		INPUT_BASE+2,x
 	cmp		#'m'
 	beq		+
 	cmp		#'M'
 	bne		inflate_game_not_smc
 +:	
-	lda.l	INPUT_BASE+3,x
+	lda.l		INPUT_BASE+3,x
 	cmp		#'c'
 	beq		+
 	cmp		#'C'
 	bne		inflate_game_not_smc
 +:	
 
- lda		#0
- sta.l	MYTH_PRAM_BIO
+ 	lda		#0
+ 	sta.l		MYTH_PRAM_BIO
  
  	lda		#$01
-	sta.l	REG_MEMSEL
+	sta.l		REG_MEMSEL
 	
-	ldy 	#0
+	ldy 		#0
 	ldx		#0
 
-jml $DE0000+inflate_game_blockLoop	; Jump to this code in PSRAM
+	jml 		$DE0000+inflate_game_blockLoop	; Jump to this code in PSRAM
 
 inflate_game_blockLoop:
 ; Get a bit of EOF and two bits of block type
@@ -239,20 +239,20 @@ inflateGameStoreByte
 
 	dec 	tcc__r0h
 	bne 	+
-	  ; odd address
+	; odd address
 	xba
 	lda 	tcc__r1h
 	rep	#$20
-	  sta	[outputPointer]
+	sta	[outputPointer]
 	sep	#$20
 	lda 	#2
 	sta 	tcc__r0h
 	inc 	outputPointer
-	  inc 	outputPointer
-	  bne	++
-	  rep	#$20
-	  inc	outputPointer+1
-	  sep	#$20
+	inc 	outputPointer
+	bne	++
+	rep	#$20
+	inc	outputPointer+1
+	sep	#$20
  +:
 ;	  ; even address
     sta	tcc__r1h
@@ -717,14 +717,27 @@ game_getBits_normalizeLoop:
 	
 	
 
-; Read 16 bits
+; Read 16 bits (these reads are always byte-aligned within the stream)
 game_getWord:
-	jsr		game_getByte
+	jsr		game_getByte_fast
 	tax
+game_getByte_fast:
+	lda	#1
+	sta	getBit_buffer
+	lda 	[inputPointer]
+	rep	#$20
+	inc 	inputPointer
+	sep 	#$20
+	bne	+
+	inc	inputPointer+2
++:
+	sec
+	rts
+	
+	
 ; Read 8 bits
 game_getByte:
 	lda		#$80
-;game_getByte_loop:
 	.rept 8
 	lsr		getBit_buffer
 	beq		+
@@ -736,13 +749,7 @@ game_getByte:
 -:
 ;	bne		++
 	pha
-	;lda		#1
-	;sta.l	MYTH_PRAM_BIO
 	lda 	[inputPointer]
- 	;xba
- 	;lda		#0
- 	;sta.l	MYTH_PRAM_BIO
- 	;xba	
 	rep		#$20
 	inc 	inputPointer
 	sep 	#$20
@@ -762,6 +769,7 @@ game_getByte_loop:
 	ror		a 
 	bcc		game_getByte_loop
 	rts
+
 	
 game_getBits_loop:
 	lsr		getBit_buffer
@@ -772,13 +780,7 @@ game_getBits_loop:
 +:	
 ;	bne		++
 	pha
-	;lda		#1
-	;sta.l	MYTH_PRAM_BIO
 	lda 	[inputPointer]
- 	;xba
- 	;lda		#0
- 	;sta.l	MYTH_PRAM_BIO
- 	;xba	
 	rep		#$20
 	inc 	inputPointer
 	sep 	#$20
@@ -797,30 +799,24 @@ game_getBits_loop:
 
 ; Read one bit, return in the C flag
 game_getBit:
-	lsr		getBit_buffer
-	beq		+
-	rts
+	lsr		getBit_buffer	; 5
+	beq		+				; 2|3
+	rts						; 6
 +:
-	pha
-	;lda		#1
-	;sta.l	MYTH_PRAM_BIO
- 	lda 	[inputPointer]
-	;xba
-	;lda		#0
- 	;sta.l	MYTH_PRAM_BIO
- 	;xba	
-	rep		#$20
-	inc 	inputPointer
-	sep 	#$20
-	bne		+
-	inc		inputPointer+2
+	pha						; 3
+ 	lda 	[inputPointer]	; 6
+	rep		#$20			; 3
+	inc 	inputPointer	; 7
+	sep 	#$20			; 3
+	bne		+				; 2|3
+	inc		inputPointer+2	; 5
 +:
-	sec
-	ror		a 
-	sta		getBit_buffer
-	pla
+	sec						; 2
+	ror		a 				; 2
+	sta		getBit_buffer	; 3
+	pla						; 3
 game_getBit_return:
-	rts
+	rts						; 6
 
 
 inflate_remove_smc_header:

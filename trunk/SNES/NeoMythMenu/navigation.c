@@ -1,5 +1,5 @@
 // Menu navigation code for the SNES Myth
-// Mic, 2010
+// Mic, 2010-2011
 
 #include "snes.h"
 #include "neo2.h"
@@ -99,6 +99,14 @@ const char * const romSizeStrings[] =
 	"(32 Mbit)", "(64 Mbit)",
 };
 
+const char * const ramSizeStrings[] =
+{
+	"(None)", "(16 kbit)", "(32 kbit)",
+	"(64 kbit)", "(128 kbit)", "(256 kbit)",
+	"(512 kbit)", "(1 Mbit)",
+};
+
+
 const char * const regionPatchStrings[] =
 {
 	"Off     ", "Quick   ", "Complete",
@@ -112,6 +120,14 @@ const char * const resetTypeStrings[] =
 	//"Disabled        "
 };
 
+const char * const sramBankOverrideStrings[] =
+{
+	"Auto",
+	"0   ",
+	"1   ",
+	"2   ",
+	"3   "
+};
 
 oamEntry_t marker;
 
@@ -134,6 +150,8 @@ enum
 	MENU1_ITEM_RUN_MODE = 4,
 	MENU1_ITEM_FIX_REGION = 5,
 	MENU1_ITEM_RESET_TYPE = 6,
+	MENU1_ITEM_TEST_CART = 7,
+	MENU1_ITEM_SRAM_BANK = 7,
 	MENU1_ITEM_LAST
 };
 
@@ -146,6 +164,32 @@ menuOption_t extRunMenuItems[MENU1_ITEM_LAST + 1] =
 	{"Mode:", 0, 14, 8},
 	{"Autofix region:", 0, 15, 18},
 	{"Reset:", 0, 16, 9},
+#ifdef CART_TESTS
+	{"Cart self-test", 0, 17, 0},
+#endif
+	{"SRAM bank:", 0, 17, 13},
+	{0,0,0,0}	// Terminator
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum
+{
+	MENU2_ITEM_TEST_MYTH_PSRAM = 0,
+	MENU2_ITEM_TEST_GBAC_PSRAM = 1,
+	MENU2_ITEM_TEST_SRAM = 2,
+    MENU2_ITEM_WRITE_SRAM = 3,
+	MENU2_ITEM_READ_SRAM = 4,
+	MENU2_ITEM_LAST
+};
+
+menuOption_t cartTestMenuItems[MENU2_ITEM_LAST + 1] =
+{
+	{"Test Myth PSRAM", 0, 9, 0},
+	{"Test GBAC PSRAM", 0, 10, 0},
+	{"Test SRAM (full)", 0, 11, 0},
+	{"Test SRAM (write)", 0, 12, 0},
+	{"Test SRAM (read)", 0, 13, 0},
 	{0,0,0,0}	// Terminator
 };
 
@@ -171,6 +215,7 @@ menuOption_t noCodesMenuItems[MENU7_ITEM_LAST + 1] =
 // Prototypes
 void main_menu_process_keypress(u16);
 void extended_run_menu_process_keypress(u16);
+void cart_test_menu_process_keypress(u16);
 void gg_code_entry_menu_process_keypress(u16);
 void gg_code_edit_menu_process_keypress(u16);
 void ar_code_entry_menu_process_keypress(u16);
@@ -772,6 +817,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue = (char*)&(metaStrings[48 + romRunMode][4]);
 			extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue = (char*)regionPatchStrings[doRegionPatch];
 			extRunMenuItems[MENU1_ITEM_RESET_TYPE].optionValue = (char*)resetTypeStrings[resetType];
+			extRunMenuItems[MENU1_ITEM_SRAM_BANK].optionValue = (char*)sramBankOverrideStrings[sramBankOverride+1];
 			for (i = 0; i < MENU1_ITEM_LAST; i++)
 			{
 				print_menu_item(extRunMenuItems,
@@ -781,6 +827,19 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			highlightedOption[MID_GG_ENTRY_MENU] = 0;
 			break;
 
+#ifdef CART_TESTS
+		case MID_CART_TEST_MENU:
+			keypress_handler = cart_test_menu_process_keypress;
+			print_meta_string(MS_CART_TEST_MENU_INSTRUCTIONS);
+			for (i = 0; i < MENU2_ITEM_LAST; i++)
+			{
+				print_menu_item(cartTestMenuItems,
+				                i,
+				                (i==0) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			}
+			highlightedOption[MID_CART_TEST_MENU] = 0;
+			break;
+#endif
 
 		case MID_GG_ENTRY_MENU:
 			keypress_handler = gg_code_entry_menu_process_keypress;
@@ -1129,6 +1188,10 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 
 			printxy("RAM size: $", 2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 			print_hex(snesRomInfo[0x18], 13, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			if (snesRomInfo[0x18] <= 7)
+			{
+				printxy((char*)ramSizeStrings[snesRomInfo[0x18]], 16, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			}
 
 			printxy("Country:  $", 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 			print_hex(snesRomInfo[0x19], 13, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
@@ -1324,6 +1387,17 @@ void extended_run_menu_process_keypress(u16 keys)
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
 			        32);
 		}
+		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_SRAM_BANK)
+		{
+			sramBankOverride++; if (sramBankOverride > 3) sramBankOverride = -1;
+			extRunMenuItems[MENU1_ITEM_SRAM_BANK].optionValue = (char*)sramBankOverrideStrings[sramBankOverride+1];
+
+			printxy(extRunMenuItems[MENU1_ITEM_SRAM_BANK].optionValue,
+			        extRunMenuItems[MENU1_ITEM_SRAM_BANK].optionColumn,
+			        extRunMenuItems[MENU1_ITEM_SRAM_BANK].row,
+			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+			        32);
+		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_ROM_INFO)
 		{
 			if (!highlightedIsDir)
@@ -1344,6 +1418,11 @@ void extended_run_menu_process_keypress(u16 keys)
 		{
 			// Go to the game genie screen
 			switch_to_menu(MID_GG_ENTRY_MENU, 0);
+		}
+		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_TEST_CART)
+		{
+			// Go to the game genie screen
+			switch_to_menu(MID_CART_TEST_MENU, 0);
 		}
 	}
 	else if (keys & JOY_START)
@@ -1389,6 +1468,237 @@ void extended_run_menu_process_keypress(u16 keys)
 	}
 }
 
+
+void cart_test_menu_process_keypress(u16 keys)
+{
+#ifdef CART_TESTS
+	void (*psram_read)(char*, u16, u16, u16);
+	void (*psram_write)(char*, u16, u16, u16);
+	static u16 buf[0x20];
+	u16 prbank, proffs, i;
+	u16 banks, bnum, chk;
+	u16 checkOk;
+
+	if (keys & JOY_UP)
+	{
+		// Up
+		if (highlightedOption[MID_CART_TEST_MENU])
+		{
+			// Un-highlight the previously highlighted string(s), and highlight the new one(s)
+			print_menu_item(cartTestMenuItems,
+			                highlightedOption[MID_CART_TEST_MENU],
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			print_menu_item(cartTestMenuItems,
+			                highlightedOption[MID_CART_TEST_MENU] - 1,
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+			highlightedOption[MID_CART_TEST_MENU]--;
+		}
+	}
+	else if (keys & JOY_DOWN)
+	{
+		// Down
+		if (highlightedOption[MID_CART_TEST_MENU] < MENU2_ITEM_LAST - 1)
+		{
+			print_menu_item(cartTestMenuItems,
+			                highlightedOption[MID_CART_TEST_MENU],
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			print_menu_item(cartTestMenuItems,
+			                highlightedOption[MID_CART_TEST_MENU] + 1,
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+			highlightedOption[MID_CART_TEST_MENU]++;
+		}
+	}
+	else if (keys & JOY_B)
+	{
+		// B
+		if ((highlightedOption[MID_CART_TEST_MENU] == MENU2_ITEM_TEST_MYTH_PSRAM)  ||
+		    (highlightedOption[MID_CART_TEST_MENU] == MENU2_ITEM_TEST_GBAC_PSRAM))
+		{
+			if (highlightedOption[MID_CART_TEST_MENU] == MENU2_ITEM_TEST_MYTH_PSRAM)
+			{
+				MAKE_RAM_FPTR(psram_write, neo2_myth_psram_write_test_data);
+				MAKE_RAM_FPTR(psram_read, neo2_myth_psram_read);
+				banks = 0x80;
+				bnum = 0x50;
+			}
+			else
+			{
+				MAKE_RAM_FPTR(psram_write, neo2_gbac_psram_write_test_data);
+				MAKE_RAM_FPTR(psram_read, neo2_gbac_psram_read);
+				banks = 0x100;
+				bnum = 0x40;
+			}
+			clear_screen();
+			print_hw_card_rev();
+			print_meta_string(MS_VERSION_COPYRIGHT);
+			printxy("Writing ", 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			update_screen();
+			checkOk = 1;
+			for (prbank = 0x00; prbank < banks; prbank++)
+			{
+				print_hex(prbank>>8, 10, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				print_hex(prbank, 12, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				update_screen();
+				psram_write(0, prbank, 0x0000, 0x8000);
+				psram_write(0, prbank, 0x8000, 0x8000);
+			}
+
+			printxy("Reading ", 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			update_screen();
+			for (prbank = 0x00; prbank < banks; prbank++)
+			{
+				print_hex(prbank>>8, 10, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				print_hex(prbank, 12, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				update_screen();
+				proffs = 0;
+				do
+				{
+					psram_read((char*)buf, prbank, proffs, 0x40);
+					if (bnum == 0x40) {
+						chk = prbank + (proffs>>1);
+						for (i = 0; i < 0x20; i++)
+						{
+							if (buf[i] != chk)
+							{
+								checkOk = 0;
+								break;
+							}
+							chk++;
+						}
+					}
+					else
+					{
+						chk = proffs + (bnum | (prbank&0x0F));
+						for (i = 0; i < 0x20; i++)
+						{
+							if (buf[i] != chk)
+							{
+								checkOk = 0;
+								break;
+							}
+							chk += 2;
+						}
+					}
+					if (checkOk==0) break;
+					proffs += 0x40;
+				} while (proffs);
+				if (checkOk==0) break;
+			}
+
+			if (checkOk)
+			{
+				printxy("OK", 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			}
+			else
+			{
+				printxy("FAIL", 	2, 11, 4, 21);
+				printxy("Bank", 	2, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				print_hex(prbank, 	7, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+
+				printxy("Offset", 	2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				print_hex((proffs+i)>>8, 9, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				print_hex((proffs+i), 11, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+
+				printxy("Expected", 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				print_hex(chk>>8, 11, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				print_hex(chk, 13, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+
+				printxy("Actual", 	2, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				print_hex(buf[i]>>8,11, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				print_hex(buf[i], 	13, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				print_hex(buf[0]>>8,15, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				print_hex(buf[0], 	17, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				print_hex(buf[1]>>8,19, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				print_hex(buf[1], 	21, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			}
+		    update_screen();
+
+		}
+		else if ((highlightedOption[MID_CART_TEST_MENU] == MENU2_ITEM_TEST_SRAM) ||
+		         (highlightedOption[MID_CART_TEST_MENU] == MENU2_ITEM_WRITE_SRAM) ||
+		         (highlightedOption[MID_CART_TEST_MENU] == MENU2_ITEM_READ_SRAM))
+		{
+
+			MAKE_RAM_FPTR(psram_read, neo2_sram_read);
+			MAKE_RAM_FPTR(psram_write, neo2_sram_write);
+
+			clear_screen();
+			print_hw_card_rev();
+			print_meta_string(MS_VERSION_COPYRIGHT);
+
+			checkOk = 1;
+
+			if (highlightedOption[MID_CART_TEST_MENU] != MENU2_ITEM_READ_SRAM)
+			{
+				printxy("Writing ", 2, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				update_screen();
+
+				for (i=0; i<0x10; i++)
+				{
+					buf[i+i] = 0xDEAD;
+					buf[i+i+1] = 0xBEEF;
+				}
+				for (prbank=0; prbank<4; prbank++)
+				{
+					proffs = 0x0000;
+					do
+					{
+						psram_write((char*)buf, prbank, proffs, 0x40);
+						proffs += 0x40;
+					} while (proffs);
+				}
+			}
+
+			if (highlightedOption[MID_CART_TEST_MENU] != MENU2_ITEM_WRITE_SRAM)
+			{
+				printxy("Reading ", 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				update_screen();
+				for (prbank=0; prbank<4; prbank++)
+				{
+					proffs = 0x0000;
+					do
+					{
+						psram_read((char*)buf, prbank, proffs, 0x40);
+						for (i=0; i<0x10; i++)
+						{
+							if ((buf[i+i] != 0xDEAD) ||
+							    (buf[i+i+1] != 0xBEEF)) {
+								checkOk = 0;
+								break;
+							}
+						}
+						if (checkOk == 0) break;
+						proffs += 0x40;
+					} while (proffs);
+					if (checkOk == 0) break;
+				}
+			}
+
+			if (checkOk)
+			{
+				printxy("OK", 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+			}
+			else
+			{
+				printxy("FAIL", 	2, 11, 4, 21);
+				printxy("Bank", 	2, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				print_hex(prbank,11, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				printxy("Offset", 	2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				print_hex(proffs>>8,11, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+				print_hex(proffs, 	13, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			}
+		}
+	}
+	else if (keys & JOY_Y)
+	{
+		// Y
+		switch_to_menu(MID_MAIN_MENU, 0);
+	}
+
+#endif
+}
 
 
 void gg_code_entry_menu_process_keypress(u16 keys)

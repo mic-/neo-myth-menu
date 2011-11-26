@@ -52,12 +52,13 @@
 .DEFINE CHN2TOGGLE	$42
 .DEFINE CHN3TOGGLE	$43
 .DEFINE USECHO		$44
+.DEFINE NSAMPLES_LATE	$45
 
 
 ; Commands sent by the S-CPU
-.DEFINE CMD_PLAY			$21
-.DEFINE CMD_PAUSE			$22
-.DEFINE	CMD_STOP			$23
+.DEFINE CMD_PLAY		$21
+.DEFINE CMD_PAUSE		$22
+.DEFINE	CMD_STOP		$23
 .DEFINE CMD_SEND_LOOP_MSGS	$24
 .DEFINE CMD_RESTART_SONG	$25
 .DEFINE	CMD_SET_MVOL 		$30
@@ -238,7 +239,7 @@ set_coefs:
 start:
 	clrp
 	mov		x,#$F0
-	mov 	sp,x
+	mov 		sp,x
 	
 	mov		USECHO,#$20
 	
@@ -257,7 +258,10 @@ start:
 	mov		CHN1TOGGLE,#255
 	mov		CHN2TOGGLE,#255
 	mov		CHN3TOGGLE,#255
-	
+
+  mov NSAMPLES_LATE,#0
+  mov NSAMPLES_LATE+1,#0
+  
 	mov		LAST_BYTE,#$CD
 	
 	call	!stop
@@ -365,24 +369,18 @@ no_new_command:
 	mov		NUM_FLAGS,#8
 	mov		a,[VGM_PTR+x]	; load a new flags byte
 	mov		FLAGS,a
-	incw	VGM_PTR
+	incw		VGM_PTR
 +:
 	dec		NUM_FLAGS
 	ror		FLAGS			; put the next flag in C
 	bcc		+
-	call	!psg_param		; the flag was set; this is a PSG write command
+	call		!psg_param		; the flag was set; this is a PSG write command
 	jmp		!play
 	
 +:
 	mov		a,[VGM_PTR+x]	; the was flag clear; this is not a PSG write command
-	incw	VGM_PTR
+	incw		VGM_PTR
 
-	;cmp		a,#$50
-	;bne		+
-	;call	!psg_param
-	;jmp		!play
-	;+:
-	
 	mov		TEMP,a			; save the command byte
 	and		a,#$F0
 	cmp		a,#$70			; first check if it's a short wait command since we want the lowest latency in processing them
@@ -431,14 +429,23 @@ no_new_command:
 short_wait:
 	and		TEMP,#$F
 	mov		x,TEMP
+  inc x
 short_wait_2:
-	mov		a,!short_wait_timer_values+x
-	mov		SPC_TIMER2,a
-	mov		SPC_CTRL,#$84		; enable timer 2
--:
-	mov		a,SPC_COUNTER2
-	beq		-
-	mov 	SPC_CTRL,#$80		; disable timers
+  and a,!short_wait_timer_values+x ;5
+  and a,!short_wait_timer_values+x ;5
+  and a,!short_wait_timer_values+x ;5
+  nop ; 2
+  dec x  ;2 
+  bne shor_wait_2  ;4/2
+  jmp !play
+
+;	mov		a,!short_wait_timer_values+x
+;	mov		SPC_TIMER2,a
+;	mov		SPC_CTRL,#$84		; enable timer 2
+;-:
+;	mov		a,SPC_COUNTER2
+;	beq		-
+;	mov 	SPC_CTRL,#$80		; disable timers
 	jmp		!play
 
 
@@ -450,7 +457,10 @@ gg_stereo_param:
 
 ; Wait 1/60 s
 wait_frame_ntsc:
-	mov		SPC_TIMER1,#131		; 133 = floor(8000/60)
+  mov a,#133
+  setc
+  sbc a,NSAMPLES_LATE
+	mov		SPC_TIMER1,a  ;#133		; 133 = floor(8000/60)
 	mov		SPC_CTRL,#$02		; enable timer 1
 wait_frame_2:
 	call	!update_vol	
@@ -458,6 +468,7 @@ wait_frame_2:
 	mov		a,SPC_COUNTER1
 	beq		-
 	mov		SPC_CTRL,#$00		; disable timers
+  mov NSAMPLES_LATE,#0
 	jmp		!play
 
 
@@ -477,7 +488,10 @@ compressed_long_wait:
 
 ; Wait 1/50 s
 wait_frame_pal:
-	mov		SPC_TIMER0,#160		; 160 = 8000 / 50
+  mov a,#160
+  setc
+  sbc a,NSAMPLES_LATE
+	mov		SPC_TIMER0,a  ;#160		; 160 = 8000 / 50
 	mov		SPC_CTRL,#$81		; enable timer 0
 	bra		wait_frame_2
 ;	call	!update_vol	
@@ -491,28 +505,33 @@ wait_frame_pal:
 	
 ; TODO: Handle this more exactly. Currently relies on short_wait which already is pretty inexact.
 long_wait:
+ inc NSAMPLES_LATE
 	mov		a,[VGM_PTR+x]
 	mov		DELAY,a
-	incw	VGM_PTR
+	incw		VGM_PTR
 	mov		a,[VGM_PTR+x]
 	mov		DELAY+1,a
-	incw	VGM_PTR
-	call	!update_vol
+	incw		VGM_PTR
+	call		!update_vol
 long_wait2:
+  movw ya,DELAY
+  subw ya,NSAMPLES_LATE
+  bmi long_wait_done
+  movw DELAY.ya
 	mov		TEMP,#$10
 	mov		TEMP2,#0
 long_wait_loop:
-	movw	ya,DELAY
-	cmpw	ya,TEMP
-	bcs	+
+	movw		ya,DELAY
+	cmpw		ya,TEMP
+	bcs		+
 	and		a,#$0F
 	beq		long_wait_done
 	dec		a
 	mov		x,a
 	bra		short_wait_2
 +:
-	subw	ya,TEMP
-	movw	DELAY,ya
+	subw		ya,TEMP
+	movw		DELAY,ya
 	mov		x,#$0F
 	mov		a,!short_wait_timer_values+x
 	mov		SPC_TIMER2,a
@@ -520,9 +539,10 @@ long_wait_loop:
 -:
 	mov		a,SPC_COUNTER2
 	beq		-
-	mov 	SPC_CTRL,#$80		; disable timers
+	mov 		SPC_CTRL,#$80		; disable timers
 	bra		long_wait_loop
 long_wait_done:
+  mov NSAMPLES_LATE,#0
 	jmp		!play
 	
 
@@ -530,7 +550,7 @@ long_wait_done:
 ; A value is being written to the PSG	
 psg_param:
 	mov		a,[VGM_PTR+x]		; read the parameter byte
-	incw	VGM_PTR
+	incw		VGM_PTR
 	mov		TEMP,a
 	bbs		TEMP .7,latch_data
 	mov		a,LATCHED_REG
@@ -584,10 +604,12 @@ latch_data:
 
 
 volume_reg_updated:
+  clrc
+  adc NSAMPLES_LATE,#3
 	mov		x,LATCHED_REG
 	mov		a,TONE0_LATCH+x
-	mov 	x,a
-	mov 	a,!tone_vol+x
+	mov 		x,a
+	mov 		a,!tone_vol+x
 	mov		TEMP,a
 	mov		a,LATCHED_REG
 	lsr		a
@@ -604,6 +626,8 @@ volume_reg_updated:
 
 ; TODO: Handle constant output (psgPeriod <= 1)
 tone_reg_updated:
+  clrc
+  adc NSAMPLES_LATE,#4
 	mov		SAMPLE,#0
 	mov		a,LATCHED_REG
 	lsr		a
@@ -652,6 +676,8 @@ tone_reg_updated:
 	
 	
 noise_reg_updated:
+  clrc
+  adc NSAMPLES_LATE,#4
 	;bbc		NOISE_LATCH .2,periodic_noise
 	mov		a,NOISE_LATCH
 	and		a,#4

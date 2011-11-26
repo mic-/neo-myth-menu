@@ -659,32 +659,38 @@ pal_game_pattern3: .db $AF, $3F, $21, $00, $29, $10		; lda.l $00213f / and #$10
 suspect_pattern: .db 0,0,0,0,0,0,0,0,0,0
 
 
- .macro REGION_CHECK_SCAN_AND_REPLACE
+ .macro REGION_CHECK_SCAN_AND_REPLACE  ;pattern, length-1, replacementOffset, newValue1, newValue2, labelDone
 	sep	#$20	; 8-bit A
 	ldx	#\2
 -:
 	lda.l	$7d0000+suspect_pattern,x
 	cmp.l	$7d0000+\1,x
-	bne		++
+	bne	++
 	dex
-	bpl		-
-	ply		; PSRAM position
+	bpl	-
+	
+; The pattern matched
+	ply	; PSRAM position
+phy ;NEW
 	tya
-	ldx		#1
-	and		#1
-	beq		+
+	ldx	#1
+	and	#1
+	beq	+
 	dex
 	dey
 +:
-	lda		#\4
+	lda	#\4
 	sta.l	$7d0000+suspect_pattern+1+\3
-	lda		#\5
+	lda	#\5
 	sta.l	$7d0000+suspect_pattern+2+\3
-	rep		#$20	; 16-bit A
-	lda.l	$7d0000+suspect_pattern+\3-1,x
-	sta.w	PSRAM_OFFS+2,y	; Write to PSRAM
-	lda.l	$7d0000+suspect_pattern+1+\3,x
-	sta.w	PSRAM_OFFS+4,y
+	rep	#$20	; 16-bit A
+	lda.l	$7d0000+suspect_pattern+\3,x
+	sta.w	PSRAM_OFFS+1+\3,y	; Write to PSRAM
+	lda.l	$7d0000+suspect_pattern+2+\3,x
+	sta.w	PSRAM_OFFS+3+\3,y
+plx ;NEW
+;jsr show_copied_data
+;-: bra -
 	jmp.l	$7d0000+\6
 ++:
  .endm
@@ -699,17 +705,17 @@ fix_region_checks:
 	phx
 	phy
 
-	lda.l	doRegionPatch
+	lda.l		doRegionPatch
 	beq		++
 	dea
 	bne		+
-	cmp.b	tcc__r3			; make sure that ((doRegionPatch == 2) || (banksCopied == 0)) is true
+	cmp.b		tcc__r3			; make sure that ((doRegionPatch == 2) || (banksCopied == 0)) is true
 	bne		++
 +:
-	lda.b	tcc__r2
-	sta.b	tcc__r4
+	lda.b		tcc__r2
+	sta.b		tcc__r4
 	jsr		_fix_region_checks
-	inc.b	tcc__r4
+	inc.b		tcc__r4
 	jsr		_fix_region_checks
 ++:
 	sep		#$30			; 8-bit A/X/Y
@@ -731,14 +737,14 @@ _fix_region_checks:
 	pha
 	plb						; DBR = $5x (PSRAM)
 
-	lda.l	REG_STAT78
+	lda.l		REG_STAT78
 	and		#$10
 	beq		_frc_ppu_is_60hz
 	rep		#$30			; 16-bit A/X/Y
 	ldx		#0
 -:
-	lda.w	PSRAM_OFFS,x
-	phx
+	lda.w		PSRAM_OFFS,x
+	phx		; psram position
 	tay
 	and		#$ff
 	cmp		#$ad
@@ -753,7 +759,7 @@ _fix_region_checks:
 	cmp		#$af
 	beq		_frc_possible_ntsc_pattern_odd
 _frc_50hz_next:
-	plx
+	plx		; psram position
 	inx
 	inx
 	bne		-
@@ -764,7 +770,7 @@ _frc_ppu_is_60hz:
 	ldx		#0
 -:
 	lda.w	PSRAM_OFFS,x
-	phx
+	phx			; psram position
 	tay
 	and		#$ff
 	cmp		#$ad
@@ -779,7 +785,7 @@ _frc_ppu_is_60hz:
 	cmp		#$af
 	beq		_frc_possible_pal_pattern_odd
 _frc_60hz_next:
-	plx
+	plx		; psram position
 	inx
 	inx
 	bne		-
@@ -799,8 +805,8 @@ _frc_possible_ntsc_pattern:
 	jsr		_frc_copy_pattern
 	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern0,4,2,$a9,$00,_frc_50hz_next
 	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern2,4,2,$a9,$00,_frc_50hz_next
-	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern1,5,4,$a9,$00,_frc_50hz_next
-	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern3,5,4,$a9,$00,_frc_50hz_next
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern1,5,3,$a9,$00,_frc_50hz_next
+	REGION_CHECK_SCAN_AND_REPLACE ntsc_game_pattern3,5,3,$a9,$00,_frc_50hz_next
 	rep		#$30
 	plx
 	jmp.l	$7d0000+_frc_50hz_next
@@ -811,13 +817,14 @@ _frc_check_for_pal_patterns
 	jsr		_frc_copy_pattern
 	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern0,4,2,$a9,$10,_frc_60hz_next
 	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern2,4,2,$a9,$10,_frc_60hz_next
-	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern1,5,4,$a9,$10,_frc_60hz_next
-	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern3,5,4,$a9,$10,_frc_60hz_next
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern1,5,3,$a9,$10,_frc_60hz_next
+	REGION_CHECK_SCAN_AND_REPLACE pal_game_pattern3,5,3,$a9,$10,_frc_60hz_next
 	rep		#$30
 	plx
 	jmp.l	$7d0000+_frc_60hz_next
 
 _frc_copy_pattern:
+	; In: X=PSRAM offset where the AD/AF byte was found
 	rep		#$30
 	txy
 	ldx		#1
@@ -1165,17 +1172,6 @@ neo2_myth_psram_read:
 	sep		#$20
 	pha
 
-    ;lda     #$01
-    ;sta.l   MYTH_EXTM_ON   	; A25,A24 ON
-    ;lda    #GBAC_TO_PSRAM_COPY_MODE
-    ;sta.l  MYTH_OPTION_IO
-    ;lda    #$01       		; PSRAM WE ON !
-    ;sta.l  MYTH_WE_IO
-    ;lda    #$F8
-    ;sta.l  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
-	;pla
-    ;sta.l  MYTH_PRAM_BIO
-
 	LDA    #$20      		; OFF A21
 	STA.L  MYTH_GBAC_ZIO
 	JSR    SET_NEOCMA  		;
@@ -1272,18 +1268,7 @@ neo2_myth_psram_write:
 	sep		#$20
 	pha
 
-    ;lda     #$01
-    ;sta.l   MYTH_EXTM_ON   	; A25,A24 ON
-    ;lda    #GBAC_TO_PSRAM_COPY_MODE
-    ;sta.l  MYTH_OPTION_IO
-    ;lda    #$01       		; PSRAM WE ON !
-    ;sta.l  MYTH_WE_IO
-    ;lda    #$F8
-    ;sta.l  MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
-	;pla
-    ;sta.l  MYTH_PRAM_BIO
-
-	LDA    #$20      		; OFF A21
+ 	LDA    #$20      		; OFF A21
 	STA.L  MYTH_GBAC_ZIO
 	JSR    SET_NEOCMA  		;
 	JSR    SET_NEOCMB  		;
@@ -1327,13 +1312,6 @@ _nctmp_write:
 	dec		tcc__r4
 	bne		-
 
-	;sep		#$20
-    ;lda     #$00       ;
-    ;sta.l   MYTH_WE_IO     ; PSRAM WRITE OFF
-	;lda     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
-	;sta.l   MYTH_OPTION_IO
-	;lda     #$00
-	;sta.l   MYTH_EXTM_ON   ; A25,A24 OFF
 
   	sep		#$20
     LDA     #$00       ;
@@ -1360,8 +1338,406 @@ _nctmp_write:
 	rtl
 
 
+; void neo2_myth_psram_write_test_data(char *src, u16 psramBank, u16 psramOffset, u16 length)
+neo2_myth_psram_write_test_data:
+.IFDEF CART_TESTS
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+
+	lda		14,s		; psramBank
+	tax
+	lsr		a
+	lsr		a
+	lsr		a
+	lsr		a
+	sep		#$20
+	pha
+
+	LDA    		#$20      		; OFF A21
+	STA.L  		MYTH_GBAC_ZIO
+	JSR    		SET_NEOCMA  		;
+	JSR    		SET_NEOCMB  		;
+	JSR    		SET_NEOCMC  		; ON_NEO CARD A24 & A25 + SA16 & SA17
+	LDA    		#$01
+	STA.L  		MYTH_EXTM_ON  	; A25,A24 ON
+	LDA    		#$04       		; COPY MODE !
+	STA.L  		MYTH_OPTION_IO
+	LDA    		#$01       		; PSRAM WE ON !
+	STA.L  		MYTH_WE_IO
+	LDA    		#$F8
+	STA.L  		MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+	STA.L  		MYTH_PRAM_ZIO  	; PSRAM    8M SIZE
+	pla		
+	STA.L  		MYTH_PRAM_BIO
+	
+	txa						; psramBank lower 8 bits
+	and		#$0F
+	ora		#$50
+	sta.l		$7d0000+_psram_testdata_write+3
+	sta.b		tcc__r0
+	stz		tcc__r0+1
+	
+	rep		#$20
+	lda		16,s			; psramOffset
+	tax
+	lda		18,s			; length
+	lsr		a
+	sta.b		tcc__r4
+	lda		10,s			; src offset
+	tay
+-:
+	txa	
+	clc
+	adc		tcc__r0
+_psram_testdata_write:
+	sta.l		PSRAM_ADDR,x
+	inx
+	inx
+	iny
+	iny
+	dec		tcc__r4
+	bne		-
+
+  	sep		#$20
+    	LDA     #$00       ;
+    	STA.L   MYTH_WE_IO     ; PSRAM WRITE OFF
+    	LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
+    	STA.L   MYTH_OPTION_IO
+    	LDA     #$20       		; OFF A21
+    	STA.L   MYTH_GBAC_ZIO
+    	JSR     SET_NEOCMD		; SET MENU
+    	LDA     #$00
+    	STA.L   MYTH_GBAC_LIO
+    	STA.L   MYTH_GBAC_HIO
+    	STA.L   MYTH_GBAC_ZIO
+
+    	lda.l	sourceMedium
+    	beq	+
+    	jsr	neo2_enable_sd
++:
+    
+ 	plb
+ 	ply
+ 	plx
+ 	plp
+ .ENDIF
+	rtl
 
 
+; void neo2_gbac_psram_write_test_data(char *src, u16 psramBank, u16 psramOffset, u16 length)
+neo2_gbac_psram_write_test_data:
+.IFDEF CART_TESTS
+    	php
+    	rep     	#$30
+    	phx
+    	phy
+	phb
+
+	lda		14,s		; psramBank
+	sta	tcc__r0		; r0 = bank
+	tax			; x = bank
+	;lsr		a
+	;lsr		a
+	;lsr		a
+	;lsr 		a
+	and #$F0
+	lsr a
+	sep		#$20
+	pha
+	
+    	jsr     	_neo_select_psram
+    	sep		#$20
+    	lda    		#$F8
+    	sta.l  		MYTH_PRAM_ZIO	; PSRAM 8M SIZE
+	LDA    		#GBAC_TO_PSRAM_COPY_MODE
+	STA.L  		MYTH_OPTION_IO
+	lda 		#1
+	sta.l 		MYTH_WE_IO
+	lda		#0
+	sta.l		MYTH_PRAM_BIO
+	
+	LDA    		#$F8
+	STA.L  		MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+	pla
+	STA.L  		MYTH_GBAC_LIO
+	
+	txa						; psramBank lower 8 bits
+	and		#$0F
+	ora		#$40
+	sta.l		$7d0000+_gbac_psram_testdata_write+3
+	
+	rep		#$20
+	lda		16,s			; psramOffset
+	tax
+lsr a
+clc
+adc tcc__r0
+sta tcc__r0
+	lda		18,s			; length
+	lsr		a
+	sta.b		tcc__r4
+	lda		10,s			; src offset
+	tay
+-:
+	lda		tcc__r0
+_gbac_psram_testdata_write:
+	sta.l		$400000,x
+	inc		tcc__r0
+	inx
+	inx
+	iny
+	iny
+	dec		tcc__r4
+	bne		-
+
+	sep		#$20
+  	ldx		#$00E2
+  	ldy		#$D200
+	jsr		_neo_asic_cmd	
+    	jsr		_neo_select_menu
+    	jsr		neo2_post_sd
+    	rep		#$30
+    	
+ 	plb
+ 	ply
+ 	plx
+ 	plp
+ .ENDIF
+	rtl
+    
+    
+; void neo2_gbac_psram_read(char *dest, u16 psramBank, u16 psramOffset, u16 length)
+neo2_gbac_psram_read:
+.IFDEF CART_TESTS
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+
+	lda		14,s		; psramBank
+	tax
+	;lsr		a
+	;lsr		a
+	;lsr		a
+	;lsr 		a
+	and #$F0
+	lsr a
+	sep		#$20
+	pha
+
+    	jsr     	_neo_select_psram
+    	sep		#$20
+    	lda    		#$F0
+    	sta.l  		MYTH_PRAM_ZIO	; PSRAM 8M SIZE
+	LDA    		#GBAC_TO_PSRAM_COPY_MODE
+	STA.L  		MYTH_OPTION_IO
+	lda 		#1
+	sta.l 		MYTH_WE_IO
+	lda		#0
+	sta.l		MYTH_PRAM_BIO
+	LDA    		#$F8
+	STA.L  		MYTH_GBAC_ZIO  	; GBA CARD 8M SIZE
+	pla		
+	STA.L  		MYTH_GBAC_LIO	; LIO = bank>>4
+	
+ 	
+	lda		12,s			; dest bank
+	pha
+	plb
+	txa					; psramBank lower 8 bits
+	and		#$0F
+	ora		#$40
+	sta.l		$7d0000+neo2_gbac_psram_read_op+3
+
+	rep		#$20
+	lda		16,s			; psramOffset
+	tax
+	lda		18,s			; length
+	lsr		a
+	sta.b		tcc__r4
+	lda		10,s			; dest offset
+	tay
+neo2_gbac_psram_read_op:
+	lda.l		$400000,x
+	sta.w		$0000,y
+	inx
+	inx
+	iny
+	iny
+	dec		tcc__r4
+	bne		neo2_gbac_psram_read_op
+
+	sep		#$20
+  	ldx		#$00E2
+  	ldy		#$D200
+	jsr		_neo_asic_cmd	
+    	jsr		_neo_select_menu
+    	jsr		neo2_post_sd
+    	rep		#$30
+    	
+ 	plb
+ 	ply
+ 	plx
+ 	plp
+ .ENDIF
+	rtl
+
+
+       
+         
+; void neo2_sram_read(char *dest, u16 sramBank, u16 sramOffset, u16 length)
+neo2_sram_read:
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+
+	lda		14,s		; sramBank
+	sep		#$20
+	and		#$03
+	ora		#$70
+	sta.l		$7d0000+neo2_sram_read_op+3
+	
+
+        LDA    	#$20      ; OFF A21
+        STA.L	MYTH_GBAC_ZIO
+
+        JSR    	SET_NEOCMC  ; ON_NEO CARD A24 & A25 + SA16 & SA17
+
+        LDA    #$20      ; OFF A21
+        STA    MYTH_GBAC_ZIO
+        LDA     #$00
+        STA.L   MYTH_GBAC_ZIO   ; SET A16~A23
+        STA.L   MYTH_GBAC_HIO   ; SET A24,A25
+        LDA     #$01
+        STA.L   MYTH_EXTM_ON   ; A25,A24 ON
+        LDA     #$04
+        STA.L   MYTH_SRAM_TYPE  ; SET SRAM SAVE TYPE
+        LDA     #$0F
+        STA.L   MYTH_SRAM_MAP  ; SET $700000
+        LDA     #$01
+        STA.L   MYTH_SRAM_WE  ; SRAM ON !  	
+ 
+ 	lda		12,s			; dest bank
+ 	pha
+	plb
+	
+	rep		#$20
+	lda		16,s			; sramOffset
+	tax
+	lda		18,s			; length
+	lsr		a
+	sta.b		tcc__r4
+	lda		10,s			; dest offset
+	tay
+neo2_sram_read_op:
+	lda.l		$700000,x
+	sta.w		$0000,y
+	inx
+	inx
+	iny
+	iny
+	dec		tcc__r4
+	bne		neo2_sram_read_op
+
+	SEP #$20
+	LDA #0
+        STA.L    MYTH_SRAM_TYPE
+        STA.L    MYTH_SRAM_TYPE
+        STA.L    MYTH_SRAM_WE
+         
+    	jsr		_neo_select_menu
+    	jsr		neo2_post_sd
+    	rep		#$30
+    	
+ 	plb
+ 	ply
+ 	plx
+ 	plp
+	rtl
+	
+
+; void neo2_sram_write(char *src, u16 sramBank, u16 sramOffset, u16 length)
+neo2_sram_write:
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+
+	lda		14,s		; sramBank
+	sep		#$20
+	and		#$03
+	ora		#$70
+	sta.l		$7d0000+neo2_sram_write_op+3
+	
+
+        LDA    	#$20      ; OFF A21
+        STA.L	MYTH_GBAC_ZIO
+
+        JSR    	SET_NEOCMC  ; ON_NEO CARD A24 & A25 + SA16 & SA17
+
+        LDA    #$20      ; OFF A21
+        STA    MYTH_GBAC_ZIO
+        LDA     #$00
+        STA.L   MYTH_GBAC_ZIO   ; SET A16~A23
+        STA.L   MYTH_GBAC_HIO   ; SET A24,A25
+        LDA     #$01
+        STA.L   MYTH_EXTM_ON   ; A25,A24 ON
+        LDA     #$04
+        STA.L   MYTH_SRAM_TYPE  ; SET SRAM SAVE TYPE
+        LDA     #$0F
+        STA.L   MYTH_SRAM_MAP  ; SET $700000
+        LDA     #$01
+        STA.L   MYTH_SRAM_WE  ; SRAM ON !  	
+ 
+ 	lda		12,s			; src bank
+ 	pha
+	plb
+	
+	rep		#$20
+	lda		16,s			; sramOffset
+	tax
+	lda		18,s			; length
+	lsr		a
+	sta.b		tcc__r4
+	lda		10,s			; src offset
+	tay
+-:
+	lda.w		$0000,y
+neo2_sram_write_op:
+	sta.l		$700000,x
+	inx
+	inx
+	iny
+	iny
+	dec		tcc__r4
+	bne		-
+
+	SEP #$20
+	LDA #0
+        STA.L    MYTH_SRAM_TYPE
+        STA.L    MYTH_SRAM_TYPE
+        STA.L    MYTH_SRAM_WE
+         
+    	jsr		_neo_select_menu
+    	jsr		neo2_post_sd
+    	rep		#$30
+    	
+ 	plb
+ 	ply
+ 	plx
+ 	plp
+	rtl
+	
+	
+	
+        
 ; void neo2_myth_psram_copy(DWORD dest, DWORD src, DWORD length)
 ;
 .EQU _neo2_myth_psram_copy_save_regs 5
@@ -2117,7 +2493,7 @@ _neo_asic_cmd:
 	sep 	#$20
 	rep		#$10
 
-    jsr    SET_NEOCM5
+    	jsr    SET_NEOCM5
 
 	; E.g. command = 0x370003 (X=0x0037, Y=0x0003):
 	;   Set MYTH_GBAC_LIO = X & 0xE0 (== 0x20)
@@ -2186,9 +2562,9 @@ _neo_select_psram:
 	phy
 
 	lda		#0
-	sta.l	MYTH_OPTION_IO				; set mode 0
+	sta.l		MYTH_OPTION_IO			; set mode 0
 	lda		#$20
-	sta.l	MYTH_GBAC_ZIO				; A21 off
+	sta.l		MYTH_GBAC_ZIO			; A21 off
 
 	ldx		#$00E2
 	ldy		#$1500
@@ -2196,23 +2572,23 @@ _neo_select_psram:
 	
 	ldx		#$0037
 	rep		#$20
-	lda.l 	neo_mode					; enable/disable SD card interface
+	lda.l 		neo_mode			; enable/disable SD card interface
 	ora		#$2203
 	tay
-	jsr		_neo_asic_cmd				; set cr = select menu flash
+	jsr		_neo_asic_cmd			; set cr = select menu flash
 
 	ldx		#$00DA
 	ldy		#$AF44
-	jsr		_neo_asic_cmd				; set iosr = disable game flash
+	jsr		_neo_asic_cmd			; set iosr = disable game flash
 
-	ldx		#$00C4 ;00EE
-	ldy		#$0000 ;0630
-	jsr		_neo_asic_cmd				
+	;ldx		#$00C4 ;00EE
+	;ldy		#$0000 ;0630
+	;jsr		_neo_asic_cmd				
 
 	sep		#$20
 	lda		#0
-	sta.l	MYTH_GBAC_LIO				; clear low bank select reg
-	sta.l	MYTH_GBAC_HIO				; clear high bank select reg	
+	sta.l		MYTH_GBAC_LIO			; clear low bank select reg
+	sta.l		MYTH_GBAC_HIO			; clear high bank select reg	
 	
 	rep		#$30
 	ply
@@ -2220,76 +2596,16 @@ _neo_select_psram:
 	rts
 
 
-; Does the GBAC have PSRAM of its own (e.g. Neo2 Pro)?
-neo2_check_gbac_psram:
-    php
-    rep     #$30
-    phx
-    phy
 
-    jsr     _neo_select_psram
-    sep		#$20
-   	lda    	#$F8
-    sta.l  	MYTH_PRAM_ZIO	; PSRAM 8M SIZE
-	LDA    	#GBAC_TO_PSRAM_COPY_MODE
-	STA.L  	MYTH_OPTION_IO
-	lda 	#1
-	sta.l 	MYTH_WE_IO
-	lda		#10
-	sta.l	MYTH_PRAM_BIO
-	
-    rep     #$20
-
-    ; Calculate the beginning of the Fibonacci series
-    ldx     #0
-    ldy     #8
-    lda     #1
-    sta.l   $400000
-    sta.l   $400000+2        
--:
-    lda.l   $400000,x
-    clc
-    adc.l   $400000+2,x
-    inx
-    inx
-    sta.l   $400000+2,x
-    dey     
-    bne     -
-
-    ; The 4th and 8th entries in the series should be 3 and 21
-    ldx     #0
-    lda.l   $400000+6
-    cmp     #3
-    bne     +
-    lda.l   $400000+14
-    cmp     #21
-    bne     +
-    ldx     #1
-+:
-    txa
-    sta.l   hasGbacPsram
-
-	sep		#$20
-	lda 	#0
-	sta.l 	MYTH_WE_IO
-	lda		#0
-	sta.l	MYTH_PRAM_BIO
-    jsr     _neo_select_menu
-    jsr		neo2_post_sd
-    rep     #$30    
-    ply
-    plx
-    plp
-    rtl
     
     
 ; void neo2_enable_sd(void);
 neo2_enable_sd:
 	sei								; disable interrupts
-	rep		#$30
-	lda		#$0480
+	rep	#$30
+	lda	#$0480
 	sta.l	neo_mode
-	jsr		_neo_select_menu
+	jsr	_neo_select_menu
 	
 	sep     #$20                        ; 8-bit A
    	rep     #$20                        ; 16-bit A
@@ -2300,22 +2616,22 @@ neo2_enable_sd:
 ; void neo2_disable_sd(void);
 neo2_disable_sd:
 	sei								; disable interrupts
-	rep		#$30
-	lda		#0
+	rep	#$30
+	lda	#0
 	sta.l	neo_mode
-	jsr		_neo_select_menu
+	jsr	_neo_select_menu
 	rts
 
 
 ; void neo2_pre_sd(void);
 neo2_pre_sd:
 	sei						; disable interrupts
-	sep		#$20
-	lda		#$87 
+	sep	#$20
+	lda	#$87 
 	sta.l	MYTH_GBAC_LIO
 
-    lda    	#$F8
-    sta.l  	MYTH_PRAM_ZIO	; PSRAM 8M SIZE
+    	lda    	#$F8
+    	sta.l  	MYTH_PRAM_ZIO	; PSRAM 8M SIZE
 	LDA    	#GBAC_TO_PSRAM_COPY_MODE
 	STA.L  	MYTH_OPTION_IO
 	LDA    	#$F8
@@ -2324,14 +2640,14 @@ neo2_pre_sd:
 	lda 	#1
 	sta.l 	MYTH_WE_IO
 
-	rep		#$20
+	rep	#$20
 	rts
 
 
 ; void neo2_post_sd(void);
 neo2_post_sd:
-	sep		#$20
-	lda		#0
+	sep	#$20
+	lda	#0
 	sta.l	MYTH_GBAC_LIO
 
 	LDA    	#0
@@ -2342,7 +2658,7 @@ neo2_post_sd:
 	lda 	#0
 	sta.l 	MYTH_WE_IO
 	
-	rep		#$20
+	rep	#$20
 	rts
 
 
@@ -2494,55 +2810,65 @@ neo2_recv_sd_psram_multi:
 	lda		_neo2_recv_sd_psram_multi_count,s
 	tay
 	sep		#$20
-	lda		_neo2_recv_sd_psram_multi_prbank,s	
-	sta.l	$7d0000+_nrsdpm_write+3
+	;lda		_neo2_recv_sd_psram_multi_prbank,s	
+	;sta.l		$7d0000+_nrsdpm_write+3
+lda.l	$7d0000+_disk_readprm_jump_to_psram+3 
+pha
+plb
+lda	#$E8			; $E8 = INX
+xba
+lda	_neo2_recv_sd_psram_multi_prbank,s
+rep 	#$20
+sta.w _nrsdpm_write+3
+sep #$20
 
-	lda		#$40
+	lda		#$C0
 	pha
 	plb
 	
 _nrsdpm_sectors:
 	phy
-	sep 	#$20
+	sep 		#$20
 	ldy		#$1024
 -:									; Wait for start bit
-	lda.w	$6061
+	lda.w		$6061
 	and		#1
 	beq		+
 	dey
 	bne		-
 	; Timeout
 	ply
-	stz.b	tcc__r0					; FALSE
-	jmp.w	_nrsdpm_return
+	stz.b		tcc__r0					; FALSE
+	jmp.w		_nrsdpm_return
 +:
 
 	ldy		#256					; words per sector
 _nrsdpm_loop_inner:
 	sep		#$20
-	lda.w	$6061					; Read high nybble of low byte (D)
+	lda.w		$6061					; Read high nybble of low byte (D)
 	asl		a	
 	asl		a	
 	asl		a	
 	asl		a						; A = %DDDD0000					
 	sta		tcc__r0	
-	lda.w	$6061					; Read low nybble of low byte (s)
+	lda.w		$6061					; Read low nybble of low byte (s)
 	and		#$0F
 	ora		tcc__r0
 	xba
 	
-	lda.w	$6061					; Read high nybble of high byte 
+	lda.w		$6061					; Read high nybble of high byte 
 	asl		a	
 	asl		a	
 	asl		a	
 	asl		a
 	sta		tcc__r0	
-	lda.w	$6061					; Read low nybble of low byte (s)
+	lda.w		$6061					; Read low nybble of low byte (s)
 	and		#$0F
 	ora		tcc__r0
 	xba
 	rep		#$20
 
+; THIS LABEL MUST BE LOCATED AT AN ODD ADDRESS
 _nrsdpm_write:
 	sta.l $500000,x					; Write 16 bits to PSRAM
 	inx
@@ -2560,10 +2886,16 @@ _nrsdpm_write:
 
 	cpx		#0						; has proffs wrapped around (i.e. should we move to the next bank) ?
 	bne		+
-	lda.l	$7d0000+_nrsdpm_write+3
+phb
+lda.l	$7d0000+_disk_readprm_jump_to_psram+3 
+pha
+plb
+rep #$20
+	lda.w	_nrsdpm_write+3
 	ina
-	sta.l	$7d0000+_nrsdpm_write+3
-
+	sta.w	_nrsdpm_write+3
+sep #$20
+plb
 +:
 
 	ply								; count
@@ -2584,7 +2916,7 @@ _nrsdpm_return:
 	plp
 	rts
 
-;nop	
+nop	
 	
 
 .DEFINE RECV_SD_OFS $DE0000
@@ -2603,36 +2935,67 @@ neo2_recv_sd_psram_multi_hwaccel:
 	phy
 	phb
 
-;jsr show_copied_data
-;-: bra -
-
 	lda		_neo2_recv_sd_psram_multi_hwaccel_proffs,s
 	tax
 	lda		_neo2_recv_sd_psram_multi_hwaccel_count,s
 	tay
 	sep		#$20
+	;lda		#$01
+	;sta.l	REG_MEMSEL	
+_nrsdpmhw_selfmod_bank1:	
+	lda.l	$7d0000+_disk_readprm_jump_to_psram+3 
+	pha
+	plb
 	lda		#$AD					; $AD = LDA Abs
 	xba
 	lda		_neo2_recv_sd_psram_multi_hwaccel_prbank,s
-	rep #$20
-	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB0+3
-	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB1+3
-	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB2+3
-	eor		#$4500  				; Set high byte = $E8 = INX
-	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB3+3
-	sep		#$20
+	rep 	#$20
+	sta.w	_nrsdpmhw_writeB00+3
+	sta.w	_nrsdpmhw_writeB01+3
+	sta.w	_nrsdpmhw_writeB02+3
+	sta.w	_nrsdpmhw_writeB03+3
+	sta.w	_nrsdpmhw_writeB04+3
+	sta.w	_nrsdpmhw_writeB05+3
+	sta.w	_nrsdpmhw_writeB06+3
+	sta.w	_nrsdpmhw_writeB07+3
+	sta.w	_nrsdpmhw_writeB08+3
+	sta.w	_nrsdpmhw_writeB09+3
+	sta.w	_nrsdpmhw_writeB0a+3
+	sta.w	_nrsdpmhw_writeB0b+3
+	sta.w	_nrsdpmhw_writeB0c+3
+	sta.w	_nrsdpmhw_writeB0d+3
+	sta.w	_nrsdpmhw_writeB0e+3
+
+	sta.w	_nrsdpmhw_writeB0f+3
+
+	sta.w	_nrsdpmhw_writeB10+3
+	sta.w	_nrsdpmhw_writeB11+3
+	sta.w	_nrsdpmhw_writeB12+3
+	sta.w	_nrsdpmhw_writeB13+3
+	sta.w	_nrsdpmhw_writeB14+3
+	sta.w	_nrsdpmhw_writeB15+3
+	sta.w	_nrsdpmhw_writeB16+3
+	sta.w	_nrsdpmhw_writeB17+3
+	sta.w	_nrsdpmhw_writeB18+3
+	sta.w	_nrsdpmhw_writeB19+3
+	sta.w	_nrsdpmhw_writeB1a+3
+	sta.w	_nrsdpmhw_writeB1b+3
+	sta.w	_nrsdpmhw_writeB1c+3
+	sta.w	_nrsdpmhw_writeB1d+3
+	sta.w	_nrsdpmhw_writeB1e+3
+		
+	eor	#$6F00  				; Set high byte = $C2 = REP
+	sta.w	_nrsdpmhw_writeB1f+3
+	sep	#$20
 	
-	lda		#$01
-	sta.l	REG_MEMSEL
-	
-	lda		#$C0
+	lda	#$C0
 	pha
 	plb
 	
 _nrsdpmhw_sectors:
 	phy
 	sep 	#$20
-	ldy		#$1024
+	ldy	#$1024
 -:									; Wait for start bit
 	lda.w	$6061
 	and		#1
@@ -2645,85 +3008,237 @@ _nrsdpmhw_sectors:
 	jmp.w	_nrsdpmhw_return
 +:
 
-	sep		#$20
-	lda		#SDBUF_HI_LO
+	sep	#$20
+	lda	#SDBUF_HI_LO
 	sta.l	MYTH_SDBUF_IO			; Enter 4+4 buffered mode
-	
-	ldy		#128					; dwords per sector
+
+	clc
+
+	ldy		#16						; qwords per sector
 _nrsdpmhw_loop_inner:
 	lda.w 	$6063
 	lda.w 	$6063
 ; NOTE: THIS LABEL MUST BE LOCATED ON AN ODD ADDRESS
-_nrsdpmhw_writeB0:
+_nrsdpmhw_writeB00:
 	sta.l 	$500000,x				; Write 8 bits to PSRAM
-	;inx
 	lda.w 	$6063
 	lda.w 	$6063
-_nrsdpmhw_writeB1:
+_nrsdpmhw_writeB01:
 	sta.l 	$500001,x				; Write 8 bits to PSRAM
-	;inx
 	lda.w 	$6063
 	lda.w 	$6063
-_nrsdpmhw_writeB2:
+_nrsdpmhw_writeB02:
 	sta.l 	$500002,x				; Write 8 bits to PSRAM
-	;inx
 	lda.w 	$6063
 	lda.w 	$6063
-_nrsdpmhw_writeB3:
+_nrsdpmhw_writeB03:
 	sta.l 	$500003,x				; Write 8 bits to PSRAM
-	inx
-inx
-inx
-inx
-	dey
-	bne		_nrsdpmhw_loop_inner	; repeat 256 times
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB04:
+	sta.l 	$500004,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB05:
+	sta.l 	$500005,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB06:
+	sta.l 	$500006,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB07:
+	sta.l 	$500007,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB08:
+	sta.l 	$500008,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB09:
+	sta.l 	$500009,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB0a:
+	sta.l 	$50000a,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB0b:
+	sta.l 	$50000b,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB0c:
+	sta.l 	$50000c,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB0d:
+	sta.l 	$50000d,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB0e:
+	sta.l 	$50000e,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB0f:
+	sta.l 	$50000f,x				; Write 8 bits to PSRAM
 
-	lda		#SDBUF_OFF
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB10:
+	sta.l 	$500010,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB11:
+	sta.l 	$500011,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB12:
+	sta.l 	$500012,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB13:
+	sta.l 	$500013,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB14:
+	sta.l 	$500014,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB15:
+	sta.l 	$500015,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB16:
+	sta.l 	$500016,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB17:
+	sta.l 	$500017,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB18:
+	sta.l 	$500018,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB19:
+	sta.l 	$500019,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB1a:
+	sta.l 	$50001a,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB1b:
+	sta.l 	$50001b,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB1c:
+	sta.l 	$50001c,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB1d:
+	sta.l 	$50001d,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB1e:
+	sta.l 	$50001e,x				; Write 8 bits to PSRAM
+	lda.w 	$6063
+	lda.w 	$6063
+_nrsdpmhw_writeB1f:
+	sta.l 	$50001f,x				; Write 8 bits to PSRAM
+	
+	rep 	#$20
+	txa
+	adc 	#32
+	tax
+	sep 	#$20
+
+	dey
+	beq +
+	jmp _nrsdpmhw_loop_inner
+	+:
+
+	lda	#SDBUF_OFF
 	sta.l	MYTH_SDBUF_IO			; Exit 4+4 mode
 	
 	; Read 8 CRC bytes (16 nybbles)
 	.rept 16
-	lda.l	MYTH_NEO2_RD_DAT4
+	lda.w	$6061 ;MYTH_NEO2_RD_DAT4
 	.endr
 
-	lda.l	MYTH_NEO2_RD_DAT4		; end bit
+	lda.w	$6061 					; end bit
 
 	cpx		#0						; has proffs wrapped around (i.e. should we move to the next bank) ?
 	bne		+
-rep #$20
-	lda.l	RECV_SD_OFS+_nrsdpmhw_writeB0+3
+	sep		#$20
+	phb
+_nrsdpmhw_selfmod_bank2:
+	lda.l	$7d0000+_disk_readprm_jump_to_psram+3 ;#$7E
+	;lda #$DF
+	pha
+	plb
+	rep 	#$20
+	lda.w	_nrsdpmhw_writeB00+3
 	ina
-	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB0+3
-	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB1+3
-	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB2+3
-	lda.l	RECV_SD_OFS+_nrsdpmhw_writeB3+3
-	ina
-	sta.l	RECV_SD_OFS+_nrsdpmhw_writeB3+3
-sep #$20
+	sta.w	_nrsdpmhw_writeB00+3
+	sta.w	_nrsdpmhw_writeB01+3
+	sta.w	_nrsdpmhw_writeB02+3
+	sta.w	_nrsdpmhw_writeB03+3
+	sta.w	_nrsdpmhw_writeB04+3
+	sta.w	_nrsdpmhw_writeB05+3
+	sta.w	_nrsdpmhw_writeB06+3
+	sta.w	_nrsdpmhw_writeB07+3
+	sta.w	_nrsdpmhw_writeB08+3
+	sta.w	_nrsdpmhw_writeB09+3
+	sta.w	_nrsdpmhw_writeB0a+3
+	sta.w	_nrsdpmhw_writeB0b+3
+	sta.w	_nrsdpmhw_writeB0c+3
+	sta.w	_nrsdpmhw_writeB0d+3
+	sta.w	_nrsdpmhw_writeB0e+3
+
+	sta.w	_nrsdpmhw_writeB0f+3
+
+	sta.w	_nrsdpmhw_writeB10+3
+	sta.w	_nrsdpmhw_writeB11+3
+	sta.w	_nrsdpmhw_writeB12+3
+	sta.w	_nrsdpmhw_writeB13+3
+	sta.w	_nrsdpmhw_writeB14+3
+	sta.w	_nrsdpmhw_writeB15+3
+	sta.w	_nrsdpmhw_writeB16+3
+	sta.w	_nrsdpmhw_writeB17+3
+	sta.w	_nrsdpmhw_writeB18+3
+	sta.w	_nrsdpmhw_writeB19+3
+	sta.w	_nrsdpmhw_writeB1a+3
+	sta.w	_nrsdpmhw_writeB1b+3
+	sta.w	_nrsdpmhw_writeB1c+3
+	sta.w	_nrsdpmhw_writeB1d+3
+	sta.w	_nrsdpmhw_writeB1e+3
+		
+	eor	#$6F00  				; Set high byte = $C2 = REP
+	sta.w	_nrsdpmhw_writeB1f+3
+	sep 	#$20
+	plb
 +:
 
-	ply								; count
+	ply						; count
 	dey
 	beq		+
 	jmp.w	_nrsdpmhw_sectors
 +:
 	rep		#$20
 	lda		#1
-	sta		tcc__r0					; TRUE
+	sta		tcc__r0				; TRUE
 	
 _nrsdpmhw_return:
 	plb
-	
+
 	;jsr.w show_copied_data
-	
-	sep		#$20
-	lda		#$00
-	sta.l	REG_MEMSEL
 
 	ply
 	plx
 	plp
 	rts
+	
 	
 	
 
@@ -2733,9 +3248,9 @@ neo2_recv_sd_multi:
 
 
 jsr_r10:
-	rep #$20
-    lda.b tcc__r10
-    dec a
+    rep 	#$20
+    lda.b 	tcc__r10
+    dec 	a
     pha
     rts
 
@@ -2764,7 +3279,7 @@ jsr_r10:
 
 run_game_from_sd_card:
 	jsl		clear_status_window
-	jsl		update_screen
+	;jsl		update_screen
 
 	sep		#$20
 
@@ -2775,8 +3290,8 @@ run_game_from_sd_card:
 	lda.l	romAddressPins
 	sta		tcc__r2h
 
-	lda.l	useGbacPsram
-	bne		+
+;	lda.l	useGbacPsram
+;	bne		+
 	LDA    	#$20      	; OFF A21
 	STA.L  	MYTH_GBAC_ZIO
 	JSR    	SET_NEOCMA  	;
@@ -2784,6 +3299,7 @@ run_game_from_sd_card:
 	JSR    	SET_NEOCMC  	; ON_NEO CARD A24 & A25 + SA16 & SA17
 
 	LDA.L   romAddressPins+1
+lda #0
 	STA.L   MYTH_GBAC_HIO	; SET AH25,AH25
 
 	LDA     #$01
@@ -2976,8 +3492,8 @@ MOV_SD_PSRAM_DONE:
 ;-------------------------------------------------------------------------------
 ;neo gba card menu ,swap back to power on mode
 
-	lda.l	useGbacPsram
-	bne		+
+;	lda.l	useGbacPsram
+;	bne		+
 	 LDA     #MAP_MENU_FLASH_TO_ROM	; SET GBA CARD RUN
 	 STA.L   MYTH_OPTION_IO
 
@@ -3164,8 +3680,6 @@ _RUN_M01:
         
 	
 .include "diskio_asm.inc"
-
-;.include "inflate.asm"
 
 ram_code_end:
 
