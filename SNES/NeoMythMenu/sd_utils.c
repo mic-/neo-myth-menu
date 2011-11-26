@@ -94,8 +94,13 @@ u16 count_games_on_sd_card()
                 buf->fsize = sdFileInfo.fsize;
                 buf->fattrib = sdFileInfo.fattrib;
 
-                if ((strstri(".SMC", sdFileInfo.fname) > 0) ||
-                   (strstri(".BIN", sdFileInfo.fname) > 0))
+				if (buf->fattrib & AM_DIR)
+				{
+					buf->ftype = 0;
+				}
+                else if ((strstri(".SMC", sdFileInfo.fname) > 0) ||
+                         (strstri(".SFC", sdFileInfo.fname) > 0) ||
+                         (strstri(".BIN", sdFileInfo.fname) > 0))
                 {
                     buf->ftype = GAME_MODE_NORMAL_ROM;
                 }

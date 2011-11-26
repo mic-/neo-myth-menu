@@ -1,7 +1,8 @@
 ; Assembly optimized pff routines
-; /Mic, 2010
+; /Mic, 2010-2011
 
 .include "hdr.asm"
+.include "snes_io.inc"
 
 .equ FATFS_fs_type 0
 .equ FATFS_csize 1
@@ -193,6 +194,15 @@ pf_read_1mbit_to_psram_asm:
 	jmp		_pr1pa_return
 +:
 
+	sep		#$20
+lda.l cpID
+cmp #3
+bcc +
+	lda		#$01
+	sta.l	REG_MEMSEL
++:
+	rep		#$20
+
 	; basesect = clust2sect(fs->curr_clust)
 	ldy		#FATFS_curr_clust+2
 	lda		[tcc__r2],y
@@ -216,6 +226,9 @@ pf_read_1mbit_to_psram_asm:
 
 	lda		#256
 	sta.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_numSects
+	
+	jml 	$800000+_pr1pa_while_numSects
+
 _pr1pa_while_numSects:
 
 	lda		_pf_read_1mbit_to_psram_asm_recalcsector,s
@@ -383,26 +396,36 @@ _pr1pa_no_recalc:
 	lda		#1
 	sta		_pf_read_1mbit_to_psram_asm_recalcsector,s
 
-;	lda		_pf_read_1mbit_to_psram_asm_prbank,s
-;	cmp		#$5F
-;	bne		+
-;	jmp.w	_pr1pa_read_single_sector
-;+:
-
+	lda		#$00DF
+	sta		tcc__r1h
+	lda		#$8000
+	sta		tcc__r1
+	
 	lda		_pf_read_1mbit_to_psram_asm_prbank,s
-	cmp		#$5F
+	cmp		#$DF 
 	bcc		+
 	lda		_pf_read_1mbit_to_psram_asm_proffs,s
 	cmp		#$8000
 	bcc		+
-	jmp.w	_pr1pa_read_single_sector
+	;jmp.w	_pr1pa_read_single_sector
+	sep		#$20
+	; Make the diskio / transfer loop code execute from WRAM instead of from PSRAM
+	; for the last 32 kB of the current MByte, since we'll be overwriting that
+	; memory with file data now.
+	lda		#$7E
+	sta.l	$7d0000+_disk_readprm_jump_to_psram+3
+	rep		#$20
+	lda		#$00E0
+	sta		tcc__r1h
+	stz		tcc__r1
 +:
-	
+
 	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
 	cmp		#3
 	bcs		+
 	jmp.w	_pr1pa_read_single_sector
 +:
+
 	; if (remSectInClust > numSects) remSectInClust = numSects
 	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_numSects
 	ina
@@ -429,28 +452,19 @@ _pr1pa_no_recalc:
 	lda		_pf_read_1mbit_to_psram_asm_prbank,s
 	adc		tcc__r0h
 	sta		tcc__r0h
-	cmp		#$5F ;60
+	cmp		tcc__r1h ;#$DF 
 	bcc		+
-	; Take the number of overshooting sectors plus one, and subtract that from remSectInClust
-;	lda		tcc__r0
-;	.rept 9
-;	lsr		a
-;	.endr
-;	ina
-;	sta		tcc__r1
-;	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
-;	sec
-;	sbc		tcc__r1
-;	bpl		++
-;	jmp.w	_pr1pa_read_single_sector
-
-	sec
 	lda		tcc__r0
-	sbc		#$8000
+	cmp		tcc__r1
+	bcc		+
+	; remSectInClust = (end_address - 0xDF8000) / 512
+	sec
+	;lda		tcc__r0
+	sbc		tcc__r1 ;#$8000
 	sta		tcc__r0
 	lda		tcc__r0h
-	sbc		#$5F
-  bmi +
+	sbc		tcc__r1h ;#$DF ;5F
+  	bmi +
 	sta		tcc__r0h
 	.rept 9
 	lsr		tcc__r0h
@@ -527,7 +541,6 @@ _pr1pa_no_recalc:
 	adc		tcc__r0
 	sta		[tcc__r2],y
 	rep		#$20
-
 
 	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
 	sta		tcc__r0
@@ -684,6 +697,14 @@ _pr1pa_while_numSects_next:
 	stz		tcc__r0			; FR_OK
 _pr1pa_return:
 
+	sep		#$20
+	lda		#$DF
+	sta.l	$7d0000+_disk_readprm_jump_to_psram+3
+	
+	lda		#$00
+	sta.l	REG_MEMSEL
+	rep		#$20
+	
 	ply
 	plx
 	plp

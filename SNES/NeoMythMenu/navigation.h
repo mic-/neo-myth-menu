@@ -26,6 +26,8 @@ enum
 
 	MID_VGM_PLAY_MENU,
 
+	MID_CART_TEST_MENU,
+
 
 	MID_LAST_MENU
 };

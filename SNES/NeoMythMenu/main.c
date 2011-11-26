@@ -1,5 +1,5 @@
 // SNES Myth Shell
-// C version 0.55
+// C version 0.56
 //
 // Mic, 2010-2011
 
@@ -33,7 +33,7 @@ extern u8 font[];
 u8 cardModel, cpID;
 u16 romAddressPins;
 u8 gameMode;
-u8 romSize, romRunMode, sramSize, sramBank, sramMode;
+u8 romSize, romRunMode=1, sramSize, sramBank, sramMode;
 u8 extDsp, extSram;
 u16 neo_mode = 0;
 
@@ -247,6 +247,15 @@ void print_highlighted_game_info()
 
 	// Print DSP type
 	print_meta_string((pGame[5] >> 4) + 50);
+
+	// DEBUG
+	/*print_hex(sramMode,4, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+	print_hex(extSram,4, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+	print_hex(extDsp,4, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+	print_hex(sramBank,4, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+	print_hex(romRunMode,7, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+	print_hex(romSize,10, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));*/
+
 }
 
 
@@ -368,10 +377,10 @@ void print_games_list()
 					attrib = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE);
 					if (gamesList.highlighted == gamesList.firstShown + i)
 					{
-						strcpy(highlightedFileName, fit.sfn); //&sdFileInfo.fname[0]);
-						highlightedFileSize = fit.fsize; //sdFileInfo.fsize;
+						strcpy(highlightedFileName, fit.sfn);
+						highlightedFileSize = fit.fsize;
 						attrib = TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE);
-						if (fit.fattrib & AM_DIR) //sdFileInfo.fattrib & AM_DIR)
+						if (fit.fattrib & AM_DIR)
 						{
 							highlightedIsDir = 1;
 						}
@@ -513,29 +522,7 @@ void run_game_from_gba_card_c()
 		return;
 	}
 
-	/*for (i = 0; i < MAX_GG_CODES * 2; i++)
-	{
-		if (ggCodes[i].used == CODE_TARGET_RAM)
-		{
-			anyRamCheats = 1;
-		}
-		else
-		{
-			ggCodes[i].bank &= 0x3f;
-		}
-		if (romRunMode == 1)
-		{
-			// Convert LOROM addresses to file offsets
-			if (ggCodes[i].used == CODE_TARGET_ROM)
-			{
-				ggCodes[i].offset &= 0x7fff;
-				if (ggCodes[i].bank & 1) ggCodes[i].offset |= 0x8000;
-				ggCodes[i].bank >>= 1;
-			}
-		}
-	}*/
 	calc_gg_code_addresses();
-
 
 	run_game();
 }
@@ -729,7 +716,7 @@ void play_spc_from_sd_card_c()
 	prbank = 0x50;
 	proffs = 0;
 	progress = 1;
-	for (i = 0; i < 129; i++)
+	for (i = 0; i < 130; i++)
 	{
 		if (progress)
 		{
@@ -787,6 +774,10 @@ void get_sram_size_mode(romLayout_t layout)
 			{
 				sramMode = 5;
 			}
+		}
+		else
+		{
+			sramMode = 1;
 		}
 	}
 	if (sramMode == 0) sramSize = 0;
@@ -851,6 +842,8 @@ void run_game_from_sd_card_c()
 	static DWORD unzippedSize;
 	static u8 *myth_pram_bio = (u8*)0xC006;
 	romLayout_t layout;
+void (*psram_read)(char*, u16, u16, u16);
+//static u8 *crcptr;
 
 	if (highlightedIsDir)
 	{
@@ -874,6 +867,7 @@ void run_game_from_sd_card_c()
 	}
 
 	if ((strstri(".SMC", highlightedFileName) > 0) ||
+	    (strstri(".SFC", highlightedFileName) > 0) ||
 	    (strstri(".BIN", highlightedFileName) > 0))
 	{
 		gameMode = GAME_MODE_NORMAL_ROM;
@@ -928,9 +922,16 @@ void run_game_from_sd_card_c()
 	// Disable these for the time being
 	extDsp = 0;
 	extSram = 0;
-	sramBank = 0;
+
+	// These are set by get_sram_size_mode
 	sramSize = 0;
 	sramMode = 0;
+
+	sramBank = 0;
+	if (sramBankOverride != -1)
+	{
+		sramBank = sramBankOverride;
+	}
 
 	if (gameMode == GAME_MODE_NORMAL_ROM)
 	{
@@ -948,6 +949,7 @@ void run_game_from_sd_card_c()
 		return;
 	}
 
+
 	recalcSector = 1;
 	if (gameMode == GAME_MODE_NORMAL_ROM)
 	{
@@ -964,7 +966,7 @@ void run_game_from_sd_card_c()
 			// Skip the sector calculation on the first read after the seek
 			recalcSector = 0;
 		}
-		prbank = 0x50;
+		prbank = 0xD0; //0x50;
 		mythprbank = 0;
 	}
 	else
@@ -977,6 +979,13 @@ void run_game_from_sd_card_c()
 	{
 		if (highlightedFileSize & 0x1FF) sects++;
 	}
+
+// DEBUG
+/*print_hex(romSize,14, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+print_hex(sramSize,14, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+print_hex(sramMode,14, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+print_hex(romRunMode,14, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+update_screen();*/
 
 	proffs = 0;
 	i = mbits;
@@ -998,9 +1007,9 @@ void run_game_from_sd_card_c()
 
 		sects -= 256;
 		prbank += 2;
-		if (prbank == 0x60)
+		if (prbank == 0xE0)
 		{
-			prbank = 0x50;
+			prbank = 0xD0;
 			mythprbank++;
 			if (sects) psram_write((char*)0x7E9000, (mythprbank<<4)|0x0F, 0x9000, 0x2800);
 			*myth_pram_bio = mythprbank;
@@ -1008,8 +1017,10 @@ void run_game_from_sd_card_c()
 		i--;
 	}
 
+	// Load any remaining sectors (for ROMs with odd sizes)
 	if (sects)
 	{
+		prbank -= 0x80;
 		show_loading_progress();
 
 		// Load any remaining sectors
@@ -1073,7 +1084,7 @@ void run_game_from_sd_card_c()
 	{
 		MAKE_RAM_FPTR(mirror_psram, neo2_myth_psram_copy);
 
-		romSize = 0x0B;
+		romSize = 0x0B;	// 0xB == 32Mbit
 
 		printxy("Mirroring..     ", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
 		update_screen();
@@ -1087,6 +1098,51 @@ void run_game_from_sd_card_c()
 	else if (mbits == 0)
 	{
 
+	}
+
+	if (doRegionPatch != 0)
+	{
+		printxy("Fixing region.. ", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+		update_screen();
+	}
+
+
+// DEBUG
+/*MAKE_RAM_FPTR(psram_read, neo2_myth_psram_read);
+psram_read(snesRomInfo, 0x00, 0x8000, 0x20);
+print_hex(snesRomInfo[0], 6, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+print_hex(snesRomInfo[1], 8, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+print_hex(snesRomInfo[2], 10, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+print_hex(snesRomInfo[3], 12, 17, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+update_screen();
+while (1) {}*/
+
+//DEBUG
+/*
+MAKE_RAM_FPTR(psram_read, neo2_myth_psram_read);
+mbits = 0;
+crcptr = (u8*)gbaCardAlphabeticalIdx;
+for (prbank=0; prbank<0x60; prbank++)
+{
+	proffs = 0;
+	do {
+		psram_read(crcptr, prbank, proffs, 0x100);
+		for (i=0; i<0x100; i++)
+		{
+			mbits += crcptr[i];
+		}
+		proffs += 0x100;
+	} while (proffs);
+}
+print_hex(mbits>>8, 4, 19, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+print_hex(mbits, 6, 19, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+update_screen();
+while (1) {}
+*/
+
+	if (layout==LAYOUT_HIROM && mbits>32)
+	{
+		romRunMode = 2;  // ExHIROM
 	}
 
 	run_game();
@@ -1396,7 +1452,6 @@ int main()
 	int i;
 	u16 keys;
 
-	DWORD (*pfninflate)(DWORD, DWORD);
 	void (*check_gbac_psram)();
 
 	static DIR dir;
@@ -1415,10 +1470,12 @@ int main()
 	// Use a faster SD->PSRAM transfer mode if the firmware supports it
 	if (cpID >= 4)
 	{
+		// ~160-175 kB/s
 		MAKE_RAM_FPTR(recv_sd_psram_multi, neo2_recv_sd_psram_multi_hwaccel);
 	}
 	else
 	{
+		// ~75-80 kB/s
 		MAKE_RAM_FPTR(recv_sd_psram_multi, neo2_recv_sd_psram_multi);
 	}
 
@@ -1429,6 +1486,8 @@ int main()
 	/*MAKE_RAM_FPTR(check_gbac_psram, neo2_check_gbac_psram);
 	check_gbac_psram();
 	useGbacPsram = hasGbacPsram;*/
+
+	sramBankOverride = -1;
 
 	REG_DISPCNT = 0x80;				// Turn screen off
 
@@ -1445,9 +1504,6 @@ int main()
 	clear_screen();
 	switch_to_menu(MID_MAIN_MENU, 0);
 	update_screen();
-
-	//MAKE_RAM_FPTR(pfninflate, inflate);
-	//pfninflate(0x7F4000, 0x413c7b); //vgzfile+10);
 
 	REG_BGCNT = 3;			// Enable BG0 and BG1
 
