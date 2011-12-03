@@ -153,6 +153,7 @@ FRESULT pf_open (const char*);			/* Open a file */
 FRESULT pf_read (void*, WORD, WORD*);	/* Read data from a file */
 FRESULT pf_read_sect_to_psram (WORD, WORD, WORD);	/* Read data from a file */
 FRESULT pf_read_1mbit_to_psram (WORD, WORD, WORD);	/* Read data from a file */
+FRESULT pf_write (const void*, WORD, WORD*);	/* Write data to the open file */
 FRESULT pf_lseek (DWORD);				/* Move file pointer of a file object */
 FRESULT pf_opendir (DIR*, const char*);	/* Open an existing directory */
 FRESULT pf_readdir (DIR*, FILINFO*);	/* Read a directory item */
@@ -169,7 +170,10 @@ extern FRESULT pf_read_1mbit_to_psram_asm (WORD, WORD, WORD, WORD);	/* Read data
 #define	FA_READ		0x01
 #define	FA_STREAM	0x40
 #define	FA__ERROR	0x80
-
+/*FA_STREAM*/
+#define	FA__WIP		0x40
+#define	FA_OPENED	0x01
+#define FR_NOT_OPENED 0x00
 
 /* FAT sub type (FATFS.fs_type) */
 

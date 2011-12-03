@@ -15,19 +15,18 @@ enum
 	MID_AR_ENTRY_MENU,                      // Action Replay code entry menu.
 	MID_AR_EDIT_MENU,                       // Same screen as AR_ENTRY_MENU, but now the user is editing a code.
 	MID_CHEAT_DB_MENU,
-	MID_CHEAT_DB_NO_CODES_MENU,    		 // The menu shown when the user presses Select and no cheats are found in the database for
-										 // the highlighted game.
+	MID_CHEAT_DB_NO_CODES_MENU,    		 	// The menu shown when the user presses Select and no cheats are found in the database for
+											// the highlighted game.
 	MID_ROM_INFO_MENU,
 
-
-	MID_SD_ERROR_MENU,
-	MID_SD_INFO_MENU,
-
+	MID_SD_ERROR_MENU,						// The menu screen used for displaying SD card operation error info
+	MID_SD_INFO_MENU,						// The menu screen used for displaying information abou the SD card
 
 	MID_VGM_PLAY_MENU,
 
-	MID_CART_TEST_MENU,
+	MID_CART_TEST_MENU,						// Cart self-tests (PSRAM, SRAM, ZIPRAM). Not enabled in nformal builds
 
+	MID_DUMP_MENU,
 
 	MID_LAST_MENU
 };

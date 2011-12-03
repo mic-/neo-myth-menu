@@ -1,6 +1,6 @@
 ; VGM (SN76489) player for the SPC-700
 ; Extended version used in "The 700 Club" musicdisk
-; /Mic, 2010
+; /Mic, 2010-2011
 ; 
 ; Assemble with wla-dx
 
@@ -178,11 +178,11 @@ loop_song:
 +:
 	mov		a,#<(vgm_file+28)
 	mov		y,#>(vgm_file+28)
-	movw	VGM_PTR,ya
+	movw		VGM_PTR,ya
 	mov		a,!vgm_file+28
 	mov		y,!vgm_file+29
-	addw	ya,VGM_PTR
-	movw	VGM_PTR,ya			; VGM_PTR = &vgm_file[0x1C] + vgm_file[0x1C];  // The word at 0x1C holds the loop offset
+	addw		ya,VGM_PTR
+	movw		VGM_PTR,ya		; VGM_PTR = &vgm_file[0x1C] + vgm_file[0x1C];  // The word at 0x1C holds the loop offset
 	mov		NUM_FLAGS,#0		; Reset the decompression flags
 	jmp		!play	
 
@@ -236,6 +236,9 @@ set_coefs:
 
 .ORGA $0300
 
+; Should run at ~23.22 cycles/sample average
+
+
 start:
 	clrp
 	mov		x,#$F0
@@ -259,47 +262,48 @@ start:
 	mov		CHN2TOGGLE,#255
 	mov		CHN3TOGGLE,#255
 
-  mov NSAMPLES_LATE,#0
-  mov NSAMPLES_LATE+1,#0
+  	mov 		NSAMPLES_LATE,#0
+  	mov 		NSAMPLES_LATE+1,#0
   
 	mov		LAST_BYTE,#$CD
 	
-	call	!stop
+	call		!stop
 
 	mov		SPC_PORT0,LAST_BYTE
 
 play:
 	; Has a new command arrived from the S-CPU?
-	mov		a,LAST_BYTE
-	cmp		a,SPC_PORT0
-	bne		+
-	jmp		!no_new_command			; Nope
+	mov		a,LAST_BYTE		; 3
+	cmp		a,SPC_PORT0		; 3
+	bne		+			; 2/4
+	jmp		!no_new_command		; 3. Nope
 +:
-	mov		a,SPC_PORT1
-	mov		LAST_BYTE,SPC_PORT0
-	cmp		a,#CMD_PLAY				; Was it a Play command?
-	bne		+
-	call	!prepare
+	; 10 cycles spent
+	mov		a,SPC_PORT1		; 3
+	mov		LAST_BYTE,SPC_PORT0	; 5
+	cmp		a,#CMD_PLAY		; 2. Was it a Play command?
+	bne		+			; 2/4
+	call		!prepare		; 8
 	;mov		SPC_PORT0,LAST_BYTE		; Echo back to the S-CPU
-	bra		processed_command ;no_new_command
+	bra		processed_command 
 +:
 	cmp		a,#CMD_PAUSE			; Was it a Pause command?
 	bne		+
-	call	!pause
+	call		!pause
 	;mov		SPC_PORT0,LAST_BYTE
-	bra		processed_command ;no_new_command
+	bra		processed_command 
 +:
 	cmp		a,#CMD_TOGGLE_ECHO
 	bne		+
 	eor		USECHO,#$20
-	call	!stop
-	call	!prepare
+	call		!stop
+	call		!prepare
 	;mov		SPC_PORT0,LAST_BYTE		
-	bra		processed_command ;no_new_command
+	bra		processed_command 
 +:	
 	cmp		a,#CMD_STOP				; Was it a Stop command?
 	bne		+	
-	call	!stop
+	call		!stop
 	jmp		!$FFC0
 +:
 	cmp		a,#CMD_SEND_LOOP_MSGS	; Was it a Send Loop Messages command?
@@ -308,7 +312,7 @@ play:
 	eor		a,#1
 	mov		SENDLOOPS,a
 	;mov		SPC_PORT0,LAST_BYTE		
-	bra		processed_command ;no_new_command
+	bra		processed_command 
 +:
 	mov		TEMP,a
 	and		a,#$F0
@@ -325,7 +329,7 @@ play:
 	mov		SPC_DSP_ADDR,#DSP_MVOLR
 	mov		SPC_DSP_DATA,MVOL	
 	;mov		SPC_PORT0,LAST_BYTE
-	bra		processed_command ;no_new_command
+	bra		processed_command 
 +:	
 	cmp		a,#CMD_TOGGLE_CHN		; Was it a Toggle Channel command?
 	bne		+
@@ -355,57 +359,59 @@ processed_command:
 	mov		SPC_PORT0,LAST_BYTE
 +:
 ; There are no new commands from the S-CPU. Are we in Playing or Paused/Stopped state?
+; 11 cycles spent (if there were no new commands)
 no_new_command:
-	cmp		PLAYING,#0
-	bne		+
-	jmp		!play
-+:	
-	mov		x,#0
+	cmp		PLAYING,#0	; 5
+	bne		+		; 2/4	
+	jmp		!play		; 3
++:					; 20 cycles spent
+	mov		x,#0		; 2
 
 	; Perform decompression..
 	
-	mov		a,NUM_FLAGS		; any flags left?
-	bne		+
-	mov		NUM_FLAGS,#8
-	mov		a,[VGM_PTR+x]	; load a new flags byte
-	mov		FLAGS,a
-	incw		VGM_PTR
+	mov		a,NUM_FLAGS	; 3. any flags left?
+	bne		+		; 2/4
+inc NSAMPLES_LATE	
+	mov		NUM_FLAGS,#8	; 5
+	mov		a,[VGM_PTR+x]	; 6. load a new flags byte
+	mov		FLAGS,a		; 3
+	incw		VGM_PTR		; 6
 +:
 	dec		NUM_FLAGS
-	ror		FLAGS			; put the next flag in C
+	ror		FLAGS		; put the next flag in C
 	bcc		+
-	call		!psg_param		; the flag was set; this is a PSG write command
+	call		!psg_param	; the flag was set; this is a PSG write command
 	jmp		!play
 	
 +:
 	mov		a,[VGM_PTR+x]	; the was flag clear; this is not a PSG write command
 	incw		VGM_PTR
 
-	mov		TEMP,a			; save the command byte
+	mov		TEMP,a		; save the command byte
 	and		a,#$F0
-	cmp		a,#$70			; first check if it's a short wait command since we want the lowest latency in processing them
+	cmp		a,#$70		; first check if it's a short wait command since we want the lowest latency in processing them
 	beq		short_wait
 	cmp		a,#$90
 	beq		compressed_long_wait
 	
 	mov		a,TEMP	
-	cmp		a,#$4E			; $4E is used a a NOP command to pad compression runs when needed
+	cmp		a,#$4E		; $4E is used a a NOP command to pad compression runs when needed
 	bne		+
 	jmp		!play
 +:
-	cmp		a,#$66			; loop
+	cmp		a,#$66		; loop
 	bne		+
 	jmp		!loop_song
 +:
-	cmp		a,#$4F			; set gamegear stereo parameter
+	cmp		a,#$4F		; set gamegear stereo parameter
 	beq		gg_stereo_param
-	cmp		a,#$62			; wait one ntsc frame (1/60 s)
+	cmp		a,#$62		; wait one ntsc frame (1/60 s)
 	beq		wait_frame_ntsc
-	cmp		a,#$63			; wait one pal frame (1/50 s)
+	cmp		a,#$63		; wait one pal frame (1/50 s)
 	beq		wait_frame_pal
-	cmp		a,#$61			; wait xxyy samples
+	cmp		a,#$61		; wait xxyy samples
 	beq		long_wait
-	cmp		a,#$67			; data block
+	cmp		a,#$67		; data block
 	bne		+
 	mov		x,#3
 	mov		a,[VGM_PTR+x]
@@ -414,62 +420,59 @@ no_new_command:
 	mov		a,[VGM_PTR+x]
 	clrc
 	adc		a,#4
-	addw	ya,VGM_PTR
-	movw	VGM_PTR,ya
+	addw		ya,VGM_PTR
+	movw		VGM_PTR,ya
 +:
 
 	; All other commands are unhandled and assumed to be 3 bytes long
 	incw	VGM_PTR
 	incw	VGM_PTR
-	jmp		!play
+	jmp	!play
 
 
 ; Wait n/44100 s  (n = [1..16])
-; TODO: Handle this more exactly (cycle-timed loops?)
 short_wait:
-	and		TEMP,#$F
-	mov		x,TEMP
-  inc x
+	and	TEMP,#$F
+	mov	a,TEMP
+  	inc 	a
 short_wait_2:
-  and a,!short_wait_timer_values+x ;5
-  and a,!short_wait_timer_values+x ;5
-  and a,!short_wait_timer_values+x ;5
-  nop ; 2
-  dec x  ;2 
-  bne shor_wait_2  ;4/2
-  jmp !play
+setc
+sbc a,NSAMPLES_LATE
+bmi short_wait_done
+short_wait_3:
+  	and 	a,!short_wait_timer_values+x ;5
+  	and 	a,!short_wait_timer_values+x ;5
+  	and 	a,!short_wait_timer_values+x ;5
+  	nop 			; 2
+  	dec 	x  		;2 
+  	bne 	short_wait_3  	;4/2
+  	jmp 	!play
 
-;	mov		a,!short_wait_timer_values+x
-;	mov		SPC_TIMER2,a
-;	mov		SPC_CTRL,#$84		; enable timer 2
-;-:
-;	mov		a,SPC_COUNTER2
-;	beq		-
-;	mov 	SPC_CTRL,#$80		; disable timers
 	jmp		!play
 
 
 ; TODO: Handle GG stereo settings
 gg_stereo_param:
 	incw	VGM_PTR
-	jmp		!play
+	jmp	!play
 
 
 ; Wait 1/60 s
 wait_frame_ntsc:
-  mov a,#133
-  setc
-  sbc a,NSAMPLES_LATE
-	mov		SPC_TIMER1,a  ;#133		; 133 = floor(8000/60)
-	mov		SPC_CTRL,#$02		; enable timer 1
+  	mov 	a,#133
+  	setc
+  	sbc 	a,NSAMPLES_LATE
+	mov	SPC_TIMER1,a  ;#133		; 133 = floor(8000/60)
+	mov	SPC_CTRL,#$02		; enable timer 1
 wait_frame_2:
 	call	!update_vol	
 -: 
-	mov		a,SPC_COUNTER1
-	beq		-
-	mov		SPC_CTRL,#$00		; disable timers
-  mov NSAMPLES_LATE,#0
-	jmp		!play
+	mov	a,SPC_COUNTER1
+	beq	-
+	mov	SPC_CTRL,#$00		; disable timers
+short_wait_done:	
+  	mov 	NSAMPLES_LATE,#0
+	jmp	!play
 
 
 ; The VGM packer converts some long waits (0x61 nn nn) to a short form 0x9m, where m
@@ -488,24 +491,18 @@ compressed_long_wait:
 
 ; Wait 1/50 s
 wait_frame_pal:
-  mov a,#160
-  setc
-  sbc a,NSAMPLES_LATE
+  	mov 		a,#160
+  	setc
+  	sbc 		a,NSAMPLES_LATE
 	mov		SPC_TIMER0,a  ;#160		; 160 = 8000 / 50
 	mov		SPC_CTRL,#$81		; enable timer 0
 	bra		wait_frame_2
-;	call	!update_vol	
-;-:
-;	mov		a,SPC_COUNTER0
-;	beq		-
-;	mov		SPC_CTRL,#$80		; disable timers
-;	jmp		!play
 	
 
 	
 ; TODO: Handle this more exactly. Currently relies on short_wait which already is pretty inexact.
 long_wait:
- inc NSAMPLES_LATE
+ 	inc 	NSAMPLES_LATE
 	mov		a,[VGM_PTR+x]
 	mov		DELAY,a
 	incw		VGM_PTR
@@ -514,10 +511,10 @@ long_wait:
 	incw		VGM_PTR
 	call		!update_vol
 long_wait2:
-  movw ya,DELAY
-  subw ya,NSAMPLES_LATE
-  bmi long_wait_done
-  movw DELAY.ya
+  	movw 	ya,DELAY
+  	subw 	ya,NSAMPLES_LATE
+  	bmi 	long_wait_done
+  	movw 	DELAY,ya
 	mov		TEMP,#$10
 	mov		TEMP2,#0
 long_wait_loop:
@@ -527,8 +524,8 @@ long_wait_loop:
 	and		a,#$0F
 	beq		long_wait_done
 	dec		a
-	mov		x,a
-	bra		short_wait_2
+	;mov		x,a
+	jmp		!short_wait_2
 +:
 	subw		ya,TEMP
 	movw		DELAY,ya
@@ -542,7 +539,7 @@ long_wait_loop:
 	mov 		SPC_CTRL,#$80		; disable timers
 	bra		long_wait_loop
 long_wait_done:
-  mov NSAMPLES_LATE,#0
+  	mov NSAMPLES_LATE,#0
 	jmp		!play
 	
 
@@ -605,7 +602,7 @@ latch_data:
 
 volume_reg_updated:
   clrc
-  adc NSAMPLES_LATE,#3
+  adc NSAMPLES_LATE,#2
 	mov		x,LATCHED_REG
 	mov		a,TONE0_LATCH+x
 	mov 		x,a
@@ -627,7 +624,7 @@ volume_reg_updated:
 ; TODO: Handle constant output (psgPeriod <= 1)
 tone_reg_updated:
   clrc
-  adc NSAMPLES_LATE,#4
+  adc NSAMPLES_LATE,#3
 	mov		SAMPLE,#0
 	mov		a,LATCHED_REG
 	lsr		a
@@ -677,7 +674,7 @@ tone_reg_updated:
 	
 noise_reg_updated:
   clrc
-  adc NSAMPLES_LATE,#4
+  adc NSAMPLES_LATE,#3
 	;bbc		NOISE_LATCH .2,periodic_noise
 	mov		a,NOISE_LATCH
 	and		a,#4
