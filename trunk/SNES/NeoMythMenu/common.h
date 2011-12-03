@@ -38,6 +38,7 @@
 #define MS_SD_INFO_MENU_INSTRUCTIONS 82
 #define MS_VGM_PLAY_MENU_INSTRUCTIONS 83
 #define MS_CART_TEST_MENU_INSTRUCTIONS 84
+#define MS_DUMP_MENU_INSTRUCTIONS 85
 
 
 // Masks for the joypad data returned by read_joypad
@@ -65,6 +66,8 @@
 #define SHELL_OBJPAL_DARK_OLIVE 0
 #define SHELL_OBJPAL_WHITE 1
 
+#define KEY_REPEAT_INITIAL_DELAY 32
+#define KEY_REPEAT_DELAY 7
 
 #define GAME_MODE_NORMAL_ROM 4
 #define GAME_MODE_SPC 32
@@ -86,6 +89,13 @@ enum
 	SD_OP_OPEN_DIR,
 	SD_OP_READ_DIR,
 	SD_OP_UNKNOWN
+};
+
+enum
+{
+	DUMP_ROM=0,
+	DUMP_SRAM=1,
+	DUMP_NEO_SRAM=2
 };
 
 typedef struct
@@ -136,9 +146,9 @@ typedef enum
 
 typedef enum
 {
-        LAYOUT_LOROM = 0,
-        LAYOUT_HIROM = 1,
-        LAYOUT_UNKNOWN = 2
+    LAYOUT_LOROM = 0,
+    LAYOUT_HIROM = 1,
+    LAYOUT_UNKNOWN = 2
 } romLayout_t;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -170,9 +180,21 @@ extern u8 diskioResp[17];
 extern void (*keypress_handler)(u16);
 extern void (*recv_sd_psram_multi)(WORD, WORD, WORD);
 
+extern const unsigned char crcLut1[256];
+extern const unsigned char crcLut2[256];
+extern unsigned char sec_buf[520];
+
 extern u16 highlightedIsDir;
 extern char highlightedFileName[100];
 extern long long highlightedFileSize;
+
+extern u8 dumpType;
+extern u8 romDumpLayout;
+extern u8 romDumpSize;
+extern u8 sramDumpAddr;
+extern u8 sramDumpSize;
+extern u8 neoSramDumpAddr;
+extern u8 neoSramDumpSize;
 
 ////////////////////////////////////////////////////////////////////////////////
 

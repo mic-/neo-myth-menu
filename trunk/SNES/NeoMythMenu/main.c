@@ -1,5 +1,5 @@
 // SNES Myth Shell
-// C version 0.56
+// C version 0.57
 //
 // Mic, 2010-2011
 
@@ -96,7 +96,16 @@ static const u16 objColors[] =
 };
 
 
+const char * const romDumpNames[] = {
+	"ROM256K.SMC","ROM512K.SMC","ROM1M.SMC",
+	"ROM2M.SMC","ROM4M.SMC","ROM8M.SMC",
+	"ROM16M.SMC","ROM32M.SMC","ROM64M.SMC"
+};
 
+const char * const ramDumpNames[] = {
+	"RAM16K.SRM","RAM32K.SRM","RAM64.SRM",
+	"RAM128K.SRM","RAM256K.SRM"
+};
 
 ///////////// DEBUG ///////////////////
 
@@ -831,6 +840,156 @@ void get_rom_size(WORD sizeInMbits)
 
 
 
+void dump_to_sd()
+{
+	int i;
+	void (*bootcart_read)(char *, u16, u16, u16);
+	DWORD sectors;
+	u16 romBank,romOffs,romOffsReset;
+	char *dumpFileName;
+
+	strcpy(tempString, "/MENU/SNES/DUMPS/");
+	if (dumpType == DUMP_ROM)
+	{
+		dumpFileName = (char*)(romDumpNames[romDumpSize-0x05]);
+		strcpy(&tempString[17], dumpFileName);
+		tempString[17+strlen(dumpFileName)] = 0;
+		if (romDumpSize == 0) return;
+		sectors = 1 << (romDumpSize + 1);
+		romOffsReset = 0x8000;
+		romBank = 0x80;
+		if (romDumpLayout & LAYOUT_HIROM)
+		{
+			romOffsReset = 0;
+			romBank = 0xC0;
+		}
+	}
+	else if (dumpType == DUMP_SRAM)
+	{
+		dumpFileName = (char*)(ramDumpNames[sramDumpSize-1]);
+		strcpy(&tempString[17], dumpFileName);
+		tempString[17+strlen(dumpFileName)] = 0;
+		if (sramDumpSize == 0) return;
+		sectors = 1 << (sramDumpSize + 1);
+		romOffsReset = 0;
+		romBank = 0x70;
+		if (sramDumpAddr & LAYOUT_HIROM)
+		{
+			romBank = 0x20;
+		}
+	}
+	else
+	{
+		// Neo cart SRAM
+		dumpFileName = (char*)(ramDumpNames[neoSramDumpSize-1]);
+		strcpy(&tempString[17], dumpFileName);
+		tempString[17+strlen(dumpFileName)] = 0;
+		if (neoSramDumpSize == 0) return;
+		sectors = 1 << (neoSramDumpSize + 1);
+		// The neoSramDumpAddr is in 8 kB steps
+		romOffs = neoSramDumpAddr;
+		romBank = neoSramDumpSize & 0x18;
+		romOffs <<= 13;
+		romBank >>= 3;
+	}
+
+
+	clear_status_window();
+	hide_games_list();
+	update_screen();
+
+	printxy("Opening", 3, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	printxy(dumpFileName, 11, 9, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	update_screen();
+
+	if ((lastSdError = pf_open(tempString)) != FR_OK)
+	{
+		lastSdOperation = SD_OP_OPEN_FILE;
+		switch_to_menu(MID_SD_ERROR_MENU, 0);
+		return;
+	}
+
+	printxy("Writing..", 3, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	printxy("PLEASE DO NOT REMOVE THE", 3, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	printxy("SD CARD OR TURN OFF THE ", 3, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	printxy("SNES UNTIL THE DUMP IS  ", 3, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	printxy("COMPLETE",                 3, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	update_screen();
+
+	// Write the CRC LUTs to RAM
+	for (i=0; i<256; i++)
+	{
+		sec_buf[i]     = (i & 0x0F) << 4;
+		sec_buf[i+256] = (i & 0xF0) >> 4;
+	}
+
+	printxy("Dumping   ", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	print_hex(sectors>>8, 11, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(sectors, 13, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	update_screen();
+
+	if ((dumpType == DUMP_ROM) || (dumpType == DUMP_SRAM))
+	{
+		MAKE_RAM_FPTR(bootcart_read, neo2_myth_bootcart_rom_read);
+		romOffs = romOffsReset;
+		while (sectors)
+		{
+			bootcart_read((char*)gbaCardAlphabeticalIdx, romBank, romOffs, 512);
+
+			if ((lastSdError = pf_write(gbaCardAlphabeticalIdx, 512, &i)) != FR_OK)
+			{
+				lastSdOperation = SD_OP_WRITE_FILE;
+				switch_to_menu(MID_SD_ERROR_MENU, 0);
+				return;
+			}
+
+			sectors--;
+			romOffs += 512;
+			if (romOffs == 0)
+			{
+				romBank++;
+				romOffs = romOffsReset;
+				print_hex(sectors>>8, 11, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+				print_hex(sectors, 13, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+				update_screen();
+			}
+		}
+
+	}
+	else
+	{
+		// Neo cart SRAM
+		MAKE_RAM_FPTR(bootcart_read, neo2_sram_read);
+		while (sectors)
+		{
+			bootcart_read((char*)gbaCardAlphabeticalIdx, romBank, romOffs, 512);
+
+			if ((lastSdError = pf_write(gbaCardAlphabeticalIdx, 512, &i)) != FR_OK)
+			{
+				lastSdOperation = SD_OP_WRITE_FILE;
+				switch_to_menu(MID_SD_ERROR_MENU, 0);
+				return;
+			}
+
+			sectors--;
+			romOffs += 512;
+			if (romOffs == 0)
+			{
+				romBank++;
+				romOffs = 0;
+				print_hex(sectors>>8, 11, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+				print_hex(sectors, 13, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+				update_screen();
+			}
+		}
+	}
+
+	printxy("Done        ", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	printxy("Y: Go back", 3, 22, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	update_screen();
+}
+
+
 void run_game_from_sd_card_c()
 {
 	int i,j;
@@ -842,7 +1001,7 @@ void run_game_from_sd_card_c()
 	static DWORD unzippedSize;
 	static u8 *myth_pram_bio = (u8*)0xC006;
 	romLayout_t layout;
-void (*psram_read)(char*, u16, u16, u16);
+//void (*psram_read)(char*, u16, u16, u16);
 //static u8 *crcptr;
 
 	if (highlightedIsDir)
@@ -876,6 +1035,9 @@ void (*psram_read)(char*, u16, u16, u16);
 	}
 	else if (strstri(".SPC", highlightedFileName) > 0)
 	{
+//test_write();
+//while (1) {}
+
 		gameMode = GAME_MODE_SPC;
 		play_spc_from_sd_card_c();
 		return;
@@ -1450,7 +1612,10 @@ int main()
 {
 	u8 *bp;
 	int i;
-	u16 keys;
+	u16 keys, keysTemp;
+	u16 keysLast;
+	u8 keyUpReptDelay;
+	u8 keyDownReptDelay;
 
 	void (*check_gbac_psram)();
 
@@ -1507,6 +1672,11 @@ int main()
 
 	REG_BGCNT = 3;			// Enable BG0 and BG1
 
+	keys = keysLast = 0;
+    keyUpReptDelay = KEY_REPEAT_INITIAL_DELAY;
+    keyDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
+
+
 	while (1)
 	{
 		if (bg0BufferDirty)
@@ -1514,7 +1684,44 @@ int main()
 			update_screen();
 		}
 
-		keys = read_joypad();
+		//keys = read_joypad();
+		keysTemp = read_joypad();
+        keys = keysTemp & ~keysLast;
+        keysLast = keysTemp;
+
+        if (!(keys & JOY_UP))
+        {
+        	if (keysLast & JOY_UP)
+        	{
+            	if (0 == --keyUpReptDelay)
+            	{
+					wait_nmi();
+            	    keyUpReptDelay = KEY_REPEAT_DELAY;
+            	    keys |= JOY_UP;
+            	}
+        	}
+        	else
+        	{
+        	    keyUpReptDelay = KEY_REPEAT_INITIAL_DELAY;
+        	}
+		}
+
+        if (!(keys & JOY_DOWN))
+        {
+        	if (keysLast & JOY_DOWN)
+        	{
+            	if (0 == --keyDownReptDelay)
+            	{
+					wait_nmi();
+            	    keyDownReptDelay = KEY_REPEAT_DELAY;
+            	    keys |= JOY_DOWN;
+            	}
+        	}
+        	else
+        	{
+        	    keyDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
+        	}
+		}
 
 		keypress_handler(keys);
 	}

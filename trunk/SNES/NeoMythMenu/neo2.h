@@ -7,6 +7,7 @@
 extern void copy_ram_code();
 
 extern void neo2_myth_current_rom_read(char *dest, u16 romBank, u16 romOffset, u16 length);
+extern void neo2_myth_bootcart_rom_read(char *dest, u16 romBank, u16 romOffset, u16 length);
 
 //extern void neo2_check_gbac_psram();
 

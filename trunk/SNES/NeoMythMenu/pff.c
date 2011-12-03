@@ -1140,6 +1140,60 @@ FRESULT pf_read_1mbit_to_psram (
 }
 
 
+/******************************************/
+
+
+FRESULT pf_write (
+	const void* buff,	/* Pointer to the data to be written */
+	WORD btw,			/* Number of bytes to write (0:Finalize the current write operation) */
+	WORD* bw			/* Pointer to number of bytes written */
+)
+{
+	static CLUST clst;
+	static DWORD sect, remain;
+	BYTE *p = buff;
+	BYTE cs;
+	WORD wcnt;
+	FATFS *fs = FatFs;
+
+	*bw = 0;
+	if (!fs) { return FR_NOT_ENABLED; }
+	if (!(fs->flag & FA_OPENED)) { return FR_NOT_OPENED; }
+
+	if (!(fs->flag & FA__WIP)){ fs->fptr &= 0xFFFFFE00; }
+	remain = fs->fsize - fs->fptr;
+	if (btw > remain) {btw = (WORD)remain;}			/* Truncate btw by remaining bytes */
+
+	while (btw)	{									/* Repeat until all data transferred */
+		if ((fs->fptr & 511) == 0) {			/* On the sector boundary? */
+			cs = (BYTE)((fs->fptr >> 9) & (fs->csize - 1));	/* Sector offset in the cluster */
+			if (!cs) {								/* On the cluster boundary? */
+				clst = (fs->fptr == 0) ?			/* On the top of the file? */
+					fs->org_clust : get_fat(fs->curr_clust);
+				if (clst <= 1) { goto fw_abort; }
+				fs->curr_clust = clst;				/* Update current cluster */
+			}
+			sect = clust2sect(fs->curr_clust);		/* Get current sector */
+			if (!sect) { goto fw_abort; }
+			fs->dsect = sect + cs;
+
+			//crc16_bc(p);
+			if(disk_writesect(p, fs->dsect)) { goto fw_abort; }	/* Send data to the sector */
+			if(fs->flag & FA__WIP){ fs->flag &= ~FA__WIP; }
+		}
+		wcnt = 512 -  (WORD)(fs->fptr & 511);		/* Number of bytes to write to the sector */
+		if (wcnt > btw) wcnt = btw;
+
+		fs->fptr += (DWORD)wcnt; p += wcnt;				/* Update pointers and counters */
+		btw -= wcnt; *bw += wcnt;
+	}
+
+	return FR_OK;
+
+fw_abort:
+	fs->flag = 0;
+	return FR_DISK_ERR;
+}
 
 
 #if _USE_LSEEK

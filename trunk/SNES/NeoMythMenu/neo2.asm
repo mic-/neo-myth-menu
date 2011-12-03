@@ -424,21 +424,21 @@ run_secondary_cart:
 
 	sep		#$20
 	lda		#1
-	sta.l	$00c017
+	sta.l		$00c017
 	lda		#$05
-	sta.l	MYTH_OPTION_IO
+	sta.l		MYTH_OPTION_IO
 
 	; Fill in the cartridge name
 	ldx		#0
 -:
-	lda.l	$00ffc0,x
-	sta.l	MS3+4,x
+	lda.l		$00ffc0,x
+	sta.l		MS3+4,x
 	inx
 	cpx		#20
 	bne		-
 
 	lda		#MAP_MENU_FLASH_TO_ROM
-	sta.l	MYTH_OPTION_IO
+	sta.l		MYTH_OPTION_IO
 
 	rep		#$20
 	pea		3
@@ -453,32 +453,32 @@ run_secondary_cart:
 	jsl		print_hw_card_rev
 
 	; Print region and CPU/PPU1/PPU2 versions
-	lda.l	REG_STAT78
-	lsr	a
-	lsr	a
-	lsr	a
-	lsr	a
+	lda.l		REG_STAT78
+	lsr		a
+	lsr		a
+	lsr		a
+	lsr		a
 	and		#1
 	clc
 	adc		#59
 	pha
 	jsl		print_meta_string
 	pla
-	lda.l	REG_RDNMI
+	lda.l		REG_RDNMI
 	and		#3
 	clc
 	adc		#61
 	pha
 	jsl		print_meta_string
 	pla
-	lda.l	REG_STAT77
+	lda.l		REG_STAT77
 	and		#3
 	clc
 	adc		#65
 	pha
 	jsl		print_meta_string
 	pla
-	lda.l	REG_STAT78
+	lda.l		REG_STAT78
 	and		#3
 	clc
 	adc		#69
@@ -493,17 +493,17 @@ run_secondary_cart:
 	; Wait until B or Y is pressed
 -:
 	jsl		read_joypad
-	lda.b	tcc__r0
+	lda.b		tcc__r0
 	and		#$c000
 	beq		-
 
-	lda.b	tcc__r0
+	lda.b		tcc__r0
 	and		#$4000
 	beq		+
 	; Y was pressed
 	lda		#0
 	sep		#$20
-	sta.l	$00c017
+	sta.l		$00c017
 	jsl		mosaic_up + $7D0000
 	rep		#$20
 	jsl		clear_screen
@@ -524,19 +524,19 @@ run_secondary_cart:
 	rtl
 
 +:
-	lda.b	tcc__r0
+	lda.b		tcc__r0
 	and		#$8000
 	beq		+
 	; B was pressed
 	sep		#$20
 	lda		#$05
-	sta.l	MYTH_OPTION_IO
+	sta.l		MYTH_OPTION_IO
 	lda		#0
-	sta.l	$00c017
+	sta.l		$00c017
 	lda		#$05
-	sta.l	MYTH_OPTION_IO
+	sta.l		MYTH_OPTION_IO
 	plx
-	jmp.w	run_3800 & $ffff
+	jmp.w		run_3800 & $ffff
 
 +:
 	rep		#$30
@@ -689,8 +689,7 @@ phy ;NEW
 	lda.l	$7d0000+suspect_pattern+2+\3,x
 	sta.w	PSRAM_OFFS+3+\3,y
 plx ;NEW
-;jsr show_copied_data
-;-: bra -
+
 	jmp.l	$7d0000+\6
 ++:
  .endm
@@ -1154,6 +1153,60 @@ neo2_myth_current_rom_read:
 	rtl
 
 
+; void neo2_myth_bootcart_rom_read(char *dest, u16 romBank, u16 romOffset, u16 length);
+neo2_myth_bootcart_rom_read:
+	php
+	rep		#$30
+	phx
+	phy
+	phb
+
+	sep		#$20
+	lda		#1
+	sta.l		$C017
+	lda		#5
+	sta.l		MYTH_OPTION_IO
+
+	lda		12,s			; dest bank
+	sta		tcc__r2h
+	stz		tcc__r2h+1
+	lda		14,s			; romBank
+	;clc
+	;adc		#$80			
+	pha
+	plb
+	rep		#$20
+	lda		10,s			; dest offset
+	tay
+	stz		tcc__r2
+	lda		16,s			; romOffset
+	tax
+	lda		18,s			; length
+	lsr		a
+	sta.b		tcc__r1
+-:
+	lda.w		$0000,x
+	sta		[tcc__r2],y
+	inx
+	inx
+	iny
+	iny
+	dec		tcc__r1
+	bne		-
+	
+	sep		#$20
+
+	lda		#MAP_MENU_FLASH_TO_ROM ;GBAC_TO_PSRAM_COPY_MODE
+	sta.l		MYTH_OPTION_IO
+	lda		#0
+	sta.l		$C017
+
+	plb
+ 	ply
+ 	plx
+ 	plp
+	rtl
+	
 
 ; void neo2_myth_psram_read(char *dest, u16 psramBank, u16 psramOffset, u16 length)
 neo2_myth_psram_read:
@@ -2916,7 +2969,7 @@ _nrsdpm_return:
 	plp
 	rts
 
-nop	
+;nop	
 	
 
 .DEFINE RECV_SD_OFS $DE0000

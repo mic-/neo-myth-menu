@@ -26,6 +26,10 @@ u8 highlightedOption[MID_LAST_MENU];
 u8 cheatGameIdx = 0;
 u8 gameFoundInDb = 0;
 u8 resetType = 0;
+u8 dumpType = 0;
+u8 dumping = 0;
+
+extern void dump_to_sd();
 
 char highlightedFileName[100];
 long long highlightedFileSize;
@@ -34,7 +38,7 @@ u16 highlightedIsDir;
 extern FATFS *FatFs;
 
 extern DWORD compressedVgmSize;
-
+extern u8 diskioCrcbuf[8];
 extern ggCode_t ggCodes[MAX_GG_CODES * 2];
 extern const cheatDbEntry_t cheatDatabase[];
 
@@ -93,19 +97,61 @@ const char * const countryCodeStrings[] =
 	"(Australia)",
 };
 
-const char * const romSizeStrings[] =
+const char * const romRamSizeStrings[] =
 {
-	"(4 Mbit)", "(8 Mbit)", "(16 Mbit)",
-	"(32 Mbit)", "(64 Mbit)",
+	"(None)    ", "(16 kbit) ", "(32 kbit) ",
+	"(64 kbit) ", "(128 kbit)", "(256 kbit)",
+	"(512 kbit)", "(1 Mbit)  ", "(2 Mbit)  ",
+	"(4 Mbit)  ", "(8 Mbit)  ", "(16 Mbit) ",
+	"(32 Mbit) ", "(64 Mbit) ",
 };
 
-const char * const ramSizeStrings[] =
+const char * const dumpTypeStrings[] =
 {
-	"(None)", "(16 kbit)", "(32 kbit)",
-	"(64 kbit)", "(128 kbit)", "(256 kbit)",
-	"(512 kbit)", "(1 Mbit)",
+	"ROM     ", "SRAM    ", "Neo SRAM",
 };
 
+const char * const sramAddrStrings[] =
+{
+	"$700000",	// LoROM
+	"$200000",	// HiROM
+};
+
+const char * const neoSramAddrStrings[] =
+{
+	"$000000",
+	"$002000",
+	"$004000",
+	"$006000",
+	"$008000",
+	"$00A000",
+	"$00C000",
+	"$00E000",
+	"$010000",
+	"$012000",
+	"$014000",
+	"$016000",
+	"$018000",
+	"$01A000",
+	"$01C000",
+	"$01E000",
+	"$020000",
+	"$022000",
+	"$024000",
+	"$026000",
+	"$028000",
+	"$02A000",
+	"$02C000",
+	"$02E000",
+	"$030000",
+	"$032000",
+	"$034000",
+	"$036000",
+	"$038000",
+	"$03A000",
+	"$03C000",
+	"$03E000",
+};
 
 const char * const regionPatchStrings[] =
 {
@@ -147,11 +193,12 @@ enum
 	MENU1_ITEM_ACTION_REPLAY = 1,
 	MENU1_ITEM_ROM_INFO = 2,
     MENU1_ITEM_SD_INFO = 3,
-	MENU1_ITEM_RUN_MODE = 4,
-	MENU1_ITEM_FIX_REGION = 5,
-	MENU1_ITEM_RESET_TYPE = 6,
-	MENU1_ITEM_TEST_CART = 7,
-	MENU1_ITEM_SRAM_BANK = 7,
+    MENU1_ITEM_DUMP_TO_SD = 4,
+	MENU1_ITEM_RUN_MODE = 5,
+	MENU1_ITEM_FIX_REGION = 6,
+	MENU1_ITEM_RESET_TYPE = 7,
+	MENU1_ITEM_TEST_CART = 8,
+	MENU1_ITEM_SRAM_BANK = 8,
 	MENU1_ITEM_LAST
 };
 
@@ -161,6 +208,7 @@ menuOption_t extRunMenuItems[MENU1_ITEM_LAST + 1] =
 	{"Action Replay", 0, 10, 0},
 	{"ROM info", 0, 11, 0},
 	{"SD info", 0, 12, 0},
+	{"Dump to SD", 0, 13, 0},
 	{"Mode:", 0, 14, 8},
 	{"Autofix region:", 0, 15, 18},
 	{"Reset:", 0, 16, 9},
@@ -197,6 +245,32 @@ menuOption_t cartTestMenuItems[MENU2_ITEM_LAST + 1] =
 
 enum
 {
+	MENU3_ITEM_DUMP_TYPE = 0,
+	MENU3_ITEM_ROM_LAYOUT = 1,
+	MENU3_ITEM_ROM_SIZE = 2,
+	MENU3_ITEM_SRAM_ADDR = 3,
+	MENU3_ITEM_SRAM_SIZE = 4,
+	MENU3_ITEM_NEO_SRAM_ADDR = 5,
+	MENU3_ITEM_NEO_SRAM_SIZE = 6,
+	MENU3_ITEM_LAST
+};
+
+menuOption_t dumpMenuItems[MENU3_ITEM_LAST + 1] =
+{
+	{"Dump:", 0, 9, 8},
+	{"ROM layout:", 0, 11, 14},
+	{"ROM size:", 0, 12, 14},
+	{"SRAM addr:", 0, 14, 14},
+	{"SRAM size:", 0, 15, 14},
+	{"Neo SRAM bank:", 0, 17, 17},
+	{"Neo SRAM size:", 0, 18, 17},
+	{0,0,0,0}	// Terminator
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+enum
+{
 	MENU7_ITEM_GAME_GENIE = 0,
 	MENU7_ITEM_ACTION_REPLAY = 1,
 	MENU7_ITEM_LAST
@@ -223,6 +297,7 @@ void ar_code_edit_menu_process_keypress(u16);
 void cheat_db_menu_process_keypress(u16);
 void cheat_db_no_codes_menu_process_keypress(u16);
 void rom_info_menu_process_keypress(u16);
+void dump_menu_process_keypress(u16);
 void sd_error_menu_process_keypress(u16);
 void vgm_play_menu_process_keypress(u16);
 
@@ -250,7 +325,8 @@ u16 read_joypad()
 		lo = REG_JOY1L;
 		hi = REG_JOY1H;
 
-		retVal &= 0xff00;
+		retVal = lo | (hi<<8);
+		/*retVal &= 0xff00;
 		retVal |= lo;
 		if (!lo)
 		{
@@ -269,7 +345,7 @@ u16 read_joypad()
 			while (!((b = REG_HVB_JOY) & 1));
 			while ((b = REG_HVB_JOY) & 1);
 			b = REG_JOY1L | REG_JOY1H;
-		}
+		}*/
 
 		break;
 	}
@@ -827,17 +903,54 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			highlightedOption[MID_GG_ENTRY_MENU] = 0;
 			break;
 
+		case MID_DUMP_MENU:
+			keypress_handler = dump_menu_process_keypress;
+			print_meta_string(MS_DUMP_MENU_INSTRUCTIONS);
+			dumping = 0;
+
+			MAKE_RAM_FPTR(get_info, neo2_myth_bootcart_rom_read);
+			get_info(snesRomInfo, 0, 0xffc0, 0x40);
+
+			romDumpLayout = snesRomInfo[0x15] & LAYOUT_HIROM;
+			sramDumpAddr = romDumpLayout;
+			romDumpSize = snesRomInfo[0x17];
+			if (romDumpSize > 0x0C) romDumpSize = 0x0C;
+			if (romDumpSize < 0x05) romDumpSize = 0x05;
+
+			sramDumpSize = snesRomInfo[0x18];
+			if (sramDumpSize > 0x0C) sramDumpSize = 0x0C;
+
+			neoSramDumpAddr = 0;
+			neoSramDumpSize = 0;
+
+			dumpMenuItems[MENU3_ITEM_DUMP_TYPE].optionValue = (char*)dumpTypeStrings[dumpType];
+			dumpMenuItems[MENU3_ITEM_ROM_LAYOUT].optionValue = (char*)&(metaStrings[48 + (romDumpLayout^1)][4]);
+			dumpMenuItems[MENU3_ITEM_ROM_SIZE].optionValue = (char*)romRamSizeStrings[romDumpSize];
+			dumpMenuItems[MENU3_ITEM_SRAM_ADDR].optionValue = (char*)sramAddrStrings[sramDumpAddr];
+			dumpMenuItems[MENU3_ITEM_SRAM_SIZE].optionValue = (char*)romRamSizeStrings[sramDumpSize];
+			dumpMenuItems[MENU3_ITEM_NEO_SRAM_ADDR].optionValue = (char*)neoSramAddrStrings[neoSramDumpAddr];
+			dumpMenuItems[MENU3_ITEM_NEO_SRAM_SIZE].optionValue = (char*)romRamSizeStrings[neoSramDumpSize];
+
+			highlightedOption[MID_DUMP_MENU] = 0;
+			for (i = 0; i < MENU3_ITEM_LAST; i++)
+			{
+				print_menu_item(dumpMenuItems,
+				                i,
+				                (highlightedOption[MID_DUMP_MENU]==i) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			}
+			break;
+
 #ifdef CART_TESTS
 		case MID_CART_TEST_MENU:
 			keypress_handler = cart_test_menu_process_keypress;
 			print_meta_string(MS_CART_TEST_MENU_INSTRUCTIONS);
+			highlightedOption[MID_CART_TEST_MENU] = 0;
 			for (i = 0; i < MENU2_ITEM_LAST; i++)
 			{
 				print_menu_item(cartTestMenuItems,
 				                i,
 				                (i==0) ? TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE) : TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
 			}
-			highlightedOption[MID_CART_TEST_MENU] = 0;
 			break;
 #endif
 
@@ -1080,6 +1193,16 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			printxy(sdOpErrorStrings[lastSdOperation], 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 			printxy(sdFrStrings[lastSdError], 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 
+			printxy("CRC16:", 2, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			print_hex(diskioCrcbuf[7], 9, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(diskioCrcbuf[6], 11, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(diskioCrcbuf[5], 13, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(diskioCrcbuf[4], 15, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(diskioCrcbuf[3], 17, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(diskioCrcbuf[2], 19, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(diskioCrcbuf[1], 21, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+			print_hex(diskioCrcbuf[0], 23, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+
 			printxy("Packet:", 2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 			for (i = 0; i < 7; i++)
 			{
@@ -1100,6 +1223,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			print_hex(num_sectors>>16, 13, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 			print_hex(num_sectors>>8, 15, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 			print_hex(num_sectors, 17, 18, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
+
 #else
 			// DEBUG
 			printxy(sdOpErrorStrings[lastSdOperation], 2, 8, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
@@ -1183,14 +1307,14 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			print_hex(snesRomInfo[0x17], 13, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 			if ((snesRomInfo[0x17] >= 0x9) && (snesRomInfo[0x17] <= 0xD))
 			{
-				printxy((char*)romSizeStrings[snesRomInfo[0x17] - 0x9], 16, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				printxy((char*)romRamSizeStrings[snesRomInfo[0x17]], 16, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 			}
 
 			printxy("RAM size: $", 2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 			print_hex(snesRomInfo[0x18], 13, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE));
 			if (snesRomInfo[0x18] <= 7)
 			{
-				printxy((char*)ramSizeStrings[snesRomInfo[0x18]], 16, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
+				printxy((char*)romRamSizeStrings[snesRomInfo[0x18]], 16, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
 			}
 
 			printxy("Country:  $", 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_OLIVE), 21);
@@ -1349,6 +1473,16 @@ void main_menu_process_keypress(u16 keys)
 
 
 
+void print_option(menuOption_t *items, u8 idx)
+{
+	printxy(items[idx].optionValue,
+            items[idx].optionColumn,
+            items[idx].row,
+            TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
+            32);
+}
+
+
 void extended_run_menu_process_keypress(u16 keys)
 {
 	if (keys & JOY_B)
@@ -1359,22 +1493,24 @@ void extended_run_menu_process_keypress(u16 keys)
 			// Switch HIROM/LOROM
 			romRunMode ^= 1;
 			extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue = (char*)&(metaStrings[48 + romRunMode][4]);
-			printxy(extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue,
+			/*printxy(extRunMenuItems[MENU1_ITEM_RUN_MODE].optionValue,
 			        extRunMenuItems[MENU1_ITEM_RUN_MODE].optionColumn,
 			        extRunMenuItems[MENU1_ITEM_RUN_MODE].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
-			        32);
+			        32);*/
+			print_option(extRunMenuItems, MENU1_ITEM_RUN_MODE);
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_FIX_REGION)
 		{
 			doRegionPatch++; if (doRegionPatch > 2) doRegionPatch = 0;
 			extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue = (char*)regionPatchStrings[doRegionPatch];
+			print_option(extRunMenuItems, MENU1_ITEM_FIX_REGION);
 
-			printxy(extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue,
+			/*printxy(extRunMenuItems[MENU1_ITEM_FIX_REGION].optionValue,
 			        extRunMenuItems[MENU1_ITEM_FIX_REGION].optionColumn,
 			        extRunMenuItems[MENU1_ITEM_FIX_REGION].row,
 			        TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE),
-			        32);
+			        32);*/
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_RESET_TYPE)
 		{
@@ -1408,6 +1544,11 @@ void extended_run_menu_process_keypress(u16 keys)
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_SD_INFO)
 		{
 			switch_to_menu(MID_SD_INFO_MENU, 0);
+		}
+		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_DUMP_TO_SD)
+		{
+			// Go to the memory dumping screen
+			switch_to_menu(MID_DUMP_MENU, 0);
 		}
 		else if (highlightedOption[MID_EXT_RUN_MENU] == MENU1_ITEM_ACTION_REPLAY)
 		{
@@ -1465,6 +1606,101 @@ void extended_run_menu_process_keypress(u16 keys)
 	{
 		// Y
 		switch_to_menu(MID_MAIN_MENU, 0);
+	}
+}
+
+
+void dump_menu_process_keypress(u16 keys)
+{
+	if (keys & JOY_B)
+	{
+		// B
+		if (dumping) return;
+		if (highlightedOption[MID_DUMP_MENU] == MENU3_ITEM_DUMP_TYPE)
+		{
+			dumpType++; if (dumpType > DUMP_NEO_SRAM) dumpType = DUMP_ROM;
+			dumpMenuItems[MENU3_ITEM_DUMP_TYPE].optionValue = (char*)dumpTypeStrings[dumpType];
+			print_option(dumpMenuItems, MENU3_ITEM_DUMP_TYPE);
+		}
+		else if (highlightedOption[MID_DUMP_MENU] == MENU3_ITEM_ROM_LAYOUT)
+		{
+			romDumpLayout ^= 1;
+			dumpMenuItems[MENU3_ITEM_ROM_LAYOUT].optionValue = (char*)&(metaStrings[48 + (romDumpLayout^1)][4]);
+			print_option(dumpMenuItems, MENU3_ITEM_ROM_LAYOUT);
+		}
+		else if (highlightedOption[MID_DUMP_MENU] == MENU3_ITEM_ROM_SIZE)
+		{
+			romDumpSize++; if (romDumpSize > 0x0C) romDumpSize = 0x05;
+			dumpMenuItems[MENU3_ITEM_ROM_SIZE].optionValue = (char*)romRamSizeStrings[romDumpSize];
+			print_option(dumpMenuItems, MENU3_ITEM_ROM_SIZE);
+		}
+		else if (highlightedOption[MID_DUMP_MENU] == MENU3_ITEM_SRAM_SIZE)
+		{
+			sramDumpSize++; if (sramDumpSize > 0x05) sramDumpSize = 0x00;
+			dumpMenuItems[MENU3_ITEM_SRAM_SIZE].optionValue = (char*)romRamSizeStrings[sramDumpSize];
+			print_option(dumpMenuItems, MENU3_ITEM_SRAM_SIZE);
+		}
+		else if (highlightedOption[MID_DUMP_MENU] == MENU3_ITEM_SRAM_ADDR)
+		{
+			sramDumpAddr ^= 1;
+			dumpMenuItems[MENU3_ITEM_SRAM_ADDR].optionValue = (char*)sramAddrStrings[sramDumpAddr];
+			print_option(dumpMenuItems, MENU3_ITEM_SRAM_ADDR);
+		}
+		else if (highlightedOption[MID_DUMP_MENU] == MENU3_ITEM_NEO_SRAM_SIZE)
+		{
+			neoSramDumpSize++; if (neoSramDumpSize > 0x05) neoSramDumpSize = 0x00;
+			dumpMenuItems[MENU3_ITEM_NEO_SRAM_SIZE].optionValue = (char*)romRamSizeStrings[neoSramDumpSize];
+			print_option(dumpMenuItems, MENU3_ITEM_NEO_SRAM_SIZE);
+		}
+		else if (highlightedOption[MID_DUMP_MENU] == MENU3_ITEM_NEO_SRAM_ADDR)
+		{
+			neoSramDumpAddr++; if (neoSramDumpAddr > 31) neoSramDumpAddr = 0;
+			dumpMenuItems[MENU3_ITEM_NEO_SRAM_ADDR].optionValue = (char*)neoSramAddrStrings[neoSramDumpAddr];
+			print_option(dumpMenuItems, MENU3_ITEM_NEO_SRAM_ADDR);
+		}
+	}
+	else if (keys & JOY_START)
+	{
+		// Start
+		if (dumping) return;
+		dumping = 1;
+		dump_to_sd();
+	}
+	else if (keys & JOY_UP)
+	{
+		// Up
+		if (dumping) return;
+		if (highlightedOption[MID_DUMP_MENU])
+		{
+			// Un-highlight the previously highlighted string(s), and highlight the new one(s)
+			print_menu_item(dumpMenuItems,
+			                highlightedOption[MID_DUMP_MENU],
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			print_menu_item(dumpMenuItems,
+			                highlightedOption[MID_DUMP_MENU] - 1,
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+			highlightedOption[MID_DUMP_MENU]--;
+		}
+	}
+	else if (keys & JOY_DOWN)
+	{
+		// Down
+		if (dumping) return;
+		if (highlightedOption[MID_DUMP_MENU] < MENU3_ITEM_LAST - 1)
+		{
+			print_menu_item(dumpMenuItems,
+			                highlightedOption[MID_DUMP_MENU],
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_DARK_OLIVE));
+			print_menu_item(dumpMenuItems,
+			                highlightedOption[MID_DUMP_MENU] + 1,
+			                TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+				highlightedOption[MID_DUMP_MENU]++;
+		}
+	}
+	else if (keys & JOY_Y)
+	{
+		// Y
+		switch_to_menu(MID_EXT_RUN_MENU, 0);
 	}
 }
 

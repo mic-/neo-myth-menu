@@ -25,7 +25,7 @@ unsigned char sec_cache[CACHE_SIZE*512 + 8];
 unsigned char sec_buf[520]; /* for uncached reads */
 
 #define R1_LEN (48/8)
-#define    R2_LEN (136/8)
+#define R2_LEN (136/8)
 #define R3_LEN (48/8)
 #define R6_LEN (48/8)
 #define R7_LEN (48/8)
@@ -45,12 +45,14 @@ DRESULT (*disk_read) (BYTE*, DWORD, BYTE);
 DRESULT (*disk_readp) (void* dest, DWORD sector, WORD sofs, WORD count);
 DRESULT (*disk_readsect_psram) (WORD prbank, WORD proffs, DWORD sector);
 DRESULT (*disk_read_psram_multi) (WORD prbank, WORD proffs, DWORD sector, WORD count);
+DRESULT (*disk_writesect) (BYTE* src, DWORD sector);
 
 extern DSTATUS disk_initialize_asm(void);
 extern DRESULT disk_read_asm(BYTE*, DWORD, BYTE);
 extern DRESULT disk_readp_asm(void* dest, DWORD sector, WORD sofs, WORD count);
 extern DRESULT disk_readsect_psram_asm(WORD prbank, WORD proffs, DWORD sector);
 extern DRESULT disk_read_psram_multi_asm(WORD prbank, WORD proffs, DWORD sector, WORD count);
+extern DRESULT disk_writesect_asm(BYTE*, DWORD);
 
 
 void diskio_init()
@@ -60,5 +62,6 @@ void diskio_init()
 	MAKE_RAM_FPTR(disk_readp, disk_readp_asm);
 	MAKE_RAM_FPTR(disk_readsect_psram, disk_readsect_psram_asm);
 	MAKE_RAM_FPTR(disk_read_psram_multi, disk_read_psram_multi_asm);
+	MAKE_RAM_FPTR(disk_writesect, disk_writesect_asm);
 }
 

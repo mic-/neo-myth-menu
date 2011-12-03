@@ -42,6 +42,7 @@ extern DRESULT (*disk_read) (BYTE*, DWORD, BYTE);
 extern DRESULT (*disk_readp) (void* dest, DWORD sector, WORD sofs, WORD count);
 extern DRESULT (*disk_readsect_psram) (WORD prbank, WORD proffs, DWORD sector);
 extern DRESULT (*disk_read_psram_multi) (WORD prbank, WORD proffs, DWORD sector, WORD count);
+extern DRESULT (*disk_writesect) (BYTE* src, DWORD sector);
 
 extern void diskio_init();
 
