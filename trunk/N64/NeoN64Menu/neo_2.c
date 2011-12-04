@@ -688,14 +688,14 @@ void neo2_pre_sd(void)
 			PI_BSD_DOM1_RLS_REG = 0x00000003;
 			PI_BSD_DOM1_PWD_REG = 0x00000003;
 			PI_BSD_DOM1_PGS_REG = 0x00000007;
-		break;
+		return;
 
 		case 2:
 			PI_BSD_DOM1_LAT_REG = 0x00000000;
 			PI_BSD_DOM1_RLS_REG = 0x00000000;
 			PI_BSD_DOM1_PWD_REG = 0x00000003;
 			PI_BSD_DOM1_PGS_REG = 0x00000000;
-		break;
+		return;
 	}
 }
 
@@ -902,7 +902,9 @@ void simulate_pif_boot(u32 cic_chip)
         case 0x55: //Australia
         case 0x58: // ????
         case 0x59: // X (PAL)
-            switch (cic_chip) {
+		{
+            switch (cic_chip)
+			{
                 case CIC_6102:
                     gGPR[5]=0xFFFFFFFFC0F1D859LL;
                     gGPR[14]=0x000000002DE108EALL;
@@ -929,13 +931,16 @@ void simulate_pif_boot(u32 cic_chip)
             gGPR[20]=0x0000000000000000LL;
             gGPR[23]=0x0000000000000006LL;
             gGPR[31]=0xFFFFFFFFA4001554LL;
-            break;
+			break;
+		}
         case 0x37: // 7 (Beta)
         case 0x41: // ????
         case 0x45: //USA
         case 0x4A: //Japan
         default:
-            switch (cic_chip) {
+		{
+            switch (cic_chip)
+			{
                 case CIC_6102:
                     gGPR[5]=0xFFFFFFFFC95973D5LL;
                     gGPR[14]=0x000000002449A366LL;
@@ -954,10 +959,13 @@ void simulate_pif_boot(u32 cic_chip)
                     gGPR[14]=0x000000005CD2B70FLL;
                     break;
             }
+
             gGPR[20]=0x0000000000000001LL;
             gGPR[23]=0x0000000000000000LL;
             gGPR[24]=0x0000000000000003LL;
             gGPR[31]=0xFFFFFFFFA4001550LL;
+			break;
+		}
     }
 
     switch (cic_chip) {
@@ -1279,11 +1287,18 @@ void neo_run_psram(u8 *option, int reset)
 
     // if set to use card cic, figure out cic for simulated start
     if (romcic == 0)
+	{
         runcic = get_cic((unsigned char *)0xB0000040);
+	}
     else
+	{
         runcic = romcic & 7;
-    if (!reset && (runcic != 2))
+	}
+
+    if((!reset) && (runcic != 2))
+	{
         reset = 1;                      // reset back to menu since cannot reset to game in hardware
+	}
 
     CIC_IO   = romcic; //reset ? 0x00020002 : romcic;
     neo_sync_bus();
@@ -1301,7 +1316,7 @@ void neo_run_psram(u8 *option, int reset)
 	for(wait = 0;wait < 200;wait++)
 	{
 		//Just waste a little time until any interrupts that have been triggered BEFORE ints where disabled have jumped back to their caller
-		asm("nop\nnop\n");
+		neo_sync_bus();
 	}
 
     simulate_pif_boot(runcic);          // should never return
