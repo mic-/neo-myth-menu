@@ -1,7 +1,4 @@
 
-#undef __DEBUG_PSRAM__
-#define HW_SELF_TEST
-
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
@@ -12,8 +9,21 @@
 #include "neo_2_asm.h"
 #include "configuration.h"
 #include "interrupts.h"
+
+#undef __DEBUG_PSRAM__
+#undef CHECK_FOR_MF_BIOS
+#define HW_SELF_TEST
+
 #ifdef HW_SELF_TEST
 #include <stdlib.h>
+#endif
+
+#if defined RUN_FROM_U2
+    const char* menu_title = "Neo N64 Myth Menu v2.5 (U2)";
+#elif defined RUN_FROM_SD
+    const char* menu_title = "Neo N64 Myth Menu v2.5 (SD)";
+#else
+    const char* menu_title = "Neo N64 Myth Menu v2.5 (MF)";
 #endif
 
 typedef volatile unsigned short vu16;
@@ -56,7 +66,6 @@ unsigned int gCardID;                   /* should be 0x34169624 for Neo2 flash c
 short int gCardOkay;                    /* 0 = okay, -1 = err */
 short int gCursorX;                     /* range is 0 to 63 (only 0 to 39 onscreen) */
 short int gCursorY;                     /* range is 0 to 31 (only 0 to 27 onscreen) */
-
 
 unsigned short gButtons = 0;
 struct controller_data gKeys;
@@ -2801,13 +2810,6 @@ int main(void)
     int brwsr = 0;                      // start in game flash browser
 #endif
     char temp[128];
-#if defined RUN_FROM_U2
-    char *menu_title = "Neo N64 Myth Menu v2.5 (U2)";
-#elif defined RUN_FROM_SD
-    char *menu_title = "Neo N64 Myth Menu v2.5 (SD)";
-#else
-    char *menu_title = "Neo N64 Myth Menu v2.5 (MF)";
-#endif
     char *menu_help1 = "A=Run reset to menu  B=Reset to game";
     char *menu_help2 = "DPad=Navigate     CPad=change option";
     char *menu_help3[4] = { "Z=Show Options      START=SD browser",
@@ -2860,12 +2862,14 @@ int main(void)
     }
     neo_select_game();
 
+#ifdef CHECK_FOR_MF_BIOS
 #ifdef RUN_FROM_U2
     // check for boot rom in menu
     neo_select_menu();                  // enable menu flash in cart space
 
     if (!memcmp((void *)0xB0000020, "N64 Myth Menu (MF)", 18))
         neo_run_menu();
+#endif
 #endif
 
 	disk_io_set_mode(0,0);
@@ -2960,6 +2964,10 @@ int main(void)
 	{
 		neo2_enable_sd();
 		bmax = getSDInfo(-1);
+	}
+	else
+	{
+		bmax = 0;
 	}
 
     if (bmax)

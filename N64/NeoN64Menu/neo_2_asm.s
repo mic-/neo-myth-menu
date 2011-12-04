@@ -33,7 +33,7 @@
 		addi $22,$0,0x08			/*shift by 8*/
 		addi $23,$0,-1				/*dec by 1*/
 
-		ori $18,$0,0xf000			/*mask = 0000 f000*/
+		ori $18,$0,0xf000			/*mask = 0000 f000*/	
 		ori $19,$0,0x0f00			/*mask = 0000 0f00*/
 		ori $20,$0,0x00f0			/*mask = 0000 00f0*/
 		ori $21,$0,0x000f			/*mask = 0000 000f*/
@@ -47,7 +47,7 @@
 		neo2_recv_sd_multi_psram_no_ds_oloop:
 		lui $11,0x0001				/* $11 = timeout = 64 * 1024*/
 		addi $8,$0,0x0100
-		addi $9,$0,0x01
+		addi $9,$0,-1
 
 		neo2_recv_sd_multi_psram_no_ds_tloop:
 		lw $2,($15)					/* rdMmcDatBit4*/
@@ -55,7 +55,7 @@
 		beq $2,$0,neo2_recv_sd_multi_psram_no_ds_get_sect			/* start bit detected*/
 		nop
 		bne $11,$0,neo2_recv_sd_multi_psram_no_ds_tloop			/* not timed out*/
-		addu $11,$11,$9
+		add $11,$11,$9
 		beq $11,$0,neo2_recv_sd_multi_psram_no_ds_exit		/* timeout*/
 		addu $2,$0,$0					/* res = FALSE*/
 
@@ -190,7 +190,7 @@
 		neo2_recv_sd_psram_ds1_oloop:
 		lui $11,0x0001				/* $11 = timeout = 64 * 1024*/
 		addi $8,$0,0x0100
-		addi $9,$0,0x01
+		addi $9,$0,-1
 
 		neo2_recv_sd_psram_ds1_tloop:
 		lw $2,($15)					/* rdMmcDatBit4*/
@@ -198,7 +198,7 @@
 		beq $2,$0,neo2_recv_sd_psram_ds1_get_sect			/* start bit detected*/
 		nop
 		bne $11,$0,neo2_recv_sd_psram_ds1_tloop			/* not timed out*/
-		addu $11,$11,$9
+		add $11,$11,$9
 		beq $11,$0,neo2_recv_sd_psram_ds1_exit		/* timeout*/
 		addu $2,$0,$0					/* res = FALSE*/
 
@@ -325,7 +325,7 @@
 		beq $2,$0,getsect		 /* start bit detected*/
 		nop
 		bne $11,$0,tloop		  /* not timed out*/
-		addiu $11,$11,-1
+		addi $11,$11,-1
 		beq $11,$0,___exit		/* timeout*/
 		ori $2,$0,0		       /* res = FALSE*/
 
