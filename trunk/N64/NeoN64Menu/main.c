@@ -3453,7 +3453,6 @@ int main(void)
     config_shutdown();//will never reach here anyway
     return 0;
 }
-
 #ifdef HW_SELF_TEST
 int hw_self_test_dbg_scr_x,hw_self_test_dbg_scr_y;
 const int hw_self_test_dbg_scr_y_max = 240/8;
@@ -3635,7 +3634,31 @@ void hw_self_test_sram_write(int onboard)											//write and compare later (T
 	graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 }
 
-void hw_self_test_zipram_block(int* m_idx,unsigned int* stack)
+volatile int hw_self_test_long_cmp(void* a,void* b,int c)
+{
+	asm(
+			".set	push\n"
+			".set	noreorder\n"
+			"addu	$t0,$a0,$a2\n"
+			"0:\n"
+			"lw		$t1,($a0)\n"
+			"lw		$t2,($a1)\n"
+			"bne	$t1,$t2,1f\n"
+			"addiu	$a0,$a0,4\n"
+			"bne	$a0,$t0,0b\n"
+			"addiu	$a1,$a1,4\n"
+			"jr		$ra\n"
+			"addi	$v0,$zero,1\n"
+			"1:\n"
+			"jr		$ra\n"
+			"add	$v0,$zero,$zero\n"
+			".set pop\n"
+		);
+
+	return 0;	//remove warnings
+}
+
+void hw_self_test_zipram_block(int* m_idx,unsigned int* stack,int check_top)
 {
 	unsigned char* a = &tmpBuf[0];
 	unsigned char* b = &tmpBuf[128*1024];
@@ -3647,22 +3670,38 @@ void hw_self_test_zipram_block(int* m_idx,unsigned int* stack)
 		for(i = 0;i < 128 * 1024;i += 16)
 		{
 			c = (unsigned int*)&a[i];
-			c[0] = mt_random(stack,m_idx);
-			c[4] = mt_random(stack,m_idx);
-			c[8] = mt_random(stack,m_idx);
-			c[12] = mt_random(stack,m_idx);
+			c[0] = mt_random(stack,m_idx) + gTicks;
+			c[1] = mt_random(stack,m_idx) - gTicks;
+			c[2] = mt_random(stack,m_idx) + gTicks;
+			c[3] = mt_random(stack,m_idx) - gTicks;
 		}
 
 		neo_copyto_psram(a,j,128*1024);
 		neo_copyfrom_psram(b,j,128*1024);
 
-		if(memcmp(a,b,128*1024) != 0)
+		if(!hw_self_test_long_cmp(a,b,128*1024))
 		{
 			graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
 			hw_self_test_follow("BLOCK FAILED!",0);
 			graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 			return;
 		}
+
+		if(!check_top)
+		{	
+			continue;
+		}
+
+		neo_psram_offset(0);
+		neo_copyfrom_psram(b,j,128*1024);
+		if(hw_self_test_long_cmp(a,b,128*1024))
+		{
+			graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
+			hw_self_test_follow("MIRRORING DETECTED!",0);
+			graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+			return;
+		}
+		neo_psram_offset((16*1024*1024) / (32*1024));
 	}
 
 	graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
@@ -3742,14 +3781,15 @@ void hw_self_test()
 		hw_self_test_follow(">>TEST ZIP RAM",0);
 		hw_self_test_follow(" ",0);
 		mt_init(stack,&m_idx);
+		data_cache_writeback_invalidate(stack,MT_LEN);
 		graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 		hw_self_test_follow("TESTING BLOCK 0-16MB",0);
 		neo_psram_offset(0);
-		hw_self_test_zipram_block(&m_idx,stack);
+		hw_self_test_zipram_block(&m_idx,stack,0);
 		hw_self_test_follow(" ",0);
 		hw_self_test_follow("TESTING BLOCK 16-32MB",0);
 		neo_psram_offset((16*1024*1024) / (32*1024));
-		hw_self_test_zipram_block(&m_idx,stack);
+		hw_self_test_zipram_block(&m_idx,stack,1);
 		#if 0
 		hw_self_test_follow(" ",0);
 		hw_self_test_follow("TESTING BANK2..",0);
