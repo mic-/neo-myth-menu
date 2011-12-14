@@ -45,7 +45,7 @@ else
 ELF := $(notdir $(OUTPUT)).elf
 
 $(OUTPUT): $(ELF)
-	@$(OBJC) -O binary $(ELF) $@
+	@$(OBJC) --pad-to 131072 -O binary $(ELF) $@
 
 $(ELF): $(OBJS)
 	@echo Linking $(TARGET)...

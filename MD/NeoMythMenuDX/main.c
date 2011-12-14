@@ -298,7 +298,6 @@ WCHAR ipsPath[512];                     /* ips path */
 WCHAR path[512];                        /* SD card file path */
 
 unsigned char __attribute__((aligned(16))) rom_hdr[256];             /* rom header from selected rom (if loaded) */
-
 unsigned char __attribute__((aligned(16))) buffer[XFER_SIZE*2];      /* Work RAM buffer - big enough for SMD decoding */
 
 optionEntry gOptions[OPTION_ENTRIES];   /* entries for global options */
@@ -365,8 +364,9 @@ static int inputboxDelay = 5;
 
 int wait_for_buttons(const unsigned char* btn_p,int btn_c);
 int wait_for_button();
+#if 0
 void dump_zipram(int len,int gen);
-
+#endif
 //macros
 inline int is_space(char c)
 {
@@ -6119,58 +6119,27 @@ void hw_gen_pattern_16KB(unsigned char* block,int* seed,int* f)
 {
 	register unsigned char* a0 = block;
 	register unsigned char* a1 = a0 + (16 * 1024);
-	register int d0 = *seed;
+	register unsigned char d0 = (unsigned char)*seed;
+	register int d1 = *f;
 
 	do
 	{
-		if(d0 <= (4*1024))
-		{
-			*(unsigned short*)a0 = d0;
-			++d0;
-		}
-		else if(d0 <= (8*1024))
-		{
-			*(unsigned short*)a0 = d0;
-			d0 += 8;
-		}
-		else if(d0 <= (16*1024))
-		{
-			*(unsigned short*)a0 = d0;
-			d0 += 63;
-		}
-		else
-		{
-			if(d0 > 0xffff)
-			{
-				d0 = 0;
+		*a0 = ((d1 << 8)) - (1 + (d0--));
+		d1 ^= 1;
+	}while((++a0) < a1);
 
-				if((a0 + 2) > block)
-				{
-					*f = a0[-4];
-				}
-				else if(a0 > block)
-				{
-					*f = a0[-2];
-				}
-				else
-				{
-					*f = a1[0];
-				}
-			}
-
-			*(unsigned short*)a0 = d0;
-			d0 += 128-(*f);
-		}
-
-		a0 += 2;
-	}while(a0 < a1);
-
+	*f = d1;
 	*seed = d0;
 }
 
 void hw_tst_prologue(const char* s)
 {
 	int ix;
+	
+	ints_off();
+	neo2_disable_sd();
+
+	ints_on();
 	clear_screen();
 
     gCursorX = 1;
@@ -6205,24 +6174,9 @@ void hw_tst_prologue(const char* s)
 
 void hw_tst_epilogue()
 {
-	hw_tst_new_ln();
-	hw_tst_follow("Job finished!",0);
-	#if 0
-	hw_tst_follow("Press 'B' to exit",0x4000);
+	ints_on();
 
-	do
-	{
-		//wait
-	}while(hw_tst_wait_event() != SEGA_CTRL_B);
-	
-	clear_screen();	
-	gUpdate = -1;
-	#else
-	hw_tst_new_ln();
-	hw_tst_new_ln();
-	hw_tst_follow("Please reset the console...",0);
 	while (1) {}
-	#endif
 }
 
 void hw_tst_dump()
@@ -6234,30 +6188,47 @@ void hw_tst_myth_psram_test(int selection)
 {
 	int i,e;
 	int seed,f;
+	char mbs[2];
 
 	hw_tst_prologue("TESTING ONBOARD PSRAM");
 	//==================================================
 
+	hw_tst_dbg_x += 4;
 	hw_tst_follow("Testing...",0x0000);
 	hw_tst_new_ln();
+	ints_off();
+
+	int a = hw_tst_dbg_x - (6 + 4);
+	int b = a + 30 + 5;
+	int x = a;
+	int y = hw_tst_dbg_y;
+	int z = -1;
 
 	for(e = 0,seed = 0,f = 1,i = 0;i<64*(128*1024);i += 16 * 1024)
 	{
 		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
-
-		ints_off();
 		neo_copyto_myth_psram(&buffer[0],i,16*1024);
 		neo_copyfrom_myth_psram(&buffer[16*1024],i,16*1024);
-		ints_on();
+		if ((i>>17) > z)
+		{
+			z = i>>17;
+			UTIL_IntegerToString(mbs,z+1,10);
+			printToScreen(mbs,x,y,0);
+			x += 2 + ((z+1)>=10) + ((z+1)>=100);
+			if (x >= b) {x = a;++y;}
+		}
 
-		if(memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
+		if(utility_memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
 		{
 			e = 1;
+			ints_on();
 			hw_tst_follow("Testing...FAILED!",0x4000);
 			break;
 		}
 	}
 
+	hw_tst_dbg_y = y + 2;
+	ints_on();
 	if(!e)
 	{
 		hw_tst_follow("Testing...PASSED!",0x2000);
@@ -6273,31 +6244,47 @@ void hw_tst_psram_test(int selection)
 {
 	int i,e;
 	int seed,f;
+	char mbs[2];
 
 	hw_tst_prologue("TESTING NEO2    PSRAM");
 	//==================================================
-
+	hw_tst_dbg_x += 4;
 	hw_tst_follow("Testing...",0x0000);
 	hw_tst_new_ln();
+	ints_off();
 
-	for(e = 0,seed = 0,f = 1,i = 0;i<64*(128*1024);i += 16 * 1024)
+	int a = hw_tst_dbg_x - (6 + 4);
+	int b = a + 30 + 5;
+	int x = a;
+	int y = hw_tst_dbg_y;
+	int z = -1;
+
+	for(e = 0,seed = 0,f = 1,i = 0;i<128*(128*1024);i += 16 * 1024)
 	{
 		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
-
-		ints_off();
 		neo_copyto_psram(&buffer[0],i,16*1024);
 		neo_copyfrom_psram(&buffer[16*1024],i,16*1024);
-		ints_on();
 
-		if(memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
+		if ((i>>17) > z)
+		{
+			z = i>>17;
+			UTIL_IntegerToString(mbs,z+1,10);
+			printToScreen(mbs,x,y,0);
+			x += 2 + ((z+1)>=10) + ((z+1)>=100);
+			if (x >= b) {x = a;++y;}
+		}
+
+		if(utility_memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
 		{
 			e = 1;
+			ints_on();
 			hw_tst_follow("Testing...FAILED!",0x4000);
-
 			break;
 		}
 	}
 
+	hw_tst_dbg_y = y + 2;
+	ints_on();
 	if(!e)
 	{
 		hw_tst_follow("Testing...PASSED!",0x2000);
@@ -6320,13 +6307,13 @@ void hw_tst_sram_write(int selection)
 	hw_tst_follow("Writing seed...",0x0000);
 	hw_tst_new_ln();
 
+	ints_off();
 	for(seed = 0,f = 1,i = 0;i<1*(128*1024);i += 16 * 1024)
 	{
 		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
-		ints_off();
 		neo_copyto_sram(&buffer[0],i,16*1024);
-		ints_on();
 	}
+	ints_on();
 
 	hw_tst_follow("Writing seed...FINISHED!",0x2000);
 
@@ -6345,20 +6332,22 @@ void hw_tst_sram_read(int selection)
 	hw_tst_follow("Testing SRAM...",0x0000);
 	hw_tst_new_ln();
 
+	ints_off();
 	for(e = 0,seed = 0,f = 1,i = 0;i<1*(128*1024);i += 16 * 1024)
 	{
 		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
-		ints_off();
 		neo_copyfrom_sram(&buffer[16*1024],i,16*1024);
-		ints_on();
-
-		if(memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
+		
+		if(utility_memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
 		{
+			ints_on();
 			e = 1;
 			hw_tst_follow("Testing SRAM...FAILED!",0x4000);
 			break;
 		}
 	}
+
+	ints_on();
 
 	if(!e)
 	{
@@ -6370,10 +6359,9 @@ void hw_tst_sram_read(int selection)
 	//==================================================
 	hw_tst_epilogue();
 }
-
+#if 0
 void dump_zipram(int len,int gen)//Not a real dumping routine.Its more like response dumper :)
 {
-	#if 0
 	int i,j;
 	WCHAR* fnbuf = &wstr_buf[gWStrOffs];
 	FIL f;
@@ -6411,6 +6399,6 @@ void dump_zipram(int len,int gen)//Not a real dumping routine.Its more like resp
 
 	f_close(&f);
 	gWStrOffs -= 512;
-	#endif
 }
+#endif
 
