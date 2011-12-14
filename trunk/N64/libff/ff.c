@@ -1323,6 +1323,7 @@ void get_fileinfo (		/* No return code */
 
 
 
+
 	p = fno->fname;
 	if (dj->sect) {
 		dir = dj->dir;
@@ -1937,6 +1938,7 @@ FRESULT f_read (
 #endif
 				fp->csect += (BYTE)cc;				/* Next sector address in the cluster */
 				rcnt = cc << 9;						/* Number of bytes transferred */
+				prev_cluster = fp->curr_clust;
 				continue;
 			}
 			prev_cluster = fp->curr_clust;
@@ -2052,6 +2054,7 @@ FRESULT f_read_psram (
 
 				fp->csect += (BYTE)cc;				/* Next sector address in the cluster */
 				rcnt = cc << 9;
+				prev_cluster = fp->curr_clust;
 				continue;
 			}
 			prev_cluster = fp->curr_clust;
