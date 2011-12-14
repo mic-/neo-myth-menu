@@ -1236,7 +1236,10 @@ void get_sd_info(int entry)
     printToScreen(gEmptyLine,1,23,0x0000);
 
     if (gSelections[entry].type == 128)
+	{
+		gSelections[entry].run = 0xee;//hack for options
         return;
+	}
 
     if (path[eos-1] != (WCHAR)'/')
         utility_c2wstrcat(path, "/");
@@ -5910,7 +5913,7 @@ int main(void)
                 if (gCurMode == MODE_FLASH)
                 {
                     // call options screen, which will either return or run the rom
-                    if (gSelections[gCurEntry].type < 3)
+                   // if (gSelections[gCurEntry].type < 3)
                         do_options();
                 }
                 else if (gCurMode == MODE_USB)
@@ -5931,7 +5934,7 @@ int main(void)
                 else if (gCurMode == MODE_SD)
                 {
                     // call options screen, which will either return or run the rom
-                    if (gSelections[gCurEntry].type < 3)
+                  //  if (gSelections[gCurEntry].type < 3)
                         do_options();
                 }
             }
