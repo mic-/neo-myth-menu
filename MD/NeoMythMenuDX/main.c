@@ -291,8 +291,6 @@ extern unsigned short cardType;         /* b0 = block access, b1 = V2 and/or HC,
 extern unsigned int num_sectors;        /* number of sectors on SD card (or 0) */
 extern unsigned char *sd_csd;           /* card specific data */
 
-Cluster __attribute__((aligned(16))) __ff_clust_buffer[0x20 + 16];
-
 FATFS gSDFatFs;                         /* global FatFs structure for FF */
 FIL gSDFile;                            /* global file structure for FF */
 
@@ -364,6 +362,10 @@ void update_display(void);
 static short int gChangedPage = 0;
 static short int gCacheOutOfSync = 0;
 static int inputboxDelay = 5;
+
+int wait_for_buttons(const unsigned char* btn_p,int btn_c);
+int wait_for_button();
+void dump_zipram(int len,int gen);
 
 //macros
 inline int is_space(char c)
@@ -839,7 +841,7 @@ void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
     UINT ts;
     ints_on();     /* enable interrupts */
     gDirectRead = 1;
-    f_read_direct(&gSDFile, (unsigned char *)pstart, len, &ts, __ff_clust_buffer);
+    f_read(&gSDFile, (unsigned char *)pstart, len, &ts);
     gDirectRead = 0;
     ints_off();     /* disable interrupts */
 }
@@ -2174,6 +2176,7 @@ void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(u
         (dst)(&buffer[gFileType ? XFER_SIZE : 0], doffset + iy, XFER_SIZE);
         update_progress(str1, str2, iy, length);
     }
+
     if ((length == 0x200000) && ((dst == &neo_copyto_myth_psram) || (dst == &neo_sd_to_myth_psram)))
     {
         // clear past end of rom for S&K
@@ -3871,6 +3874,11 @@ void runCheatEditor(int index)
     gWStrOffs -= 512;
 }
 
+void hw_tst_myth_psram_test(int selection);
+void hw_tst_psram_test(int selection);
+void hw_tst_sram_write(int selection);
+void hw_tst_sram_read(int selection);
+
 void do_options(void)
 {
     int i;
@@ -4073,18 +4081,59 @@ void do_options(void)
         maxOptions++;
     }
 
-    /*
-    //fake entry = separator
-    gOptions[maxOptions].exclusiveFCall = 0;
-    gOptions[maxOptions].name = "\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82\x82";
-    gOptions[maxOptions].value = NULL;
-    gOptions[maxOptions].callback = NULL;
-    gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
-    maxOptions++;
-    */
+	//HW SELF TEST ROUTINES
+	{
+        gOptions[maxOptions].name = "TEST ONBOARD PSRAM";
+        gOptions[maxOptions].value = NULL;
+        gOptions[maxOptions].callback = &hw_tst_myth_psram_test;
+        gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
+		gOptions[maxOptions].exclusiveFCall = 1;
+        maxOptions++;
 
-    //For the cheat support
-    for(i = 0; i < registeredCheatEntries; i++)
+        gOptions[maxOptions].name = "TEST NEO2    PSRAM";
+        gOptions[maxOptions].value = NULL;
+        gOptions[maxOptions].callback = &hw_tst_psram_test;
+        gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
+		gOptions[maxOptions].exclusiveFCall = 1;
+        maxOptions++;
+
+        gOptions[maxOptions].name = "TEST SRAM(write)";
+        gOptions[maxOptions].value = NULL;
+        gOptions[maxOptions].callback = &hw_tst_sram_write;
+        gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
+		gOptions[maxOptions].exclusiveFCall = 1;
+        maxOptions++;
+
+        gOptions[maxOptions].name = "TEST SRAM(read)";
+        gOptions[maxOptions].value = NULL;
+        gOptions[maxOptions].callback = &hw_tst_sram_read;
+        gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
+		gOptions[maxOptions].exclusiveFCall = 1;
+        maxOptions++;
+	}
+
+	//List one ips patch
+    if( (ipsPath[0] != 0) )
+    {
+        utility_w2cstrcpy((char*)buffer, ipsPath);
+        strncpy(ipsFPath, (const char *)buffer, 36);
+        ipsFPath[35] = '\0';
+        gOptions[maxOptions].name = ipsFPath;
+
+        if(!gImportIPS)
+            gOptions[maxOptions].value = "Off";
+        else
+            gOptions[maxOptions].value = "On";
+
+        gOptions[maxOptions].userData = NULL;
+        gOptions[maxOptions].callback = &toggleIPS;
+        gOptions[maxOptions].patch = &importIPS;
+
+        maxOptions++;
+    }
+
+    //List cheats
+    for(i = 0; (i < registeredCheatEntries) && (OPTION_ENTRIES > maxOptions); i++)
     {
         if(cheatEntries[i].name[0] != '\0')
         {
@@ -4102,25 +4151,6 @@ void do_options(void)
 
             maxOptions++;
         }
-    }
-
-    if(ipsPath[0] != 0)
-    {
-        utility_w2cstrcpy((char*)buffer, ipsPath);
-        strncpy(ipsFPath, (const char *)buffer, 36);
-        ipsFPath[35] = '\0';
-        gOptions[maxOptions].name = ipsFPath;
-
-        if(!gImportIPS)
-            gOptions[maxOptions].value = "Off";
-        else
-            gOptions[maxOptions].value = "On";
-
-        gOptions[maxOptions].userData = NULL;
-        gOptions[maxOptions].callback = &toggleIPS;
-        gOptions[maxOptions].patch = &importIPS;
-
-        maxOptions++;
     }
 
     int start = 0;
@@ -5568,6 +5598,9 @@ int main(void)
 
     if(gSdDetected)
     {
+#if 0
+	dump_zipram(16*1024,1);
+#endif
         clear_screen();
         setStatusMessage("Loading cache & configuration...");
         loadConfig();
@@ -5648,6 +5681,8 @@ int main(void)
     utility_memset(gProgressBarStaticBuffer,0x87,36);
     gProgressBarStaticBuffer[32] = '\0';
     gCacheOutOfSync = 0;
+
+
 
     while(1)
     {
@@ -5956,5 +5991,423 @@ int main(void)
     }
 
     return 0;
+}
+
+int wait_for_button()
+{
+	unsigned short int buttons,changed;
+
+	while(1)
+	{
+        delay(2);
+        buttons = get_pad(0);
+
+        if ((buttons & SEGA_CTRL_TYPE) == SEGA_CTRL_NONE)
+        {
+            buttons = get_pad(1);
+            if ((buttons & SEGA_CTRL_TYPE) == SEGA_CTRL_NONE)
+            {
+                // no controllers, loop until one plugged in
+                delay(20);
+                continue;
+            }
+        }
+
+        if ((buttons & SEGA_CTRL_BUTTONS) != gButtons)
+        {
+            changed = (buttons & SEGA_CTRL_BUTTONS) ^ gButtons;
+            gButtons = buttons & SEGA_CTRL_BUTTONS;
+
+			#define gen_branch(_B_)\
+			{\
+		        if( (changed & (_B_) ) && (buttons & (_B_)) )\
+		        {\
+					return (_B_);\
+		        }\
+			}
+
+			gen_branch(SEGA_CTRL_UP);
+			gen_branch(SEGA_CTRL_DOWN);
+			gen_branch(SEGA_CTRL_LEFT);
+			gen_branch(SEGA_CTRL_RIGHT);
+			gen_branch(SEGA_CTRL_A);
+			gen_branch(SEGA_CTRL_B);		
+			gen_branch(SEGA_CTRL_C);
+			gen_branch(SEGA_CTRL_START);
+			#undef gen_branch
+
+        }//changed??
+	}
+
+	return 0;
+}
+
+int wait_for_buttons(const unsigned char* btn_p,int btn_c)
+{
+	unsigned short int buttons,changed;
+
+	if(0 == btn_c)
+	{
+		return 0;
+	}
+
+	while(1)
+	{
+        delay(2);
+        buttons = get_pad(0);
+
+        if ((buttons & SEGA_CTRL_TYPE) == SEGA_CTRL_NONE)
+        {
+            buttons = get_pad(1);
+            if ((buttons & SEGA_CTRL_TYPE) == SEGA_CTRL_NONE)
+            {
+                // no controllers, loop until one plugged in
+                delay(20);
+                continue;
+            }
+        }
+
+        if ((buttons & SEGA_CTRL_BUTTONS) != gButtons)
+        {
+            changed = (buttons & SEGA_CTRL_BUTTONS) ^ gButtons;
+            gButtons = buttons & SEGA_CTRL_BUTTONS;
+
+			int i;
+			for(i = 0;i<btn_c;i++)
+			{	
+				unsigned char ld = btn_p[i];
+
+		        if( (changed & ld ) && (buttons & ld) )
+		        {
+					return ld;
+		        }
+			}
+        }//changed??
+	}
+
+	return 0;
+}
+
+unsigned char hw_tst_dbg_x,hw_tst_dbg_y;
+
+int hw_tst_wait_event()
+{
+	const unsigned char btns[] = {SEGA_CTRL_A,SEGA_CTRL_B};
+	return wait_for_buttons(btns,sizeof(btns) / sizeof(btns[0]));
+}
+
+void hw_tst_new_ln()
+{
+	if((++hw_tst_dbg_y) <= 20)
+	{
+		return;
+	}
+
+	hw_tst_dbg_y = 5;
+}
+
+void hw_tst_follow(const char* msg,int color)
+{
+	printToScreen(msg,hw_tst_dbg_x,hw_tst_dbg_y,((unsigned short)color));
+	hw_tst_new_ln();
+}
+
+void hw_gen_pattern_16KB(unsigned char* block,int* seed,int* f)
+{
+	register unsigned char* a0 = block;
+	register unsigned char* a1 = a0 + (16 * 1024);
+	register int d0 = *seed;
+
+	do
+	{
+		if(d0 <= (4*1024))
+		{
+			*(unsigned short*)a0 = d0;
+			++d0;
+		}
+		else if(d0 <= (8*1024))
+		{
+			*(unsigned short*)a0 = d0;
+			d0 += 8;
+		}
+		else if(d0 <= (16*1024))
+		{
+			*(unsigned short*)a0 = d0;
+			d0 += 63;
+		}
+		else
+		{
+			if(d0 > 0xffff)
+			{
+				d0 = 0;
+
+				if((a0 + 2) > block)
+				{
+					*f = a0[-4];
+				}
+				else if(a0 > block)
+				{
+					*f = a0[-2];
+				}
+				else
+				{
+					*f = a1[0];
+				}
+			}
+
+			*(unsigned short*)a0 = d0;
+			d0 += 128-(*f);
+		}
+
+		a0 += 2;
+	}while(a0 < a1);
+
+	*seed = d0;
+}
+
+void hw_tst_prologue(const char* s)
+{
+	int ix;
+	clear_screen();
+
+    gCursorX = 1;
+    gCursorY = 1;
+    put_str("\x80\x82\x82\x82\x82", 0x2000);
+    gCursorX = 6;
+    put_str("  HARDWARE SELF TEST MODE ", 0x4000);
+    gCursorX = 34;
+    put_str("\x82\x82\x82\x82\x85", 0x2000);
+
+    gCursorX = 1;
+    gCursorY = 2;
+    put_str(gFEmptyLine, 0x2000);
+
+    // list area (if applicable)
+    gCursorY = 3;
+    for (ix=0; ix<22; ix++, gCursorY++)
+        put_str(gFEmptyLine, 0x2000);
+
+    gCursorX = 1;
+    gCursorY = 24;
+    put_str(gFEmptyLine, 0x2000);
+    gCursorX = 1;
+    gCursorY = 25;
+    put_str(gFBottomLine, 0x2000);
+	hw_tst_dbg_x = 9;
+	hw_tst_dbg_y = 3;
+	hw_tst_follow(s,0x2000);
+	hw_tst_dbg_y = 5;
+	hw_tst_dbg_x = 8;
+}
+
+void hw_tst_epilogue()
+{
+	hw_tst_new_ln();
+	hw_tst_follow("Job finished!",0);
+	#if 0
+	hw_tst_follow("Press 'B' to exit",0x4000);
+
+	do
+	{
+		//wait
+	}while(hw_tst_wait_event() != SEGA_CTRL_B);
+	
+	clear_screen();	
+	gUpdate = -1;
+	#else
+	hw_tst_new_ln();
+	hw_tst_new_ln();
+	hw_tst_follow("Please reset the console...",0);
+	while (1) {}
+	#endif
+}
+
+void hw_tst_dump()
+{
+
+}
+
+void hw_tst_myth_psram_test(int selection)
+{
+	int i,e;
+	int seed,f;
+
+	hw_tst_prologue("TESTING ONBOARD PSRAM");
+	//==================================================
+
+	hw_tst_follow("Testing...",0x0000);
+	hw_tst_new_ln();
+
+	for(e = 0,seed = 0,f = 1,i = 0;i<64*(128*1024);i += 16 * 1024)
+	{
+		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
+
+		ints_off();
+		neo_copyto_myth_psram(&buffer[0],i,16*1024);
+		neo_copyfrom_myth_psram(&buffer[16*1024],i,16*1024);
+		ints_on();
+
+		if(memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
+		{
+			e = 1;
+			hw_tst_follow("Testing...FAILED!",0x4000);
+			break;
+		}
+	}
+
+	if(!e)
+	{
+		hw_tst_follow("Testing...PASSED!",0x2000);
+	}
+
+	hw_tst_dump();
+
+	//==================================================
+	hw_tst_epilogue();
+}
+
+void hw_tst_psram_test(int selection)
+{
+	int i,e;
+	int seed,f;
+
+	hw_tst_prologue("TESTING NEO2    PSRAM");
+	//==================================================
+
+	hw_tst_follow("Testing...",0x0000);
+	hw_tst_new_ln();
+
+	for(e = 0,seed = 0,f = 1,i = 0;i<64*(128*1024);i += 16 * 1024)
+	{
+		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
+
+		ints_off();
+		neo_copyto_psram(&buffer[0],i,16*1024);
+		neo_copyfrom_psram(&buffer[16*1024],i,16*1024);
+		ints_on();
+
+		if(memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
+		{
+			e = 1;
+			hw_tst_follow("Testing...FAILED!",0x4000);
+
+			break;
+		}
+	}
+
+	if(!e)
+	{
+		hw_tst_follow("Testing...PASSED!",0x2000);
+	}
+
+	hw_tst_dump();
+
+	//==================================================
+	hw_tst_epilogue();
+}
+
+void hw_tst_sram_write(int selection)
+{
+	int i;
+	int seed,f;
+
+	hw_tst_prologue("TESTING SRAM(write)");
+	//==================================================
+
+	hw_tst_follow("Writing seed...",0x0000);
+	hw_tst_new_ln();
+
+	for(seed = 0,f = 1,i = 0;i<1*(128*1024);i += 16 * 1024)
+	{
+		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
+		ints_off();
+		neo_copyto_sram(&buffer[0],i,16*1024);
+		ints_on();
+	}
+
+	hw_tst_follow("Writing seed...FINISHED!",0x2000);
+
+	//==================================================
+	hw_tst_epilogue();
+}
+
+void hw_tst_sram_read(int selection)
+{
+	int i,e;
+	int seed,f;
+
+	hw_tst_prologue("TESTING SRAM(read)");
+	//==================================================
+
+	hw_tst_follow("Testing SRAM...",0x0000);
+	hw_tst_new_ln();
+
+	for(e = 0,seed = 0,f = 1,i = 0;i<1*(128*1024);i += 16 * 1024)
+	{
+		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
+		ints_off();
+		neo_copyfrom_sram(&buffer[16*1024],i,16*1024);
+		ints_on();
+
+		if(memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
+		{
+			e = 1;
+			hw_tst_follow("Testing SRAM...FAILED!",0x4000);
+			break;
+		}
+	}
+
+	if(!e)
+	{
+		hw_tst_follow("Testing SRAM...PASSED!",0x2000);
+	}
+
+	hw_tst_dump();
+
+	//==================================================
+	hw_tst_epilogue();
+}
+
+void dump_zipram(int len,int gen)//Not a real dumping routine.Its more like response dumper :)
+{
+	#if 0
+	int i,j;
+	WCHAR* fnbuf = &wstr_buf[gWStrOffs];
+	FIL f;
+	UINT ts;
+
+	len = (len > XFER_SIZE) ? XFER_SIZE : len;
+	gWStrOffs += 512;
+
+    utility_c2wstrcpy(fnbuf,"/menu/md/ZIP.BIN");
+	memset(&f,0,sizeof(FIL));
+
+	ints_on();
+    if(f_open(&f,fnbuf,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
+	{
+		gWStrOffs -= 512;
+		return;
+	}
+
+	ints_off();
+	if (gen)
+	{
+		for (i = 0;i < len;i += 256)
+		{
+			for (j = 0;j < 256;j++)
+				buffer[i + j] = j;
+		}
+		neo_copyto_psram(&buffer[0],0,len);
+	}
+
+	neo_copyfrom_psram(&buffer[len],0,len);
+
+	//write resp
+	ints_on();
+	f_write(&f,&buffer[len],len,&ts);
+
+	f_close(&f);
+	gWStrOffs -= 512;
+	#endif
 }
 

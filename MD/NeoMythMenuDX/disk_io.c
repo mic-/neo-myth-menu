@@ -1,8 +1,16 @@
-
 #include <string.h>
 #include <stdio.h>
-
 #include <diskio.h>
+
+#define CACHE_SIZE 4                    /* number sectors in cache */
+#define R1_LEN (48/8)
+#define R2_LEN (136/8)
+#define R3_LEN (48/8)
+#define R6_LEN (48/8)
+#define R7_LEN (48/8)
+#define INIT_RETRIES (128)
+//#define DEBUG_PRINT
+//#define DEBUG_RESP
 
 typedef volatile unsigned short int vu16;
 typedef unsigned int u32;
@@ -12,44 +20,33 @@ extern void neo2_recv_sd(unsigned char *buf);
 extern int neo2_recv_sd_multi(unsigned char *buf, int count);
 extern void neo2_pre_sd(void);
 extern void neo2_post_sd(void);
-
 // for debug
 extern void delay(int count);
 extern void put_str(char *str, int fcolor);
 extern short int gCursorX;              /* range is 0 to 63 (only 0 to 39 onscreen) */
 extern short int gCursorY;              /* range is 0 to 31 (only 0 to 27 onscreen) */
-
-//#define DEBUG_PRINT
-//#define DEBUG_RESP
-
-/* global variables and arrays */
-
 unsigned short cardType;                /* b0 = block access, b1 = V2 and/or HC, b15 = funky read timing */
-
 unsigned char pkt[6];                   /* command packet */
-
 unsigned int num_sectors;
-
-#define CACHE_SIZE 4                    /* number sectors in cache */
 unsigned int sec_tags[CACHE_SIZE];
 unsigned char __attribute__((aligned(16))) sec_cache[CACHE_SIZE*512 + 8];
 unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads */
-
-#define R1_LEN (48/8)
-#define R2_LEN (136/8)
-#define R3_LEN (48/8)
-#define R6_LEN (48/8)
-#define R7_LEN (48/8)
-
 unsigned char sd_csd[R2_LEN];
-
-#define INIT_RETRIES (64)
+short do_init = 0;
 
 /*-----------------------------------------------------------------------*/
 /*                             support code                              */
 /*-----------------------------------------------------------------------*/
 
-//typedef volatile unsigned short vu16;
+void sd_op_delay() __attribute__ ((section (".data")));
+void sd_op_delay()
+{
+	short i,j;
+	
+	for (i = 0,j = (do_init != 0) << 4;i < j;i++) {	/*16 nops/bit should be enough even for the slowest card*/
+		asm("nop\n");
+	}
+}
 
 void wrMmcCmdBit( unsigned int bit ) __attribute__ ((section (".data")));
 void wrMmcCmdBit( unsigned int bit )
@@ -69,6 +66,7 @@ void wrMmcCmdBit( unsigned int bit )
         ( 1<<10 ) |            // d1 value
         ( 1<<9 );            // d0 value
     data = *(vu16*)(addr);
+	sd_op_delay();
 }
 
 void wrMmcCmdByte( unsigned int byte ) __attribute__ ((section (".data")));
@@ -127,6 +125,7 @@ unsigned int rdMmcCmdBit()
         ( 1<<10 ) |            // d1
         ( 1<<9 ) |            // d0
         ( 1<<7 );            // cmd input mode
+	sd_op_delay();
     data = *(vu16*)(addr);
     return (data>>4) & 1;
 }
@@ -307,6 +306,7 @@ void debugMmcPrint( char *str )
 #define debugMmcPrint(x)
 #endif
 
+#ifdef DEBUG_PRINT
 void debugPrint( char *str ) __attribute__ ((section (".data")));
 void debugPrint( char *str )
 {
@@ -327,6 +327,9 @@ void debugPrint( char *str )
     delay(20);
     neo2_pre_sd();
 }
+#else
+#define debugPrint(a)
+#endif
 
 void sendMmcCmd( unsigned char cmd, unsigned int arg ) __attribute__ ((section (".data")));
 void sendMmcCmd( unsigned char cmd, unsigned int arg )
@@ -590,6 +593,8 @@ BOOL sdInit(void)
     unsigned short rca;
     unsigned char resp[R2_LEN];            // R2 is largest response
 
+	do_init = 1;
+
     for( i = 0; i < 80; i++ )
         wrMmcCmdBit(1);
 
@@ -615,8 +620,10 @@ BOOL sdInit(void)
             {
                 if (resp[1] & 0x40)
                     cardType |= 1;        // HC card
+
                 if (!(resp[2] & 0x30))
                     return FALSE;       // unusable
+
                 break;
             }
         }
@@ -634,8 +641,8 @@ BOOL sdInit(void)
     sendMmcCmd(3, 1);                    // SEND_RELATIVE_ADDR
     if (!recvMmcCmdResp(resp, R6_LEN, 1) || (resp[0] != 3))
         return FALSE;                   // unusable
-    rca = (resp[1]<<8) | resp[2];
 
+    rca = (resp[1]<<8) | resp[2];
 #if 1
     sendMmcCmd(9, (((rca>>8)&0xFF)<<24) | ((rca&0xFF)<<16) | 0xFFFF); // SEND_CSD
     recvMmcCmdResp(sd_csd, R2_LEN, 1);
@@ -648,10 +655,12 @@ BOOL sdInit(void)
     sendMmcCmd(55, (((rca>>8)&0xFF)<<24) | ((rca&0xFF)<<16) | 0xFFFF); // APP_CMD
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || !(resp[4] & 0x20))
         return FALSE;                   // unusable
+
     sendMmcCmd(6, 2);                    // SET_BUS_WIDTH (to 4 bits)
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || (resp[0] != 6))
         return FALSE;                   // unusable
 
+	do_init = 0;
     return TRUE;
 }
 

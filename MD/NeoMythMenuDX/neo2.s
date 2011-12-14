@@ -442,7 +442,12 @@ _neo_select_game:
 3:
         bsr     _neo_asic_cmd           /* set iosr = enable game flash */
 4:
+		.ifdef NEO3
+		move.l  #0x00AA55F0,d0
+		.else
         move.l  #0x00EE0630,d0
+		.endif
+
         bsr     _neo_asic_cmd           /* set cr1 = enable extended address bus */
         move.w  #0xFFFF,EXTM_ON(a1)     /* enable extended address bus */
         move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
@@ -842,6 +847,9 @@ set_usb:
 neo_run_game:
         lea     0xA10000,a1
         bsr     _neo_select_game        /* select Game Flash */
+		.ifdef NEO3
+		bsr		_neo_enable_id
+		.endif
         bra.b   neo_chk_mahb
 
 | void neo_run_psram(int pstart, int psize, int bbank, int bsize, int run);
@@ -851,6 +859,9 @@ neo_run_psram:
         lea     0xA10000,a1
         bsr     _neo_select_psram       /* select flash cart PSRAM */
 
+		.ifdef NEO3
+		bsr		_neo_enable_id
+		.endif
 |        move.w  #0x0000,WE_IO(a1)       /* write-protect psram */
 |        move.l  #0x00E2D200,d0
 |        bsr     _neo_asic_cmd           /* write-protect flash cart psram */
@@ -904,7 +915,9 @@ neo_run_sms:
 neo_run_myth_psram:
         lea     0xA10000,a1
         bsr     _neo_select_menu        /* select Neo Myth menu flash */
-
+		.ifdef NEO3
+		bsr		_neo_enable_id
+		.endif
         move.l  16(sp),d0               /* run */
         bclr    #5,d0
         bne.w   9f                      /* EBIOS or MA-Homebrew */

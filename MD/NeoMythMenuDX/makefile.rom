@@ -7,12 +7,12 @@ BINTOC := bin2c
 
 OBJS := crt0.o main.o neo2.o font.o disk_io.o rom_io.o conf.o utility.o util_68k.o cheat.o vgm_player.o Z80.o
 
-OPTION :=
+OPTION := 
 INCS := -I. -I$(GENDEV)/m68k-elf/include -I$(GENDEV)/m68k-elf/m68k-elf/include
 CCFLAGS := $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -fshort-wchar -fno-strict-aliasing
 HWCCFLAGS := $(OPTION) -m68000 -Wall -O1 -c -fomit-frame-pointer -fshort-wchar -fno-strict-aliasing
 Z80FLAGS := -vb2
-ASFLAGS := -m68000 --register-prefix-optional
+ASFLAGS := -m68000 --register-prefix-optional $(AS_FLAGS)
 LIBS := -L$(GENDEV)/m68k-elf/lib -L$(GENDEV)/m68k-elf/m68k-elf/lib -lff -lc -lgcc -lnosys
 LINKFLAGS := -T $(GENDEV)/ldscripts/md.ld -Wl,-Map=output.map
 BUILD := build_rom
