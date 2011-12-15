@@ -6146,7 +6146,7 @@ void hw_tst_myth_psram_test(int selection)
 {
     int i,e;
     int sseed, seed,f;
-    char mbs[2];
+    char mbs[4];
 
     hw_tst_prologue("TESTING ONBOARD PSRAM");
     //==================================================
@@ -6207,7 +6207,7 @@ void hw_tst_psram_test(int selection)
 {
     int i,e;
     int seed,f;
-    char mbs[2];
+    char mbs[4];
 
     hw_tst_prologue("TESTING NEO2    PSRAM");
     //==================================================
