@@ -362,8 +362,6 @@ static short int gChangedPage = 0;
 static short int gCacheOutOfSync = 0;
 static int inputboxDelay = 5;
 
-int wait_for_buttons(const unsigned char* btn_p,int btn_c);
-int wait_for_button();
 #if 0
 void dump_zipram(int len,int gen);
 #endif
@@ -604,7 +602,7 @@ int shortenName(char *dst, char *src, int max)
     dst[max - right - 1] = '~';
     utility_memcpy(&dst[max - right], &src[iy], right);
     dst[max] = '\0';
-	return max;
+    return max;
 }
 
 /* cheat handling functions */
@@ -850,20 +848,20 @@ void neo_sd_to_myth_psram(unsigned char *src, int pstart, int len)
 void sort_entries()
 {
     int ix;
-	short int a,b;
-	selEntry_t temp;
-	selEntry_t* pa,*pb;
+    short int a,b;
+    selEntry_t temp;
+    selEntry_t* pa,*pb;
 
-	/*
-		Not very efficient sorting algorithm , but at least is optimized.
-		A better method would be to use a pointer swap table but that needs some work...
-	*/
+    /*
+        Not very efficient sorting algorithm , but at least is optimized.
+        A better method would be to use a pointer swap table but that needs some work...
+    */
     for (ix=0; ix<gMaxEntry-1; ix++)
     {
-		pa = &gSelections[ix];
-		pb = &gSelections[ix+1];
-		a = (short int)pa->type;
-		b = (short int)pb->type;
+        pa = &gSelections[ix];
+        pb = &gSelections[ix+1];
+        a = (short int)pa->type;
+        b = (short int)pb->type;
 
         if((a != 128) && (b == 128))
         {
@@ -873,17 +871,17 @@ void sort_entries()
             utility_memcpy_entry_block((void*)pb,(void*)&temp);
             ix = !ix ? -1 : ix-2;
         }
-		else if(((a^b) & 0x80) == 0)
-		{
+        else if(((a^b) & 0x80) == 0)
+        {
             // both entries are directories, or both are files
-			if(utility_wstrcmp(pa->name,pb->name) > 0)
-			{
-		        utility_memcpy_entry_block((void*)&temp,(void*)pa);
-		        utility_memcpy_entry_block((void*)pa,(void*)pb);
-		        utility_memcpy_entry_block((void*)pb,(void*)&temp);
-		        ix = !ix ? -1 : ix-2;
-			}
-		}
+            if(utility_wstrcmp(pa->name,pb->name) > 0)
+            {
+                utility_memcpy_entry_block((void*)&temp,(void*)pa);
+                utility_memcpy_entry_block((void*)pa,(void*)pb);
+                utility_memcpy_entry_block((void*)pb,(void*)&temp);
+                ix = !ix ? -1 : ix-2;
+            }
+        }
     }
 }
 
@@ -989,22 +987,22 @@ void get_smd_hdr(unsigned char *jump)
 
 WCHAR *get_file_ext(WCHAR *src)
 {
-	WCHAR* s = src;
-	while(*src != 0)
-	{
-		if(*src == (WCHAR)'.')
-			return src;
+    WCHAR* s = src;
+    while(*src != 0)
+    {
+        if(*src == (WCHAR)'.')
+            return src;
 
-		++src;
-	}
+        ++src;
+    }
 
-	return s;
+    return s;
 }
 
 void get_sd_ips(int entry)
 {
     char* pa;
-	WCHAR* fp;
+    WCHAR* fp;
     UINT bytesWritten = 0;
 
     gImportIPS = 0;
@@ -1014,9 +1012,9 @@ void get_sd_ips(int entry)
     utility_c2wstrcat(ipsPath, "/");
     utility_wstrcat(ipsPath, gSelections[entry].name);
 
-	fp = get_file_ext(ipsPath);
-	if(*fp == (WCHAR)'.')
-    	*fp = 0;
+    fp = get_file_ext(ipsPath);
+    if(*fp == (WCHAR)'.')
+        *fp = 0;
     utility_c2wstrcat(ipsPath, ".ips");
 
     f_close(&gSDFile);
@@ -1057,7 +1055,7 @@ void get_sd_cheat(WCHAR* sss)
 {
     char *cheatBuf = (char*)&buffer[XFER_SIZE + 2];
     WCHAR* cheatPath = &wstr_buf[gWStrOffs];
-	WCHAR* fp;
+    WCHAR* fp;
     CheatEntry* e = NULL;
     char* pb = (char*)&buffer[0];
     char* head,*sp;
@@ -1075,10 +1073,10 @@ void get_sd_cheat(WCHAR* sss)
     utility_c2wstrcat(cheatPath, "/");
     utility_wstrcat(cheatPath, sss);
 
-	fp = get_file_ext(cheatPath);
+    fp = get_file_ext(cheatPath);
 
-	if(*fp == (WCHAR)'.')
-		*fp = 0; // cut off the extension
+    if(*fp == (WCHAR)'.')
+        *fp = 0; // cut off the extension
 
     utility_c2wstrcat(cheatPath, ".cht");
 
@@ -1236,10 +1234,10 @@ void get_sd_info(int entry)
     printToScreen(gEmptyLine,1,23,0x0000);
 
     if (gSelections[entry].type == 128)
-	{
-		gSelections[entry].run = 0xee;//hack for options
+    {
+        gSelections[entry].run = 0xee;//hack for options
         return;
-	}
+    }
 
     if (path[eos-1] != (WCHAR)'/')
         utility_c2wstrcat(path, "/");
@@ -1547,7 +1545,7 @@ int update_sd_display_make_name(int e)//single session
 
 void update_sd_display()//quick hack to remove flickering
 {
-	int x1,x2,x3;
+    int x1,x2,x3;
 
     //Fast update not possible without " "statically" rendered tiles".Reload "map"
     if((gLastEntryIndex == -1) || (gCurEntry == -1) /*|| (gCurMode != MODE_SD)*/ || (gChangedPage)
@@ -1638,7 +1636,7 @@ void update_display(void)
         if (gMaxEntry)
         {
             int lines = ((gMaxEntry - gStartEntry) > PAGE_ENTRIES) ? PAGE_ENTRIES : (gMaxEntry - gStartEntry);
-			int len;
+            int len;
 
             for (ix = 0; ix < lines; ix++)
             {
@@ -1651,13 +1649,13 @@ void update_display(void)
                     utility_strncat(temp, (const char *)buffer, 34);
                     temp[35] = '\0';
                     utility_strcat(temp, "]"); // show directories in brackets
-					len = utility_strlen(temp);
+                    len = utility_strlen(temp);
                 }
                 else
-				{
-					//file
+                {
+                    //file
                     len = shortenName(temp, (char *)buffer, 36);
-				}
+                }
 
                 printToScreen(temp,20 - (len >> 1),3 + ix,((gStartEntry + ix) == gCurEntry) ? 0x2000 : 0x0000);
                 printToScreen("\x7c",1,3 + ix,0x2000);printToScreen("\x7c",38,3 + ix,0x2000);
@@ -2710,41 +2708,41 @@ void cache_loadPA(WCHAR* sss,int skip_check)
 {
     UINT fbr = 0;
     WCHAR* fnbuf;
-	WCHAR* fnew;
+    WCHAR* fnew;
 
     if(gCurMode != MODE_SD)
-	{
-		STEP_INTO("gCurMode != MODE_SD");
+    {
+        STEP_INTO("gCurMode != MODE_SD");
         return;
-	}
+    }
 
-	if(!skip_check)
+    if(!skip_check)
     {
         switch(gSelections[gCurEntry].type)
         {
             case 4://vgm
             case 127://unknown
             case 128://dir
-			{
-				STEP_INTO("gSelections[gCurEntry].type == 4/127/128");
+            {
+                STEP_INTO("gSelections[gCurEntry].type == 4/127/128");
                 return;
-			}
+            }
         }
 
         if(gSelections[gCurEntry].run == 0x27)
-		{
-			STEP_INTO("gSelections[gCurEntry].run == 0x27");
+        {
+            STEP_INTO("gSelections[gCurEntry].run == 0x27");
             return;
-		}
+        }
     }
 
-	fnbuf = &wstr_buf[gWStrOffs];
+    fnbuf = &wstr_buf[gWStrOffs];
     gWStrOffs += 512;
 
     //setStatusMessage("Reading cache...");
     utility_memset_psram(fnbuf,0,512);
 
-	ints_off();
+    ints_off();
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,CACHE_DIR);
 
@@ -2752,21 +2750,21 @@ void cache_loadPA(WCHAR* sss,int skip_check)
     utility_wstrcat(fnbuf,sss);
 
     fnew = get_file_ext(fnbuf);
-	if(*fnew == (WCHAR)'.')
-		*fnew = 0;
+    if(*fnew == (WCHAR)'.')
+        *fnew = 0;
 
     utility_c2wstrcat(fnbuf,".dxcs");
 
-	//utility_w2cstrcpy((char*)&buffer[(XFER_SIZE*2)-256],fnbuf);
-	//setStatusMessage((const char*)&buffer[(XFER_SIZE*2)-256]);
-	//delay(100);
-	ints_on();
+    //utility_w2cstrcpy((char*)&buffer[(XFER_SIZE*2)-256],fnbuf);
+    //setStatusMessage((const char*)&buffer[(XFER_SIZE*2)-256]);
+    //delay(100);
+    ints_on();
     f_close(&gSDFile);
-	ints_on();
+    ints_on();
 
     if(f_open(&gSDFile,fnbuf,FA_OPEN_EXISTING | FA_READ) != FR_OK)
     {
-		STEP_INTO("f_open(&gSDFile,fnbuf,FA_OPEN_EXISTING | FA_READ) != FR_OK");
+        STEP_INTO("f_open(&gSDFile,fnbuf,FA_OPEN_EXISTING | FA_READ) != FR_OK");
         clearStatusMessage();
         cache_invalidate_pointers();
         gCacheBlock.processed = cache_process();
@@ -2777,7 +2775,7 @@ void cache_loadPA(WCHAR* sss,int skip_check)
 
     if(gSDFile.fsize != sizeof(CacheBlock))
     {
-		STEP_INTO("gSDFile.fsize != sizeof(CacheBlock)");
+        STEP_INTO("gSDFile.fsize != sizeof(CacheBlock)");
         clearStatusMessage();
         f_close(&gSDFile);
         gWStrOffs -= 512;
@@ -2803,7 +2801,7 @@ void cache_loadPA(WCHAR* sss,int skip_check)
 
     if(gCacheBlock.processed != 0xFF)
     {
-		STEP_INTO("gCacheBlock.processed != 0xFF");
+        STEP_INTO("gCacheBlock.processed != 0xFF");
         clearStatusMessage();
         gCacheBlock.processed = cache_process();
         cache_sync();
@@ -2834,7 +2832,7 @@ void cache_sync()
 {
     UINT fbr = 0;
     WCHAR* fnbuf = &wstr_buf[gWStrOffs];
-	WCHAR* fnew;
+    WCHAR* fnew;
     if(gCurMode != MODE_SD)
         return;
 
@@ -2872,8 +2870,8 @@ void cache_sync()
     utility_wstrcat(fnbuf,gSelections[gCurEntry].name);
 
     fnew = get_file_ext(fnbuf);
-	if(*fnew == (WCHAR)'.')
-		*fnew = 0;
+    if(*fnew == (WCHAR)'.')
+        *fnew = 0;
 
     utility_c2wstrcat(fnbuf,".dxcs");
 
@@ -2968,15 +2966,15 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 {
     UINT fbr = 0;
     WCHAR* fnbuf = &wstr_buf[gWStrOffs];
-	WCHAR* fnew;
+    WCHAR* fnew;
     int sramLength,sramBankOffs,k,i,tw;
 
     //dont let this happen
     if(!gSRAMSize)
-	{
-		STEP_INTO("GSRAMSIZE == 0");
+    {
+        STEP_INTO("GSRAMSIZE == 0");
         return;
-	}
+    }
 
     gWStrOffs += 512;
 
@@ -2984,17 +2982,17 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     utility_memset(fnbuf,0,512);
 
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
-	if(gSRAMBank)
-		sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
-	else
-		sramBankOffs = max(sramLength,8192);
+    if(gSRAMBank)
+        sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
+    else
+        sramBankOffs = max(sramLength,8192);
 
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,SAVES_DIR);
 
     if(!createDirectory(fnbuf))
     {
-		STEP_INTO("createDirectory(fnbuf) == 0");
+        STEP_INTO("createDirectory(fnbuf) == 0");
         gWStrOffs -= 512;
         return;
     }
@@ -3002,13 +3000,13 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     utility_c2wstrcat(fnbuf,"/");
     utility_wstrcat(fnbuf,sss);
 
-	fnew = get_file_ext(fnbuf);
-	if(*fnew == (WCHAR)'.')
-    	*fnew = 0;
+    fnew = get_file_ext(fnbuf);
+    if(*fnew == (WCHAR)'.')
+        *fnew = 0;
 
     if(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)
     {
-		STEP_INTO("(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
+        STEP_INTO("(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
         //sms or bram
         if(gSRAMgrServiceMode==SMGR_MODE_SMS)
         {
@@ -3021,7 +3019,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     }
     else
     {
-		STEP_INTO("NOT (gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
+        STEP_INTO("NOT (gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
         utility_c2wstrcat(fnbuf,MD_32X_SAVE_EXT);
     }
 
@@ -3029,12 +3027,12 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     deleteFile(fnbuf);
 
     f_close(&gSDFile);
-	delay(80);
-	ints_on();
+    delay(80);
+    ints_on();
 
     if(f_open(&gSDFile,fnbuf,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
     {
-		STEP_INTO("f_open(&gSDFile,fnbuf,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK");
+        STEP_INTO("f_open(&gSDFile,fnbuf,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK");
         gWStrOffs -= 512;
         return;
     }
@@ -3043,7 +3041,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 
     if(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)
     {
-		STEP_INTO("(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
+        STEP_INTO("(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
         gSRAMgrServiceMode = 0x0000;
 
         //sms or bram - direct copy
@@ -3103,11 +3101,11 @@ void sram_mgr_restoreGame(int index)
 {
     UINT fbr = 0;
     WCHAR* fnbuf = &wstr_buf[gWStrOffs];
-	WCHAR* fnew;
+    WCHAR* fnew;
     int sramLength,sramBankOffs,k,i,tr;
 
-	if(!gSRAMSize)
-		return;
+    if(!gSRAMSize)
+        return;
 
     gWStrOffs += 512;
 
@@ -3120,14 +3118,14 @@ void sram_mgr_restoreGame(int index)
     utility_wstrcat(fnbuf,gSelections[index].name);
 
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
-	if(gSRAMBank)
-    	sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
-	else
-    	sramBankOffs = max(sramLength,8192);//minimum bank size is 8KB, not 4KB
+    if(gSRAMBank)
+        sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
+    else
+        sramBankOffs = max(sramLength,8192);//minimum bank size is 8KB, not 4KB
 
-	fnew = get_file_ext(fnbuf);
-	if(*fnew == (WCHAR)'.')
-    	*fnew = 0;
+    fnew = get_file_ext(fnbuf);
+    if(*fnew == (WCHAR)'.')
+        *fnew = 0;
 
     if(gSelections[index].type==2||gSRAMSize==16)
     {
@@ -3823,10 +3821,10 @@ void runCheatEditor(int index)
     utility_c2wstrcat(cheatPath, "/");
     utility_wstrcat(cheatPath, gSelections[gCurEntry].name);
 
-	WCHAR* fnew = get_file_ext(cheatPath);
+    WCHAR* fnew = get_file_ext(cheatPath);
 
-	if(*fnew == (WCHAR)'.')
-    	*fnew = 0; // cut off the extension
+    if(*fnew == (WCHAR)'.')
+        *fnew = 0; // cut off the extension
     utility_c2wstrcat(cheatPath, ".cht");
 
     f_close(&gSDFile);
@@ -3877,7 +3875,7 @@ void runCheatEditor(int index)
     gWStrOffs -= 512;
 }
 
-void hw_tst_myth_psram_test(int selection);
+void hw_tst_myth_psram_test(int selection) __attribute__ ((section (".data")));
 void hw_tst_psram_test(int selection);
 void hw_tst_sram_write(int selection);
 void hw_tst_sram_read(int selection);
@@ -4084,38 +4082,38 @@ void do_options(void)
         maxOptions++;
     }
 
-	//HW SELF TEST ROUTINES
-	{
+    //HW SELF TEST ROUTINES
+    {
         gOptions[maxOptions].name = "TEST ONBOARD PSRAM";
         gOptions[maxOptions].value = NULL;
         gOptions[maxOptions].callback = &hw_tst_myth_psram_test;
         gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
-		gOptions[maxOptions].exclusiveFCall = 1;
+        gOptions[maxOptions].exclusiveFCall = 1;
         maxOptions++;
 
         gOptions[maxOptions].name = "TEST NEO2    PSRAM";
         gOptions[maxOptions].value = NULL;
         gOptions[maxOptions].callback = &hw_tst_psram_test;
         gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
-		gOptions[maxOptions].exclusiveFCall = 1;
+        gOptions[maxOptions].exclusiveFCall = 1;
         maxOptions++;
 
         gOptions[maxOptions].name = "TEST SRAM(write)";
         gOptions[maxOptions].value = NULL;
         gOptions[maxOptions].callback = &hw_tst_sram_write;
         gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
-		gOptions[maxOptions].exclusiveFCall = 1;
+        gOptions[maxOptions].exclusiveFCall = 1;
         maxOptions++;
 
         gOptions[maxOptions].name = "TEST SRAM(read)";
         gOptions[maxOptions].value = NULL;
         gOptions[maxOptions].callback = &hw_tst_sram_read;
         gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
-		gOptions[maxOptions].exclusiveFCall = 1;
+        gOptions[maxOptions].exclusiveFCall = 1;
         maxOptions++;
-	}
+    }
 
-	//List one ips patch
+    //List one ips patch
     if( (ipsPath[0] != 0) )
     {
         utility_w2cstrcpy((char*)buffer, ipsPath);
@@ -4413,8 +4411,8 @@ void do_options(void)
                                 (gOptions[ix].patch)(ix);
                         }
 
-						//cache_load();
-						gCacheOutOfSync = 1;
+                        //cache_load();
+                        gCacheOutOfSync = 1;
                         if(gManageSaves)
                         {
                             f_close_zip(&gSDFile);
@@ -4471,8 +4469,8 @@ void do_options(void)
                                 (gOptions[ix].patch)(ix);
                         }
 
-						//cache_load();
-						gCacheOutOfSync = 1;
+                        //cache_load();
+                        gCacheOutOfSync = 1;
                         if(gManageSaves)
                         {
                             f_close_zip(&gSDFile);
@@ -4866,8 +4864,8 @@ void run_rom(int reset_mode)
         {
             // copy file to flash cart psram
             copyGame(&neo_copyto_psram, &neo_copy_sd, 0, 0, fsize, "Loading ", temp);
-			cache_load();
-			gCacheOutOfSync = 1;
+            cache_load();
+            gCacheOutOfSync = 1;
             if(gManageSaves)
             {
                 gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
@@ -4915,8 +4913,8 @@ void run_rom(int reset_mode)
             if (!utility_memcmp((void*)0x200180, "GM MK-1563 -00", 14) && (fsize == 0x200000))
                 fsize = 0x300000;
 
-			cache_load();
-			gCacheOutOfSync = 1;
+            cache_load();
+            gCacheOutOfSync = 1;
             if(gManageSaves)
             {
                 gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
@@ -5594,25 +5592,25 @@ int main(void)
     get_sd_directory(-1);               /* get root directory of sd card */
 #endif
 
-	cache_invalidate_pointers();
-	utility_memcpy(gCacheBlock.sig,"DXCS",4);
-	gCacheBlock.processed = 0;
-	gCacheBlock.version = 1;
+    cache_invalidate_pointers();
+    utility_memcpy(gCacheBlock.sig,"DXCS",4);
+    gCacheBlock.processed = 0;
+    gCacheBlock.version = 1;
 
     if(gSdDetected)
     {
 #if 0
-	dump_zipram(16*1024,1);
+    dump_zipram(16*1024,1);
 #endif
         clear_screen();
         setStatusMessage("Loading cache & configuration...");
         loadConfig();
 
         char* p = config_getS("romName");
-		STEP_INTO("Checking last loaded rom..");
+        STEP_INTO("Checking last loaded rom..");
         if(p)
         {
-			ints_off();
+            ints_off();
             if(utility_strlen(p) > 2)
             {
                 WCHAR* buf = &wstr_buf[gWStrOffs];
@@ -5622,13 +5620,13 @@ int main(void)
                 cache_loadPA(buf,1);
 
                 if(p[0] == '*')
-				{
-					STEP_INTO("SMGR_STATUS_NULL");
+                {
+                    STEP_INTO("SMGR_STATUS_NULL");
                     gSRAMgrServiceStatus = SMGR_STATUS_NULL;
-				}
+                }
                 else if(gSRAMgrServiceStatus == SMGR_STATUS_BACKUP_SRAM)
                 {
-					STEP_INTO("SMGR_STATUS_BACKUP_SRAM");
+                    STEP_INTO("SMGR_STATUS_BACKUP_SRAM");
                     gSRAMgrServiceMode = (short int)config_getI("romType");
                     sram_mgr_saveGamePA(buf);
                     setStatusMessage("Loading cache & configuration...");
@@ -5637,7 +5635,7 @@ int main(void)
                     config_push("romType","0");
 
                     gSRAMgrServiceStatus = SMGR_STATUS_NULL; //just in case mute cache even if the config has been updated
-					gCacheOutOfSync = 1;
+                    gCacheOutOfSync = 1;
                     cache_sync();
                     updateConfig();
                 }
@@ -5996,12 +5994,12 @@ int main(void)
     return 0;
 }
 
-int wait_for_button()
+int wait_for_buttons(unsigned short initial)
 {
-	unsigned short int buttons,changed;
+    unsigned short int buttons;
 
-	while(1)
-	{
+    while(1)
+    {
         delay(2);
         buttons = get_pad(0);
 
@@ -6016,131 +6014,67 @@ int wait_for_button()
             }
         }
 
-        if ((buttons & SEGA_CTRL_BUTTONS) != gButtons)
-        {
-            changed = (buttons & SEGA_CTRL_BUTTONS) ^ gButtons;
-            gButtons = buttons & SEGA_CTRL_BUTTONS;
+        if ((buttons & SEGA_CTRL_BUTTONS) != initial)
+            break;
+    }
 
-			#define gen_branch(_B_)\
-			{\
-		        if( (changed & (_B_) ) && (buttons & (_B_)) )\
-		        {\
-					return (_B_);\
-		        }\
-			}
-
-			gen_branch(SEGA_CTRL_UP);
-			gen_branch(SEGA_CTRL_DOWN);
-			gen_branch(SEGA_CTRL_LEFT);
-			gen_branch(SEGA_CTRL_RIGHT);
-			gen_branch(SEGA_CTRL_A);
-			gen_branch(SEGA_CTRL_B);		
-			gen_branch(SEGA_CTRL_C);
-			gen_branch(SEGA_CTRL_START);
-			#undef gen_branch
-
-        }//changed??
-	}
-
-	return 0;
-}
-
-int wait_for_buttons(const unsigned char* btn_p,int btn_c)
-{
-	unsigned short int buttons,changed;
-
-	if(0 == btn_c)
-	{
-		return 0;
-	}
-
-	while(1)
-	{
-        delay(2);
-        buttons = get_pad(0);
-
-        if ((buttons & SEGA_CTRL_TYPE) == SEGA_CTRL_NONE)
-        {
-            buttons = get_pad(1);
-            if ((buttons & SEGA_CTRL_TYPE) == SEGA_CTRL_NONE)
-            {
-                // no controllers, loop until one plugged in
-                delay(20);
-                continue;
-            }
-        }
-
-        if ((buttons & SEGA_CTRL_BUTTONS) != gButtons)
-        {
-            changed = (buttons & SEGA_CTRL_BUTTONS) ^ gButtons;
-            gButtons = buttons & SEGA_CTRL_BUTTONS;
-
-			int i;
-			for(i = 0;i<btn_c;i++)
-			{	
-				unsigned char ld = btn_p[i];
-
-		        if( (changed & ld ) && (buttons & ld) )
-		        {
-					return ld;
-		        }
-			}
-        }//changed??
-	}
-
-	return 0;
+    return buttons & SEGA_CTRL_BUTTONS;
 }
 
 unsigned char hw_tst_dbg_x,hw_tst_dbg_y;
 
-int hw_tst_wait_event()
+void hw_tst_wait_event(unsigned short events)
 {
-	const unsigned char btns[] = {SEGA_CTRL_A,SEGA_CTRL_B};
-	return wait_for_buttons(btns,sizeof(btns) / sizeof(btns[0]));
+	unsigned short buttons = 0;
+
+	while (!buttons)
+		buttons = wait_for_buttons(0) & events;
+	while (buttons)
+		buttons = wait_for_buttons(buttons) & events;
 }
 
 void hw_tst_new_ln()
 {
-	if((++hw_tst_dbg_y) <= 20)
-	{
-		return;
-	}
+    if((++hw_tst_dbg_y) <= 23)
+    {
+        return;
+    }
 
-	hw_tst_dbg_y = 5;
+    hw_tst_dbg_y = 5;
 }
 
 void hw_tst_follow(const char* msg,int color)
 {
-	printToScreen(msg,hw_tst_dbg_x,hw_tst_dbg_y,((unsigned short)color));
-	hw_tst_new_ln();
+    printToScreen(msg,hw_tst_dbg_x,hw_tst_dbg_y,((unsigned short)color));
+    hw_tst_new_ln();
 }
 
 void hw_gen_pattern_16KB(unsigned char* block,int* seed,int* f)
 {
-	register unsigned char* a0 = block;
-	register unsigned char* a1 = a0 + (16 * 1024);
-	register unsigned char d0 = (unsigned char)*seed;
-	register int d1 = *f;
+    register unsigned char* a0 = block;
+    register unsigned char* a1 = a0 + (16 * 1024);
+    register unsigned char d0 = (unsigned char)*seed;
+    register int d1 = *f;
 
-	do
-	{
-		*a0 = ((d1 << 8)) - (1 + (d0--));
-		d1 ^= 1;
-	}while((++a0) < a1);
+    do
+    {
+        *a0 = ((d1 << 8)) - (1 + (d0--));
+        d1 ^= 1;
+    }while((++a0) < a1);
 
-	*f = d1;
-	*seed = d0;
+    *f = d1;
+    *seed = d0;
 }
 
 void hw_tst_prologue(const char* s)
 {
-	int ix;
-	
-	ints_off();
-	neo2_disable_sd();
+    int ix;
 
-	ints_on();
-	clear_screen();
+    ints_off();
+    neo2_disable_sd();
+
+    ints_on();
+    clear_screen();
 
     gCursorX = 1;
     gCursorY = 1;
@@ -6165,18 +6099,42 @@ void hw_tst_prologue(const char* s)
     gCursorX = 1;
     gCursorY = 25;
     put_str(gFBottomLine, 0x2000);
-	hw_tst_dbg_x = 9;
-	hw_tst_dbg_y = 3;
-	hw_tst_follow(s,0x2000);
-	hw_tst_dbg_y = 5;
-	hw_tst_dbg_x = 8;
+    hw_tst_dbg_x = 9;
+    hw_tst_dbg_y = 3;
+    hw_tst_follow(s,0x2000);
+    hw_tst_dbg_y = 5;
+    hw_tst_dbg_x = 8;
 }
 
 void hw_tst_epilogue()
 {
-	ints_on();
+    hw_tst_new_ln();
+    hw_tst_follow("Job finished!",0);
+    hw_tst_follow("Press 'B' to exit",0x2000);
 
-	while (1) {}
+    ints_on();
+    hw_tst_wait_event(SEGA_CTRL_A | SEGA_CTRL_B);
+
+    gCurEntry = 0;
+    gStartEntry = 0;
+    gMaxEntry = 0;
+    if (gCurMode == MODE_SD)
+    {
+        gCursorY = 0;
+        neo2_enable_sd();
+        get_sd_directory(-1);   /* get root directory of sd card */
+        loadConfig();
+    }
+    else
+    {
+        gCurMode = MODE_FLASH;
+        neo2_disable_sd();
+        get_menu_flash();
+    }
+
+    clear_screen();
+    gUpdate = -1;
+    gButtons = 0;
 }
 
 void hw_tst_dump()
@@ -6186,219 +6144,224 @@ void hw_tst_dump()
 
 void hw_tst_myth_psram_test(int selection)
 {
-	int i,e;
-	int seed,f;
-	char mbs[2];
+    int i,e;
+    int sseed, seed,f;
+    char mbs[2];
 
-	hw_tst_prologue("TESTING ONBOARD PSRAM");
-	//==================================================
+    hw_tst_prologue("TESTING ONBOARD PSRAM");
+    //==================================================
 
-	hw_tst_dbg_x += 4;
-	hw_tst_follow("Testing...",0x0000);
-	hw_tst_new_ln();
-	ints_off();
+    hw_tst_dbg_x += 4;
+    hw_tst_follow("Testing...",0x0000);
+    hw_tst_new_ln();
+    ints_off();
 
-	int a = hw_tst_dbg_x - (6 + 4);
-	int b = a + 30 + 5;
-	int x = a;
-	int y = hw_tst_dbg_y;
-	int z = -1;
+    int a = hw_tst_dbg_x - (6 + 4);
+    int b = a + 30 + 5;
+    int x = a;
+    int y = hw_tst_dbg_y;
+    int z = -1;
 
-	for(e = 0,seed = 0,f = 1,i = 0;i<64*(128*1024);i += 16 * 1024)
-	{
-		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
-		neo_copyto_myth_psram(&buffer[0],i,16*1024);
-		neo_copyfrom_myth_psram(&buffer[16*1024],i,16*1024);
-		if ((i>>17) > z)
-		{
-			z = i>>17;
-			UTIL_IntegerToString(mbs,z+1,10);
-			printToScreen(mbs,x,y,0);
-			x += 2 + ((z+1)>=10) + ((z+1)>=100);
-			if (x >= b) {x = a;++y;}
-		}
+    for(e = 0,seed = 0,f = 1,i = 0;i<64*(128*1024);i += 16 * 1024)
+    {
+        sseed = seed;
+        hw_gen_pattern_16KB(&buffer[0],&seed,&f);
+        neo_copyfrom_myth_psram(&buffer[16*1024],i,16*1024); // save psram
+        neo_copyto_myth_psram(&buffer[0],i,16*1024);
+        neo_copyfrom_myth_psram(&buffer[0],i,16*1024);
+        neo_copyto_myth_psram(&buffer[16*1024],i,16*1024); // restore psram
+        seed = sseed;
+        hw_gen_pattern_16KB(&buffer[16*1024],&seed,&f);
+        if ((i>>17) > z)
+        {
+            z = i>>17;
+            UTIL_IntegerToString(mbs,z+1,10);
+            printToScreen(mbs,x,y,0);
+            x += 2 + ((z+1)>=10) + ((z+1)>=100);
+            if (x >= b) {x = a;++y;}
+        }
 
-		if(utility_memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
-		{
-			e = 1;
-			ints_on();
-			hw_tst_follow("Testing...FAILED!",0x4000);
-			break;
-		}
-	}
+        if(utility_memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
+        {
+            e = 1;
+            ints_on();
+            hw_tst_follow("Testing...FAILED!",0x4000);
+            break;
+        }
+    }
 
-	hw_tst_dbg_y = y + 2;
-	ints_on();
-	if(!e)
-	{
-		hw_tst_follow("Testing...PASSED!",0x2000);
-	}
+    hw_tst_dbg_y = y + 2;
+    ints_on();
+    if(!e)
+    {
+        hw_tst_follow("Testing...PASSED!",0x2000);
+    }
 
-	hw_tst_dump();
+    hw_tst_dump();
 
-	//==================================================
-	hw_tst_epilogue();
+    //==================================================
+    hw_tst_epilogue();
 }
 
 void hw_tst_psram_test(int selection)
 {
-	int i,e;
-	int seed,f;
-	char mbs[2];
+    int i,e;
+    int seed,f;
+    char mbs[2];
 
-	hw_tst_prologue("TESTING NEO2    PSRAM");
-	//==================================================
-	hw_tst_dbg_x += 4;
-	hw_tst_follow("Testing...",0x0000);
-	hw_tst_new_ln();
-	ints_off();
+    hw_tst_prologue("TESTING NEO2    PSRAM");
+    //==================================================
+    hw_tst_dbg_x += 4;
+    hw_tst_follow("Testing...",0x0000);
+    hw_tst_new_ln();
+    ints_off();
 
-	int a = hw_tst_dbg_x - (6 + 4);
-	int b = a + 30 + 5;
-	int x = a;
-	int y = hw_tst_dbg_y;
-	int z = -1;
+    int a = hw_tst_dbg_x - (6 + 4);
+    int b = a + 30 + 5;
+    int x = a;
+    int y = hw_tst_dbg_y;
+    int z = -1;
 
-	for(e = 0,seed = 0,f = 1,i = 0;i<128*(128*1024);i += 16 * 1024)
-	{
-		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
-		neo_copyto_psram(&buffer[0],i,16*1024);
-		neo_copyfrom_psram(&buffer[16*1024],i,16*1024);
+    for(e = 0,seed = 0,f = 1,i = 0;i<128*(128*1024);i += 16 * 1024)
+    {
+        hw_gen_pattern_16KB(&buffer[0],&seed,&f);
+        neo_copyto_psram(&buffer[0],i,16*1024);
+        neo_copyfrom_psram(&buffer[16*1024],i,16*1024);
 
-		if ((i>>17) > z)
-		{
-			z = i>>17;
-			UTIL_IntegerToString(mbs,z+1,10);
-			printToScreen(mbs,x,y,0);
-			x += 2 + ((z+1)>=10) + ((z+1)>=100);
-			if (x >= b) {x = a;++y;}
-		}
+        if ((i>>17) > z)
+        {
+            z = i>>17;
+            UTIL_IntegerToString(mbs,z+1,10);
+            printToScreen(mbs,x,y,0);
+            x += 2 + ((z+1)>=10) + ((z+1)>=100);
+            if (x >= b) {x = a;++y;}
+        }
 
-		if(utility_memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
-		{
-			e = 1;
-			ints_on();
-			hw_tst_follow("Testing...FAILED!",0x4000);
-			break;
-		}
-	}
+        if(utility_memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
+        {
+            e = 1;
+            ints_on();
+            hw_tst_follow("Testing...FAILED!",0x4000);
+            break;
+        }
+    }
 
-	hw_tst_dbg_y = y + 2;
-	ints_on();
-	if(!e)
-	{
-		hw_tst_follow("Testing...PASSED!",0x2000);
-	}
+    hw_tst_dbg_y = y + 2;
+    ints_on();
+    if(!e)
+    {
+        hw_tst_follow("Testing...PASSED!",0x2000);
+    }
 
-	hw_tst_dump();
+    hw_tst_dump();
 
-	//==================================================
-	hw_tst_epilogue();
+    //==================================================
+    hw_tst_epilogue();
 }
 
 void hw_tst_sram_write(int selection)
 {
-	int i;
-	int seed,f;
+    int i;
+    int seed,f;
 
-	hw_tst_prologue("TESTING SRAM(write)");
-	//==================================================
+    hw_tst_prologue("TESTING SRAM(write)");
+    //==================================================
 
-	hw_tst_follow("Writing seed...",0x0000);
-	hw_tst_new_ln();
+    hw_tst_follow("Writing seed...",0x0000);
+    hw_tst_new_ln();
 
-	ints_off();
-	for(seed = 0,f = 1,i = 0;i<1*(128*1024);i += 16 * 1024)
-	{
-		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
-		neo_copyto_sram(&buffer[0],i,16*1024);
-	}
-	ints_on();
+    ints_off();
+    for(seed = 0,f = 1,i = 0;i<1*(128*1024);i += 16 * 1024)
+    {
+        hw_gen_pattern_16KB(&buffer[0],&seed,&f);
+        neo_copyto_sram(&buffer[0],i,16*1024);
+    }
+    ints_on();
 
-	hw_tst_follow("Writing seed...FINISHED!",0x2000);
+    hw_tst_follow("Writing seed...FINISHED!",0x2000);
 
-	//==================================================
-	hw_tst_epilogue();
+    //==================================================
+    hw_tst_epilogue();
 }
 
 void hw_tst_sram_read(int selection)
 {
-	int i,e;
-	int seed,f;
+    int i,e;
+    int seed,f;
 
-	hw_tst_prologue("TESTING SRAM(read)");
-	//==================================================
+    hw_tst_prologue("TESTING SRAM(read)");
+    //==================================================
 
-	hw_tst_follow("Testing SRAM...",0x0000);
-	hw_tst_new_ln();
+    hw_tst_follow("Testing SRAM...",0x0000);
+    hw_tst_new_ln();
 
-	ints_off();
-	for(e = 0,seed = 0,f = 1,i = 0;i<1*(128*1024);i += 16 * 1024)
-	{
-		hw_gen_pattern_16KB(&buffer[0],&seed,&f);
-		neo_copyfrom_sram(&buffer[16*1024],i,16*1024);
-		
-		if(utility_memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
-		{
-			ints_on();
-			e = 1;
-			hw_tst_follow("Testing SRAM...FAILED!",0x4000);
-			break;
-		}
-	}
+    ints_off();
+    for(e = 0,seed = 0,f = 1,i = 0;i<1*(128*1024);i += 16 * 1024)
+    {
+        hw_gen_pattern_16KB(&buffer[0],&seed,&f);
+        neo_copyfrom_sram(&buffer[16*1024],i,16*1024);
 
-	ints_on();
+        if(utility_memcmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
+        {
+            ints_on();
+            e = 1;
+            hw_tst_follow("Testing SRAM...FAILED!",0x4000);
+            break;
+        }
+    }
 
-	if(!e)
-	{
-		hw_tst_follow("Testing SRAM...PASSED!",0x2000);
-	}
+    ints_on();
 
-	hw_tst_dump();
+    if(!e)
+    {
+        hw_tst_follow("Testing SRAM...PASSED!",0x2000);
+    }
 
-	//==================================================
-	hw_tst_epilogue();
+    hw_tst_dump();
+
+    //==================================================
+    hw_tst_epilogue();
 }
 #if 0
 void dump_zipram(int len,int gen)//Not a real dumping routine.Its more like response dumper :)
 {
-	int i,j;
-	WCHAR* fnbuf = &wstr_buf[gWStrOffs];
-	FIL f;
-	UINT ts;
+    int i,j;
+    WCHAR* fnbuf = &wstr_buf[gWStrOffs];
+    FIL f;
+    UINT ts;
 
-	len = (len > XFER_SIZE) ? XFER_SIZE : len;
-	gWStrOffs += 512;
+    len = (len > XFER_SIZE) ? XFER_SIZE : len;
+    gWStrOffs += 512;
 
     utility_c2wstrcpy(fnbuf,"/menu/md/ZIP.BIN");
-	memset(&f,0,sizeof(FIL));
+    memset(&f,0,sizeof(FIL));
 
-	ints_on();
+    ints_on();
     if(f_open(&f,fnbuf,FA_CREATE_ALWAYS | FA_WRITE) != FR_OK)
-	{
-		gWStrOffs -= 512;
-		return;
-	}
+    {
+        gWStrOffs -= 512;
+        return;
+    }
 
-	ints_off();
-	if (gen)
-	{
-		for (i = 0;i < len;i += 256)
-		{
-			for (j = 0;j < 256;j++)
-				buffer[i + j] = j;
-		}
-		neo_copyto_psram(&buffer[0],0,len);
-	}
+    ints_off();
+    if (gen)
+    {
+        for (i = 0;i < len;i += 256)
+        {
+            for (j = 0;j < 256;j++)
+                buffer[i + j] = j;
+        }
+        neo_copyto_psram(&buffer[0],0,len);
+    }
 
-	neo_copyfrom_psram(&buffer[len],0,len);
+    neo_copyfrom_psram(&buffer[len],0,len);
 
-	//write resp
-	ints_on();
-	f_write(&f,&buffer[len],len,&ts);
+    //write resp
+    ints_on();
+    f_write(&f,&buffer[len],len,&ts);
 
-	f_close(&f);
-	gWStrOffs -= 512;
+    f_close(&f);
+    gWStrOffs -= 512;
 }
 #endif
 

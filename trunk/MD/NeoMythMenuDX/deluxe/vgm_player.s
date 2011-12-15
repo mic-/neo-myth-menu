@@ -39,40 +39,38 @@ ExitVGM:
 | reset YM2612
         lea     FMReset(pc),a5
         lea     0xA00000,a0
-        move.w  #0x4000,d1
-        moveq   #26,d2
+        moveq   #6,d3
+0:
+        move.b  (a5)+,d0                /* FM reg */
+        move.b  (a5)+,d1                /* FM data */
+        moveq   #15,d2
 1:
-        move.b  (a5)+,d1                /* FM reg */
-        move.b  (a5)+,0(a0,d1.w)        /* FM data */
-        nop
-        nop
-        dbra    d2,1b
-
-        moveq   #0x30,d0
-        moveq   #0x5F,d2
-2:
         move.b  d0,0x4000(a0)           /* FM reg */
         nop
         nop
-        move.b  #0xFF,0x4001(a0)        /* FM data */
+        move.b  d1,0x4001(a0)           /* FM data */
         nop
         nop
         move.b  d0,0x4002(a0)           /* FM reg */
         nop
         nop
-        move.b  #0xFF,0x4003(a0)        /* FM data */
-        nop
-        nop
+        move.b  d1,0x4003(a0)           /* FM data */
         addq.b  #1,d0
+        dbra    d2,1b
+        dbra    d3,0b
+
+        move.w  #0x4000,d1
+        moveq   #28,d2
+2:
+        move.b  (a5)+,d1                /* YM reg */
+        move.b  (a5)+,0(a0,d1.w)        /* YM data */
         dbra    d2,2b
 
 | reset PSG
-        lea     PSGReset(pc),a5
-        lea     0xC00000,a0
-        move.b  (a5)+,0x0011(a0)
-        move.b  (a5)+,0x0011(a0)
-        move.b  (a5)+,0x0011(a0)
-        move.b  (a5),0x0011(a0)
+        move.b  #0x9F,0xC00011
+        move.b  #0xBF,0xC00011
+        move.b  #0xDF,0xC00011
+        move.b  #0xFF,0xC00011
 9:
         /* wait on C released */
         move.b  0xA10003,d0     /* - 1 c b r l d u */
@@ -82,6 +80,7 @@ ExitVGM:
         move.w  #0x2000,sr
         movem.l (sp)+,d2-d7/a2-a6
         rts
+
 
 | void PlayVGM(void);
         .global PlayVGM
@@ -138,14 +137,11 @@ PlayVGM:
 | main player loop - process next VGM command
 
 read_cmd:
+        moveq   #0,d0
         fetch_vgm d0            /* Read one byte from the VGM data */
-
-        moveq   #0,d1
-        move.b  d0,d1
-        add.w   d1,d1
-        lea     cmd_table,a0
-        move.w  0(a0,d1.w),d1
-        jmp     0(a0,d1.w)      /* dispatch command */
+        add.w   d0,d0
+        move.w  cmd_table(pc,d0.w),d1
+        jmp     cmd_table(pc,d1.w)      /* dispatch command - 92 cycles */
 
 cmd_table:
         /* 00 - 0F */
@@ -426,76 +422,72 @@ reserved_0:
 
 reserved_1:
         addq.l  #1,a6
-        bra     read_cmd        /* command has no args */
+        bra     read_cmd        /* command has one arg */
 
 reserved_2:
         addq.l  #2,a6
-        bra     read_cmd        /* command has no args */
+        bra     read_cmd        /* command has two args */
 
 reserved_3:
         addq.l  #3,a6
-        bra     read_cmd        /* command has no args */
+        bra     read_cmd        /* command has three args */
 
 reserved_4:
         addq.l  #4,a6
-        bra     read_cmd        /* command has no args */
+        bra     read_cmd        /* command has four args */
 
 write_psg:
         fetch_vgm d0
         move.b  d0,0xC00011
-        subi.l  #112+56+42,d5
+        subi.l  #92+56+42,d5
         bra     read_cmd
 
 write_fm0:
         fetch_vgm d0
         move.b  d0,0xA04000
-        nop
-        nop
         fetch_vgm d0
         move.b  d0,0xA04001
-        subi.l  #112+112+66,d5
+        subi.l  #92+112+58,d5
         bra     read_cmd
 
 write_fm1:
         fetch_vgm d0
         move.b  d0,0xA04002
-        nop
-        nop
         fetch_vgm d0
         move.b  d0,0xA04003
-        subi.l  #112+112+66,d5
+        subi.l  #92+112+58,d5
         bra     read_cmd
 
 wait_1:
-        addi.l  #173-138,d5
+        addi.l  #173-118,d5
 0:
         subi.l  #26,d5          /* 16 for subi, 10 for bpl */
         bpl.b   0b
         bra     read_cmd
 
 wait_2:
-        addi.l  #173*2-138,d5
+        addi.l  #173*2-118,d5
 0:
         subi.l  #26,d5          /* 16 for subi, 10 for bpl */
         bpl.b   0b
         bra     read_cmd
 
 wait_3:
-        addi.l  #173*3-138,d5
+        addi.l  #173*3-118,d5
 0:
         subi.l  #26,d5          /* 16 for subi, 10 for bpl */
         bpl.b   0b
         bra     read_cmd
 
 wait_4:
-        addi.l  #173*4-138,d5
+        addi.l  #173*4-118,d5
 0:
         subi.l  #26,d5          /* 16 for subi, 10 for bpl */
         bpl.b   0b
         bra     read_cmd
 
 wait_5:
-        addi.l  #173*5-138,d5
+        addi.l  #173*5-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -503,7 +495,7 @@ wait_5:
         bra     read_cmd
 
 wait_6:
-        addi.l  #173*6-138,d5
+        addi.l  #173*6-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -511,7 +503,7 @@ wait_6:
         bra     read_cmd
 
 wait_7:
-        addi.l  #173*7-138,d5
+        addi.l  #173*7-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -519,7 +511,7 @@ wait_7:
         bra     read_cmd
 
 wait_8:
-        addi.l  #173*8-138,d5
+        addi.l  #173*8-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -527,7 +519,7 @@ wait_8:
         bra     read_cmd
 
 wait_9:
-        addi.l  #173*9-138,d5
+        addi.l  #173*9-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -535,7 +527,7 @@ wait_9:
         bra     read_cmd
 
 wait_10:
-        addi.l  #173*10-138,d5
+        addi.l  #173*10-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -543,7 +535,7 @@ wait_10:
         bra     read_cmd
 
 wait_11:
-        addi.l  #173*11-138,d5
+        addi.l  #173*11-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -551,7 +543,7 @@ wait_11:
         bra     read_cmd
 
 wait_12:
-        addi.l  #173*12-138,d5
+        addi.l  #173*12-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -559,7 +551,7 @@ wait_12:
         bra     read_cmd
 
 wait_13:
-        addi.l  #173*13-138,d5
+        addi.l  #173*13-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -567,7 +559,7 @@ wait_13:
         bra     read_cmd
 
 wait_14:
-        addi.l  #173*14-138,d5
+        addi.l  #173*14-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -575,7 +567,7 @@ wait_14:
         bra     read_cmd
 
 wait_15:
-        addi.l  #173*15-138,d5
+        addi.l  #173*15-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -583,7 +575,7 @@ wait_15:
         bra     read_cmd
 
 wait_16:
-        addi.l  #173*16-138,d5
+        addi.l  #173*16-118,d5
 0:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -592,12 +584,13 @@ wait_16:
 
 wait_735:
         move.w  #735,d0
-        subi.l  #112+8+16+10,d5
+        subi.l  #92+8+16+10,d5
 0:
         subq.w  #1,d0
         bcs     read_cmd
 
-        addi.l  #173-32,d5
+        addi.l  #173-42,d5
+        bmi.b   0b
 1:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -606,12 +599,13 @@ wait_735:
 
 wait_882:
         move.w  #882,d0
-        subi.l  #112+8+16+10,d5
+        subi.l  #92+8+16+10,d5
 0:
         subq.w  #1,d0
         bcs     read_cmd
 
-        addi.l  #173-32,d5
+        addi.l  #173-42,d5
+        bmi.b   0b
 1:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -623,12 +617,13 @@ wait_nnnn:
         lsl.w   #8,d0
         fetch_vgm d0
         ror.w   #8,d0
-        subi.l  #112+112+44+16+10,d5
+        subi.l  #92+112+44+16+10,d5
 0:
         subq.w  #1,d0
         bcs     read_cmd
 
-        addi.l  #173-32,d5
+        addi.l  #173-42,d5
+        bmi.b   0b
 1:
         check_button
         subi.l  #36+26,d5       /* 36 for check button, 16 for subi, 10 for bpl */
@@ -636,113 +631,113 @@ wait_nnnn:
         bra.b   0b
 
 write_pcm_wait_0:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     read_cmd
 
 write_pcm_wait_1:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_1
 
 write_pcm_wait_2:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_2
 
 write_pcm_wait_3:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_3
 
 write_pcm_wait_4:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_4
 
 write_pcm_wait_5:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_5
 
 write_pcm_wait_6:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_6
 
 write_pcm_wait_7:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_7
 
 write_pcm_wait_8:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_8
 
 write_pcm_wait_9:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_9
 
 write_pcm_wait_10:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_10
 
 write_pcm_wait_11:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_11
 
 write_pcm_wait_12:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_12
 
 write_pcm_wait_13:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_13
 
 write_pcm_wait_14:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_14
 
 write_pcm_wait_15:
-        fetch_pcm d0
         move.b  #0x2A,0xA04000
+        fetch_pcm d0
         move.b  d0,0xA04001
         subi.l  #36+26,d5
         bra     wait_15
@@ -825,6 +820,15 @@ end_data:
 
 
 FMReset:
+        /* block settings */
+        .byte   0x30,0x00
+        .byte   0x40,0x7F
+        .byte   0x50,0x1F
+        .byte   0x60,0x1F
+        .byte   0x70,0x1F
+        .byte   0x80,0xFF
+        .byte   0x90,0x00
+
         /* disable LFO */
         .byte   0,0x22
         .byte   1,0x00
@@ -840,6 +844,8 @@ FMReset:
         .byte   1,0x02
         .byte   1,0x06
         /* disable DAC */
+        .byte   0,0x2B
+        .byte   1,0x80
         .byte   0,0x2A
         .byte   1,0x80
         .byte   0,0x2B
@@ -857,11 +863,5 @@ FMReset:
         .byte   3,0x00
         .byte   2,0xB6
         .byte   3,0x00
-
-PSGReset:
-        .byte   0x9f
-        .byte   0xbf
-        .byte   0xdf
-        .byte   0xff
 
         .align  2
