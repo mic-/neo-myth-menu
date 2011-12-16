@@ -1429,7 +1429,11 @@ multi_sd_to_myth_psram:
         lsl.w   #4,d1
         or.b    d2,d1                   /* second byte */
 
+.if 1
         move.w  d1,(a0)+
+.else
+		swap	d1
+.endif
 
         move.w  (a1),d1
         moveq   #15,d2
@@ -1445,7 +1449,11 @@ multi_sd_to_myth_psram:
         lsl.w   #4,d1
         or.b    d2,d1                   /* second byte */
 
+.if 1
         move.w  d1,(a0)+
+.else
+		move.l	d1,(a0)+
+.endif
 
         dbra    d0,2b
 
@@ -1485,9 +1493,117 @@ multi_sd_to_myth_psram:
         moveq   #0,d0                   /* FALSE */
         rts
 
+.if 1
+| int neo_seed_cmp_psram(void* seed,int pstart,int len);
+        .global neo_seed_cmp_psram
+neo_seed_cmp_psram:
+        lea     0xA10000,a1
+        bsr     _neo_select_psram       /* select flash cart PSRAM (write-enabled) */
 
+        move.l  8(sp),d0                /* pstart */
+        andi.l  #0xF00000,d0            /* closest 1MB */
+        bsr     _neo_set_fbank          /* set the flash space bank registers */
+        move.l  #0x100000,d0
+        bsr     _neo_set_fsize          /* set the flash space bank size to 1MB */
+
+        movea.l 4(sp),a1               
+        move.l  8(sp),d1               
+        andi.l  #0x0FFFFE,d1           
+        movea.l d1,a0
+        move.l  12(sp),d0              
+        lsr.l   #1,d0                  
+        subq.w  #1,d0
+		moveq	#0,d1
+
+.if 0	|Use seed ?
+0:
+		move.w	(a0)+,d1
+		move.w	d1,(a1)
+		sub.w	(a1)+,d1
+		dbne	d0,0b
+.else	|Ok generate something on the fly
+		move.l  d2,-(sp)
+		move.w	#0xffff,d2
+0:
+		addq.w	#1,d2
+		move.w	d2,(a1)
+		move.w	d2,d1
+		sub.w	(a1)+,d1
+		dbne	d0,0b
+		move.l	(sp)+,d2
+.endif
+
+|		Check both count + delta. Non zero = failure
+		ext.l	d1
+		add.w	#1,d0
+		add.l	d1,d0
+		move.l  d0,-(sp)
+
+        lea     0xA10000,a1
+        move.w  #0x0000,WE_IO(a1)       /* write-protect psram */
+        move.w  #0x0000,DAT_SWAP(a1)    /* enable byte swap function */
+        move.l  #0x00E2D200,d0
+        bsr     _neo_asic_cmd           /* write-protect flash cart psram */
+        bsr     _neo_select_menu        /* select Menu Flash */
+
+		move.l	(sp)+,d0
+		rts
+
+| int neo_seed_cmp_myth_psram(void* seed,int pstart,int len);
+        .global neo_seed_cmp_myth_psram
+neo_seed_cmp_myth_psram:
+        lea     0xA10000,a1
+
+        move.l  8(sp),d0                /* pstart */
+        move.w  #20,d1
+        lsr.l   d1,d0                   /* bank = pstart / 1MB  */
+        move.w  d0,PRAM_BIO(a1)         /* set the neo myth psram bank register */
+        move.w  #0x00F8,PRAM_ZIO(a1)    /* set the neo myth psram bank size to 1MB */
+        move.w  #0x0007,OPTION_IO(a1)   /* set mode 7 (copy mode) */
+        move.w  #0x0006,WE_IO(a1)       /* map bank 7, write-enable neo myth psram */
+
+        movea.l 4(sp),a0                
+        move.l  8(sp),d1                
+        andi.l  #0x0FFFFE,d1          
+        ori.l   #0x200000,d1            
+        movea.l d1,a1
+        move.l  12(sp),d0               
+        lsr.l   #1,d0                
+        subq.w  #1,d0
+		moveq	#0,d1
+
+.if 0	|Use seed ?
+0:
+		move.w	(a0)+,d1
+		move.w	d1,(a1)
+		sub.w	(a1)+,d1
+		dbne	d0,0b
+.else	|Ok generate something on the fly
+		move.l  d2,-(sp)
+		move.w	#0xffff,d2
+0:
+		addq.w	#1,d2
+		move.w	d2,(a1)
+		move.w	d2,d1
+		sub.w	(a1)+,d1
+		dbne	d0,0b
+		move.l	(sp)+,d2
+.endif
+
+|		Check both count + delta. Non zero = failure
+		ext.l	d1
+		add.w	#1,d0
+		add.l	d1,d0
+		move.l  d0,-(sp)
+
+        lea     0xA10000,a1
+        bsr     _neo_select_menu        /* select Menu Flash */
+
+		move.l	(sp)+,d0
+		rts
+.endif
 neo_mode:
         .word   0
 
-
         .text
+
