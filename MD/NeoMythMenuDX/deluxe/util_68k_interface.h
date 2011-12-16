@@ -33,6 +33,7 @@ extern void utility_memset_psram(void* dst,int c,int len);
 //MISC
 extern int utility_isMultipleOf(int base,int n);
 extern int utility_memcmp(const void* dst, const void* src, int cnt);
+extern int utility_word_cmp(const void* dst, const void* src, int cnt);
 extern int utility_logtwo(int x);
 #endif
 

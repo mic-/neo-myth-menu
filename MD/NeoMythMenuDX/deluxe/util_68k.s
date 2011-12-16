@@ -17,6 +17,28 @@ utility_logtwo:
 1:
 		rts
 
+|int utility_word_cmp(const void* dst, const void* src, int cnt)
+|Returns 0 on success
+        .global utility_word_cmp
+utility_word_cmp:
+		movem.l 4(sp),a0-a1
+		move.l  12(sp),d1
+		
+		moveq	#0,d0
+		lsr.l	#1,d1
+		subq.l	#1,d1
+0:
+		move.w  (a0)+,d0
+		sub.w	(a1)+,d0
+		dbne	d1,0b
+
+|		Check both count + delta. Non zero = failure
+		ext.l	d0
+		addq.w	#1,d1
+		add.l	d1,d0
+
+		rts
+
 |int utility_memcmp (const void* dst, const void* src, int cnt)
         .global utility_memcmp
 utility_memcmp:
