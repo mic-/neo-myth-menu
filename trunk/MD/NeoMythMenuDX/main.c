@@ -3875,11 +3875,7 @@ void runCheatEditor(int index)
     gWStrOffs -= 512;
 }
 
-#ifdef RUN_IN_PSRAM
-void hw_tst_myth_psram_test(int selection) __attribute__ ((section (".data")));
-#else
 void hw_tst_myth_psram_test(int selection);
-#endif
 void hw_tst_psram_test(int selection);
 void hw_tst_sram_write(int selection);
 void hw_tst_sram_read(int selection);
@@ -6029,23 +6025,23 @@ unsigned char hw_tst_dbg_x,hw_tst_dbg_y;
 
 int deci_to_tile_units(int input,int spacing,int unit)//0..999
 {
-	if (input < 10) {
-		return (spacing * unit) + unit;
-	} else if (input >= 100) {
-		return (spacing * unit) + ((unit<<2) - unit);
-	}
+    if (input < 10) {
+        return (spacing * unit) + unit;
+    } else if (input >= 100) {
+        return (spacing * unit) + ((unit<<2) - unit);
+    }
 
-	return (spacing * unit) + (unit << 1);
+    return (spacing * unit) + (unit << 1);
 }
 
 void hw_tst_wait_event(unsigned short events)
 {
-	unsigned short buttons = 0;
+    unsigned short buttons = 0;
 
-	while (!buttons)
-		buttons = wait_for_buttons(0) & events;
-	while (buttons)
-		buttons = wait_for_buttons(buttons) & events;
+    while (!buttons)
+        buttons = wait_for_buttons(0) & events;
+    while (buttons)
+        buttons = wait_for_buttons(buttons) & events;
 }
 
 void hw_tst_new_ln()
@@ -6150,7 +6146,7 @@ void hw_tst_epilogue()
     clear_screen();
     gUpdate = -1;
     gButtons = 0;
-	delay(5);
+    delay(5);
 }
 
 void hw_tst_dump()
@@ -6160,14 +6156,8 @@ void hw_tst_dump()
 
 void hw_tst_myth_psram_test(int selection)
 {
-	extern int neo_seed_cmp_myth_psram(void* seed,int pstart,int len);
-	const int largest_jump = 32 * 1024;			//See "seed-less" configuration in neo2.s
-#ifdef RUN_IN_PSRAM
-	const int ram_menu_start = (44 * (128*1024)); //menu @ 48M but give it some thresold
-	int sseed;
-#endif
-    int i,e;
-    int seed,f;
+    extern int neo_test_myth_psram(int pstart, int len, void *save);
+    int i, e;
     char mbs[4];
 
     hw_tst_prologue("TESTING ONBOARD PSRAM");
@@ -6184,7 +6174,7 @@ void hw_tst_myth_psram_test(int selection)
     int y = hw_tst_dbg_y;
     int z = -1;
 
-    for(e = 0,seed = 0,f = 1,i = 0;i<64*(128*1024);)
+    for(e = 0,i = 0;i<64*(128*1024);)
     {
         if ((i>>17) > z)
         {
@@ -6196,40 +6186,29 @@ void hw_tst_myth_psram_test(int selection)
         }
 
 #ifdef RUN_IN_PSRAM
-		if (((i+largest_jump) >= ram_menu_start)) //Don't overwrite RAM MENU
-		{
-		    sseed = seed;
-		    hw_gen_pattern_16KB(&buffer[0],&seed,&f);
-		    neo_copyfrom_myth_psram(&buffer[16*1024],i,16*1024); // save psram
-		    neo_copyto_myth_psram(&buffer[0],i,16*1024);
-		    neo_copyfrom_myth_psram(&buffer[0],i,16*1024);
-		    neo_copyto_myth_psram(&buffer[16*1024],i,16*1024); // restore psram
-		    seed = sseed;
-		    hw_gen_pattern_16KB(&buffer[16*1024],&seed,&f);
-
-		    if(utility_word_cmp(&buffer[0],&buffer[16*1024],16*1024) != 0)
-			{
-		        e = 1;
-		        ints_on();
-		        hw_tst_follow("Testing...FAILED!",0x4000);
-		        break;
-		    }
-
-			i += 16 * 1024;
-		}
-		else
+        if (i >= (56*(128*1024))) //Don't overwrite RAM MENU
+        {
+            if(neo_test_myth_psram(i, WORK_RAM_SIZE, buffer) != 0)
+            {
+                e = 1;
+                ints_on();
+                hw_tst_follow("Testing...FAILED!",0x4000);
+                break;
+            }
+            i += WORK_RAM_SIZE;
+        }
+        else
 #endif
-		{
-			//See "seed-less" configuration in neo2.s
-			if(neo_seed_cmp_myth_psram(buffer,i,largest_jump) != 0)
-		    {
-		        e = 1;
-		        ints_on();
-		        hw_tst_follow("Testing...FAILED!",0x4000);
-		        break;
-		    }
-			i += largest_jump;
-		}
+        {
+            if(neo_test_myth_psram(i, WORK_RAM_SIZE, 0) != 0)
+            {
+                e = 1;
+                ints_on();
+                hw_tst_follow("Testing...FAILED!",0x4000);
+                break;
+            }
+            i += WORK_RAM_SIZE;
+        }
     }
 
     hw_tst_dbg_y = y + 2;
@@ -6247,10 +6226,8 @@ void hw_tst_myth_psram_test(int selection)
 
 void hw_tst_psram_test(int selection)
 {
-	extern int neo_seed_cmp_psram(void* seed,int pstart,int len);
-	const int largest_jump = 32 * 1024;			//See "seed-less" configuration in neo2.s
-    int i,e;
-    int seed,f;
+    extern int neo_test_psram(int pstart, int len);
+    int i, e;
     char mbs[4];
 
     hw_tst_prologue("TESTING NEO2    PSRAM");
@@ -6266,7 +6243,7 @@ void hw_tst_psram_test(int selection)
     int y = hw_tst_dbg_y;
     int z = -1;
 
-    for(e = 0,seed = 0,f = 1,i = 0;i<128*(128*1024);i += largest_jump)
+    for(e = 0,i = 0;i<128*(128*1024);i += WORK_RAM_SIZE)
     {
         if ((i>>17) > z)
         {
@@ -6277,8 +6254,7 @@ void hw_tst_psram_test(int selection)
             if (x >= b) {x = a;++y;}
         }
 
-		//See "seed-less" configuration in neo2.s
-		if(neo_seed_cmp_psram(buffer,i,largest_jump) != 0)
+        if(neo_test_psram(i, WORK_RAM_SIZE) != 0)
         {
             e = 1;
             ints_on();
