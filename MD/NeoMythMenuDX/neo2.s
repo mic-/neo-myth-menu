@@ -442,11 +442,11 @@ _neo_select_game:
 3:
         bsr     _neo_asic_cmd           /* set iosr = enable game flash */
 4:
-		.ifdef NEO3
-		move.l  #0x00AA55F0,d0
-		.else
+        .ifdef NEO3
+        move.l  #0x00AA55F0,d0
+        .else
         move.l  #0x00EE0630,d0
-		.endif
+        .endif
 
         bsr     _neo_asic_cmd           /* set cr1 = enable extended address bus */
         move.w  #0xFFFF,EXTM_ON(a1)     /* enable extended address bus */
@@ -847,9 +847,9 @@ set_usb:
 neo_run_game:
         lea     0xA10000,a1
         bsr     _neo_select_game        /* select Game Flash */
-		.ifdef NEO3
-		bsr		_neo_enable_id
-		.endif
+        .ifdef NEO3
+        bsr     _neo_enable_id
+        .endif
         bra.b   neo_chk_mahb
 
 | void neo_run_psram(int pstart, int psize, int bbank, int bsize, int run);
@@ -859,9 +859,9 @@ neo_run_psram:
         lea     0xA10000,a1
         bsr     _neo_select_psram       /* select flash cart PSRAM */
 
-		.ifdef NEO3
-		bsr		_neo_enable_id
-		.endif
+        .ifdef NEO3
+        bsr     _neo_enable_id
+        .endif
 |        move.w  #0x0000,WE_IO(a1)       /* write-protect psram */
 |        move.l  #0x00E2D200,d0
 |        bsr     _neo_asic_cmd           /* write-protect flash cart psram */
@@ -915,9 +915,9 @@ neo_run_sms:
 neo_run_myth_psram:
         lea     0xA10000,a1
         bsr     _neo_select_menu        /* select Neo Myth menu flash */
-		.ifdef NEO3
-		bsr		_neo_enable_id
-		.endif
+        .ifdef NEO3
+        bsr     _neo_enable_id
+        .endif
         move.l  16(sp),d0               /* run */
         bclr    #5,d0
         bne.w   9f                      /* EBIOS or MA-Homebrew */
@@ -1432,7 +1432,7 @@ multi_sd_to_myth_psram:
 .if 1
         move.w  d1,(a0)+
 .else
-		swap	d1
+        swap    d1
 .endif
 
         move.w  (a1),d1
@@ -1452,7 +1452,7 @@ multi_sd_to_myth_psram:
 .if 1
         move.w  d1,(a0)+
 .else
-		move.l	d1,(a0)+
+        move.l  d1,(a0)+
 .endif
 
         dbra    d0,2b
@@ -1493,51 +1493,50 @@ multi_sd_to_myth_psram:
         moveq   #0,d0                   /* FALSE */
         rts
 
-.if 1
-| int neo_seed_cmp_psram(void* seed,int pstart,int len);
-        .global neo_seed_cmp_psram
-neo_seed_cmp_psram:
+| int neo_test_psram(int pstart, int len)
+| Destructively test psram.
+        .global neo_test_psram
+neo_test_psram:
         lea     0xA10000,a1
         bsr     _neo_select_psram       /* select flash cart PSRAM (write-enabled) */
 
-        move.l  8(sp),d0                /* pstart */
+        move.l  4(sp),d0                /* pstart */
         andi.l  #0xF00000,d0            /* closest 1MB */
         bsr     _neo_set_fbank          /* set the flash space bank registers */
         move.l  #0x100000,d0
         bsr     _neo_set_fsize          /* set the flash space bank size to 1MB */
 
-        movea.l 4(sp),a1               
-        move.l  8(sp),d1               
-        andi.l  #0x0FFFFE,d1           
+        move.l  4(sp),d1                /* pstart */
+        andi.l  #0x0FFFFE,d1
         movea.l d1,a0
-        move.l  12(sp),d0              
-        lsr.l   #1,d0                  
+        move.l  8(sp),d0                /* len */
+        lsr.l   #1,d0
         subq.w  #1,d0
-		moveq	#0,d1
-
-.if 0	|Use seed ?
 0:
-		move.w	(a0)+,d1
-		move.w	d1,(a1)
-		sub.w	(a1)+,d1
-		dbne	d0,0b
-.else	|Ok generate something on the fly
-		move.l  d2,-(sp)
-		move.w	#0xffff,d2
-0:
-		addq.w	#1,d2
-		move.w	d2,(a1)
-		move.w	d2,d1
-		sub.w	(a1)+,d1
-		dbne	d0,0b
-		move.l	(sp)+,d2
+        moveq   #0,d1
+        move.w  d1,(a0)
+        eor.w   d1,(a0)
+        move.w  (a0),d1
+        bne.b   1f                      /* failed, just quit */
+.if 0
+        move.w  #0x5555,d1
+        move.w  d1,(a0)
+        eor.w   d1,(a0)
+        move.w  (a0),d1
+        bne.b   1f                      /* failed, just quit */
+        move.w  #0xAAAA,d1
+        move.w  d1,(a0)
+        eor.w   d1,(a0)
+        move.w  (a0),d1
+        bne.b   1f                      /* failed, just quit */
 .endif
-
-|		Check both count + delta. Non zero = failure
-		ext.l	d1
-		add.w	#1,d0
-		add.l	d1,d0
-		move.l  d0,-(sp)
+        move.w  #0xFFFF,d1
+        move.w  d1,(a0)
+        eor.w   d1,(a0)
+        move.w  (a0)+,d1
+        dbne    d0,0b
+1:
+        move.l  d1,-(sp)                /* save test pattern result */
 
         lea     0xA10000,a1
         move.w  #0x0000,WE_IO(a1)       /* write-protect psram */
@@ -1546,12 +1545,15 @@ neo_seed_cmp_psram:
         bsr     _neo_asic_cmd           /* write-protect flash cart psram */
         bsr     _neo_select_menu        /* select Menu Flash */
 
-		move.l	(sp)+,d0
-		rts
+        move.l  (sp)+,d0
+        rts
 
-| int neo_seed_cmp_myth_psram(void* seed,int pstart,int len);
-        .global neo_seed_cmp_myth_psram
-neo_seed_cmp_myth_psram:
+| int neo_test_myth_psram(int pstart, int len, void *save)
+| Destructively test myth psram unless save buffer passed, then save/restore
+| myth psram using buffer
+        .global neo_test_myth_psram
+neo_test_myth_psram:
+        move.l  d2,-(sp)
         lea     0xA10000,a1
 
         move.l  8(sp),d0                /* pstart */
@@ -1562,48 +1564,74 @@ neo_seed_cmp_myth_psram:
         move.w  #0x0007,OPTION_IO(a1)   /* set mode 7 (copy mode) */
         move.w  #0x0006,WE_IO(a1)       /* map bank 7, write-enable neo myth psram */
 
-        movea.l 4(sp),a0                
-        move.l  8(sp),d1                
-        andi.l  #0x0FFFFE,d1          
-        ori.l   #0x200000,d1            
-        movea.l d1,a1
-        move.l  12(sp),d0               
-        lsr.l   #1,d0                
+        move.l  8(sp),d1                /* pstart */
+        andi.l  #0x0FFFFE,d1
+        ori.l   #0x200000,d1
+        movea.l d1,a0
+        move.l  12(sp),d0               /* len */
+        lsr.l   #1,d0
         subq.w  #1,d0
-		moveq	#0,d1
 
-.if 0	|Use seed ?
+        move.l  16(sp),d1               /* optional save buffer */
+        beq.b   0f                      /* no buffer - destructive test */
+| save myth psram
+        movem.l d0/a0,-(sp)
+        movea.l d1,a1
+4:
+        move.w  (a0)+,(a1)+
+        dbra    d0,4b
+        movem.l (sp)+,d0/a0
 0:
-		move.w	(a0)+,d1
-		move.w	d1,(a1)
-		sub.w	(a1)+,d1
-		dbne	d0,0b
-.else	|Ok generate something on the fly
-		move.l  d2,-(sp)
-		move.w	#0xffff,d2
-0:
-		addq.w	#1,d2
-		move.w	d2,(a1)
-		move.w	d2,d1
-		sub.w	(a1)+,d1
-		dbne	d0,0b
-		move.l	(sp)+,d2
+        moveq   #0,d1
+        move.w  d1,(a0)
+        eor.w   d1,(a0)
+        move.w  (a0),d1
+        bne.b   1f                      /* failed, just quit */
+.if 0
+        move.w  #0x5555,d1
+        move.w  d1,(a0)
+        eor.w   d1,(a0)
+        move.w  (a0),d1
+        bne.b   1f                      /* failed, just quit */
+        move.w  #0xAAAA,d1
+        move.w  d1,(a0)
+        eor.w   d1,(a0)
+        move.w  (a0),d1
+        bne.b   1f                      /* failed, just quit */
 .endif
+        move.w  #0xFFFF,d1
+        move.w  d1,(a0)
+        eor.w   d1,(a0)
+        move.w  (a0)+,d1
+        dbne    d0,0b
+1:
+        move.l  d1,d2                   /* save test pattern result */
 
-|		Check both count + delta. Non zero = failure
-		ext.l	d1
-		add.w	#1,d0
-		add.l	d1,d0
-		move.l  d0,-(sp)
-
+        move.l  16(sp),d1               /* optional save buffer */
+        beq.b   3f                      /* no buffer - destructive test */
+| restore myth psram
+        movea.l d1,a1
+        move.l  8(sp),d1                /* pstart */
+        andi.l  #0x0FFFFE,d1
+        ori.l   #0x200000,d1
+        movea.l d1,a0
+        move.l  12(sp),d0               /* len */
+        lsr.l   #1,d0
+        subq.w  #1,d0
+2:
+        move.w  (a1)+,(a0)+
+        dbra    d0,2b
+3:
         lea     0xA10000,a1
         bsr     _neo_select_menu        /* select Menu Flash */
 
-		move.l	(sp)+,d0
-		rts
-.endif
+        move.l  d2,d0
+        move.l  (sp)+,d2
+        rts
+
+| local variables
 neo_mode:
         .word   0
 
-        .text
 
+        .text
