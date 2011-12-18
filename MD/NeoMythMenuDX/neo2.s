@@ -1515,7 +1515,6 @@ neo_test_psram:
 0:
         moveq   #0,d1
         move.w  d1,(a0)
-        eor.w   d1,(a0)
         move.w  (a0),d1
         bne.b   1f                      /* failed, just quit */
 .if 0
@@ -1532,8 +1531,8 @@ neo_test_psram:
 .endif
         move.w  #0xFFFF,d1
         move.w  d1,(a0)
-        eor.w   d1,(a0)
         move.w  (a0)+,d1
+        addq.w	#1,d1
         dbne    d0,0b
 1:
         move.l  d1,-(sp)                /* save test pattern result */
@@ -1584,7 +1583,6 @@ neo_test_myth_psram:
 0:
         moveq   #0,d1
         move.w  d1,(a0)
-        eor.w   d1,(a0)
         move.w  (a0),d1
         bne.b   1f                      /* failed, just quit */
 .if 0
@@ -1601,8 +1599,8 @@ neo_test_myth_psram:
 .endif
         move.w  #0xFFFF,d1
         move.w  d1,(a0)
-        eor.w   d1,(a0)
         move.w  (a0)+,d1
+        addq.w	#1,d1
         dbne    d0,0b
 1:
         move.l  d1,d2                   /* save test pattern result */
