@@ -336,12 +336,12 @@ void sdutils_sram_cls()
 	frm2 = Frame2;
 	Frame2 = BANK_RAM_CODE;
 
-	if ( options_sram_bank == 7 )
-	{
-		sram_hi = 0x0010;
-		sram_lo = 0x0000;
-	}
-	else
+	//if ( options_sram_bank > 7 )
+//	{
+	//	sram_hi = 0x0010;
+	//	sram_lo = 0x0000;
+//	}
+	//else
 	{
 		sram_lo = options_sram_bank << 13;
 		sram_hi = 0x000;
