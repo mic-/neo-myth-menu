@@ -2,44 +2,38 @@
 #include "shared.h"
 #include "vdp.h"
 #include "util.h"
+#include "pad.h"
 #include "main_map.h"
 
 void bank1_load_bg();
-void bank1_options_apply_cheats(char* out);
-void bank1_cheat_inputbox(char* dst);
+BYTE bank1_cheat_inputbox(char* dst);
 void bank1_print_hex(char* in);
 void bank1_dump_hex(char* in);
 
 /*
  * Task dispatcher for this bank
  */
-void dispatch(WORD task,char* user_data)
+BYTE dispatch(WORD task,char* user_data)
 {
     switch (task)
     {
         case TASK_LOAD_BG:
             bank1_load_bg();
-		return;
-
-		case TASK_APPLY_OPTIONS:
-			bank1_options_apply_cheats(user_data);
-		return;
+		return 1;
 
 		case TASK_EXEC_CHEAT_INPUTBOX:
-			bank1_cheat_inputbox(user_data);
-		return;
+			return bank1_cheat_inputbox(user_data);
 
 		case TASK_PRINT_HEX:
 			bank1_print_hex(user_data);
-		return;
+		return 1;
 
 		case TASK_DUMP_HEX:
 			bank1_dump_hex(user_data);
-		return;
-
-        default:
-		return;
+		return 1;
     }
+
+	return 0;
 }
 
 /*
@@ -639,70 +633,6 @@ BYTE bank1_cheat_identify_type(BYTE addr_hi,WORD addr_lo)
 	return CT_ROM;
 }
 
-/*
-	output :
-	$00:1 count
-	if(count > 128) first one is ram cheat
-*/
-void bank1_options_apply_cheats(char* out)
-{
-	BYTE i,j,ram;
-	BYTE* base;
-	BYTE valid[MAX_CHEATS];
-	
-	ram = MAX_CHEATS;
-	pfn_memset_asm(valid,0,options_cheat_ptr);
-
-	//look for ram cheats and allow one hw cheat
-	for(i = 0,j = 0;i<options_cheat_ptr;i++)
-	{
-		base = (BYTE*)0xDACC;
-		base += i << 2;
-
-		if(bank1_cheat_identify_type(base[0],*(unsigned short*)&base[2]) == CT_RAM)
-		{
-			if(ram != MAX_CHEATS)
-			{
-				ram = i;
-				valid[i] = 1;
-				++j;
-			}
-			else
-			{
-				valid[i] = 0;
-			}
-		}
-		else
-		{
-			valid[i] = 1;
-			++j;
-		}
-	}
-
-	//Reoder list
-	base = (BYTE*)0xDACC;
-
-	if(ram != MAX_CHEATS)
-	{
-		pfn_memcpy_asm(base,base + (ram << 2),4);
-		j = 1;
-	}
-	else
-	{
-		j = 0;
-	}
-
-	for(i = 0;i<options_cheat_ptr;i++)
-	{
-		if(i == ram){continue;}
-		else if(valid[i] == 0){continue;}
-		pfn_memcpy_asm(base + j,base + (i << 2),4);
-		j += 4;
-	}
-
-	*out = (ram != MAX_CHEATS) ? 128 | j : j;
-
-}
 
 #define LEFT_MARGIN 3
 #define INSTRUCTIONS_Y 20
@@ -754,38 +684,6 @@ void bank1_dump_hex(char* in)
     }
 }
 
-void bank1_cheat_inputbox(char* dst)
-{
-	dst=dst;
-	#if 0
-	BYTE buf[4];
-	BYTE key;
-
-	cls();
-
-	memset_asm(buf,0,4);
-
-	while(1)
-	{
-        key = pad1_get_2button();
-        pad = key & ~padLast;
-        padLast = key;
-
-		if(pad&PAD_SW1)
-			break;
-	}
-
-	dst[0] = buf[3];	//data
-	dst[1] = buf[0];	//addr hi
-	dst[2] = buf[1];	//addr lo lsb
-	dst[3] = buf[2];	//addr lo msb
-
-	cls();
-	sync_state();	
-	puts_active_list();
-	#endif
-}
-
 /*
 	I			: Exit
 	II			: Toggle addressing mode 8/4 bit
@@ -794,6 +692,7 @@ void bank1_cheat_inputbox(char* dst)
 	UP			: Increase High Nybble
 	DN			: Decrease High Nybble
 	RB			: Increase Lo Nybble
+
 	LB			: Decrease Lo Nybble
 
 	8Bit		addressing:
@@ -802,9 +701,13 @@ void bank1_cheat_inputbox(char* dst)
 	LB			: Move left
 	RB			: Move right
 */
+void print_hex(BYTE val, BYTE x, BYTE y) 
+{
+	val=val,x=x,y=y;
+	bank1_print_hex(&val);
+}
 
-#if 0
-BYTE cheat_inputbox(char* in)
+BYTE bank1_cheat_inputbox(char* in)
 {
 	const char* msg = "SMS MYTH CHEAT EDITOR 0.1a";
 	BYTE* field;
@@ -813,6 +716,7 @@ BYTE cheat_inputbox(char* in)
 	BYTE haddr,addr,selection,a,b,upd,addressing;
 
 	fieldc = *(in);
+
 	if(0 == fieldc){return 0;}
 
 	field = (BYTE*)in;
@@ -822,6 +726,7 @@ BYTE cheat_inputbox(char* in)
 	pfn_memset_asm(field,0,fieldc);
 	puts_shared(msg,3 ,7,PALETTE1); 
 	haddr = LEFT_MARGIN + (((22/2) - (fieldc/*>>1*/))) + 1;				/*Don't divide it since we need 1tile/char in dec form*/
+
 	addressing = 0;														/*8bit mode*/
 
 	while(1)
@@ -835,55 +740,74 @@ BYTE cheat_inputbox(char* in)
 		{
 			addressing ^= 1;
 			upd = 1;
+
 		}
 
 		switch(addressing)
 		{
 			case 0:
+
 				if(pad & PAD_RIGHT)		{ if(addr < fieldc){if(++addr >= fieldc){addr=fieldc-1;};upd = 1;}	}
 				else if(pad & PAD_LEFT) { if(addr > 0){--addr;upd = 1;}										}
 				else if(pad & PAD_UP)	{ ++field[addr]; upd = 1;											}
 				else if(pad & PAD_DOWN) { --field[addr]; upd = 1;											}
 			break;	
 			
+
 			case 1:
 				selection = field[addr];
 				a = (selection >> 4);
 				b = (selection & 0x0f);
 
+
 				if(pad & PAD_UP)		{ if(a < 0x0f){++a; upd = 1;}										}
+
 				if(pad & PAD_DOWN)		{ if(a > 0){--a;	upd = 1;}										}
 				if(pad & PAD_RIGHT)		{ if(b < 0x0f){++b;	upd = 1;}										}
+
 				if(pad & PAD_LEFT)		{ if(b > 0){--b;	upd = 1;}										}
+
 
 				field[addr] = (a << 4) | b;
 			break;
 		}
 
+
+
 		if(upd)
 		{
 			upd = 0;
+
 			for(a = 0;a<fieldc;a++)		{ print_hex(field[a],haddr + (a << 1),12); }
+
 			puts_shared("                       ",LEFT_MARGIN,13,PALETTE1); 
 			puts_shared("^",haddr + (addr << 1) ,13,(addressing) ? PALETTE0 : PALETTE1);		/*Show locked/unlocked state*/ 
 
+
+
 			if(addressing)
+
 			{
 				puts_shared(" I=EXIT UP/DN=INC/DEC HI 4Bit", LEFT_MARGIN-1, INSTRUCTIONS_Y, PALETTE1);
 				puts_shared("II=MODE LF/RT=INC/DEC LO 4Bit", LEFT_MARGIN-1, INSTRUCTIONS_Y+1, PALETTE1);
 			}
+
 			else
 			{
 				puts_shared(" I=EXIT UP/DN=INC/DEC 8Bit   ", LEFT_MARGIN-1, INSTRUCTIONS_Y, PALETTE1);
 				puts_shared("II=MODE LF/RT=MOVE CURSOR    ", LEFT_MARGIN-1, INSTRUCTIONS_Y+1, PALETTE1);
 			}
 		}
+
 	}
 	puts_shared("                             ", LEFT_MARGIN-1, INSTRUCTIONS_Y, PALETTE1);
 	puts_shared("                             ", LEFT_MARGIN-1, INSTRUCTIONS_Y+1, PALETTE1);
 	puts_shared("                         ",LEFT_MARGIN,16,PALETTE1);
 	return 1;
 }
+
+
+#if 0
 
 void bank1_sd_to_vram_aligned(WORD addr,WORD len)	//This can optimized by reading the WHOLE file to psram
 {
