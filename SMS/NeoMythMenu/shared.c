@@ -142,5 +142,16 @@ const BYTE *gbacGameList = (char*)&dummyGameList[0];
 const BYTE *gbacGameList = (const BYTE*)0xB000;
 #endif
 
+const char* sram_bank_binary[] =
+{
+	"SRAM/BANK0.SAV",
+	"SRAM/BANK1.SAV",
+	"SRAM/BANK2.SAV",
+	"SRAM/BANK3.SAV",
+	"SRAM/BANK4.SAV",
+	"SRAM/BANK5.SAV",
+	"SRAM/BANK6.SAV",
+	"SRAM/BANK7.SAV",
+};
 
 

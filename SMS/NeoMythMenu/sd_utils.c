@@ -239,12 +239,6 @@ void change_directory(char *path)
 
 void read_file_to_psram(FileInfoEntry *fi, BYTE prbank, WORD proffs)
 {
-   /*
-	int sectorsPerUpdate, sectorsToNextUpdate;
-	WORD sectorsToRead;
-	FRESULT fr;
-	BYTE dotPos = 10;
-	*/
     WORD sectorsInFile;
     char *fullPath = (char *)0xDD00;    // Note: hardcoded
     
@@ -331,32 +325,40 @@ void sdutils_sram_cls()
 {
 	BYTE* p = (BYTE*)0xdb00;
 	BYTE blocks;
-	WORD addr;
-	WORD base;
+	WORD sram_lo,sram_hi;
 	BYTE frm2;
 
-	cls();
 	puts("CLEARING SRAM", 8, 9, PALETTE1); vdp_wait_vblank();
 	puts("Working", 3, 11, PALETTE1); vdp_wait_vblank();
 	blocks = 0;
-	addr = 0;
-	base = 0;	
-	memset_asm(p,0,512);
+
+	memset_asm(p,0x00,512);
 	frm2 = Frame2;
 	Frame2 = BANK_RAM_CODE;
+
+	if ( options_sram_bank == 7 )
+	{
+		sram_hi = 0x0010;
+		sram_lo = 0x0000;
+	}
+	else
+	{
+		sram_lo = options_sram_bank << 13;
+		sram_hi = 0x000;
+	}
+
 	while(blocks < 16)
 	{
 		++blocks;
 		puts(".", 10+(blocks>>1), 11, PALETTE1);vdp_wait_vblank();
-		pfn_neo2_ram_to_sram(0x00,base+addr,p,512);
-		addr += 512;
+		pfn_neo2_ram_to_sram(sram_hi,sram_lo,p,512);
+		sram_lo += 512;
 	}
 	
-	cls();
 	Frame2 = frm2;
 }
 
-void sdutils_sd_to_sram(const char* filename)
+void sdutils_xfer_sd_to_sram(const char* filename)
 {
 	FRESULT (*f_write)(void*) = pfn_pf_write_sector;
 	void (*grab_fs)(FATFS**) = pfn_pf_grab;
@@ -364,8 +366,8 @@ void sdutils_sd_to_sram(const char* filename)
 	BYTE* p = (BYTE*)0xdb00;
 	FATFS* fs;
 	BYTE blocks;
-	WORD addr;
-	WORD base;
+	WORD sram_lo,sram_hi;
+	WORD sdio_lo,sdio_hi;
 
 	Frame2 = BANK_PFF;
 	grab_fs(&fs);
@@ -373,40 +375,30 @@ void sdutils_sd_to_sram(const char* filename)
 
 	if(f_open(filename) != FR_OK){return;}
 
-	cls();
 	puts("RESTORING SRAM", 8, 9, PALETTE1); vdp_wait_vblank();
 	puts("Working", 3, 11, PALETTE1); vdp_wait_vblank();
 
 	blocks = 0;
-	addr = 0;
-	base = 0;
+	sram_lo = options_sram_bank << 13;
+	sram_hi = 0x000;
+	sdio_lo = sdio_hi = 0;
 
 	while(blocks < 16)
 	{
 		++blocks;
 		puts(".", 10+(blocks>>1), 11, PALETTE1);vdp_wait_vblank();
 		Frame2 = BANK_PFF;
-		pfn_pf_read_sectors(0,0,1);
+		pfn_pf_read_sectors(sdio_lo,sdio_hi,1);
 		Frame2 = BANK_RAM_CODE;
-		pfn_neo2_ram_to_sram(0x00,base+addr,p,512);
-		addr += 512;
+		pfn_neo2_ram_to_sram(sram_hi,sram_lo,p,512);
+		sram_lo += 512;
+		sdio_lo += 512;
 	}
 
-	sdutils_load_cfg();
-	p[1] = 0x01;
-	addr = strlen_asm(filename);
-	p[256]= addr & 0xff;
-	strcpy_asm(&p[257],filename);
-	p[257+addr-1]='\0';
-	sdutils_save_cfg();
-
 	Frame2 = BANK_PFF;
-	cls();
-	change_directory("/");
-	puts_active_list();
 }
 
-void sdutils_sram_to_sd(const char* filename)
+void sdutils_xfer_sram_to_sd(const char* filename)
 {
 	FRESULT (*f_write)(void*) = pfn_pf_write_sector;
 	void (*grab_fs)(FATFS**) = pfn_pf_grab;
@@ -414,224 +406,30 @@ void sdutils_sram_to_sd(const char* filename)
 	BYTE* p = (BYTE*)0xdb00;
 	FATFS* fs;
 	BYTE blocks;
-	WORD addr;
-	WORD base;
+	WORD sram_lo,sram_hi;
 
 	Frame2 = BANK_PFF;
 	grab_fs(&fs);
 	if(!fs){return;}
 	if(f_open(filename) != FR_OK){return;}
 
-	cls();
 	puts("DUMPING SRAM", 8, 9, PALETTE1); vdp_wait_vblank();
 	puts("Working", 3, 11, PALETTE1); vdp_wait_vblank();
 
 	blocks = 0;
-	addr = 0;
-	base = 0;
+	sram_lo = options_sram_bank << 13;
+	sram_hi = 0x000;
 
 	while(blocks < 16)
 	{
 		++blocks;
 		puts(".", 10+(blocks>>1), 11, PALETTE1);vdp_wait_vblank();
 		Frame2 = BANK_RAM_CODE;
-		pfn_neo2_sram_to_ram(p, 0x00, base + addr,512);
+		pfn_neo2_sram_to_ram(p, sram_hi, sram_lo,512);
 		Frame2 = BANK_PFF;
 		f_write(p);
-		addr += 512;
-	}
-
-	cls();
-	change_directory("/");
-	puts_active_list();
-}
-
-/*
-	MYTH.CFG 2x blocks of 256Bytes
-	BLOCK #0
-	$0000:1 : First run flag (1 = Yes/0 = No)
-	$0001:1 : Save flag (1 = Backup game on next boot / = 0 Do nothing)
-	$0002:1 : Reset flag (1 = Reset to Menu / 0 = Reset to Game)
-	$0003:1 : FM Flag (1 = On / 0 = Off)
-	$0004:1 : Dev Build (1 = Yes / 0 = No) (Use this if you need conditional debugging in final builds)
-
-	BLOCK #1
-	$0100:1 : If save flag is set , this byte represents the filename length of the last loaded game
-	$0101:N : The next N bytes specified at $0100 make up the filename of the last loaded rom (MUST be null terminated)
-*/
-void sdutils_load_cfg()
-{
-	void (*grab_fs)(FATFS**) = pfn_pf_grab;
-	FRESULT (*f_open)(const char*) = pfn_pf_open;
-	BYTE* cfg = (BYTE*)0xdb00;
-	FATFS* fs;
-	WORD i;
-
-	Frame2 = BANK_PFF;
-	grab_fs(&fs);
-	if(!fs){return;}
-	if(f_open("/menu/sms/MYTH.CFG") != FR_OK){return;}
-
-	cls();
-	puts("Reading MYTH.CFG...", 8, 10, PALETTE1); vdp_wait_vblank();
-
-	//Read one sector so that the data appear @ 0xdb00
-	pfn_pf_read_sectors(0,0,1);
-
-	options_count = 0;
-    fm_enabled_option_idx = options_count;
-    options_add("FM : ","off","on",OPTION_TYPE_SETTING,cfg[3]);
-    reset_to_menu_option_idx = options_count;
-    options_add("Reset to menu : ","off","on",OPTION_TYPE_SETTING,cfg[2]);
-
-	if(cfg[1])
-	{
-		//Save sram to sd
-		strcpy_asm(&cfg[256+128],"/menu/sms/save/");
-		strncat_asm(&cfg[256],&cfg[256+128+15],cfg[256]);
-		i = 256+128+15+cfg[256];
-
-		while(i > 256 + 128)
-		{
-			if(cfg[i] == '.')
-			{
-				strncat_asm(&cfg[i],".SAV",4);
-				i = 1;
-				break;
-			}
-			--i;
-		}
-
-		if(i != 1){strncat_asm(&cfg[256+128+15+cfg[256]],".SAV",4);}
-
-		sdutils_sram_to_sd(&cfg[256+128]);
-
-		//Turn OFF SRAM manager
-		cfg[1] = 0x00;
-		sdutils_save_cfg();
-	}
-	cls();
-	puts_active_list();
-}
-
-void sdutils_save_cfg()
-{
-	FRESULT (*f_write)(void*) = pfn_pf_write_sector;
-	void (*grab_fs)(FATFS**) = pfn_pf_grab;
-	FRESULT (*f_open)(const char*) = pfn_pf_open;
-	BYTE* p = (BYTE*)0xdb00;
-	FATFS* fs;
-
-	Frame2 = BANK_PFF;
-	grab_fs(&fs);
-	if(!fs){return;}
-	if(f_open("/menu/sms/MYTH.CFG") != FR_OK){return;}
-	cls();
-	puts("Writing MYTH.CFG...", 38, 10, PALETTE1); vdp_wait_vblank();
-	f_write(p);
-
-	cls();
-	puts_active_list();
-}
-
-#if 0
-void sdutils_import_ips(const char* filename)
-{
-	DWORD save;
-	int written;
-	int size;
-	unsigned char prbank,a;
-	WORD wr,proffs,len,step;
-	unsigned char* buf;
-	unsigned char c;
-	FATFS (*grab_fs)(void) = pfn_pf_grab;
-	FRESULT (*f_open)(const char*) = pfn_pf_open;
-	FATFS* fs;
-
-	fs = grab_fs();
-	if(!fs){return;}
-	if(f_open(filename) != FR_OK){return;}
-
-	buf = (unsigned char*)0xDB00;
-	size = fs->fsize - 8; /*patch + eof*/
-	written = 0;
-	prbank = 0;
-	proffs = 0;
-	save = fs->fptr;		/*patch*/
-	pf_read(buf,5,&wr);
-	pf_lseek(save + 5);
-
-	while(written < size)
-	{
-		/*
-			This is SLOW actually.For every N bytes a whole sector is read
-			A better solution would be to copy the WHOLE patch to some psram offset and then proccess it from there
-		*/
-		save = fs->fptr;
-		pf_read(buf,5,&wr);
-		pf_lseek(save + 5);
-		written += 5;
-	
-		prbank = buf[2];
-		#if 0
-		proffs = buf[1] << 8;
-		proffs |= buf[0];
-		len = buf[4] << 8;
-		len |= buf[3];
-		#else
-		proffs = *(WORD*)&buf[0];
-		len = *(WORD*)&buf[2];
-		#endif
-
-		if(len)
-		{
-			written += len;
-			pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,len);
-			continue;
-		}
-		else	/*run length encoded*/
-		{
-			save = fs->fptr;
-			pf_read(buf,3,&wr);
-			pf_lseek(save + 3);
-			written += 3;
-
-			#if 0
-			len = buf[1] << 8;
-			len |= buf[0];
-			#else
-			len = *(WORD*)&buf[0];
-			#endif
-
-			c = buf[2];
-			memset_asm(buf,c,(len >= 128) ? 128 : len);/*largest step*/
-			while(len > 0)
-			{
-				step = (len > 128) ? 128 : len;
-				len -= step;
-
-				if(step&1)
-				{
-					while(step > 0)
-					{
-						if( (!(step&1))){goto patch_ips_apply_aligned_block_found;}
-						pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,1);
-						step--;
-						proffs++;
-						if(0==proffs){prbank++;}
-					}
-				}
-				else
-				{
-					patch_ips_apply_aligned_block_found:
-					pfn_neo2_ram_to_psram(prbank,proffs,(BYTE*)buf,step);
-					proffs += step;
-					if(0==proffs){prbank++;}
-				}
-			}
-		}
+		sram_lo += 512;
 	}
 }
-#endif
 
 

@@ -31,11 +31,22 @@ extern WCHAR LfnBuf[_MAX_LFN + 1];
 void option_cb_inc_sram_bank();
 void option_cb_dec_sram_bank();
 void option_cb_add_cheat();
+void option_cb_dump_sram();
+void option_cb_restore_sram();
 
-void bank1_call(WORD task,char* user_data)
+BYTE bank1_call(WORD task,char* user_data)
 {
-	void (*dispatch)(WORD,char*) = (void (*)(WORD,char*))0x4000;
-	dispatch(task,user_data);
+	BYTE f0,f1,r;
+	BYTE (*dispatch)(WORD,char*) = (BYTE (*)(WORD,char*))0x4000;
+
+	f0 = Frame1;
+	f1 = Frame2;
+    Frame1 = BANK_BG_GFX;
+    Frame2 = BANK_RAM_CODE;
+	r = dispatch(task,user_data);
+    Frame1 = f0;
+    Frame2 = f1;	
+	return r;
 }
 
 void mute_sound()
@@ -134,7 +145,7 @@ void setup_vdp()
 void print_hex(BYTE val, BYTE x, BYTE y) 
 {
 	val=val,x=x,y=y;
-	bank1_call(TASK_PRINT_HEX,&val);	/*Pass in the stack offset L->R from R->L*/
+	bank1_call(TASK_PRINT_HEX,&val); 
 }
 
 void dump_hex(WORD addr)
@@ -367,7 +378,7 @@ void puts_active_list()
 			{
 				if(OPTION_CB_SET_SRAM_BANK == options[show].user_data)
 				{
-		            temp[offs + col*2 + 2] = ('0'+options_sram_bank)-32;
+		            temp[offs + col*2 + 2] = ('0'+(options_sram_bank+1))-32;
 		            temp[offs + col*2 + 3] = attr;
 		            col++;
 				}
@@ -662,7 +673,6 @@ void handle_action_button(BYTE button)
 
     if (MENU_STATE_OPTIONS == menu_state)
     {
-
         // in the options state, the controls are
         // [DOWN]/[UP] = next/prev option
         // [LEFT]/[RIGHT] = change option
@@ -673,16 +683,19 @@ void handle_action_button(BYTE button)
         {
             if(options_highlighted < options_count)//sanity check
             {
+				BYTE type;
 				options_sync = 1;
 				option = &options[options_highlighted];
-                if(OPTION_TYPE_SETTING == options_get_type(option))
+				type = options_get_type(option);
+
+                if(OPTION_TYPE_SETTING == type)
                 {
                     if(options_get_state(option))
                         options_set_state(option,0);
                     else
                         options_set_state(option,1);
                 }
-                else if(OPTION_TYPE_ROUTINE == options_get_type(option))
+                else if(OPTION_TYPE_ROUTINE == type)
                 {
 					switch(option->user_data)
 					{
@@ -694,12 +707,6 @@ void handle_action_button(BYTE button)
 						break;
 					}
                 }
-#if 0
-                else if(OPTION_TYPE_CHEAT == options_get_type(&options[options_highlighted]))
-                {
-                    //TODO
-                }
-#endif
                 puts_active_list();
             }
         }
@@ -707,24 +714,37 @@ void handle_action_button(BYTE button)
 		{
 			if(options_highlighted >= options_count){return;}
 			option = &options[options_highlighted];
+
 			if(OPTION_TYPE_ROUTINE == options_get_type(option))
 			{
-				if(option->user_data == OPTION_CB_CHEAT_MGR)
+				cls();
+
+				switch(option->user_data)
 				{
-					option_cb_add_cheat();
-					puts_active_list();
-					return;
+					case OPTION_CB_SRAM_TO_SD:
+						option_cb_dump_sram();
+					break;
+
+					case OPTION_CB_SD_TO_SRAM:
+						option_cb_restore_sram();
+					break;
+
+					case OPTION_CB_CHEAT_MGR:
+						option_cb_add_cheat();
+					break;
+	
+					case OPTION_CB_CLEAR_SRAM:
+						sdutils_sram_cls();
+					break;
+
+					case OPTION_CB_IMPORT_IPS:
+					break; //TODO
 				}
-				if(option->user_data == OPTION_CB_CLEAR_SRAM)
-				{
-					sdutils_sram_cls();
-					puts_active_list();
-					return;
-				}
-				else if(option->user_data == OPTION_CB_IMPORT_IPS)
-				{
-					return; //todo
-				}
+
+				cls();
+				sync_state();
+				puts_active_list();
+				return;
 			}
 		}
 
@@ -761,7 +781,7 @@ void handle_action_button(BYTE button)
             gameData->size = p[2] >> 4;
             gameData->bankHi = p[2] & 0x0F;
             gameData->bankLo = p[3];
-            gameData->sramBank = p[4] >> 4;
+            gameData->sramBank = options_sram_bank; // : (p[4] >> 4);
             gameData->sramSize = p[4] & 0x0F;
             gameData->cheat[0] = p[5];
             gameData->cheat[1] = p[6];
@@ -787,8 +807,6 @@ void handle_action_button(BYTE button)
             proffs = praddr & 0xFFFF;
             prbank = praddr >> 16;            
             pfn_neo2_psram_to_ram((BYTE *)fi, prbank+0x20, proffs, 64);
-            
-			if(options_sync){sdutils_save_cfg();}
 
             if (GAME_MODE_NORMAL_ROM == fi->ftype)
             {
@@ -946,13 +964,19 @@ void import_std_options()
 
 	if(hasZipram)
 	{
+#if 0
 		options_add("Import .ips     : ","off","on",OPTION_TYPE_SETTING,0);
+#endif
 		sram_set_option_idx = options_count;
 		opt = options_add("SRAM Bank       : ","\0","\0",OPTION_TYPE_ROUTINE,0);
 		opt->user_data = OPTION_CB_SET_SRAM_BANK;
 		sram_cls_option_idx = options_count; 
-		opt = options_add("Cheat manager    ","\0","\0",OPTION_TYPE_ROUTINE,0);
+		opt = options_add("Cheat manager","\0","\0",OPTION_TYPE_ROUTINE,0);
 		opt->user_data = OPTION_CB_CHEAT_MGR;
+		opt = options_add("Dump SRAM to SD  ","\0","\0",OPTION_TYPE_ROUTINE,0);
+		opt->user_data = OPTION_CB_SRAM_TO_SD;
+		opt = options_add("Restore SRAM from SD","\0","\0",OPTION_TYPE_ROUTINE,0);
+		opt->user_data = OPTION_CB_SD_TO_SRAM;
 	}
 	else
 	{
@@ -1135,7 +1159,6 @@ void main()
         temp = init_sd();
         Frame1 = BANK_BG_GFX;
         Frame2 = BANK_RAM_CODE;
-		sdutils_load_cfg();
     }
     
     puts_active_list();
@@ -1280,9 +1303,9 @@ void options_add_cheat(BYTE data,BYTE addr_hi,WORD addr_lo)
 	++options_cheat_ptr;
 }
 
-void option_cb_inc_sram_bank()
+void option_cb_inc_sram_bank()//Up to 64KB
 {
-	if(options_sram_bank < 8){++options_sram_bank;}			//XXX how much space there is ? 2Mb(32banks?)
+	if(options_sram_bank < 7){++options_sram_bank;}	
 }
 
 void option_cb_dec_sram_bank()
@@ -1292,16 +1315,24 @@ void option_cb_dec_sram_bank()
 
 void option_cb_add_cheat()
 {
-	BYTE tmp[4];
-	WORD valid;
+	BYTE tmp[8];
 
 	if(options_cheat_ptr >= MAX_CHEATS){return;}
 
-	//bank1_call(TASK_EXEC_CHEAT_INPUTBOX,&tmp[0]); 
+	tmp[0] = 8; //field count
+	if (bank1_call(TASK_EXEC_CHEAT_INPUTBOX,&tmp[0]))
+	{
+		options_add_cheat(tmp[0],tmp[1],*(volatile unsigned short*)&tmp[2]);
+	}
+}
 
-	valid = tmp[0] + tmp[1] + tmp[2] + tmp[3];
-	if(valid == 0){return;}
+void option_cb_dump_sram()
+{
+	sdutils_xfer_sram_to_sd(sram_bank_binary[options_sram_bank]);
+}
 
-	options_add_cheat(tmp[0],tmp[1],*(volatile unsigned short*)&tmp[2]);
+void option_cb_restore_sram()
+{
+	sdutils_xfer_sd_to_sram(sram_bank_binary[options_sram_bank]);
 }
 

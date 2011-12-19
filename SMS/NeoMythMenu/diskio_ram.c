@@ -83,9 +83,9 @@ DRESULT disk_read_sector(void* dest, DWORD sector)
     return res;        
 }
 
-DRESULT disk_writep (
-	BYTE* buff,		/* Pointer to the data to be written, NULL:Initiate/Finalize write operation */
-	DWORD sc		/* Sector number (LBA) or Number of bytes to send */
+DRESULT disk_writep ( //Writes a sector a time
+	BYTE* buff,		
+	DWORD sc		
 )
 {
 	DRESULT res;

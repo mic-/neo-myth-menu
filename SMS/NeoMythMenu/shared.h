@@ -5,7 +5,7 @@
 #include <stdint.h>
 
 #define NUMBER_OF_GAMES_TO_SHOW 7
-#define MAX_OPTIONS 6
+#define MAX_OPTIONS 7
 #define MAX_CHEATS (9) //13
 #define MENU_NAMETABLE 0x3000 
 
@@ -58,6 +58,8 @@ enum
 	OPTION_CB_IMPORT_IPS    = 0xa1,
 	OPTION_CB_CLEAR_SRAM    = 0xa2,
 	OPTION_CB_CHEAT_MGR		= 0xa3,
+	OPTION_CB_SRAM_TO_SD	= 0xa4,
+	OPTION_CB_SD_TO_SRAM	= 0xa5,
 };
 
 enum
@@ -171,3 +173,6 @@ extern const char dummyGameList[];
 extern const BYTE *gbacGameList;
 
 #endif
+
+extern const char* sram_bank_binary[];
+
