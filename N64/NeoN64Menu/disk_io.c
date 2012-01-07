@@ -782,7 +782,6 @@ int sdInit(void)
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || (resp[0] != 6))
         return 0;                       // unusable
 
-    sd_speed = 0;                       // data rate after init
     return 1;
 }
 
@@ -793,18 +792,27 @@ int sdInit(void)
 DSTATUS MMC_disk_initialize (void)
 {
     int i;
-    int result;
-
+    int result = 0;
+    int passes = 0;
+    const int sds_accum = 1000;
+    const int max_passes = 4;
+    
     for (i=0; i<CACHE_SIZE; i++)
         sec_tags[i] = 0xFFFFFFFF;       // invalidate cache entry
 
     cardType &= 0x8000;                 // keep funky flag
 
-    sd_speed = 1600;                    // init with slow data rate
-    neo2_pre_sd();
-    result = sdInit();
-    neo2_post_sd();
+    sd_speed = 2000;                    // init with slow data rate
 
+    while ( (!result) && ( (passes++) < max_passes ) )
+    {
+        neo2_pre_sd();
+        result = sdInit();
+        neo2_post_sd();
+        sd_speed += sds_accum;
+    }
+
+    sd_speed = 0;                       // data rate after init
     if (!result)
         cardType = 0xFFFF;
 
