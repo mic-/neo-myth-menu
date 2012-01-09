@@ -316,7 +316,7 @@ enum {
 void updateConfig();
 void loadConfig();
 void do_options(void);
-void cache_sync();
+void cache_sync(int root);
 void cache_load();
 void cache_invalidate_pointers();
 
@@ -2596,15 +2596,25 @@ int cache_process()
     {
         gSRAMType = 0x0001;
         gSRAMSize = 0;
+        gManageSaves = 0;
+        gSRAMgrServiceStatus = SMGR_STATUS_NULL;//EEPROM unsupported : Use only the internal chip....
     }
     else
     {
         if((b-a) > 2)
         {
-            if(b-a +2 <= 8192)
+            if(((b-a)+2) <= 8192)
                 gSRAMSize = 1;
             else
-                gSRAMSize = (short int)(( (b-a+2) / 1024) / 8);
+                gSRAMSize = (short int)(( ((b-a)+2) / 1024) / 8);
+
+            gManageSaves = 1;
+            gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
+        }
+        else 
+        {
+            gManageSaves = 0;
+            gSRAMgrServiceStatus = SMGR_STATUS_NULL;
         }
 
         if((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04))
@@ -2768,7 +2778,7 @@ void cache_loadPA(WCHAR* sss,int skip_check)
         clearStatusMessage();
         cache_invalidate_pointers();
         gCacheBlock.processed = cache_process();
-        cache_sync();
+        cache_sync(0);
         gWStrOffs -= 512;
         return;
     }
@@ -2804,7 +2814,7 @@ void cache_loadPA(WCHAR* sss,int skip_check)
         STEP_INTO("gCacheBlock.processed != 0xFF");
         clearStatusMessage();
         gCacheBlock.processed = cache_process();
-        cache_sync();
+        cache_sync(0);
     }
 
     clearStatusMessage();
@@ -2828,11 +2838,12 @@ void cache_load()
     cache_loadPA(gSelections[gCurEntry].name,0);
 }
 
-void cache_sync()
+void cache_sync(int root)
 {
     UINT fbr = 0;
     WCHAR* fnbuf = &wstr_buf[gWStrOffs];
     WCHAR* fnew;
+
     if(gCurMode != MODE_SD)
         return;
 
@@ -2919,10 +2930,10 @@ void cache_sync()
 
     clearStatusMessage();
 
-    if(gCacheBlock.processed != 0xFF)
+    if( (gCacheBlock.processed != 0xFF) && (root < 2) )
     {
         gCacheBlock.processed = cache_process();
-        cache_sync();
+        cache_sync(root + 1);
     }
 
     clearStatusMessage();
@@ -2955,7 +2966,7 @@ void sram_mgr_toggleService(int index)
 
     ints_on();
 
-    cache_sync();
+    cache_sync(0);
 
     ints_on();
     setStatusMessage("Updating configuration...OK");
@@ -3684,7 +3695,7 @@ void runSRAMMgr(int index)
     ints_on();
     setStatusMessage("Working...");
     clearStatusMessage();
-    cache_sync();
+    cache_sync(0);
     clearStatusMessage();
     do_sramMgr();
     clearStatusMessage();
@@ -3713,7 +3724,7 @@ void runCheatEditor(int index)
     ints_on();
     printToScreen("Working...",(40 >> 1) - (utility_strlen("Working...") >>1),12,0x2000);
 
-    cache_sync();
+    cache_sync(0);
 
     utility_memset(buf,'\0',32);
     utility_memset(line,'\0',256);
@@ -4286,7 +4297,7 @@ void do_options(void)
             {
                 if(gCurMode == MODE_SD)
                 {
-                    cache_sync();
+                    cache_sync(0);
                     cache_invalidate_pointers();
                 }
 
@@ -4418,7 +4429,7 @@ void do_options(void)
                             f_close_zip(&gSDFile);
                             clear_screen();
                             gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
-                            cache_sync();
+                            cache_sync(0);
 
                             char* p = (char*)buffer;
                             utility_w2cstrcpy(p,gSelections[gCurEntry].name);
@@ -4432,7 +4443,7 @@ void do_options(void)
                             sram_mgr_restoreGame(gCurEntry);
                         }
                         else
-                            cache_sync();
+                            cache_sync(0);
 
                         neo2_disable_sd();
                         ints_off();     /* disable interrupts */
@@ -4476,7 +4487,7 @@ void do_options(void)
                             f_close_zip(&gSDFile);
                             clear_screen();
                             gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
-                            cache_sync();
+                            cache_sync(0);
 
                             char* p = (char*)buffer;
                             utility_w2cstrcpy(p,gSelections[gCurEntry].name);
@@ -4501,7 +4512,7 @@ void do_options(void)
             if ((changed & SEGA_CTRL_C) && !(buttons & SEGA_CTRL_C))
             {
                 //if(gOptions[currOption].exclusiveFCall)
-                    //cache_sync();
+                    //cache_sync(0);
 
                 // C released -> do option callback
                 if (gOptions[currOption].callback)
@@ -4869,7 +4880,7 @@ void run_rom(int reset_mode)
             if(gManageSaves)
             {
                 gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
-                cache_sync();
+                cache_sync(0);
 
                 char* p = (char*)buffer;
                 utility_w2cstrcpy(p,gSelections[gCurEntry].name);
@@ -4883,7 +4894,7 @@ void run_rom(int reset_mode)
                 sram_mgr_restoreGame(gCurEntry);
             }
             else
-                cache_sync();
+                cache_sync(0);
 
             clearStatusMessage();
 
@@ -4918,7 +4929,7 @@ void run_rom(int reset_mode)
             if(gManageSaves)
             {
                 gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
-                cache_sync();
+                cache_sync(0);
 
                 char* p = (char*)buffer;
                 utility_w2cstrcpy(p,gSelections[gCurEntry].name);
@@ -4932,7 +4943,7 @@ void run_rom(int reset_mode)
                 sram_mgr_restoreGame(gCurEntry);
             }
             else
-                cache_sync();
+                cache_sync(0);
 
             //patch bad headers ( based on genplus emu )
             {
@@ -5636,7 +5647,7 @@ int main(void)
 
                     gSRAMgrServiceStatus = SMGR_STATUS_NULL; //just in case mute cache even if the config has been updated
                     gCacheOutOfSync = 1;
-                    cache_sync();
+                    cache_sync(0);
                     updateConfig();
                 }
                 gWStrOffs -= 512;
