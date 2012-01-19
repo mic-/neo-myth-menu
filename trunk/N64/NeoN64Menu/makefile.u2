@@ -1,46 +1,63 @@
+ifdef $(N64_INST)
 ROOTDIR = $(N64_INST)
-GCCN64PREFIX = $(ROOTDIR)/bin/mips64-elf-
-CHKSUM64PATH = $(ROOTDIR)/bin/chksum64
-MKDFSPATH = $(ROOTDIR)/bin/mkdfs
-MKSPRITEPATH = $(ROOTDIR)/bin/mksprite
-HEADERPATH = $(ROOTDIR)/lib
-N64TOOL = $(ROOTDIR)/bin/n64tool
-HEADERNAME = header
-LINK_FLAGS = -G0 -L$(ROOTDIR)/lib -L$(ROOTDIR)/mips64-elf/lib -lff -ldragon -lc -lm -ldragonsys -lnosys -Tn64ld.x
-PROG_NAME = NEON64
-CFLAGS = -std=gnu99 -march=vr4300 -mtune=vr4300 -fomit-frame-pointer -O1 -G0 -Wall -I$(ROOTDIR)/include -I$(ROOTDIR)/mips64-elf/include -DRUN_FROM_U2
-CFLAGS += -DSTBI_NO_STDIO -DSTBI_NO_HDR
-ASFLAGS = -mtune=vr4300 -march=vr4300
-CC = $(GCCN64PREFIX)gcc
-AS = $(GCCN64PREFIX)as
-LD = $(GCCN64PREFIX)ld
-OBJCOPY = $(GCCN64PREFIX)objcopy
+else
+ROOTDIR = /opt/toolchains/n64
+endif
 
+HEADERDIR = $(ROOTDIR)/headers
+HEADER = $(HEADERDIR)/header
+
+TOOLDIR = $(ROOTDIR)/bin
+CHKSUM64 = $(TOOLDIR)/chksum64
+MKDFS = $(TOOLDIR)/mkdfs
+MKSPRITE = $(TOOLDIR)/mksprite
+N64TOOL = $(TOOLDIR)/n64tool
+
+LDSCRIPTSDIR = $(ROOTDIR)/ldscripts
+LINK_FLAGS = -T$(LDSCRIPTSDIR)/n64.ld -Map output.map -nostdlib
+
+LIBPATH = -L$(ROOTDIR)/mips64-elf/lib -L$(ROOTDIR)/mips64-elf/lib/gcc/mips64-elf/4.6.2 -L$(ROOTDIR)/mips64-elf/mips64-elf/lib
+INCPATH = -I$(CURDIR)/include -I$(ROOTDIR)/mips64-elf/include -I$(ROOTDIR)/mips64-elf/mips64-elf/include
+CCFLAGS = -std=gnu99 -march=vr4300 -mtune=vr4300 -fomit-frame-pointer -G 0 -O1 -Wall -c $(INCPATH)
+CCFLAGS += -DSTBI_NO_STDIO -DSTBI_NO_HDR -DRUN_FROM_U2
+ASFLAGS = -mtune=vr4300 -march=vr4300
+
+N64PREFIX = $(ROOTDIR)/mips64-elf/bin/mips64-elf-
+CC = $(N64PREFIX)gcc
+AS = $(N64PREFIX)as
+LD = $(N64PREFIX)ld
+OBJCOPY = $(N64PREFIX)objcopy
+
+PROG_NAME = NEON64
 OBJS = main.o neo_2_asm.o neo_2.o chksum64.o utility.o osk.o reqfile.o disk_io.o ram_io.o stb_image.o ../NeoN64Shell/libs/libconf.o  configuration.o interrupts.o
+LIBS = -lff -ldragon -lc -lm -ldragonsys -lnosys
 
 $(PROG_NAME).v64: $(PROG_NAME).dfs $(PROG_NAME).elf
 	$(OBJCOPY) $(PROG_NAME).elf $(PROG_NAME).bin -O binary
 	rm -f $(PROG_NAME).v64
-	$(N64TOOL) -b -l 1280K -t "N64 Myth Menu (U2)" -h $(HEADERPATH)/$(HEADERNAME) -o $(PROG_NAME).v64 $(PROG_NAME).bin -s 1M $(PROG_NAME).dfs
-	$(CHKSUM64PATH) $(PROG_NAME).v64
+	$(N64TOOL) -b -l 1280K -t "N64 Myth Menu (U2)" -h $(HEADER) -o $(PROG_NAME).v64 $(PROG_NAME).bin -s 1M $(PROG_NAME).dfs
+	$(CHKSUM64) $(PROG_NAME).v64
 
 $(PROG_NAME).elf : $(OBJS)
-	$(LD) -o $(PROG_NAME).elf $(OBJS) $(LINK_FLAGS)
+	$(LD) -o $(PROG_NAME).elf $(OBJS) $(LINK_FLAGS) $(LIBPATH) $(LIBS)
 
 $(PROG_NAME).dfs : ./filesystem/pattern0.sprite ./filesystem/pattern1.sprite ./filesystem/pattern2.sprite ./filesystem/unknown.sprite
-	$(MKDFSPATH) $(PROG_NAME).dfs ./filesystem/
+	$(MKDFS) $(PROG_NAME).dfs ./filesystem/
 
 ./filesystem/pattern0.sprite:
-	$(MKSPRITEPATH) 16 pattern_0.png ./filesystem/pattern0.sprite
+	$(MKSPRITE) 16 pattern_0.png ./filesystem/pattern0.sprite
 
 ./filesystem/pattern1.sprite:
-	$(MKSPRITEPATH) 16 pattern_1.png ./filesystem/pattern1.sprite
+	$(MKSPRITE) 16 pattern_1.png ./filesystem/pattern1.sprite
 
 ./filesystem/pattern2.sprite:
-	$(MKSPRITEPATH) 16 pattern_2.png ./filesystem/pattern2.sprite
+	$(MKSPRITE) 16 pattern_2.png ./filesystem/pattern2.sprite
 
 ./filesystem/unknown.sprite:
-	$(MKSPRITEPATH) 16 unknown.png ./filesystem/unknown.sprite
+	$(MKSPRITE) 16 unknown.png ./filesystem/unknown.sprite
+
+%.o: %.c
+	$(CC) $(CCFLAGS) $< -o $@
 
 all: $(PROG_NAME).v64
 
