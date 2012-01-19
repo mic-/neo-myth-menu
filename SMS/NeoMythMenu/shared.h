@@ -1,13 +1,13 @@
 #ifndef __SHARED_H__
 #define __SHARED_H__
 
-#include <z80/types.h>
 #include <stdint.h>
+#include "types.h"
 
 #define NUMBER_OF_GAMES_TO_SHOW 7
 #define MAX_OPTIONS 7
 #define MAX_CHEATS (9) //13
-#define MENU_NAMETABLE 0x3000 
+#define MENU_NAMETABLE 0x3000
 
 #define GAME_MODE_NORMAL_ROM 4
 #define GAME_MODE_SPC 32

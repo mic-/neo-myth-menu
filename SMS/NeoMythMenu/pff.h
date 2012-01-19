@@ -13,8 +13,8 @@
 / * Redistributions of source code must retain the above copyright notice.
 /----------------------------------------------------------------------------*/
 
-#include <z80/types.h>
 #include <stdint.h>
+#include "types.h"
 #include "diskio.h"
 
 

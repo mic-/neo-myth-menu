@@ -1,8 +1,8 @@
 #ifndef __NEO2_H__
 #define __NEO2_H__
 
-#include <z80/types.h>
 #include <stdint.h>
+#include "types.h"
 
 
 /*

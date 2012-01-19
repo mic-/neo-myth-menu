@@ -7,8 +7,8 @@
 #define _READONLY   0   /* 1: Read-only mode */
 #define _USE_IOCTL  1
 
-#include <z80/types.h>
 #include <stdint.h>
+#include "types.h"
 
 #define FALSE 0
 #define TRUE (~FALSE)
