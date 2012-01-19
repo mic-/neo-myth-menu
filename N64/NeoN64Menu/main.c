@@ -1230,19 +1230,19 @@ void copyfrom_sd_to_psram(FIL* f,int len,int disk_mode,int swap,int bfill,const 
 #ifdef __DEBUG_PSRAM__
 #define MYTH_IO_BASE (0xA8040000)
 #define ROM_BANK  *(vu32*)(MYTH_IO_BASE | 0x0C*2)
-#define ROM_SIZE  *(vu32*)(MYTH_IO_BASE | 0x08*2) 
+#define ROM_SIZE  *(vu32*)(MYTH_IO_BASE | 0x08*2)
 
 void test_psram(int m,const char* s)
 {
 	char* p,*p2;
 	int l,k;
- 
+
 	l = strlen(s);
 	p2 = (char*)&tmpBuf[1024];
 
 	if( l & 3 )
 	{
-		//align 
+		//align
 		k = (l + 4) & (~3);
 		p = (char*)tmpBuf;
 		memcpy(p,s,l);
@@ -1271,7 +1271,7 @@ void test_psram2(const char* s)
 
 	if( l & 3 )
 	{
-		//align 
+		//align
 		k = (l + 4) & (~3);
 		p = (char*)tmpBuf;
 		memcpy(p,s,l);
@@ -1315,7 +1315,7 @@ const char* align_text(char* s,char* back_buff,int* dl)
 
 	if( l & 3 )
 	{
-		//align 
+		//align
 		k = (l + 4) & (~3);
 		p = (char*)back_buff;
 		memcpy(p,s,l);
@@ -1392,8 +1392,8 @@ int neo_psram_offset_addr(unsigned int addr,int force)
 
 	last_psram_addr = (force) ? -1 : last_psram_addr;
 
-	
-	if(addr <= (16*mb))//0..16MB				
+
+	if(addr <= (16*mb))//0..16MB
 	{
 		if(last_psram_addr == 0)
 			return 0;
@@ -1424,7 +1424,7 @@ int neo_psram_offset_addr(unsigned int addr,int force)
 
 		last_psram_addr = 48;
 	}
-	else	
+	else
 		return 0;
 
 	neo_psram_offset((last_psram_addr*mb) >> 15);
@@ -1452,7 +1452,7 @@ void fastCopySD2Psram(int bselect,int bfill)
 
     if (gTable[bselect].type == 127)
         get_sd_info(bselect);
-	
+
 	swp = gTable[bselect].swap;
     strcpy(temp, gTable[bselect].name);
     c2wstrcpy(fpath, path);
@@ -1481,11 +1481,11 @@ void fastCopySD2Psram(int bselect,int bfill)
 
 	#if 0
 
-	//Just to make sure 
+	//Just to make sure
 	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp); 		//0-16
 	neo_psram_offset((16*1024*1024) / (32*1024));
 	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);		//16-32
-	neo_psram_offset((32*1024*1024) / (32*1024));			
+	neo_psram_offset((32*1024*1024) / (32*1024));
 	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);		//32-48
 	neo_psram_offset((48*1024*1024) / (32*1024));
 	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);		//48-64
@@ -1512,7 +1512,7 @@ void fastCopySD2Psram(int bselect,int bfill)
 			copyfrom_sd_to_psram(&f,gamelen,1,swp,bfill,"Loading",temp);
 		else//Image contains at least 1x16MB block
 		{
-			//Write 1/2 
+			//Write 1/2
 			copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);
 
 			//Switch offset
@@ -1528,7 +1528,7 @@ void fastCopySD2Psram(int bselect,int bfill)
 			copyfrom_sd_to_psram(&f,gamelen,1,swp,bfill,"Loading",temp);
 		else
 		{
-			//Write 1/2 
+			//Write 1/2
 			copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading 1/2",temp);
 
 			//Switch offset
@@ -1967,7 +1967,7 @@ void byte_swap_buf(u8 *buf, int size)
         ptr[ix] = SWAPLONG(ptr[ix]);
 }
 
- 
+
 void loadSaveState(int bsel, int bfill) //cleanup later
 {
     int ix, ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144, 0, 0, 0, 0, 0, 0, 0 };
@@ -2003,7 +2003,7 @@ void loadSaveState(int bsel, int bfill) //cleanup later
 	{
         c2wstrcpy(wname, "/menu/n64/save/last.run");
         f_force_open(&lSDFile,wname,FA_CREATE_ALWAYS | FA_WRITE,64);//f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
-		f_write(&lSDFile,&flags,8,&ts);			
+		f_write(&lSDFile,&flags,8,&ts);
         c2wstrcpy(wname, "/menu/n64/save/");
         c2wstrcat(wname, temp);
         f_write(&lSDFile,wname,280*2,&ts); //waste space for alignment porpuses
@@ -2116,8 +2116,8 @@ void saveSaveState()
         c2wstrcpy(wname2, "/menu/n64/save/last.run");
         if(f_open(&in, wname2, FA_OPEN_EXISTING | FA_READ) == FR_OK)
 		{
-			f_read(&in,&flags,8,&ts);	
-            f_read(&in,wname,280*2,&ts);	
+			f_read(&in,&flags,8,&ts);
+            f_read(&in,wname,280*2,&ts);
 			f_close(&in);
 		}
 		else
@@ -2753,7 +2753,7 @@ void init_n64(void)
     // Initialize display
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
     rdp_init();
-   // rdp_set_texture_flush(FLUSH_STRATEGY_NONE);
+    rdp_set_texture_flush(FLUSH_STRATEGY_NONE);
     register_VI_handler(vblCallback);
 
     // Initialize controllers
@@ -2951,7 +2951,7 @@ int main(void)
 				hw_self_test();
 				break;
 			}
-	
+
 			for(j = 0;j<32;j++)
 			{
 				asm("nop\n");
@@ -2971,7 +2971,7 @@ int main(void)
 	}
 
     if (bmax)
-    {        
+    {
         check_fast();                   // let SD read at full speed if allowed
 
         // try for images on the SD card
@@ -3481,7 +3481,7 @@ void hw_self_test_gen_pattern32(unsigned char* dst,int size,int* dir)
 		f ^= 1;
 		++dst;
 	}
-	
+
 	*dir = f;
 }
 
@@ -3505,13 +3505,13 @@ void mt_init(unsigned int* mt_buffer,int* mt_index)
     *mt_index = 0;
 }
 
-unsigned int mt_random(unsigned int* mt_buffer,int* mt_index) 
+unsigned int mt_random(unsigned int* mt_buffer,int* mt_index)
 {
     unsigned int * b = mt_buffer;
     int idx = *mt_index;
     unsigned int s;
     int i;
-	
+
     if (idx == (MT_LEN*sizeof(unsigned int)) )
     {
         idx = 0;
@@ -3524,7 +3524,7 @@ unsigned int mt_random(unsigned int* mt_buffer,int* mt_index)
             s = TWIST(b, i, i+1);
             b[i] = b[i - MT_IB] ^ (s >> 1) ^ MAGIC(s);
         }
-        
+
         s = TWIST(b, MT_LEN-1, 0);
         b[MT_LEN-1] = b[MT_IA-1] ^ (s >> 1) ^ MAGIC(s);
     }
@@ -3534,7 +3534,7 @@ unsigned int mt_random(unsigned int* mt_buffer,int* mt_index)
 
 void hw_self_test_sram_read(int onboard)											//compare previous write
 {
-	int sram_size = (1+onboard) * (128 * 1024);											
+	int sram_size = (1+onboard) * (128 * 1024);
 	const int block_size = 128 * 1024;
 	unsigned char* a = &tmpBuf[0];
 	unsigned char* b = &tmpBuf[block_size];
@@ -3598,13 +3598,13 @@ void hw_self_test_sram_read(int onboard)											//compare previous write
 			return;
 		}
 	}
-            
+
 	hw_self_test_follow("PASSED!",0);
 }
 
 void hw_self_test_sram_write(int onboard)											//write and compare later (To test battery)
 {
-	int sram_size = (1+onboard) * (128 * 1024);											 
+	int sram_size = (1+onboard) * (128 * 1024);
 	const int block_size = 128 * 1024;
 	unsigned char* a = &tmpBuf[0];
 	int dir,addr;
@@ -3688,7 +3688,7 @@ void hw_self_test_zipram_block(int* m_idx,unsigned int* stack,int check_top)
 		}
 
 		if(!check_top)
-		{	
+		{
 			continue;
 		}
 
@@ -3716,9 +3716,9 @@ void hw_self_test()
 
 	hw_self_test_dbg_scr_x = 5;
 	hw_self_test_dbg_scr_y = 20;
-	
+
     neo2_enable_sd();
-    ix = getSDInfo(-1); 
+    ix = getSDInfo(-1);
 	if(!ix){delay(200);}
 
 	ctx = lockVideo(1);
