@@ -1,7 +1,7 @@
 #ifndef __SMS_H__
 #define __SMS_H__
 
-#include <z80/types.h>
+#include "types.h"
 
 /*
  * Memory Control Port

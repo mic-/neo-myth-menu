@@ -1,9 +1,16 @@
-CC = $(SMSDEV)sdcc
-AS = $(SMSDEV)sdasz80
+ifndef $(SDCC_HOME)
+SDCC_HOME = /opt/toolchains/sega/sdcc
+endif
+SDCC_INCLUDE = $(SDCC_HOME)/share/sdcc/include
+SDCC_LIB = $(SDCC_HOME)/share/sdcc/lib
+
+BINPATH = $(SDCC_HOME)/bin
+CC = $(BINPATH)/sdcc
+AS = $(BINPATH)/sdasz80
 RM = rm -rf
 PADTRIM = tools/bin16k
 HEX2BIN = tools/hex2bin
-MAP2H = $(TOOLS_BASE)tools/map2h
+MAP2H = tools/map2h
 SMSHDR = tools/smshdr
 
 CFLAGS = -mz80 --data-loc 0xC001
@@ -26,7 +33,7 @@ tools/hex2bin:
 
 tools/smshdr:
 	gcc tools/smshdr.c -o tools/smshdr
-  
+
 ramcode.bin:
 	$(AS) -o diskio_asm.s
 	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0xC800 neo2.c diskio_ram.rel diskio_asm.rel
@@ -50,7 +57,7 @@ pffromcode.bin:
 	$(PADTRIM) pff.bin pffromcode.bin
 	$(MAP2H) pff.map pff.h
 	$(RM) pff.bin pff.ihx pff.asm *.noi *.lnk *.rst
-    
+
 bank0.bin:
 	$(CC) $(CFLAGS) -c sd_utils.c
 	$(CC) $(CFLAGS) -Wl-b_GSINIT=0x3400 --no-std-crt0 --oldralloc main.c $(BANK0OBJS) sd_utils.rel $(SHARED)
@@ -58,7 +65,7 @@ bank0.bin:
 	$(PADTRIM) main.bin bank0.bin
 	$(MAP2H) main.map vdp.h pad.h util.h
 	$(RM) main.asm
-    
+
 bank1.bin:
 	$(CC) $(CFLAGS) --no-std-crt0 --no-peep --code-loc 0x4000 bank1.c $(SHARED)
 	$(HEX2BIN) bank1.ihx

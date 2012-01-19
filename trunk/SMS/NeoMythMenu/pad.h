@@ -2,7 +2,7 @@
 #define __PAD_H__
 
 #include <stdint.h>
-#include <z80/types.h>
+#include "types.h"
 #include "sms.h"
 
 

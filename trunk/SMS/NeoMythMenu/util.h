@@ -1,6 +1,6 @@
 #ifndef _util_h_
 #define _util_h_
-#include <z80/types.h>
+#include "types.h"
 
 extern void puts_asm(const char *str, BYTE attributes,WORD vram_addr);
 #define puts(STR,X,Y,ATTR) puts_asm(STR,ATTR,(0x3000 + (X << 1) + (Y << 6)))
