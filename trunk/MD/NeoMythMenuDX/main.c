@@ -2611,7 +2611,7 @@ int cache_process()
             gManageSaves = 1;
             gSRAMgrServiceStatus = SMGR_STATUS_BACKUP_SRAM;
         }
-        else 
+        else
         {
             gManageSaves = 0;
             gSRAMgrServiceStatus = SMGR_STATUS_NULL;
