@@ -1,29 +1,42 @@
-CC := m68k-elf-gcc
-AS := m68k-elf-as
-OBJC := m68k-elf-objcopy
-RM := rm -f
-ASMZ80 := zasm
-BINTOC := bin2c
+ifdef $(GENDEV)
+ROOTDIR = $(GENDEV)
+else
+ROOTDIR = /opt/toolchains/sega
+endif
 
-OBJS := crt0.o main.o neo2.o font.o disk_io.o rom_io.o conf.o utility.o util_68k.o cheat.o vgm_player.o Z80.o
+TOOLDIR = $(ROOTDIR)/bin
+ASMZ80 = $(TOOLDIR)/zasm
+BINTOC = $(TOOLDIR)/bin2c
 
-OPTION := -DRUN_IN_PSRAM
-INCS := -I. -I$(GENDEV)/m68k-elf/include -I$(GENDEV)/m68k-elf/m68k-elf/include
-CCFLAGS := $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -fshort-wchar -fno-strict-aliasing
-HWCCFLAGS := $(OPTION) -m68000 -Wall -O1 -c -fomit-frame-pointer -fshort-wchar -fno-strict-aliasing
-Z80FLAGS := -vb2
-ASFLAGS := -m68000 --register-prefix-optional --defsym RUN_IN_PSRAM=1 $(AS_FLAGS)
-LIBS := -L$(GENDEV)/m68k-elf/lib -L$(GENDEV)/m68k-elf/m68k-elf/lib -lff -lc -lgcc -lnosys
-LINKFLAGS := -T $(GENDEV)/ldscripts/md-myth-wram.ld -Wl,-Map=output.map
-BUILD := build_ram
-TARGET := MDEBIOS.BIN
+LDSCRIPTSDIR = $(ROOTDIR)/ldscripts
+LINKFLAGS = -T$(LDSCRIPTSDIR)/md-myth-wram.ld -Wl,-Map=output.map -nostdlib
+
+LIBPATH = -L$(ROOTDIR)/m68k-elf/lib -L$(ROOTDIR)/m68k-elf/lib/gcc/m68k-elf/4.6.2 -L$(ROOTDIR)/m68k-elf/m68k-elf/lib
+INCPATH = -I$(CURDIR) -I$(ROOTDIR)/m68k-elf/include -I$(ROOTDIR)/m68k-elf/m68k-elf/include
+OPTION = -DRUN_IN_PSRAM
+CCFLAGS = $(OPTION) -m68000 -Wall -O2 -c -fomit-frame-pointer -fshort-wchar -fno-strict-aliasing
+HWCCFLAGS = $(OPTION) -m68000 -Wall -O1 -c -fomit-frame-pointer -fshort-wchar -fno-strict-aliasing
+Z80FLAGS = -vb2
+ASFLAGS = -m68000 --register-prefix-optional --defsym RUN_IN_PSRAM=1 $(AS_FLAGS)
+
+MDPREFIX = $(ROOTDIR)/m68k-elf/bin/m68k-elf-
+CC = $(MDPREFIX)gcc
+AS = $(MDPREFIX)as
+LD = $(MDPREFIX)ld
+OBJC = $(MDPREFIX)objcopy
+RM = rm -f
+
+BUILD = build_ram
+TARGET = MDEBIOS.BIN
+OBJS = crt0.o main.o neo2.o font.o disk_io.o rom_io.o conf.o utility.o util_68k.o cheat.o vgm_player.o Z80.o
+LIBS = $(LIBPATH) -lff -lc -lgcc -lnosys
 
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 
-export OUTPUT  := $(CURDIR)/$(TARGET)
-export VPATH   := $(CURDIR) $(CURDIR)/deluxe
-export DEPENDS := $(OBJS:.o=.d)
-export INCLUDE := $(INCS) $(foreach dir,$(VPATH),-I$(dir))
+export OUTPUT  = $(CURDIR)/$(TARGET)
+export VPATH   = $(CURDIR) $(CURDIR)/deluxe
+export DEPENDS = $(OBJS:.o=.d)
+export INCLUDE = $(INCPATH) $(foreach dir,$(VPATH),-I$(dir))
 
 .PHONY: $(BUILD) clean install
 
@@ -42,7 +55,7 @@ all: $(BUILD)
 
 else
 
-ELF := $(notdir $(OUTPUT)).elf
+ELF = $(notdir $(OUTPUT)).elf
 
 $(OUTPUT): $(ELF)
 	@$(OBJC) --pad-to 131072 -O binary $(ELF) $@

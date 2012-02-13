@@ -48,10 +48,13 @@ ExitVGM:
         move.b  d0,0x4000(a0)           /* FM reg */
         nop
         nop
+        nop
         move.b  d1,0x4001(a0)           /* FM data */
         nop
         nop
+        nop
         move.b  d0,0x4002(a0)           /* FM reg */
+        nop
         nop
         nop
         move.b  d1,0x4003(a0)           /* FM data */
@@ -803,6 +806,20 @@ data_block:
         swap    d7
         lsr.w   #4,d7
         andi.w  #7,d7           /* new vgm bank */
+
+        move.b  #0x2B,0xA04000
+        nop
+        nop
+        nop
+        move.b  #0x80,0xA04001  /* enable DAC */
+        nop
+        nop
+        nop
+        move.b  #0x2A,0xA04000
+        nop
+        nop
+        nop
+        move.b  #0x80,0xA04001  /* silence */
         bra     read_cmd
 
 end_data:

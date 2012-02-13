@@ -1,13 +1,23 @@
-CC = m68k-elf-gcc
-AR = m68k-elf-ar
-AS = m68k-elf-as
-RANLIB = m68k-elf-ranlib
+ifdef $(GENDEV)
+ROOTDIR = $(GENDEV)
+else
+ROOTDIR = /opt/toolchains/sega
+endif
+
+INSTALLDIR = $(ROOTDIR)/m68k-elf
+
+INCPATH = -I. -I$(ROOTDIR)/m68k-elf/include -I$(ROOTDIR)/m68k-elf/m68k-elf/include
+FLAGS = -m68000 -Wall -O2 -fomit-frame-pointer $(INCPATH)
+
+MDPREFIX = $(ROOTDIR)/m68k-elf/bin/m68k-elf-
+CC = $(MDPREFIX)gcc
+AS = $(MDPREFIX)as
+LD = $(MDPREFIX)ld
+AR = $(MDPREFIX)ar
+RANLIB = $(MDPREFIX)ranlib
 RM = rm -rf
 
 libff.a_OBJS = ff.o diskio.o option/ccsbcs.o optimize/genesis/memory.o
-
-INCS = -I. -I$(GENDEV)/m68k-elf/include -I$(GENDEV)/m68k-elf/m68k-elf/include
-FLAGS = -m68000 -Wall -O2 -fomit-frame-pointer $(INCS)
 
 all: $(libff.a_OBJS) libff.a
 
@@ -26,8 +36,8 @@ clean:
 	$(RM) *.o *.a option/*.o optimize/genesis/*.o
 
 install: all
-	cp ff.h $(GENDEV)/m68k-elf/include
-	cp ffconf.h $(GENDEV)/m68k-elf/include
-	cp integer.h $(GENDEV)/m68k-elf/include
-	cp diskio.h $(GENDEV)/m68k-elf/include
-	cp libff.a $(GENDEV)/m68k-elf/lib
+	cp ff.h $(INSTALLDIR)/include
+	cp ffconf.h $(INSTALLDIR)/include
+	cp integer.h $(INSTALLDIR)/include
+	cp diskio.h $(INSTALLDIR)/include
+	cp libff.a $(INSTALLDIR)/lib

@@ -65,6 +65,9 @@
 
         .ifdef  RUN_IN_PSRAM
 
+        .global _start
+_start:
+
 | When running from PSRAM, pretty much all the initialization has already been
 | done for us by the boot rom code. No need to reset the CD or 32X or sound.
 | Just clear the Work RAM, copy the initial data, and call main().
@@ -84,15 +87,13 @@ initialize:
         dbra    d1,1b
 
 | Copy initialized variables from ROM to Work RAM
-        lea     _stext,a0
-        adda.l  #0x00300000,a0
+        lea     __text_end,a0
         lea     0xFF0000,a1
-        move.l  #_sdata,d0
-        lsr.l   #1,d0
-        subq.w  #1,d0
+        lea     __data_end,a2
 2:
         move.w  (a0)+,(a1)+
-        dbra    d0,2b
+        cmpa.l  a1,a2
+        bhi.b   2b
 
         jsr     main                    /* call main() */
         jmp     initialize.l
@@ -147,6 +148,9 @@ vblank:
         rte
 
         .else
+
+        .global _start
+_start:
 
 | Standard MegaDrive startup at 0x200 - sort of. Try to handle 32X reset.
 | If MD reset, will start at initialize since that's in the exception table.
@@ -218,13 +222,13 @@ skip_tmss:
         dbra    d1,1b
 
 | Copy initialized variables from ROM to Work RAM
-        lea     _stext,a0
+        lea     __text_end,a0
         lea     0xFF0000,a1
-        move.l  #_sdata,d0
-        lsr.l   #1,d0
-        subq.w  #1,d0
+        lea     __data_end,a2
 2:
         move.w  (a0)+,(a1)+
+        cmpa.l  a1,a2
+        bhi.b   2b
         dbra    d0,2b
 
         jsr     main                    /* call main() */
