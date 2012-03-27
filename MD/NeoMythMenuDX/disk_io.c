@@ -8,7 +8,10 @@
 #define R3_LEN (48/8)
 #define R6_LEN (48/8)
 #define R7_LEN (48/8)
-#define INIT_RETRIES (128)
+#define INIT_RETRIES (64)
+#define RESP_TIME_I (64)
+#define RESP_TIME_R (1024/2)
+#define RESP_TIME_W (1024*4)
 //#define DEBUG_PRINT
 //#define DEBUG_RESP
 
@@ -33,6 +36,8 @@ unsigned char __attribute__((aligned(16))) sec_cache[CACHE_SIZE*512 + 8];
 unsigned char __attribute__((aligned(16))) sec_buf[520]; /* for uncached reads */
 unsigned char sd_csd[R2_LEN];
 short do_init = 0;
+static int respTime = RESP_TIME_R;
+
 
 /*-----------------------------------------------------------------------*/
 /*                             support code                              */
@@ -41,9 +46,10 @@ short do_init = 0;
 void sd_op_delay() __attribute__ ((section (".data")));
 void sd_op_delay()
 {
-	short i,j;
-	
-	for (i = 0,j = (do_init != 0) << 4;i < j;i++) {	/*16 nops/bit should be enough even for the slowest card*/
+	short i;
+
+	for (i=0; i<16; i++)
+    {
 		asm("nop\n");
 	}
 }
@@ -66,7 +72,7 @@ void wrMmcCmdBit( unsigned int bit )
         ( 1<<10 ) |            // d1 value
         ( 1<<9 );            // d0 value
     data = *(vu16*)(addr);
-	sd_op_delay();
+	if (do_init) sd_op_delay();
 }
 
 void wrMmcCmdByte( unsigned int byte ) __attribute__ ((section (".data")));
@@ -96,6 +102,7 @@ void wrMmcDatBit( unsigned int bit )
         ( 1<<10 ) |            // d1 value
         ( (bit&1)<<9 );        // d0 value
     data = *(vu16*)(addr);
+	if (do_init) sd_op_delay();
 }
 
 void wrMmcDatByte( unsigned int byte ) __attribute__ ((section (".data")));
@@ -125,8 +132,8 @@ unsigned int rdMmcCmdBit()
         ( 1<<10 ) |            // d1
         ( 1<<9 ) |            // d0
         ( 1<<7 );            // cmd input mode
-	sd_op_delay();
     data = *(vu16*)(addr);
+	if (do_init) sd_op_delay();
     return (data>>4) & 1;
 }
 
@@ -168,6 +175,7 @@ unsigned int rdMmcDatBit()
         //( 1<<6 ) |        // d3-d1 input (only needed in 4 bit mode)
         ( 1<<5);            // d0 input
     data = *(vu16*)(addr);
+	if (do_init) sd_op_delay();
     return data & 1;
 }
 
@@ -356,7 +364,8 @@ BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
     unsigned int i, j;
     unsigned char *r = resp;
 
-    for (i=0; i<1024; i++)
+    resp[0] = 0;
+    for (i=0; i<respTime; i++)
     {
         // wait on start bit
         if(rdMmcCmdBit()==0)
@@ -369,11 +378,13 @@ BOOL recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
             if (cflag)
                 wrMmcCmdByte(0xFF);        // 8 cycles to complete the operation so clock can halt
 
+            respTime = RESP_TIME_R;
             debugMmcResp(pkt[0]&0x3F, resp);
             return TRUE;
         }
     }
 
+    respTime = RESP_TIME_R;
     debugMmcResp(pkt[0]&0x3F, resp);
     return FALSE;
 }
@@ -579,6 +590,7 @@ BOOL sdWriteSingleBlock( unsigned char *buf, unsigned int addr )
     sdCrc16(crcbuf, buf, 512);          // Calculate CRC16
 
     sendMmcCmd( 24, addr );
+    respTime = RESP_TIME_W;
     if (recvMmcCmdResp(resp, R1_LEN, 0) && (resp[0] == 24))
         return sendSdWriteBlock4(buf, crcbuf);
 
@@ -591,42 +603,47 @@ BOOL sdInit(void)
 {
     int i;
     unsigned short rca;
-    unsigned char resp[R2_LEN];            // R2 is largest response
+    unsigned char resp[R2_LEN];         // R2 is largest response
 
 	do_init = 1;
 
-    for( i = 0; i < 80; i++ )
+    for( i = 0; i < 64; i++ )
         wrMmcCmdBit(1);
 
-    sendMmcCmd(0, 0);                    // GO_IDLE_STATE
-    wrMmcCmdByte(0xFF);                    // 8 cycles to complete the operation so clock can halt
+    sendMmcCmd(0, 0);                   // GO_IDLE_STATE
+    wrMmcCmdByte(0xFF);                 // 8 cycles to complete the operation so clock can halt
 
-    sendMmcCmd(8, 0x1AA);                // SEND_IF_COND
+    sendMmcCmd(8, 0x1AA);               // SEND_IF_COND
+    respTime = RESP_TIME_I;             // init response time (extra short)
     if (recvMmcCmdResp(resp, R7_LEN, 1))
     {
         if ((resp[0] == 8) && (resp[3] == 1) && (resp[4] == 0xAA))
-            cardType |= 2;                // V2 and/or HC card
+            cardType |= 2;              // V2 and/or HC card
         else
             return FALSE;               // unusable
     }
 
     for (i=0; i<INIT_RETRIES; i++)
     {
-        sendMmcCmd(55, 0xFFFF);            // APP_CMD
-        if (recvMmcCmdResp(resp, R1_LEN, 1) && (resp[4] & 0x20))
+        sendMmcCmd(55, 0xFFFF);         // APP_CMD
+        respTime = RESP_TIME_I;
+        if (recvMmcCmdResp(resp, R1_LEN, 1))
         {
-            sendMmcCmd(41, (cardType & 2) ? 0x40300000 : 0x00300000);    // SD_SEND_OP_COND
-            if (recvMmcCmdResp(resp, R3_LEN, 1) && (resp[0] == 0x3F) && (resp[1] & 0x80))
+            if (resp[4] & 0x20)
             {
-                if (resp[1] & 0x40)
-                    cardType |= 1;        // HC card
-
-                if (!(resp[2] & 0x30))
-                    return FALSE;       // unusable
-
-                break;
+                sendMmcCmd(41, (cardType & 2) ? 0x40300000 : 0x00300000);    // SD_SEND_OP_COND
+                if (recvMmcCmdResp(resp, R3_LEN, 1) && (resp[0] == 0x3F) && (resp[1] & 0x80))
+                {
+                    if (resp[1] & 0x40)
+                        cardType |= 1;      // HC card
+                    if (!(resp[2] & 0x30))
+                        return FALSE;       // unusable
+                    break;
+                }
             }
         }
+        else
+            return FALSE;               // no card
     }
     if (i == INIT_RETRIES)
     {
@@ -634,11 +651,11 @@ BOOL sdInit(void)
         return FALSE;                   // unusable
     }
 
-    sendMmcCmd(2, 0xFFFFFFFF);            // ALL_SEND_CID
+    sendMmcCmd(2, 0xFFFFFFFF);          // ALL_SEND_CID
     if (!recvMmcCmdResp(resp, R2_LEN, 1) || (resp[0] != 0x3F))
         return FALSE;                   // unusable
 
-    sendMmcCmd(3, 1);                    // SEND_RELATIVE_ADDR
+    sendMmcCmd(3, 1);                   // SEND_RELATIVE_ADDR
     if (!recvMmcCmdResp(resp, R6_LEN, 1) || (resp[0] != 3))
         return FALSE;                   // unusable
 
@@ -656,7 +673,7 @@ BOOL sdInit(void)
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || !(resp[4] & 0x20))
         return FALSE;                   // unusable
 
-    sendMmcCmd(6, 2);                    // SET_BUS_WIDTH (to 4 bits)
+    sendMmcCmd(6, 2);                   // SET_BUS_WIDTH (to 4 bits)
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || (resp[0] != 6))
         return FALSE;                   // unusable
 
@@ -675,27 +692,28 @@ DSTATUS MMC_disk_initialize (void)
     BOOL result;
 
     for (i=0; i<CACHE_SIZE; i++)
-        sec_tags[i] = 0xFFFFFFFF;        // invalidate cache entry
+        sec_tags[i] = 0xFFFFFFFF;       // invalidate cache entry
 
-    cardType &= 0x8000;                    // keep funky flag
+    cardType &= 0x8000;                 // keep funky flag
 
     neo2_pre_sd();
     result = sdInit();
     neo2_post_sd();
 
     if (!result)
+    {
         cardType = 0xFFFF;
+#ifdef DEBUG_PRINT
+        debugMmcPrint("Card unusable");
+#endif
+        return STA_NODISK;
+    }
 
 #ifdef    DEBUG_PRINT
-    if (!result)
-        debugMmcPrint("Card unusable");
+    if (cardType & 1)
+        debugMmcPrint("SDHC Card ready");
     else
-    {
-        if (cardType & 1)
-            debugMmcPrint("SDHC Card ready");
-        else
-            debugMmcPrint("SD Card ready");
-    }
+        debugMmcPrint("SD Card ready");
 #endif
 
     if ((sd_csd[1] & 0xC0) == 0)
@@ -725,7 +743,7 @@ DSTATUS MMC_disk_initialize (void)
         num_sectors = (((sd_csd[8] & 0x3F) << 16) | (sd_csd[9] << 8) | sd_csd[10]) * 1024;
     }
 
-    return result ? 0 : STA_NODISK;
+    return 0;
 }
 
 /*-----------------------------------------------------------------------*/
