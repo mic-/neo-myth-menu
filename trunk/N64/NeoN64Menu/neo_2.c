@@ -66,9 +66,11 @@ static u32 neo_mode = SD_OFF;
 static u8 __attribute__((aligned(16))) dmaBuf[128*1024];
 
 extern unsigned int gBootCic;
-extern unsigned int gCardTypeCmd;
-extern unsigned int gPsramCmd;
-extern short int gCardType;
+extern unsigned int gFlashIosr;
+extern unsigned int gPsramIosr;
+extern unsigned int gPsramCr;
+extern short int gPsramMode;            /* 0 = Neo2-SD IOSR/CR, 1 = Neo2-Pro IOSR/CR */
+extern short int gCardType;             /* 0x0000 = newer flash, 0x0101 = new flash, 0x0202 = old flash */
 extern unsigned int gCpldVers;          /* 0x81 = V1.2 hardware, 0x82 = V2.0 hardware, 0x83 = V3.0 hardware */
 
 extern unsigned int sd_speed;
@@ -187,8 +189,8 @@ unsigned int neo_get_cpld(void)
 
 void neo_select_menu(void)
 {
-    _neo_asic_cmd(0x00370002, 1);       // menu flash enabled
-    _neo_asic_cmd(0x00DA0044, 0);       // select menu flash
+    _neo_asic_cmd(0x00370002, 1);       // set cr = menu flash enabled
+    _neo_asic_cmd(0x00DA0044, 0);       // set iosr = select menu flash
 
     ROMSW_IO = 0xFFFFFFFF;              // gba mapped to 0xB0000000 - 0xB3FFFFFF
     neo_sync_bus();
@@ -198,8 +200,8 @@ void neo_select_menu(void)
 
 void neo_select_game(void)
 {
-    _neo_asic_cmd(0x00370202, 1);       // game flash enabled
-    _neo_asic_cmd(gCardTypeCmd, 0);     // select game flash
+    _neo_asic_cmd(0x00370202, 1);       // set cr = game flash enabled
+    _neo_asic_cmd(gFlashIosr, 0);       // set iosr = select game flash
     _neo_asic_cmd(0x00EE0630, 0);       // set cr1 = enable extended address bus
 
     ROMSW_IO = 0xFFFFFFFF;              // gba mapped to 0xB0000000 - 0xB3FFFFFF
@@ -210,10 +212,24 @@ void neo_select_game(void)
 
 void neo_select_psram(void)
 {
-    _neo_asic_cmd(0x00E21500, 1);       // GBA CARD WE ON !
-    _neo_asic_cmd(0x00372302|neo_mode, 0); // game flash and write enabled, optionally enable SD interface
-    _neo_asic_cmd(gPsramCmd, 0);        // select psram
-    _neo_asic_cmd(0x00EE0630, 0);       // set cr1 = enable extended address bus
+    switch (gPsramMode)
+    {
+        case 1:
+            // Neo2-Pro
+            _neo_asic_cmd(0x00E21500, 1);       // GBA CARD WE ON !
+            _neo_asic_cmd(0x00373202|neo_mode, 0); // set cr = game flash and write enabled, optionally enable SD interface
+            _neo_asic_cmd(0x00DA674E, 0);       // select psram
+            _neo_asic_cmd(0x00EE0630, 0);       // set cr1 = enable extended address bus
+            break;
+        default:
+        case 0:
+            // Neo2-SD
+            _neo_asic_cmd(0x00E21500, 1);       // GBA CARD WE ON !
+            _neo_asic_cmd(0x00372202|neo_mode, 0); // set cr = game flash and write enabled, optionally enable SD interface
+            _neo_asic_cmd(0x00DAAF44, 0);       // select psram
+            _neo_asic_cmd(0x00EE0630, 0);       // set cr1 = enable extended address bus
+            break;
+    }
 
     ROMSW_IO = 0xFFFFFFFF;              // gba mapped to 0xB0000000 - 0xB3FFFFFF
     neo_sync_bus();

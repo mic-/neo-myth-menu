@@ -15,6 +15,7 @@ typedef volatile unsigned int vu32;
 #define R6_LEN (48/8)
 #define R7_LEN (48/8)
 #define INIT_RETRIES (64)
+#define RESP_TIME_I (64)
 #define RESP_TIME_R (1024/2)
 #define RESP_TIME_W (1024*4)
 //#define DEBUG_PRINT
@@ -112,8 +113,6 @@ void disk_io_set_mode(int mode,int dat_swap)
 
 inline void sd_delay(int cnt)
 {
-	//cnt <<= ((cnt == 1600)<< 1) << 2;//init cnt?
-
     for(int ix=0; ix<cnt; ix++)
         asm("\tnop\n"::);
 }
@@ -421,13 +420,14 @@ int recvMmcCmdResp( unsigned char *resp, unsigned int len, int cflag )
     register unsigned int i;
     register unsigned char* r = resp;
 
+    resp[0] = 0;
     for (i=0; i<respTime; i++)
     {
         // wait on start bit
         if(rdMmcCmdBit()==0)
         {
             *r++ = rdMmcCmdByte7();//rdMmcCmdBits(7);
-            
+
             while(--len)
                 *r++ = rdMmcCmdByte();
 
@@ -718,15 +718,16 @@ int sdInit(void)
 
 	disk_io_set_mode(0,0);
 
-    respTime = RESP_TIME_R;
+    sd_speed = 4000;                    // init with slow data rate
 
-    for (i=0; i<128; i++)
+    for (i=0; i<64; i++)
         wrMmcCmdBit(1);
 
     sendMmcCmd(0, 0);                   // GO_IDLE_STATE
     wrMmcCmdByte(0xFF);                 // 8 cycles to complete the operation so clock can halt
 
     sendMmcCmd(8, 0x1AA);               // SEND_IF_COND
+    respTime = RESP_TIME_I;             // init response time (extra short)
     if (recvMmcCmdResp(resp, R7_LEN, 1))
     {
         if ((resp[0] == 8) && (resp[3] == 1) && (resp[4] == 0xAA))
@@ -738,24 +739,32 @@ int sdInit(void)
     for (i=0; i<INIT_RETRIES; i++)
     {
         sendMmcCmd(55, 0xFFFF);         // APP_CMD
-        if (recvMmcCmdResp(resp, R1_LEN, 1) && (resp[4] & 0x20))
+        respTime = RESP_TIME_I;
+        if (recvMmcCmdResp(resp, R1_LEN, 1))
         {
-            sendMmcCmd(41, (cardType & 2) ? 0x40300000 : 0x00300000);    // SD_SEND_OP_COND
-            if (recvMmcCmdResp(resp, R3_LEN, 1) && (resp[0] == 0x3F) && (resp[1] & 0x80))
+            if (resp[4] & 0x20)
             {
-                if (resp[1] & 0x40)
-                    cardType |= 1;      // HC card
-                if (!(resp[2] & 0x30))
-                    return 0;           // unusable
-                break;
+                sendMmcCmd(41, (cardType & 2) ? 0x40300000 : 0x00300000);    // SD_SEND_OP_COND
+                if (recvMmcCmdResp(resp, R3_LEN, 1) && (resp[0] == 0x3F) && (resp[1] & 0x80))
+                {
+                    if (resp[1] & 0x40)
+                        cardType |= 1;      // HC card
+                    if (!(resp[2] & 0x30))
+                        return 0;           // unusable
+                    break;
+                }
             }
         }
+        else
+            return 0;                   // no card
     }
     if (i == INIT_RETRIES)
     {
         // timed out
         return 0;                       // unusable
     }
+
+    sd_speed = 1000;                    // continue with faster data rate
 
     sendMmcCmd(2, 0xFFFFFFFF);          // ALL_SEND_CID
     if (!recvMmcCmdResp(resp, R2_LEN, 1) || (resp[0] != 0x3F))
@@ -793,39 +802,31 @@ DSTATUS MMC_disk_initialize (void)
 {
     int i;
     int result = 0;
-    int passes = 0;
-    const int sds_accum = 1000;
-    const int max_passes = 4;
-    
+
     for (i=0; i<CACHE_SIZE; i++)
         sec_tags[i] = 0xFFFFFFFF;       // invalidate cache entry
 
     cardType &= 0x8000;                 // keep funky flag
 
-    sd_speed = 2000;                    // init with slow data rate
-
-    while ( (!result) && ( (passes++) < max_passes ) )
-    {
-        neo2_pre_sd();
-        result = sdInit();
-        neo2_post_sd();
-        sd_speed += sds_accum;
-    }
+    neo2_pre_sd();
+    result = sdInit();
+    neo2_post_sd();
 
     sd_speed = 0;                       // data rate after init
     if (!result)
+    {
         cardType = 0xFFFF;
+#ifdef DEBUG_PRINT
+        debugMmcPrint("Card unusable");
+#endif
+        return STA_NODISK;
+    }
 
 #ifdef DEBUG_PRINT
-    if (!result)
-        debugMmcPrint("Card unusable");
+    if (cardType & 1)
+        debugMmcPrint("SDHC Card ready");
     else
-    {
-        if (cardType & 1)
-            debugMmcPrint("SDHC Card ready");
-        else
-            debugMmcPrint("SD Card ready");
-    }
+        debugMmcPrint("SD Card ready");
 #endif
 
     if ((sd_csd[1] & 0xC0) == 0)
@@ -855,7 +856,7 @@ DSTATUS MMC_disk_initialize (void)
         num_sectors = (((sd_csd[8] & 0x3F) << 16) | (sd_csd[9] << 8) | sd_csd[10]) * 1024;
     }
 
-    return result ? 0 : STA_NODISK;
+    return 0;
 }
 
 /*-----------------------------------------------------------------------*/
@@ -974,12 +975,12 @@ DRESULT MMC_disk_read_multi(BYTE* buff,DWORD sector,UINT count)
                 //debugPrint("Read failed!");
                 return RES_ERROR;
             }
-			
+
 			sdReadStopMulti();
 			neo2_post_sd();
 			return RES_OK;
         }
-        
+
 		if (!sdReadMultiBlocks(buff,count))
         {
             // read failed, retry once
@@ -1038,7 +1039,7 @@ DRESULT MMC_disk_write (
 				if (!sdWriteSingleBlock(sec_buf, (sector + ix) << ((cardType & 1) ? 0 : 9)))
 				{
 		            neo2_post_sd();
-		            sd_speed = 0; 
+		            sd_speed = 0;
 		            return RES_ERROR;
 				}
             }

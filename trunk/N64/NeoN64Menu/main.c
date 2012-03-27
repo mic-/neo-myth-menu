@@ -59,8 +59,10 @@ typedef uint64_t u64;
 
 unsigned int gBootCic;
 unsigned int gCpldVers;                 /* 0x81 = V1.2 hardware, 0x82 = V2.0 hardware, 0x83 = V3.0 hardware */
-unsigned int gCardTypeCmd;
-unsigned int gPsramCmd;
+unsigned int gFlashIosr;
+unsigned int gPsramIosr;
+unsigned int gPsramCr;
+short int gPsramMode;                   /* 0 = Neo2-SD IOSR/CR, 1 = Neo2-Pro IOSR/CR */
 short int gCardType;                    /* 0x0000 = newer flash, 0x0101 = new flash, 0x0202 = old flash */
 unsigned int gCardID;                   /* should be 0x34169624 for Neo2 flash carts */
 short int gCardOkay;                    /* 0 = okay, -1 = err */
@@ -120,6 +122,7 @@ extern unsigned char *sd_csd;           /* card specific data */
 FATFS gSDFatFs;                         /* global FatFs structure for FF */
 
 short int gSdDetected = 0;              /* 0 - not detected, 1 - detected */
+short int gSdMounted = 0;               /* 0 - not mounted, 1 - mounted */
 
 unsigned int fast_flag = 0;             /* 0 - use normal cart timing for SD read, 1 - use quick timing, 2 - use fast timing */
 
@@ -927,7 +930,10 @@ int getSDInfo(int entry)
 
     c2wstrcpy(privateName, "menu");
 
-    gSdDetected = 0;
+    gSdMounted = 0;
+
+//    if (!gSdDetected)
+//        return 0;                       /* no SD card */
 
     if (entry == -1)
     {
@@ -956,7 +962,7 @@ int getSDInfo(int entry)
             if (MMC_disk_initialize() == STA_NODISK)
                 return 0;               /* couldn't init SD card */
         }
-        gSdDetected = 1;
+        gSdMounted = 1;
     }
     else
     {
@@ -985,17 +991,17 @@ int getSDInfo(int entry)
 
             strcat(path, gTable[entry].name);
         }
-        gSdDetected = 1;
+        gSdMounted = 1;
     }
     c2wstrcpy(fpath, path);
     if (f_opendir(&dir, fpath))
     {
-        gSdDetected = 0;
+        gSdMounted = 0;
         if (do_sd_mgr(0))               /* we know there's a card, but can't read it */
             return 0;                   /* user opted not to try to format the SD card */
         if (f_opendir(&dir, fpath))
             return 0;                   /* failed again... give up */
-        gSdDetected = 1;
+        gSdMounted = 1;
     }
 
     // if root, check directory structure
@@ -1143,6 +1149,9 @@ void copyGF2Psram(int bselect, int bfill)
         gamelen = (romsize & 0xFFFF)*128*1024;
         break;
     }
+    gPsramMode = (gamelen > (16*1024*1024)) ? 1 : 0;
+    neo_select_psram(); // make sure psram is in right mode for size of game
+	neo_psram_offset(0);
 
     strcpy(temp, gTable[bselect].name);
 
@@ -1474,6 +1483,8 @@ void fastCopySD2Psram(int bselect,int bfill)
     }
 
 	gamelen = f.fsize;
+    gPsramMode = (gamelen > (16*1024*1024)) ? 1 : 0;
+    neo_select_psram(); // make sure psram is in right mode for size of game
 	neo_psram_offset(0);
 
 	#if 1
@@ -1666,6 +1677,9 @@ void copySD2Psram(int bselect, int bfill)
     romsize = (gTable[bselect].options[3]<<8) | gTable[bselect].options[4];
     // for SD card file, romsize is number of Mbits in rom
     gamelen = romsize*128*1024;
+    gPsramMode = (gamelen > (16*1024*1024)) ? 1 : 0;
+    neo_select_psram(); // make sure psram is in right mode for size of game
+	neo_psram_offset(0);
 
     strcpy(temp, gTable[bselect].name);
 
@@ -2111,7 +2125,9 @@ void saveSaveState()
     UINT ts;
 
     flags = 0;
-	if(gSdDetected)
+    neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
+
+	if(gSdMounted)
 	{
         c2wstrcpy(wname2, "/menu/n64/save/last.run");
         if(f_open(&in, wname2, FA_OPEN_EXISTING | FA_READ) == FR_OK)
@@ -2130,7 +2146,7 @@ void saveSaveState()
 	{
 		neo_copyfrom_sram(temp, 0x3FE00, 256);
 		neo_copyfrom_sram(&flags, 0x3FF00, 8);
-		neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
+		//neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
 
 		if ((flags & 0xFFFFFF00) != 0xAA550100)
 		{
@@ -2163,7 +2179,7 @@ void saveSaveState()
             break;
     }
 
-    if(gSdDetected)
+    if(gSdMounted)
     {
         if(f_force_open(&out,wname,FA_CREATE_ALWAYS | FA_WRITE,64) == 0)
 		{
@@ -2833,8 +2849,11 @@ int main(void)
     sprite_t *stemp;
 
     init_n64();
-	gSdDetected = 0;
+
+    gPsramMode = 0;
+    gSdMounted = 0;
 	disk_io_force_wdl = 0;
+
     gBootCic = get_cic((unsigned char *)0xB0000040);
     gCpldVers = neo_get_cpld();         // get Myth CPLD ID
     gCardID = neo_id_card();            // check for Neo Flash card
@@ -2844,20 +2863,22 @@ int main(void)
     switch(gCardType & 0x00FF)
     {
         case 0:
-        gCardTypeCmd = 0x00DAAE44;      // set iosr = enable game flash for newest cards
-        gPsramCmd = 0x00DAAF44;         // set iosr for Neo2-SD psram
+        gFlashIosr = 0x00DAAE44;        // set iosr = enable game flash for newest cards
+        gPsramIosr = 0x00DAAF44;        // set iosr for Neo2-SD psram
+        gPsramCr = 0x00372202;          // set cr for Neo2-SD psram
         break;
         case 1:
-        gCardTypeCmd = 0x00DA8E44;      // set iosr = enable game flash for new cards
-        gPsramCmd = 0x00DA674E;         // set iosr for Neo2-Pro psram
+        gFlashIosr = 0x00DA8E44;        // set iosr = enable game flash for new cards
+        gPsramIosr = 0x00DA674E;        // set iosr for Neo2-Pro psram
+        gPsramCr = 0x00373202;          // set cr for Neo2-Pro psram
         break;
         case 2:
-        gCardTypeCmd = 0x00DA0E44;      // set iosr = enable game flash for old cards
-        gPsramCmd = 0x00DA0F44;         // set iosr for psram
+        gFlashIosr = 0x00DA0E44;        // set iosr = enable game flash for old cards
         break;
         default:
-        gCardTypeCmd = 0x00DAAE44;      // set iosr = enable game flash for newest cards
-        gPsramCmd = 0x00DAAF44;         // set iosr for psram
+        gFlashIosr = 0x00DAAE44;        // set iosr = enable game flash for newest cards
+        gPsramIosr = 0x00DAAF44;        // set iosr for Neo2-SD psram
+        gPsramCr = 0x00372202;          // set cr for Neo2-SD psram
         break;
     }
     neo_select_game();
@@ -2877,6 +2898,10 @@ int main(void)
 #ifndef RUN_FROM_SD
     // check for boot rom on SD card
     neo2_enable_sd();
+//    gSdDetected = 0;
+//    cardType = 0x0000;
+//    if (MMC_disk_initialize() != STA_NODISK)
+//        gSdDetected = 1;                /* SD card present */
     bmax = getSDInfo(-1);               // get root directory of sd card
     if (bmax)
     {
@@ -2933,8 +2958,10 @@ int main(void)
 
             neo_run_psram(gTable[0].options, 1);
         }
-        neo2_disable_sd();
     }
+    neo2_disable_sd();
+//#else
+//    gSdDetected = 1;                    /* SD card present - duh! */
 #endif
 
 #ifdef HW_SELF_TEST
@@ -2960,7 +2987,7 @@ int main(void)
 	}
 #endif
 
-	if(gSdDetected == 0)
+	if(gSdMounted == 0)
 	{
 		neo2_enable_sd();
 		bmax = getSDInfo(-1);
@@ -3034,7 +3061,10 @@ int main(void)
         btout = 60;
     }
     else
+    {
+        //neo2_disable_sd();
         bmax = getGFInfo();             // preload flash menu entries
+    }
 
     config_init();
     config_load("/menu/n64/config.cfg");
@@ -3814,7 +3844,7 @@ void hw_self_test()
 	hw_self_test_finished:
 	graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 	neo2_disable_sd();
-	gSdDetected = 0;
+	gSdMounted = 0;
 	ctx = lockVideo(1);
 	graphics_fill_screen(ctx,0);
 	unlockVideo(ctx);
