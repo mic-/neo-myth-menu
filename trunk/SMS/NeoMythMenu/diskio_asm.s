@@ -31,7 +31,7 @@ WRITE_SINGLE_BLOCK = 24
 SD_SEND_OP_COND = 41
 APP_CMD = 55
 
-; Number of entries in the sector cache. 
+; Number of entries in the sector cache.
 DISKIO_CACHE_SIZE = 1
 
 MYTH_NEO2_WR_CMD1_CLR13 = 0x5E00    ; FlashBankLo=0x87,Frame1=7
@@ -51,13 +51,13 @@ MYTH_NEO2_RD_DAT4 = 0x6061          ; 0x87,1
 
 _vregs      = 0xC006
 _cardType   = 0xC016
-_diskioPacket = 0xC27D                
-_diskioResp = 0xC284                   
-_diskioTemp = 0xC295                  
-_sd_csd     = 0xC29D                       
-_sec_tags   = 0xC2AE                      
-_sec_last   = 0xC2B6                      
-_numSectors = 0xC2BA  
+_diskioPacket = 0xC27D
+_diskioResp = 0xC284
+_diskioTemp = 0xC295
+_sd_csd     = 0xC29D
+_sec_tags   = 0xC2AE
+_sec_last   = 0xC2B6
+_numSectors = 0xC2BA
 
 .globl _neo2_ram_to_psram
 
@@ -124,7 +124,7 @@ wrMmcCmdByte:
         pop     bc
         ret
 2$:
-        ld      a,(MYTH_NEO2_WR_CMD1_CLR13)    
+        ld      a,(MYTH_NEO2_WR_CMD1_CLR13)
         djnz    1$
         pop     bc
         ret
@@ -152,7 +152,7 @@ wrMmcDatByte:
 ; unsigned int rdMmcCmdBit()
 ;
 ;rdMmcCmdBit:
-;        ld      a,(MYTH_NEO2_RD_CMD1)  
+;        ld      a,(MYTH_NEO2_RD_CMD1)
 ;        srl     a
 ;        srl     a
 ;        srl     a
@@ -196,7 +196,7 @@ rdMmcCmdBits:
 		ld		c,#0x01					;7
 		xor		a						;4
 		ld		hl,#MYTH_NEO2_RD_CMD1	;10
-0$:		
+0$:
 		rla								;4
 		bit		4,(hl)					;12
 		jp		z,1$					;10
@@ -302,7 +302,7 @@ crc7:
         ld      (_vregs+4),a
 2$:
         sla     c               ; crc <<= 1
-          
+
         jp      p,3$            ; if (crc & 0x80) crc ^= 9;
         ld      a,#9
         xor     a,c
@@ -381,8 +381,12 @@ sendMmcCmd:
 ;   C = cflag
 ; Out:
 ;   A = 0 (failure) or 1 (success)
+recvMmcCmdRespInit:
+        ld      hl,#64
+        jr      recvMmcCmdRespCommon
 recvMmcCmdResp:
         ld      hl,#1024
+recvMmcCmdRespCommon:
 1$:
         ld      a,(MYTH_NEO2_RD_CMD1)
         and     a,#0x10
@@ -573,12 +577,12 @@ sdInit:
         ld      a,#0xFF
         call    wrMmcCmdByte             ; wrMmcCmdBit(0xFF)
         djnz    1$
-          
+
         ld      bc,#0
         ld      de,#0
         ld      a,#GO_IDLE_STATE
         call    sendMmcCmd
-        
+
         ld      a,#0xFF
         call    wrMmcCmdByte
 
@@ -592,8 +596,8 @@ sdInit:
         ld      de,#_diskioResp
         ld      b,#R7_LEN
         ld      c,#1
-        call    recvMmcCmdResp
-        
+        call    recvMmcCmdRespInit
+
         and     a,a
         jr      z,2$
         ld      a,(_diskioResp+0)
@@ -627,10 +631,10 @@ sdInit:
         ld      de,#_diskioResp
         ld      b,#R1_LEN
         ld      c,#1
-        call    recvMmcCmdResp
+        call    recvMmcCmdRespInit
 
         and     a,a
-        jr      z,5$
+        jr      z,3$                    ; no sd card - was 5$
         ld      a,(_diskioResp+4)
         and     a,#0x20
         jr      z,5$
@@ -836,7 +840,7 @@ _disk_initialize2:
         ld      (_cardType+1),a         ; keep funky flag
 
         call    neo2_pre_sd
-      
+
         call    sdInit
         and     a,a                      ; if (!sdInit()) cardType = 0xFFFF
         jr      nz,2$
@@ -845,7 +849,7 @@ _disk_initialize2:
         ld      (_cardType+1),a
 2$:
         call    neo2_post_sd
-        
+
         ld      a,(_sd_csd+1)
         and     a,#0xC0
         jr      nz,3$
@@ -993,10 +997,10 @@ _disk_readp2:
 
         push    ix
         di
-        ld      ix,#4                                       
+        ld      ix,#4
         add     ix,sp
-        
-        ld      l,8(ix)             ; count                                      
+
+        ld      l,8(ix)             ; count
         ld      h,9(ix)             ; ...
         ; if ((count & 0x8000) || (count >= 513)) return RES_PARERR
         ld      a,h
@@ -1011,7 +1015,7 @@ _disk_readp2:
         pop	    hl
         jr	    nc,disk_readp_invalid_count
         jr      disk_readp_count_ok
-disk_readp_invalid_count:        
+disk_readp_invalid_count:
         pop     ix
         ld      hl,#RES_PARERR
         ei
@@ -1098,7 +1102,7 @@ disk_readp_small_read:
 disk_readp_fetch_single:
         ; sector not in cache - fetch it
         call    neo2_pre_sd
-     
+
         ; hl = &sec_cache[(sector & DISKIO_CACHE_SIZE-1) * 512]
         ld      bc,(_vregs+7)
         ld      c,#0
@@ -1106,12 +1110,12 @@ disk_readp_fetch_single:
         ld      hl,#_sec_cache
         add     hl,bc
         ld      (_vregs+10),hl
-        
+
         call    disk_readp_calc_sector
         call    sdReadSingleBlock
         cp      a,#1
         jr      z,4$
-        ; read failed, retry once    
+        ; read failed, retry once
         call    disk_readp_calc_sector
         ld      hl,(_vregs+10)
         call    sdReadSingleBlock
@@ -1157,7 +1161,7 @@ disk_readp_fetch_done:
         ld      hl,#_sec_cache
         add     hl,bc
 
-	
+
 disk_readp_copy_data:
         ld      c,8(ix)         ; count
         ld      b,9(ix)         ; ...
@@ -1177,13 +1181,13 @@ disk_readp_copy_data:
         ld      e,0(ix)         ; dest
         ld      d,1(ix)         ; ...
         ldir                    ; block copy
-        
+
         ld      hl,#RES_OK
 _disk_readp_return:
         pop     ix
         ei
         ret
-	
+
 
 ; Helper subroutine
 disk_readp_calc_sector:
@@ -1208,18 +1212,18 @@ disk_readp_calc_sector:
 
 ; Reads multiple sectors into PSRAM (going through RAM)
 _disk_read_sectors2:
-;     WORD destLo,         
+;     WORD destLo,
 ;     DWORD sector,       /* Sector number (LBA) */
 ;     WORD destHi,
 ;     WORD count
 
         push    ix
-        ld      ix,#4                                       
+        ld      ix,#4
         add     ix,sp
-        
+
         ; read sector
         call    neo2_pre_sd
-        call    disk_readp_calc_sector  
+        call    disk_readp_calc_sector
         call    sdReadStartMulti
         cp      a,#1
         jr      z,3$
@@ -1263,9 +1267,9 @@ _disk_read_sectors2:
         pop     ix
         ld      hl,#RES_ERROR
         ret
-4$:        
+4$:
         call    sdReadStopMulti
-        call    neo2_post_sd  
+        call    neo2_post_sd
         ld      hl,#RES_OK
 _disk_read_sectors_return:
         pop     ix
@@ -1279,9 +1283,9 @@ _disk_read_sector2:
 
         push    ix
         di
-        ld      ix,#4                                       
+        ld      ix,#4
         add     ix,sp
-        
+
         ; read sector
         call    neo2_pre_sd
         call    disk_readp_calc_sector
@@ -1303,7 +1307,7 @@ _disk_read_sector2:
         ei
         ret
 3$:
-        call    neo2_post_sd  
+        call    neo2_post_sd
         ld      hl,#RES_OK
 _disk_read_sector_return:
         pop     ix
@@ -1325,10 +1329,10 @@ neo2_pre_sd:
         ld      a,#7
         ld      (0xFFFE),a      ; Frame1 = 7
         ret
-    
+
 neo2_disable_sd:
         ret
-    
+
 neo2_post_sd:
         ld      a,#0x0
         ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x0
@@ -1439,32 +1443,32 @@ neo2_fill_sector_buffer_loop:
 	ld      (hl),a
 	ld      a,(de)
 	rld
-	inc     l	
+	inc     l
 	ld      a,(de)	; 3rd byte
 	ld      (hl),a
 	ld      a,(de)
 	rld
-	inc     l		
+	inc     l
 	ld      a,(de)	; 4th byte
 	ld      (hl),a
 	ld      a,(de)
 	rld
-	inc     l      
+	inc     l
 	ld      a,(de)	; 5th byte
 	ld      (hl),a
 	ld      a,(de)
 	rld
-	inc     l	
+	inc     l
 	ld      a,(de)	; 6th byte
 	ld      (hl),a
 	ld      a,(de)
 	rld
-	inc     l       
+	inc     l
 	ld      a,(de)	; 7th byte
 	ld      (hl),a
 	ld      a,(de)
 	rld
-	inc     l		
+	inc     l
 	ld      a,(de)	; 8th byte
 	ld      (hl),a
 	ld      a,(de)
@@ -1484,12 +1488,12 @@ neo2_fill_sector_buffer_return:
 neo2_recv_multi_sd:
         push    bc
         push    de
- 
+
         ld      a,#1
         ld      (0xFFFE),a      ; Frame1 = 1
         ld      a,#0x87
         ld      (0xBFC0),a      ; Neo2FlashBankLo = 0x87
-        
+
         ; Wait for start bit
 		ld		hl,#MYTH_NEO2_RD_DAT4
 
@@ -1534,21 +1538,21 @@ neo2_recv_multi_sd:
         ld      a,(de)
         ld      a,(de)
         ld      a,(de)
-        
+
         ld      a,(de)   ; end bit
 
         pop     de      ; PSRAM offset
         pop     bc      ; PSRAM bank / number of sectors
         push    bc
         push    de
-    
+
         ; neo2_ram_to_psram(b, de, _sec_buf, 512)
         ld      a,#1
-        ld      (0xBFC5),a  ; Neo2Frame1We = 1    
+        ld      (0xBFC5),a  ; Neo2Frame1We = 1
         ld      a,#0x00
         ld      (0xBFC1),a  ; Neo2FlashBankSize = FLASH_SIZE_16M
         ld      a,#0
-        ld      (0xBFD0),a  ; Neo2Frame0We = 0    
+        ld      (0xBFD0),a  ; Neo2Frame0We = 0
         ld      a,b         ; destHi
         srl     a           ; bank is for word bus, lsb -> CF
         ld      (0xBFC0),a  ; bank lo
@@ -1577,10 +1581,10 @@ neo2_recv_multi_sd:
         ldi
         ldi
         djnz    6$
-        
+
         ; reset neo2 registers
         call    neo2_pre_sd
-        
+
         pop     de
         pop     bc
         ; PSRAM offset += 512
@@ -1601,7 +1605,7 @@ neo2_recv_multi_sd_return:
         call    neo2_pre_sd
 		pop		hl
         ret
-        
+
 _sec_cache = 0xC580 ;: .ds 520
 _sec_buf = 0xDB00  ;: .ds 520
 
@@ -1644,11 +1648,11 @@ _sdWriteSingleBlock_retry:
 		pop		ix
         ld      hl,#1            ; return FR_DISK_ERR
         ret
-1$:	
+1$:
 		;minimum 2 P bits
 		ld		a,#0xff
 		call	wrMmcDatByte4
-		
+
 		;write start bit
 		xor		a
 		call	wrMmcDatBit4
@@ -1682,7 +1686,7 @@ _sdWriteSingleBlock_retry:
 		pop		hl
 		inc		hl
 		djnz	4$
-	
+
 		;end bit
 		ld		a,#0x0f
 		call	wrMmcDatBit4
