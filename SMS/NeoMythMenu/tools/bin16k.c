@@ -6,17 +6,24 @@
 int main(int argc, char *argv[])
 {
 	FILE *inFile, *outFile;
-	int i, c;
-
-	if (argc != 3) return 1;
-
-	inFile = fopen(argv[1], "rb");
-	outFile = fopen(argv[2], "wb");
+	int i, c, files;
+    int outSize = 0x4000;
+    
+	if (argc < 3) return 1;
+    files = 1;
+    if (strcmp(argv[1], "--size") == 0)
+    {
+        outSize = atoi(argv[2]);
+        files += 2;
+    }
+    
+	inFile = fopen(argv[files], "rb");
+	outFile = fopen(argv[files+1], "wb");
 	if (inFile == NULL || outFile == NULL) return 1;
 
 
 	i = 0;
-	while (i < 0x4000)
+	while (i < outSize)
 	{
 		c = fgetc(inFile);
 		if (c == EOF) break;
@@ -26,7 +33,7 @@ int main(int argc, char *argv[])
 
 	fclose(inFile);
 
-	while (i < 0x4000)
+	while (i < outSize)
 	{
 		fputc(0, outFile);
 		i++;
