@@ -61,6 +61,15 @@ typedef uint64_t u64;
 
 #define _neo_asic_op(cmd) *(vu32 *)(0xB2000000 | (cmd<<1))
 
+typedef struct {
+    u32 Magic;
+    u32 Cpld;
+    u32 MenuMan;
+    u32 MenuDev;
+    u32 GameMan;
+    u32 GameDev;
+} hwinfo;
+
 static u32 neo_mode = SD_OFF;
 
 static u8 __attribute__((aligned(16))) dmaBuf[128*1024];
@@ -83,9 +92,9 @@ extern int get_cic(unsigned char *buffer);
 u32 PSRAM_ADDR = 0;
 int DAT_SWAP = 0;
 
-volatile void neo_sync_bus(void)
+void neo_sync_bus(void)
 {
-	asm
+	asm volatile
 	(
 		".set	push\n"
 		".set	noreorder\n"
@@ -185,6 +194,37 @@ unsigned int neo_get_cpld(void)
     neo_sync_bus();
 
     return data;
+}
+
+void neo_hw_info(hwinfo *ptr)
+{
+    _neo_asic_cmd(0x00E21500, 1);       // GBA CARD WE ON !
+
+    _neo_asic_cmd(0x00372002, 0);       // set cr = menu flash and write enabled
+    NEO_IO = 0xFFFFFFFF;                // 16 bit mode
+    neo_sync_bus();
+
+    /* get menu flash ID */
+    _neo_asic_op(0x00000055) = 0x0098;  // ST CFI Query
+    ptr->MenuMan = _neo_asic_op(0x00000000);
+    ptr->MenuDev = _neo_asic_op(0x00000001);
+    _neo_asic_op(0x00000000) = 0x00F0;  // ST Read Array/Reset
+    _neo_asic_op(0x00000000);
+    _neo_asic_op(0x00000000);
+
+    _neo_asic_cmd(0x00372202, 0);       // set cr = game flash and write enabled
+    NEO_IO = 0xFFFFFFFF;                // 16 bit mode
+    neo_sync_bus();
+
+    /* get menu flash ID */
+    _neo_asic_op(0x00000000) = 0x0098;  // Intel CFI Query
+    ptr->GameMan = _neo_asic_op(0x00000000);
+    ptr->GameDev = _neo_asic_op(0x00000001);
+    _neo_asic_op(0x00000000) = 0x00FF;  // Intel Read Array/Reset
+    _neo_asic_op(0x00000000);
+    _neo_asic_op(0x00000000);
+
+    _neo_asic_cmd(0x00E2D200, 1);       // GBA CARD WE OFF !
 }
 
 void neo_select_menu(void)
