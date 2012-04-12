@@ -101,6 +101,17 @@ textColors_t gTextColors;
 
 u64 back_flags;                         /* 0xAA550mno - m = brwsr, n = bopt, o = bfill */
 
+typedef struct {
+    u32 Magic;
+    u32 Cpld;
+    u32 MenuMan;
+    u32 MenuDev;
+    u32 GameMan;
+    u32 GameDev;
+} hwinfo;
+
+hwinfo gCart;
+
 struct selEntry {
     u32 valid;                          /* 0 = invalid, ~0 = valid */
     u32 type;                           /* 64 = compressed , 128 = directory, 0xFF = N64 game */
@@ -146,6 +157,8 @@ extern void neo_select_menu(void);
 extern void neo_select_game(void);
 extern void neo_select_psram(void);
 extern void neo_psram_offset(int offs);
+
+extern void neo_hw_info(hwinfo *ptr);
 
 extern unsigned int neo_id_card(void);
 extern unsigned int neo_get_cpld(void);
@@ -2125,7 +2138,6 @@ void saveSaveState()
     UINT ts;
 
     flags = 0;
-    neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
 
 	if(gSdMounted)
 	{
@@ -2135,6 +2147,7 @@ void saveSaveState()
 			f_read(&in,&flags,8,&ts);
             f_read(&in,wname,280*2,&ts);
 			f_close(&in);
+            neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
 		}
 		else
 		{
@@ -2146,7 +2159,7 @@ void saveSaveState()
 	{
 		neo_copyfrom_sram(temp, 0x3FE00, 256);
 		neo_copyfrom_sram(&flags, 0x3FF00, 8);
-		//neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
+		neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
 
 		if ((flags & 0xFFFFFF00) != 0xAA550100)
 		{
@@ -2987,6 +3000,10 @@ int main(void)
 	}
 #endif
 
+//    neo_hw_info(&gCart);
+    gCart.Magic = gCardID;
+    gCart.Cpld = gCpldVers;
+
 	if(gSdMounted == 0)
 	{
 		neo2_enable_sd();
@@ -3206,7 +3223,11 @@ int main(void)
 
         // show cart info help messages
         graphics_set_color(gTextColors.hw_info, 0);
+#if 1
         sprintf(temp, "CPLD:V%d CART:0x%08X FLASH:%c", gCpldVers & 7, gCardID, cards[gCardType & 3]);
+#else
+        sprintf(temp, "%08X:V%d:%04X/%04X:%04X/%04X", gCart.Magic, gCart.Cpld, gCart.MenuMan, gCart.MenuDev, gCart.GameMan, gCart.GameDev);
+#endif
         printText(dcon, temp, 20 - strlen(temp)/2, 24);
         graphics_set_color(gTextColors.help_info, 0);
         printText(dcon, menu_help1, 20 - strlen(menu_help1)/2, 25);
