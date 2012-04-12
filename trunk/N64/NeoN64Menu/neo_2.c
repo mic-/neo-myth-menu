@@ -60,6 +60,7 @@ typedef uint64_t u64;
 #define SD_ON  (0x0480)
 
 #define _neo_asic_op(cmd) *(vu32 *)(0xB2000000 | (cmd<<1))
+#define _neo_asic_wop(cmd) *(vu16 *)(0xB2000000 | (cmd<<1))
 
 typedef struct {
     u32 Magic;
@@ -198,33 +199,42 @@ unsigned int neo_get_cpld(void)
 
 void neo_hw_info(hwinfo *ptr)
 {
+    u32 v;
     _neo_asic_cmd(0x00E21500, 1);       // GBA CARD WE ON !
 
     _neo_asic_cmd(0x00372002, 0);       // set cr = menu flash and write enabled
-    NEO_IO = 0xFFFFFFFF;                // 16 bit mode
-    neo_sync_bus();
+    _neo_asic_cmd(0x00DA0044, 0);       // set iosr = select menu flash
+//    NEO_IO = 0xFFFFFFFF;                // 16 bit mode
+//    neo_sync_bus();
 
     /* get menu flash ID */
-    _neo_asic_op(0x00000055) = 0x0098;  // ST CFI Query
-    ptr->MenuMan = _neo_asic_op(0x00000000);
-    ptr->MenuDev = _neo_asic_op(0x00000001);
-    _neo_asic_op(0x00000000) = 0x00F0;  // ST Read Array/Reset
     _neo_asic_op(0x00000000);
+    _neo_asic_op(0x00000054) = 0x00000098; // ST CFI Query
+    _neo_asic_op(0x00000000);
+    v = _neo_asic_op(0x00000000);
+    ptr->MenuMan = v >> 16;
+    ptr->MenuDev = v & 0xFFFF;
+    _neo_asic_op(0x00000000);
+    _neo_asic_op(0x00000000) = 0x000000F0; // ST Read Array/Reset
     _neo_asic_op(0x00000000);
 
     _neo_asic_cmd(0x00372202, 0);       // set cr = game flash and write enabled
-    NEO_IO = 0xFFFFFFFF;                // 16 bit mode
-    neo_sync_bus();
+    _neo_asic_cmd(0x00DAAE44, 0);       // set iosr = select game flash
+//    NEO_IO = 0xFFFFFFFF;                // 16 bit mode
+//    neo_sync_bus();
 
-    /* get menu flash ID */
-    _neo_asic_op(0x00000000) = 0x0098;  // Intel CFI Query
-    ptr->GameMan = _neo_asic_op(0x00000000);
-    ptr->GameDev = _neo_asic_op(0x00000001);
-    _neo_asic_op(0x00000000) = 0x00FF;  // Intel Read Array/Reset
+    /* get game flash ID */
     _neo_asic_op(0x00000000);
+    _neo_asic_wop(0x00000000) = 0x0098; // Intel CFI Query
+    _neo_asic_op(0x00000000);
+    ptr->GameMan = _neo_asic_wop(0x00000000);
+    _neo_asic_op(0x00000000);
+    ptr->GameDev = _neo_asic_wop(0x00000001);
+    _neo_asic_op(0x00000000);
+    _neo_asic_wop(0x00000000) = 0x00FF; // Intel Read Array/Reset
     _neo_asic_op(0x00000000);
 
-    _neo_asic_cmd(0x00E2D200, 1);       // GBA CARD WE OFF !
+    _neo_asic_cmd(0x00E2D200, 0);       // GBA CARD WE OFF !
 }
 
 void neo_select_menu(void)

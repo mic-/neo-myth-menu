@@ -2871,6 +2871,10 @@ int main(void)
     gCpldVers = neo_get_cpld();         // get Myth CPLD ID
     gCardID = neo_id_card();            // check for Neo Flash card
 
+    neo_hw_info(&gCart);
+    gCart.Magic = gCardID;
+    gCart.Cpld = gCpldVers;
+
     neo_select_menu();                  // enable menu flash in cart space
     gCardType = *(vu32 *)(0xB01FFFF0) >> 16;
     switch(gCardType & 0x00FF)
@@ -2999,10 +3003,6 @@ int main(void)
 		}
 	}
 #endif
-
-//    neo_hw_info(&gCart);
-    gCart.Magic = gCardID;
-    gCart.Cpld = gCpldVers;
 
 	if(gSdMounted == 0)
 	{
@@ -3226,7 +3226,7 @@ int main(void)
 #if 1
         sprintf(temp, "CPLD:V%d CART:0x%08X FLASH:%c", gCpldVers & 7, gCardID, cards[gCardType & 3]);
 #else
-        sprintf(temp, "%08X:V%d:%04X/%04X:%04X/%04X", gCart.Magic, gCart.Cpld, gCart.MenuMan, gCart.MenuDev, gCart.GameMan, gCart.GameDev);
+        sprintf(temp, "%08X:V%d:%04X/%04X:%04X/%04X", gCart.Magic, gCart.Cpld & 7, gCart.MenuMan, gCart.MenuDev, gCart.GameMan, gCart.GameDev);
 #endif
         printText(dcon, temp, 20 - strlen(temp)/2, 24);
         graphics_set_color(gTextColors.help_info, 0);
