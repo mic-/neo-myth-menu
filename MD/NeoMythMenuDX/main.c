@@ -175,9 +175,9 @@ static short int gSRAMgrServiceStatus = SMGR_STATUS_NULL;
 static short int gSRAMgrServiceMode = 0x0000;
 
 #ifndef RUN_IN_PSRAM
-static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.7";
+static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.8";
 #else
-static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.7";
+static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.8";
 #endif
 
 #define MB (0x20000)
@@ -933,15 +933,37 @@ void get_menu_flash(void)
         if (!utility_memcmp(extension, ".SMS", 4) || !utility_memcmp(extension, ".sms", 4))
         {
             // SMS ROM extension
-            gSelections[gMaxEntry].type = 2; // SMS
-            gSelections[gMaxEntry].run = 0x13; // run mode = SMS + FM
+            if (gSelections[gMaxEntry].type != 2)
+            {
+                gSelections[gMaxEntry].type = 2; // SMS
+                gSelections[gMaxEntry].run = 0x13; // run mode = SMS + FM
+            }
         }
         utility_strcpy(extension, &p->meName[utility_strlen(p->meName) - 3]);
         if (!utility_memcmp(extension, ".SG", 3) || !utility_memcmp(extension, ".sg", 3))
         {
             // SG-1000 ROM extension
-            gSelections[gMaxEntry].type = 2; // SMS
-            gSelections[gMaxEntry].run = 0x12; // run mode = SMS
+            if (gSelections[gMaxEntry].type != 2)
+            {
+                gSelections[gMaxEntry].type = 2; // SMS
+                gSelections[gMaxEntry].run = 0x12; // run mode = SMS
+            }
+        }
+
+        // check for consistent run mode when sram enabled
+        if (gSelections[gMaxEntry].type == 0 && gSelections[gMaxEntry].bsize && gSelections[gMaxEntry].run != 5)
+        {
+            if (gSelections[gMaxEntry].length <= 0x200000)
+                gSelections[gMaxEntry].run = 1; // 16 Mbit + SRAM
+            else if (gSelections[gMaxEntry].length <= 0x400000)
+                gSelections[gMaxEntry].run = 2; // 32 Mbit + SRAM
+        }
+
+        // check for consistent run mode for 32X game
+        if (gSelections[gMaxEntry].type == 1)
+        {
+            if (gSelections[gMaxEntry].run < 3)
+                gSelections[gMaxEntry].run = 3; // 32X mode + SRAM
         }
 
         // next entry
@@ -4082,7 +4104,7 @@ void do_options(void)
         maxOptions++;
     }
 
-    if(gCurMode == MODE_SD)
+    //if(gCurMode == MODE_SD)
     {
         // insert options for game rom into gOptions array
         gOptions[maxOptions].exclusiveFCall = 1; //Exclusive function! jump back to source caller
