@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <libdragon.h>
@@ -24,15 +25,15 @@ typedef uint64_t u64;
 #define PI_BSD_DOM2_PGS_REG *(vu32*)(0xA460002C)
 #define PI_BSD_DOM2_RLS_REG *(vu32*)(0xA4600030)
 
-#define FRAM_STATUS_REG			*(vu32*)(0xA8000000)
-#define FRAM_COMMAND_REG		*(vu32*)(0xA8010000)
-#define FRAM_EXECUTE_CMD		(0xD2000000)
-#define FRAM_STATUS_MODE_CMD	(0xE1000000)
-#define FRAM_ERASE_OFFSET_CMD	(0x4B000000)
-#define FRAM_WRITE_OFFSET_CMD	(0xA5000000)
-#define FRAM_ERASE_MODE_CMD		(0x78000000)
-#define FRAM_WRITE_MODE_CMD		(0xB4000000)
-#define FRAM_READ_MODE_CMD		(0xF0000000)
+#define FRAM_STATUS_REG         *(vu32*)(0xA8000000)
+#define FRAM_COMMAND_REG        *(vu32*)(0xA8010000)
+#define FRAM_EXECUTE_CMD        (0xD2000000)
+#define FRAM_STATUS_MODE_CMD    (0xE1000000)
+#define FRAM_ERASE_OFFSET_CMD   (0x4B000000)
+#define FRAM_WRITE_OFFSET_CMD   (0xA5000000)
+#define FRAM_ERASE_MODE_CMD     (0x78000000)
+#define FRAM_WRITE_MODE_CMD     (0xB4000000)
+#define FRAM_READ_MODE_CMD      (0xF0000000)
 
 // V1.2-A hardware
 #define MYTH_IO_BASE (0xA8040000)
@@ -86,6 +87,21 @@ extern unsigned int gCpldVers;          /* 0x81 = V1.2 hardware, 0x82 = V2.0 har
 extern unsigned int sd_speed;
 extern unsigned int fast_flag;
 
+extern short int gCheats;               /* 0 = off, 1 = select, 2 = all */
+
+struct gscEntry {
+    char *description;
+    char *gscodes;
+    u16  count;
+    u16  state;
+    u16  mask;
+    u16  value;
+};
+typedef struct gscEntry gscEntry_t;
+
+extern gscEntry_t gGSCodes[];
+
+
 extern void delay(int cnt);
 
 extern int get_cic(unsigned char *buffer);
@@ -95,16 +111,16 @@ int DAT_SWAP = 0;
 
 void neo_sync_bus(void)
 {
-	asm volatile
-	(
-		".set	push\n"
-		".set	noreorder\n"
-		"lui	$t0,0xb000\n"
-		"lw		$zero,($t0)\n"
-		"jr		$ra\n"
-		"nop\n"
-		".set pop\n"
-	);
+    asm volatile
+    (
+        ".set   push\n"
+        ".set   noreorder\n"
+        "lui    $t0,0xb000\n"
+        "lw     $zero,($t0)\n"
+        "jr     $ra\n"
+        "nop\n"
+        ".set pop\n"
+    );
 }
 
 // do a Neo Flash ASIC command
@@ -276,7 +292,7 @@ void neo_select_psram(void)
             // Neo2-SD
             _neo_asic_cmd(0x00E21500, 1);       // GBA CARD WE ON !
             _neo_asic_cmd(0x00372202|neo_mode, 0); // set cr = game flash and write enabled, optionally enable SD interface
-            _neo_asic_cmd(0x00DAAF44, 0);       // select psram
+            _neo_asic_cmd(0x00DAAF4E, 0);       // select psram
             _neo_asic_cmd(0x00EE0630, 0);       // set cr1 = enable extended address bus
             break;
     }
@@ -745,24 +761,24 @@ void neo2_pre_sd(void)
 {
     // set the PI for myth sd
     if (sd_speed)
-		return;
+        return;
 
-	switch(fast_flag)
-	{
-		case 1:
-			PI_BSD_DOM1_LAT_REG = 0x00000010;
-			PI_BSD_DOM1_RLS_REG = 0x00000003;
-			PI_BSD_DOM1_PWD_REG = 0x00000003;
-			PI_BSD_DOM1_PGS_REG = 0x00000007;
-		return;
+    switch(fast_flag)
+    {
+        case 1:
+            PI_BSD_DOM1_LAT_REG = 0x00000010;
+            PI_BSD_DOM1_RLS_REG = 0x00000003;
+            PI_BSD_DOM1_PWD_REG = 0x00000003;
+            PI_BSD_DOM1_PGS_REG = 0x00000007;
+        return;
 
-		case 2:
-			PI_BSD_DOM1_LAT_REG = 0x00000000;
-			PI_BSD_DOM1_RLS_REG = 0x00000000;
-			PI_BSD_DOM1_PWD_REG = 0x00000003;
-			PI_BSD_DOM1_PGS_REG = 0x00000000;
-		return;
-	}
+        case 2:
+            PI_BSD_DOM1_LAT_REG = 0x00000000;
+            PI_BSD_DOM1_RLS_REG = 0x00000000;
+            PI_BSD_DOM1_PWD_REG = 0x00000003;
+            PI_BSD_DOM1_PGS_REG = 0x00000000;
+        return;
+    }
 }
 
 void neo2_post_sd(void)
@@ -909,7 +925,13 @@ void simulate_pif_boot(u32 cic_chip)
     u32 ix, sz, cart, country;
     vu32 *src, *dst;
     u32 info = *(vu32 *)0xB000003C;
-    vu64 *gGPR = (vu64 *)0xA0080000;
+    vu64 *gGPR = (vu64 *)0xA03E0000;
+    vu32 *codes = (vu32 *)0xA0000180;
+    u64 bootAddr = 0xFFFFFFFFA4000040LL;
+    char *cp, *vp, *tp;
+    char temp[8];
+    int i, type, val;
+    int curr_cheat = 0;
 
     cart = info >> 16;
     country = (info >> 8) & 0xFF;
@@ -928,8 +950,427 @@ void simulate_pif_boot(u32 cic_chip)
     *(vu32 *)0xA000030C = 0;             // cold boot
     memset((void *)0xA000031C, 0, 64);   // clear app nmi buffer
 
-    // clear memory outside boot segment
-    //memset((void *)0xA0100000, 0, sz - 0x00100000);
+    if (gCheats)
+    {
+        u16 xv, yv, zv;
+        u32 xx;
+        vu32 *sp, *dp;
+        // get rom os boot segment - note, memcpy won't work for copying rom
+        sp = (vu32 *)0xB0001000;
+        dp = (vu32 *)0xA02A0000;
+        for (ix=0; ix<0x100000; ix++)
+            *dp++ = *sp++;
+        // default boot address with cheats
+        sp = (vu32 *)0xB0000008;
+        bootAddr = 0xFFFFFFFF00000000LL | *sp;
+
+        // move general int handler
+        sp = (vu32 *)0xA0000180;
+        dp = (vu32 *)0xA0000120;
+        for (ix=0; ix<0x60; ix+=4)
+            *dp++ = *sp++;
+
+        // insert new general int handler prologue
+        *codes++ = 0x401a6800;  // mfc0     k0,c0_cause
+        *codes++ = 0x241b005c;  // li       k1,23*4
+        *codes++ = 0x335a007c;  // andi     k0,k0,0x7c
+        *codes++ = 0x175b0012;  // bne      k0,k1,0x1d8
+        *codes++ = 0x00000000;  // nop
+        *codes++ = 0x40809000;  // mtc0     zero,c0_watchlo
+        *codes++ = 0x401b7000;  // mfc0     k1,c0_epc
+        *codes++ = 0x8f7a0000;  // lw       k0,0(k1)
+        *codes++ = 0x3c1b03e0;  // lui      k1,0x3e0
+        *codes++ = 0x035bd024;  // and      k0,k0,k1
+        *codes++ = 0x001ad142;  // srl      k0,k0,0x5
+        *codes++ = 0x3c1ba000;  // lui      k1,0xa000
+        *codes++ = 0x8f7b01cc;  // lw       k1,0x01cc(k1)
+        *codes++ = 0x035bd025;  // or       k0,k0,k1
+        *codes++ = 0x3c1ba000;  // lui      k1,0xa000
+        *codes++ = 0xaf7a01cc;  // sw       k0,0x01cc(k1)
+        *codes++ = 0x3c1b8000;  // lui      k1,0x8000
+        *codes++ = 0xbf7001cc;  // cache    0x10,0x01cc(k1)
+        *codes++ = 0x3c1aa000;  // lui      k0,0xa000
+        *codes++ = 0x37400120;  // ori      zero,k0,0x120
+        *codes++ = 0x42000018;  // eret
+        *codes++ = 0x00000000;  // nop
+
+        // process cheats
+        while (gGSCodes[curr_cheat].count != 0xFFFF)
+        {
+            if (!gGSCodes[curr_cheat].state || !gGSCodes[curr_cheat].count)
+            {
+                // cheat not enabled or no codes, skip
+                curr_cheat++;
+                continue;
+            }
+
+            for (i=0; i<gGSCodes[curr_cheat].count; i++)
+            {
+                cp = &gGSCodes[curr_cheat].gscodes[i*16 + 0];
+                vp = &gGSCodes[curr_cheat].gscodes[i*16 + 9];
+
+                temp[0] = cp[0];
+                temp[1] = cp[1];
+                temp[2] = 0;
+                type = strtol(temp, (char **)NULL, 16);
+
+                switch(type)
+                {
+                    case 0x80:
+                        // write 8-bit value to (cached) ram continuously
+                        // 80XXYYYY 00ZZ
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = 0;
+                        xv = strtol(temp, (char **)NULL, 16);
+                        temp[0] = cp[4];
+                        temp[1] = cp[5];
+                        temp[2] = cp[6];
+                        temp[3] = cp[7];
+                        temp[4] = 0;
+                        yv = strtol(temp, (char **)NULL, 16);
+                        if (yv & 0x8000) xv++; // adjust for sign extension of yv
+                        if (gGSCodes[curr_cheat].mask)
+                        {
+                            zv = gGSCodes[curr_cheat].value & gGSCodes[curr_cheat].mask;
+                        }
+                        else
+                        {
+                            temp[0] = vp[2];
+                            temp[1] = vp[3];
+                            temp[2] = 0;
+                            zv = strtol(temp, (char **)NULL, 16);
+                        }
+                        *codes++ = 0x3c1a8000 | xv; // lui  k0,80xx
+                        *codes++ = 0x241b0000 | zv; // li   k1,00zz
+                        *codes++ = 0xa35b0000 | yv; // sb   k1,yyyy(k0)
+                        break;
+                    case 0x81:
+                        // write 16-bit value to (cached) ram continuously
+                        // 81XXYYYY 00ZZ
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = 0;
+                        xv = strtol(temp, (char **)NULL, 16);
+                        temp[0] = cp[4];
+                        temp[1] = cp[5];
+                        temp[2] = cp[6];
+                        temp[3] = cp[7];
+                        temp[4] = 0;
+                        yv = strtol(temp, (char **)NULL, 16);
+                        if (yv & 0x8000) xv++; // adjust for sign extension of yv
+                        if (gGSCodes[curr_cheat].mask)
+                        {
+                            zv = gGSCodes[curr_cheat].value & gGSCodes[curr_cheat].mask;
+                        }
+                        else
+                        {
+                            temp[0] = vp[0];
+                            temp[1] = vp[1];
+                            temp[2] = vp[2];
+                            temp[3] = vp[3];
+                            temp[4] = 0;
+                            zv = strtol(temp, (char **)NULL, 16);
+                        }
+                        *codes++ = 0x3c1a8000 | xv; // lui  k0,80xx
+                        *codes++ = 0x241b0000 | zv; // li   k1,zzzz
+                        *codes++ = 0xa75b0000 | yv; // sh   k1,yyyy(k0)
+                        break;
+                    case 0x88:
+                        // write 8-bit value to (cached) ram on GS button pressed - unimplemented
+                        // 88XXYYYY 00ZZ
+                        break;
+                    case 0x89:
+                        // write 16-bit value to (cached) ram on GS button pressed - unimplemented
+                        // 89XXYYYY ZZZZ
+                        break;
+                    case 0xA0:
+                        // write 8-bit value to (uncached) ram continuously
+                        // A0XXYYYY 00ZZ
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = 0;
+                        xv = strtol(temp, (char **)NULL, 16);
+                        temp[0] = cp[4];
+                        temp[1] = cp[5];
+                        temp[2] = cp[6];
+                        temp[3] = cp[7];
+                        temp[4] = 0;
+                        yv = strtol(temp, (char **)NULL, 16);
+                        if (yv & 0x8000) xv++; // adjust for sign extension of yv
+                        if (gGSCodes[curr_cheat].mask)
+                        {
+                            zv = gGSCodes[curr_cheat].value & gGSCodes[curr_cheat].mask;
+                        }
+                        else
+                        {
+                            temp[0] = vp[2];
+                            temp[1] = vp[3];
+                            temp[2] = 0;
+                            zv = strtol(temp, (char **)NULL, 16);
+                        }
+                        *codes++ = 0x3c1aa000 | xv; // lui  k0,A0xx
+                        *codes++ = 0x241b0000 | zv; // li   k1,00zz
+                        *codes++ = 0xa35b0000 | yv; // sb   k1,yyyy(k0)
+                        break;
+                    case 0xA1:
+                        // write 16-bit value to (uncached) ram continuously
+                        // A1XXYYYY 00ZZ
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = 0;
+                        xv = strtol(temp, (char **)NULL, 16);
+                        temp[0] = cp[4];
+                        temp[1] = cp[5];
+                        temp[2] = cp[6];
+                        temp[3] = cp[7];
+                        temp[4] = 0;
+                        yv = strtol(temp, (char **)NULL, 16);
+                        if (yv & 0x8000) xv++; // adjust for sign extension of yv
+                        if (gGSCodes[curr_cheat].mask)
+                        {
+                            zv = gGSCodes[curr_cheat].value & gGSCodes[curr_cheat].mask;
+                        }
+                        else
+                        {
+                            temp[0] = vp[0];
+                            temp[1] = vp[1];
+                            temp[2] = vp[2];
+                            temp[3] = vp[3];
+                            temp[4] = 0;
+                            zv = strtol(temp, (char **)NULL, 16);
+                        }
+                        *codes++ = 0x3c1aa000 | xv; // lui  k0,A0xx
+                        *codes++ = 0x241b0000 | zv; // li   k1,zzzz
+                        *codes++ = 0xa75b0000 | yv; // sh   k1,yyyy(k0)
+                        break;
+                    case 0xCC:
+                        // deactivate expansion ram using 3rd method
+                        // CC000000 0000
+                        if (cic_chip == CIC_6105)
+                            *(vu32 *)0xA00003F0 = 0x00400000;
+                        else
+                            *(vu32 *)0xA0000318 = 0x00400000;
+                        break;
+                    case 0xD0:
+                        // do next gs code if ram location is equal to 8-bit value
+                        // D0XXYYYY 00ZZ
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = 0;
+                        xv = strtol(temp, (char **)NULL, 16);
+                        temp[0] = cp[4];
+                        temp[1] = cp[5];
+                        temp[2] = cp[6];
+                        temp[3] = cp[7];
+                        temp[4] = 0;
+                        yv = strtol(temp, (char **)NULL, 16);
+                        if (yv & 0x8000) xv++; // adjust for sign extension of yv
+                        temp[0] = vp[2];
+                        temp[1] = vp[3];
+                        temp[2] = 0;
+                        zv = strtol(temp, (char **)NULL, 16);
+                        *codes++ = 0x3c1a8000 | xv; // lui  k0,0x80xx
+                        *codes++ = 0x835a0000 | yv; // lb   k0,yyyy(k0)
+                        *codes++ = 0x241b0000 | zv; // li   k1,00zz
+                        *codes++ = 0x175b0004;      // bne  k0,k1,4
+                        *codes++ = 0x00000000;      // nop
+                        break;
+                    case 0xD1:
+                        // do next gs code if ram location is equal to 16-bit value
+                        // D1XXYYYY 00ZZ
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = 0;
+                        xv = strtol(temp, (char **)NULL, 16);
+                        temp[0] = cp[4];
+                        temp[1] = cp[5];
+                        temp[2] = cp[6];
+                        temp[3] = cp[7];
+                        temp[4] = 0;
+                        yv = strtol(temp, (char **)NULL, 16);
+                        if (yv & 0x8000) xv++; // adjust for sign extension of yv
+                        temp[0] = vp[0];
+                        temp[1] = vp[1];
+                        temp[2] = vp[2];
+                        temp[3] = vp[3];
+                        temp[4] = 0;
+                        zv = strtol(temp, (char **)NULL, 16);
+                        *codes++ = 0x3c1a8000 | xv; // lui  k0,0x80xx
+                        *codes++ = 0x875a0000 | yv; // lh   k0,yyyy(k0)
+                        *codes++ = 0x241b0000 | zv; // li   k1,zzzz
+                        *codes++ = 0x175b0004;      // bne  k0,k1,4
+                        *codes++ = 0x00000000;      // nop
+                        break;
+                    case 0xD2:
+                        // do next gs code if ram location is not equal to 8-bit value
+                        // D2XXYYYY 00ZZ
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = 0;
+                        xv = strtol(temp, (char **)NULL, 16);
+                        temp[0] = cp[4];
+                        temp[1] = cp[5];
+                        temp[2] = cp[6];
+                        temp[3] = cp[7];
+                        temp[4] = 0;
+                        yv = strtol(temp, (char **)NULL, 16);
+                        if (yv & 0x8000) xv++; // adjust for sign extension of yv
+                        temp[0] = vp[2];
+                        temp[1] = vp[3];
+                        temp[2] = 0;
+                        zv = strtol(temp, (char **)NULL, 16);
+                        *codes++ = 0x3c1a8000 | xv; // lui  k0,0x80xx
+                        *codes++ = 0x835a0000 | yv; // lb   k0,yyyy(k0)
+                        *codes++ = 0x241b0000 | zv; // li   k1,00zz
+                        *codes++ = 0x135b0004;      // beq  k0,k1,4
+                        *codes++ = 0x00000000;      // nop
+                        break;
+                    case 0xD3:
+                        // do next gs code if ram location is not equal to 16-bit value
+                        // D3XXYYYY 00ZZ
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = 0;
+                        xv = strtol(temp, (char **)NULL, 16);
+                        temp[0] = cp[4];
+                        temp[1] = cp[5];
+                        temp[2] = cp[6];
+                        temp[3] = cp[7];
+                        temp[4] = 0;
+                        yv = strtol(temp, (char **)NULL, 16);
+                        if (yv & 0x8000) xv++; // adjust for sign extension of yv
+                        temp[0] = vp[0];
+                        temp[1] = vp[1];
+                        temp[2] = vp[2];
+                        temp[3] = vp[3];
+                        temp[4] = 0;
+                        zv = strtol(temp, (char **)NULL, 16);
+                        *codes++ = 0x3c1a8000 | xv; // lui  k0,0x80xx
+                        *codes++ = 0x875a0000 | yv; // lh   k0,yyyy(k0)
+                        *codes++ = 0x241b0000 | zv; // li   k1,zzzz
+                        *codes++ = 0x135b0004;      // beq  k0,k1,4
+                        *codes++ = 0x00000000;      // nop
+                        break;
+                    case 0xDD:
+                        // deactivate expansion ram using 2nd method
+                        // DD000000 0000
+                        if (cic_chip == CIC_6105)
+                            *(vu32 *)0xA00003F0 = 0x00400000;
+                        else
+                            *(vu32 *)0xA0000318 = 0x00400000;
+                        break;
+                    case 0xDE:
+                        // set game boot address
+                        // DEXXXXXX 0000 => boot address = 800XXXXX, msn ignored
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = cp[4];
+                        temp[3] = cp[5];
+                        temp[4] = cp[6];
+                        temp[5] = cp[7];
+                        temp[6] = 0;
+                        val = strtol(temp, (char **)NULL, 16);
+                        bootAddr = 0xFFFFFFFF80000000LL | (val & 0xFFFFF);
+                        break;
+                    case 0xEE:
+                        // deactivate expansion ram using 1st method
+                        // EE000000 0000
+                        if (cic_chip == CIC_6105)
+                            *(vu32 *)0xA00003F0 = 0x00400000;
+                        else
+                            *(vu32 *)0xA0000318 = 0x00400000;
+                        break;
+                    case 0xF0:
+                        // write 8-bit value to ram before boot
+                        // F0XXXXXX 00YY
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = cp[4];
+                        temp[3] = cp[5];
+                        temp[4] = cp[6];
+                        temp[5] = cp[7];
+                        temp[6] = 0;
+                        val = strtol(temp, (char **)NULL, 16);
+                        val -= (bootAddr & 0xFFFFFF);
+                        tp = (char *)(0xFFFFFFFFA02A0000LL + val);
+                        if (gGSCodes[curr_cheat].mask)
+                        {
+                            val = gGSCodes[curr_cheat].value & gGSCodes[curr_cheat].mask;
+                        }
+                        else
+                        {
+                            temp[0] = vp[2];
+                            temp[1] = vp[3];
+                            temp[2] = 0;
+                            val = strtol(temp, (char **)NULL, 16);
+                        }
+                        *tp = val & 0x00FF;
+                        break;
+                    case 0xF1:
+                        // write 16-bit value to ram before boot
+                        // F1XXXXXX YYYY
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = cp[4];
+                        temp[3] = cp[5];
+                        temp[4] = cp[6];
+                        temp[5] = cp[7];
+                        temp[6] = 0;
+                        val = strtol(temp, (char **)NULL, 16);
+                        val -= (bootAddr & 0xFFFFFF);
+                        tp = (char *)(0xFFFFFFFFA02A0000LL + val);
+                        if (gGSCodes[curr_cheat].mask)
+                        {
+                            val = gGSCodes[curr_cheat].value & gGSCodes[curr_cheat].mask;
+                        }
+                        else
+                        {
+                            temp[0] = vp[0];
+                            temp[1] = vp[1];
+                            temp[2] = vp[2];
+                            temp[3] = vp[3];
+                            temp[4] = 0;
+                            val = strtol(temp, (char **)NULL, 16);
+                        }
+                        *tp++ = (val >> 8) & 0x00FF;
+                        *tp = val & 0x00FF;
+                        break;
+                    case 0xFF:
+                        // set code base
+                        // FFXXXXXX 0000
+                        temp[0] = cp[2];
+                        temp[1] = cp[3];
+                        temp[2] = cp[4];
+                        temp[3] = cp[5];
+                        temp[4] = cp[6];
+                        temp[5] = cp[7];
+                        temp[6] = 0;
+                        val = strtol(temp, (char **)NULL, 16);
+                        //codes = (vu32 *)(0xA0000000 | (val & 0xFFFFFF));
+                        break;
+                }
+            }
+            curr_cheat++;
+        }
+
+        // generate jump to moved general int handler
+        *codes++ = 0x3c1a8000;  // lui  k0,0x8000
+        *codes++ = 0x375a0120;  // ori  k0,k0,0x120
+        *codes++ = 0x03400008;  // jr   k0
+        *codes++ = 0x00000000;  // nop
+
+        // flush general int handler memory
+        data_cache_writeback_invalidate((void *)0x80000120, 0x2E0);
+        inst_cache_invalidate((void *)0x80000120, 0x2E0);
+
+        // flush os boot segment
+        data_cache_writeback_invalidate((void *)0x802A0000, 0x100000);
+
+        // flush os boot segment memory
+        data_cache_writeback_invalidate((void *)bootAddr, 0x100000);
+        inst_cache_invalidate((void *)bootAddr, 0x100000);
+    }
 
     // Copy low 0x1000 bytes to DMEM
     src = (vu32 *)0xB0000000;
@@ -947,7 +1388,7 @@ void simulate_pif_boot(u32 cic_chip)
     gGPR[8]=0x00000000000000C0LL;
     gGPR[9]=0x0000000000000000LL;
     gGPR[10]=0x0000000000000040LL;
-    gGPR[11]=0xFFFFFFFFA4000040LL;
+    gGPR[11]=bootAddr; // 0xFFFFFFFFA4000040LL;
     gGPR[16]=0x0000000000000000LL;
     gGPR[17]=0x0000000000000000LL;
     gGPR[18]=0x0000000000000000LL;
@@ -959,7 +1400,8 @@ void simulate_pif_boot(u32 cic_chip)
     gGPR[29]=0xFFFFFFFFA4001FF0LL;
     gGPR[30]=0x0000000000000000LL;
 
-    switch (country) {
+    switch (country)
+    {
         case 0x44: //Germany
         case 0x46: //french
         case 0x49: //Italian
@@ -968,9 +1410,9 @@ void simulate_pif_boot(u32 cic_chip)
         case 0x55: //Australia
         case 0x58: // ????
         case 0x59: // X (PAL)
-		{
+        {
             switch (cic_chip)
-			{
+            {
                 case CIC_6102:
                     gGPR[5]=0xFFFFFFFFC0F1D859LL;
                     gGPR[14]=0x000000002DE108EALL;
@@ -997,16 +1439,16 @@ void simulate_pif_boot(u32 cic_chip)
             gGPR[20]=0x0000000000000000LL;
             gGPR[23]=0x0000000000000006LL;
             gGPR[31]=0xFFFFFFFFA4001554LL;
-			break;
-		}
+            break;
+        }
         case 0x37: // 7 (Beta)
         case 0x41: // ????
         case 0x45: //USA
         case 0x4A: //Japan
         default:
-		{
+        {
             switch (cic_chip)
-			{
+            {
                 case CIC_6102:
                     gGPR[5]=0xFFFFFFFFC95973D5LL;
                     gGPR[14]=0x000000002449A366LL;
@@ -1030,11 +1472,12 @@ void simulate_pif_boot(u32 cic_chip)
             gGPR[23]=0x0000000000000000LL;
             gGPR[24]=0x0000000000000003LL;
             gGPR[31]=0xFFFFFFFFA4001550LL;
-			break;
-		}
+            break;
+        }
     }
 
-    switch (cic_chip) {
+    switch (cic_chip)
+    {
         case CIC_6101:
             gGPR[22]=0x000000000000003FLL;
             break;
@@ -1107,71 +1550,170 @@ void simulate_pif_boot(u32 cic_chip)
     }
 
 
-    // now set MIPS registers - set CP0, and then GPRs, then jump thru gpr11 (which is 0xA400040)
-    asm(".set noat\n\t"
-        ".set noreorder\n\t"
-        "li $8,0x34000000\n\t"
-        "mtc0 $8,$12\n\t"
-        "nop\n\t"
-        "li $9,0x0006E463\n\t"
-        "mtc0 $9,$16\n\t"
-        "nop\n\t"
-        "li $8,0x00005000\n\t"
-        "mtc0 $8,$9\n\t"
-        "nop\n\t"
-        "li $9,0x0000005C\n\t"
-        "mtc0 $9,$13\n\t"
-        "nop\n\t"
-        "li $8,0x007FFFF0\n\t"
-        "mtc0 $8,$4\n\t"
-        "nop\n\t"
-        "li $9,0xFFFFFFFF\n\t"
-        "mtc0 $9,$14\n\t"
-        "nop\n\t"
-        "mtc0 $9,$30\n\t"
-        "nop\n\t"
-        "lui $8,0\n\t"
-        "mthi $8\n\t"
-        "nop\n\t"
-        "mtlo $8\n\t"
-        "nop\n\t"
-        "ctc1 $8,$31\n\t"
-        "nop\n\t"
-        "lui $31,0xA008\n\t"
-        "ld $1,0x08($31)\n\t"
-        "ld $2,0x10($31)\n\t"
-        "ld $3,0x18($31)\n\t"
-        "ld $4,0x20($31)\n\t"
-        "ld $5,0x28($31)\n\t"
-        "ld $6,0x30($31)\n\t"
-        "ld $7,0x38($31)\n\t"
-        "ld $8,0x40($31)\n\t"
-        "ld $9,0x48($31)\n\t"
-        "ld $10,0x50($31)\n\t"
-        "ld $11,0x58($31)\n\t"
-        "ld $12,0x60($31)\n\t"
-        "ld $13,0x68($31)\n\t"
-        "ld $14,0x70($31)\n\t"
-        "ld $15,0x78($31)\n\t"
-        "ld $16,0x80($31)\n\t"
-        "ld $17,0x88($31)\n\t"
-        "ld $18,0x90($31)\n\t"
-        "ld $19,0x98($31)\n\t"
-        "ld $20,0xA0($31)\n\t"
-        "ld $21,0xA8($31)\n\t"
-        "ld $22,0xB0($31)\n\t"
-        "ld $23,0xB8($31)\n\t"
-        "ld $24,0xC0($31)\n\t"
-        "ld $25,0xC8($31)\n\t"
-        "ld $26,0xD0($31)\n\t"
-        "ld $27,0xD8($31)\n\t"
-        "ld $28,0xE0($31)\n\t"
-        "ld $29,0xE8($31)\n\t"
-        "ld $30,0xF0($31)\n\t"
-        "ld $31,0xF8($31)\n\t"
-        "jr $11\n\t"
-        "nop"
-        ::: "$8" );
+    // now set MIPS registers - set CP0, and then GPRs, then jump thru gpr11 (which is usually 0xA400040)
+    if (!gCheats)
+        asm(".set noat\n\t"
+            ".set noreorder\n\t"
+            "li $8,0x34000000\n\t"
+            "mtc0 $8,$12\n\t"
+            "nop\n\t"
+            "li $9,0x0006E463\n\t"
+            "mtc0 $9,$16\n\t"
+            "nop\n\t"
+            "li $8,0x00005000\n\t"
+            "mtc0 $8,$9\n\t"
+            "nop\n\t"
+            "li $9,0x0000005C\n\t"
+            "mtc0 $9,$13\n\t"
+            "nop\n\t"
+            "li $8,0x007FFFF0\n\t"
+            "mtc0 $8,$4\n\t"
+            "nop\n\t"
+            "li $9,0xFFFFFFFF\n\t"
+            "mtc0 $9,$14\n\t"
+            "nop\n\t"
+            "mtc0 $9,$30\n\t"
+            "nop\n\t"
+            "lui $8,0\n\t"
+            "mthi $8\n\t"
+            "nop\n\t"
+            "mtlo $8\n\t"
+            "nop\n\t"
+            "ctc1 $8,$31\n\t"
+            "nop\n\t"
+            "lui $31,0xA03E\n\t"
+            "ld $1,0x08($31)\n\t"
+            "ld $2,0x10($31)\n\t"
+            "ld $3,0x18($31)\n\t"
+            "ld $4,0x20($31)\n\t"
+            "ld $5,0x28($31)\n\t"
+            "ld $6,0x30($31)\n\t"
+            "ld $7,0x38($31)\n\t"
+            "ld $8,0x40($31)\n\t"
+            "ld $9,0x48($31)\n\t"
+            "ld $10,0x50($31)\n\t"
+            "ld $11,0x58($31)\n\t"
+            "ld $12,0x60($31)\n\t"
+            "ld $13,0x68($31)\n\t"
+            "ld $14,0x70($31)\n\t"
+            "ld $15,0x78($31)\n\t"
+            "ld $16,0x80($31)\n\t"
+            "ld $17,0x88($31)\n\t"
+            "ld $18,0x90($31)\n\t"
+            "ld $19,0x98($31)\n\t"
+            "ld $20,0xA0($31)\n\t"
+            "ld $21,0xA8($31)\n\t"
+            "ld $22,0xB0($31)\n\t"
+            "ld $23,0xB8($31)\n\t"
+            "ld $24,0xC0($31)\n\t"
+            "ld $25,0xC8($31)\n\t"
+            "ld $26,0xD0($31)\n\t"
+            "ld $27,0xD8($31)\n\t"
+            "ld $28,0xE0($31)\n\t"
+            "ld $29,0xE8($31)\n\t"
+            "ld $30,0xF0($31)\n\t"
+            "ld $31,0xF8($31)\n\t"
+            "jr $11\n\t"
+            "nop"
+            ::: "$8" );
+    else
+        asm(".set noreorder\n\t"
+            "li $8,0x34000000\n\t"
+            "mtc0 $8,$12\n\t"
+            "nop\n\t"
+            "li $9,0x0006E463\n\t"
+            "mtc0 $9,$16\n\t"
+            "nop\n\t"
+            "li $8,0x00005000\n\t"
+            "mtc0 $8,$9\n\t"
+            "nop\n\t"
+            "li $9,0x0000005C\n\t"
+            "mtc0 $9,$13\n\t"
+            "nop\n\t"
+            "li $8,0x007FFFF0\n\t"
+            "mtc0 $8,$4\n\t"
+            "nop\n\t"
+            "li $9,0xFFFFFFFF\n\t"
+            "mtc0 $9,$14\n\t"
+            "nop\n\t"
+            "mtc0 $9,$30\n\t"
+            "nop\n\t"
+            "lui $8,0\n\t"
+            "mthi $8\n\t"
+            "nop\n\t"
+            "mtlo $8\n\t"
+            "nop\n\t"
+            "ctc1 $8,$31\n\t"
+            "nop\n\t"
+            "li $9,0x00000183\n\t"
+            "mtc0 $9,$18\n\t"
+            "nop\n\t"
+            "mtc0 $zero,$19\n\t"
+            "nop\n\t"
+            "lui $8,0xA03C\n\t"
+            "la $9,2f\n\t"
+            "la $10,9f\n\t"
+            ".set noat\n"
+            "1:\n\t"
+            "lw $2,($9)\n\t"
+            "sw $2,($8)\n\t"
+            "addiu $8,$8,4\n\t"
+            "addiu $9,$9,4\n\t"
+            "bne $9,$10,1b\n\t"
+            "nop\n\t"
+            "lui $8,0xA03C\n\t"
+            "jr $8\n\t"
+            "nop\n"
+            "2:\n\t"
+            "lui $9,0xB000\n\t"
+            "lw $9,8($9)\n\t"
+            "lui $8,0x2000\n\t"
+            "or $8,$8,$9\n\t"
+            "lui $9,0xA02A\n\t"
+            "lui $10,0xA03A\n\t"
+            "3:\n\t"
+            "lw $2,($9)\n\t"
+            "sw $2,($8)\n\t"
+            "addiu $8,$8,4\n\t"
+            "addiu $9,$9,4\n\t"
+            "bne $9,$10,3b\n\t"
+            "nop\n\t"
+            "lui $31,0xA03E\n\t"
+            "ld $1,0x08($31)\n\t"
+            "ld $2,0x10($31)\n\t"
+            "ld $3,0x18($31)\n\t"
+            "ld $4,0x20($31)\n\t"
+            "ld $5,0x28($31)\n\t"
+            "ld $6,0x30($31)\n\t"
+            "ld $7,0x38($31)\n\t"
+            "ld $8,0x40($31)\n\t"
+            "ld $9,0x48($31)\n\t"
+            "ld $10,0x50($31)\n\t"
+            "ld $11,0x58($31)\n\t"
+            "ld $12,0x60($31)\n\t"
+            "ld $13,0x68($31)\n\t"
+            "ld $14,0x70($31)\n\t"
+            "ld $15,0x78($31)\n\t"
+            "ld $16,0x80($31)\n\t"
+            "ld $17,0x88($31)\n\t"
+            "ld $18,0x90($31)\n\t"
+            "ld $19,0x98($31)\n\t"
+            "ld $20,0xA0($31)\n\t"
+            "ld $21,0xA8($31)\n\t"
+            "ld $22,0xB0($31)\n\t"
+            "ld $23,0xB8($31)\n\t"
+            "ld $24,0xC0($31)\n\t"
+            "ld $25,0xC8($31)\n\t"
+            "ld $26,0xD0($31)\n\t"
+            "ld $27,0xD8($31)\n\t"
+            "ld $28,0xE0($31)\n\t"
+            "ld $29,0xE8($31)\n\t"
+            "ld $30,0xF0($31)\n\t"
+            "ld $31,0xF8($31)\n\t"
+            "jr $11\n\t"
+            "nop\n"
+            "9:\n"
+            ::: "$8" );
 }
 
 /*
@@ -1311,7 +1853,7 @@ void neo_run_psram(u8 *option, int reset)
     u32 gamelen;
     u32 runcic;
     u32 mythaware;
-	int wait;
+    int wait;
 
     romsize = (option[3]<<8) + option[4];
     romsize += (romsize<<16);
@@ -1319,11 +1861,11 @@ void neo_run_psram(u8 *option, int reset)
     romsave = (option[5]<<16) + option[5];
     romcic  = (option[6]<<16) + option[6];
     rommode = (option[7]<<16) + option[7];
-	gamelen = (romsize & 0xFFFF)*128*1024;
+    gamelen = (romsize & 0xFFFF)*128*1024;
 
-	if(gamelen > (32*1024*1024))
-		romsize = 0x00000000;				//extended mode(WIP)
-	else if ((romsize & 0xFFFF) > 0x000F)
+    if(gamelen > (32*1024*1024))
+        romsize = 0x00000000;               //extended mode(WIP)
+    else if ((romsize & 0xFFFF) > 0x000F)
     {
         if (gamelen <= (8*1024*1024))
             romsize = 0x000F000F;
@@ -1353,18 +1895,18 @@ void neo_run_psram(u8 *option, int reset)
 
     // if set to use card cic, figure out cic for simulated start
     if (romcic == 0)
-	{
+    {
         runcic = get_cic((unsigned char *)0xB0000040);
-	}
+    }
     else
-	{
+    {
         runcic = romcic & 7;
-	}
+    }
 
     if((!reset) && (runcic != 2))
-	{
+    {
         reset = 1;                      // reset back to menu since cannot reset to game in hardware
-	}
+    }
 
     CIC_IO   = romcic; //reset ? 0x00020002 : romcic;
     neo_sync_bus();
@@ -1375,15 +1917,15 @@ void neo_run_psram(u8 *option, int reset)
     neo_sync_bus();
 
     // start cart
-	while (dma_busy()){} //sanity check
+    while (dma_busy()){} //sanity check
 
     disable_interrupts();
 
-	for(wait = 0;wait < 200;wait++)
-	{
-		//Just waste a little time until any interrupts that have been triggered BEFORE ints where disabled have jumped back to their caller
-		neo_sync_bus();
-	}
+    for(wait = 0;wait < 200;wait++)
+    {
+        //Just waste a little time until any interrupts that have been triggered BEFORE ints where disabled have jumped back to their caller
+        neo_sync_bus();
+    }
 
     simulate_pif_boot(runcic);          // should never return
     enable_interrupts();
