@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdint.h>
+
 #include <libdragon.h>
 #include <diskio.h>
 #include <ff.h>
@@ -14,16 +16,14 @@
 #undef CHECK_FOR_MF_BIOS
 #define HW_SELF_TEST
 
-#ifdef HW_SELF_TEST
-#include <stdlib.h>
-#endif
+#define ishexchar(c) (((c >= '0') && (c <= '9')) || ((c >= 'A') && (c <= 'F')) || ((c >= 'a') && (c <= 'f')))
 
 #if defined RUN_FROM_U2
-    const char* menu_title = "Neo N64 Myth Menu v2.5 (U2)";
+    const char* menu_title = "Neo N64 Myth Menu v2.6 (U2)";
 #elif defined RUN_FROM_SD
-    const char* menu_title = "Neo N64 Myth Menu v2.5 (SD)";
+    const char* menu_title = "Neo N64 Myth Menu v2.6 (SD)";
 #else
-    const char* menu_title = "Neo N64 Myth Menu v2.5 (MF)";
+    const char* menu_title = "Neo N64 Myth Menu v2.6 (MF)";
 #endif
 
 typedef volatile unsigned short vu16;
@@ -116,7 +116,7 @@ struct selEntry {
     u32 valid;                          /* 0 = invalid, ~0 = valid */
     u32 type;                           /* 64 = compressed , 128 = directory, 0xFF = N64 game */
     u32 swap;                           /* 0 = no swap, 1 = byte swap, 2 = word swap, 3 = long swap */
-    u32 pad;
+    u32 cheats;                         /* 0 = no cheats, 1 = has cheats */
     u8 options[8];                      /* menu entry options */
     u8 hdr[0x20];                       /* copy of data from rom offset 0 */
     u8 rom[0x20];                       /* copy of data from rom offset 0x20 */
@@ -125,6 +125,20 @@ struct selEntry {
 typedef struct selEntry selEntry_t;
 
 selEntry_t __attribute__((aligned(16))) gTable[1024];
+
+struct gscEntry {
+    char *description;
+    char *gscodes;
+    u16  count;
+    u16  state;
+    u16  mask;
+    u16  value;
+};
+typedef struct gscEntry gscEntry_t;
+
+gscEntry_t gGSCodes[256];
+
+short int gCheats = 0;                  /* 0 = off, 1 = select, 2 = all */
 
 extern unsigned short cardType;         /* b0 = block access, b1 = V2 and/or HC, b15 = funky read timing */
 extern unsigned int num_sectors;        /* number of sectors on SD card (or 0) */
@@ -198,33 +212,33 @@ void hw_self_test();
 
 int f_force_open(FIL* f,XCHAR* s,unsigned int flags,int retries)
 {
-	int i,j,k;
+    int i,j,k;
 
-	//if( !(flags&FA_WRITE) )
-		//return f_open(f,s,flags) == FR_OK;
+    //if( !(flags&FA_WRITE) )
+        //return f_open(f,s,flags) == FR_OK;
 
-	i = j = 0;
-	k = retries;
-	disk_io_force_wdl = 0;
+    i = j = 0;
+    k = retries;
+    disk_io_force_wdl = 0;
 
-	while(i++ < k)
-	{
-		memset(f,0,sizeof(FIL));
-		neo2_disable_sd();
-		neo2_enable_sd();
-		getSDInfo(-1);
+    while(i++ < k)
+    {
+        memset(f,0,sizeof(FIL));
+        neo2_disable_sd();
+        neo2_enable_sd();
+        getSDInfo(-1);
 
-		if(f_open(f,s,flags) == FR_OK)
-		{
-			j = 1;
-			break;
-		}
+        if(f_open(f,s,flags) == FR_OK)
+        {
+            j = 1;
+            break;
+        }
 
-		disk_io_force_wdl += 200;
-	}
+        disk_io_force_wdl += 200;
+    }
 
-	disk_io_force_wdl = 0;
-	return j;
+    disk_io_force_wdl = 0;
+    return j;
 }
 
 void w2cstrcpy(void *dst, void *src)
@@ -352,7 +366,7 @@ void printText(display_context_t dc, char *msg, int x, int y)
     if (y != -1)
         gCursorY = y;
 
-    if (dc)
+    if (dc && msg)
         graphics_draw_text(dc, gCursorX*8, gCursorY*8, msg);
 
     gCursorY++;
@@ -842,6 +856,592 @@ int do_sd_mgr(int state)
     return 0;
 }
 
+void get_sd_cheats(int entry, int bfill)
+{
+    FIL lSDFile;
+    char *buff, *cp, *vp, *dp;
+    char buffer[512];
+    char temp[42];
+    XCHAR fpath[300];
+    int i = 0, j, type, offset = 0;
+    int curr_cheat = -1;
+    display_context_t dcon;
+    u16 previous = 0, buttons;
+    int bselect = 0, bstart = 0;
+    char *cheats_help1 = "A=Run game B=Cheat off DPad=Navigate";
+    char *cheats_help2 = "CUp=Disable cheat   CDn=Enable cheat";
+    char *cheats_help3 = "CLf=Disable cheat   CRt=Enable cheat";
+    char *cheats_help4 = "CUp=Inc digit 2      CDn=Inc digit 1";
+    char *cheats_help5 = "CLf=Inc digit 3      CRt=Inc digit 0";
+
+    if (!gTable[entry].cheats || !gCheats)
+    {
+        gCheats = 0;
+        return; // no cheat codes, or not enabled
+    }
+
+    c2wstrcpy(fpath, "/menu/n64/cheats/");
+    c2wstrcat(fpath, gTable[entry].name);
+    while (fpath[i] != 0x0000) i++;
+    j = i;
+    while (i && (fpath[i] != (XCHAR)'.')) i--;
+    if (!i) i = j; // no extension
+    c2wstrcpy(&fpath[i], ".gsc");
+
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+        return; // no code file
+
+    while (1)
+    {
+        // get next line in file
+        buff = f_gets(buffer, 512, &lSDFile);
+        if (!buff)
+            break; // done with file
+
+        // process GameShark Code line
+        cp = vp = dp = NULL;
+        i = 0;
+        while ((buff[i] == ' ') || (buff[i] == '\t')) i++; // skip initial whitespace
+        // check for blank line
+        if ((buff[i] == '\n') || (buff[i] == '\r'))
+            continue; // skip
+        // check for comment line
+        if ((buff[i] == '#') || (buff[i] == ';'))
+            continue; // skip
+        cp = &buff[i];
+        while ((buff[i] != ' ') && (buff[i] != '\t') && (buff[i] != '\n') && (buff[i] != '\r')) i++; // find end of GameShark code
+        buff[i] = 0; // null terminate code string
+        i++;
+
+        while ((buff[i] == ' ') || (buff[i] == '\t')) i++; // skip whitespace
+        vp = &buff[i];
+        while ((buff[i] != ' ') && (buff[i] != '\t') && (buff[i] != '\n') && (buff[i] != '\r')) i++; // find end of GameShark code value
+        if ((buff[i] == ' ') || (buff[i] == '\t'))
+        {
+            buff[i] = 0; // null terminate value string
+            i++;
+            while ((buff[i] == ' ') || (buff[i] == '\t')) i++; // skip whitespace
+            if ((buff[i] != '\n') && (buff[i] != '\r') && (buff[i] != '#') && (buff[i] != ';'))
+            {
+                dp = &buff[i];
+                while ((buff[i] != '\n') && (buff[i] != '\r')) i++; // find end of GameShark code description
+                buff[i] = 0; // null terminate description string
+            }
+        }
+        else
+        {
+            // no description - continuation of cheat
+            buff[i] = 0; // null terminate value string
+        }
+
+        if (dp)
+        {
+            // starting new cheat
+            curr_cheat++;
+            gGSCodes[curr_cheat].description = strdup(dp);
+            gGSCodes[curr_cheat].gscodes = NULL;
+            gGSCodes[curr_cheat].count = 0;
+            gGSCodes[curr_cheat].state = (gCheats == 2) ? 1 : 0;
+            gGSCodes[curr_cheat].mask = 0;
+            if (!ishexchar(vp[3]))
+                gGSCodes[curr_cheat].mask |= 0x000F;
+            if (!ishexchar(vp[2]))
+                gGSCodes[curr_cheat].mask |= 0x00F0;
+            if (!ishexchar(vp[1]))
+                gGSCodes[curr_cheat].mask |= 0x0F00;
+            if (!ishexchar(vp[0]))
+                gGSCodes[curr_cheat].mask |= 0xF000;
+            gGSCodes[curr_cheat].value = 0;
+            offset = 0;
+        }
+
+        if (curr_cheat < 0)
+            continue; // safety check
+
+        temp[0] = cp[0];
+        temp[1] = cp[1];
+        temp[2] = 0;
+        type = strtol(temp, (char **)NULL, 16);
+
+        switch(type)
+        {
+            case 0x50:
+                // patch codes - unimplemented, also skips next line
+                // 5000XXYY 00ZZ
+                // TTTTTTTT VVVV
+                f_gets(buffer, 512, &lSDFile);
+                break;
+            case 0x80:
+                // write 8-bit value to (cached) ram continuously
+                // 80XXYYYY 00ZZ
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0x81:
+                // write 16-bit value to (cached) ram continuously
+                // 81XXYYYY ZZZZ
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0x88:
+                // write 8-bit value to (cached) ram on GS button pressed - unimplemented
+                // 88XXYYYY 00ZZ
+                break;
+            case 0x89:
+                // write 16-bit value to (cached) ram on GS button pressed - unimplemented
+                // 89XXYYYY ZZZZ
+                break;
+            case 0xA0:
+                // write 8-bit value to (uncached) ram continuously
+                // A0XXYYYY 00ZZ => 3C1A A0XX 375A YYYY 241B 00ZZ A35B 0000
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xA1:
+                // write 16-bit value to (uncached) ram continuously
+                // A1XXYYYY ZZZZ => 3C1A A0XX 375A YYYY 241B ZZZZ A75B 0000
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xCC:
+                // deactivate expansion ram using 3rd method
+                // CC000000 0000
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xD0:
+                // do next gs code if ram location is equal to 8-bit value
+                // D0XXYYYY 00ZZ
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xD1:
+                // do next gs code if ram location is equal to 16-bit value
+                // D1XXYYYY ZZZZ
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xD2:
+                // do next gs code if ram location is not equal to 8-bit value
+                // D2XXYYYY 00ZZ
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xD3:
+                // do next gs code if ram location is not equal to 16-bit value
+                // D1XXYYYY ZZZZ
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xDD:
+                // deactivate expansion ram using 2nd method
+                // DD000000 0000
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xDE:
+                // set game boot address
+                // DEXXXXXX 0000
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xEE:
+                // deactivate expansion ram using 1st method
+                // EE000000 0000
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xF0:
+                // write 8-bit value to (cached) ram before boot
+                // F0XXXXXX 00YY
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xF1:
+                // write 16-bit value to (cached) ram before boot
+                // F1XXXXXX YYYY
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+            case 0xFF:
+                // set code base
+                // FFXXXXXX 0000
+                if (gGSCodes[curr_cheat].gscodes)
+                    gGSCodes[curr_cheat].gscodes = realloc(gGSCodes[curr_cheat].gscodes, offset + 16);
+                else
+                    gGSCodes[curr_cheat].gscodes = malloc(16);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset], cp, 9);
+                memcpy(&gGSCodes[curr_cheat].gscodes[offset+9], vp, 5);
+                gGSCodes[curr_cheat].count++;
+                offset += 16;
+                break;
+        }
+
+    }
+    curr_cheat++;
+    gGSCodes[curr_cheat].count = 0xFFFF; // end of table
+    gGSCodes[curr_cheat].gscodes = NULL;
+    gGSCodes[curr_cheat].state = 0;
+
+    f_close(&lSDFile);
+
+    while (1)
+    {
+        // get next buffer to draw in
+        dcon = lockVideo(1);
+        graphics_fill_screen(dcon, 0);
+
+        if (browser && (bfill == 4))
+        {
+            drawImage(dcon, browser);
+        }
+        else if ((bfill < 3) && (pattern[bfill] != NULL))
+        {
+            rdp_sync(SYNC_PIPE);
+            rdp_set_default_clipping();
+            rdp_enable_texture_copy();
+            rdp_attach_display(dcon);
+            // Draw pattern
+            rdp_sync(SYNC_PIPE);
+            rdp_load_texture(0, 0, MIRROR_DISABLED, pattern[bfill]);
+            for (int j=0; j<240; j+=pattern[bfill]->height)
+                for (int i=0; i<320; i+=pattern[bfill]->width)
+                    rdp_draw_sprite(0, i, j);
+            rdp_detach_display();
+        }
+
+        // show title
+        graphics_set_color(gTextColors.title, 0);
+        strcpy(temp, "Select GameShark Codes");
+        printText(dcon, temp, 20 - strlen(temp)/2, 1);
+
+        // print gs codes list (lines 3 to 12)
+        for (int ix=0; ix<10; ix++)
+        {
+            if (gGSCodes[bstart+ix].count == 0xFFFF)
+                break; // end of table
+            if (!gGSCodes[bstart+ix].description)
+                continue; // safety check
+            if (gGSCodes[bstart+ix].state)
+            {
+                if (gGSCodes[bstart+ix].mask)
+                {
+                    // has integer value
+                    sprintf(temp, "%04X:%s", gGSCodes[bstart+ix].value, gGSCodes[bstart+ix].description);
+                    temp[36] = 0;
+                }
+                else
+                {
+                    sprintf(temp, "  ON:%s", gGSCodes[bstart+ix].description);
+                    temp[36] = 0;
+                }
+            }
+            else
+            {
+                sprintf(temp, " OFF:%s", gGSCodes[bstart+ix].description);
+                temp[36] = 0;
+            }
+            graphics_set_color((bstart+ix) == bselect ? gTextColors.sel_game : gTextColors.usel_game, 0);
+            printText(dcon, temp, 2, 3 + ix);
+        }
+
+        graphics_set_color(gTextColors.usel_game, 0);
+        // print codes for this cheat (lines 14 to 18)
+        for (int ix=0; ix<10; ix++)
+        {
+            if (ix >= gGSCodes[bselect].count)
+                break;
+            if (!gGSCodes[bselect].gscodes)
+                break; // safety check
+            if (ix < 5)
+            {
+                printText(dcon, &gGSCodes[bselect].gscodes[ix*16 + 0], 4, 14+ix);
+                printText(dcon, &gGSCodes[bselect].gscodes[ix*16 + 9], 13, 14+ix);
+            }
+            else
+            {
+                printText(dcon, &gGSCodes[bselect].gscodes[ix*16 + 0], 23, 9+ix);
+                printText(dcon, &gGSCodes[bselect].gscodes[ix*16 + 9], 32, 9+ix);
+            }
+        }
+
+        // show cart info help messages
+        graphics_set_color(gTextColors.hw_info, 0);
+        sprintf(temp, "GameShark Compatibility V3.3 (rev 1)");
+        printText(dcon, temp, 20 - strlen(temp)/2, 24);
+        graphics_set_color(gTextColors.help_info, 0);
+        printText(dcon, cheats_help1, 20 - strlen(cheats_help1)/2, 25);
+        if (gGSCodes[bselect].mask && gGSCodes[bselect].state)
+        {
+            printText(dcon, cheats_help4, 20 - strlen(cheats_help4)/2, 26);
+            printText(dcon, cheats_help5, 20 - strlen(cheats_help5)/2, 27);
+        }
+        else
+        {
+            printText(dcon, cheats_help2, 20 - strlen(cheats_help2)/2, 26);
+            printText(dcon, cheats_help3, 20 - strlen(cheats_help3)/2, 27);
+        }
+
+        // show display
+        unlockVideo(dcon);
+
+        // get buttons
+        buttons = getButtons(0);
+
+        if (DU_BUTTON(buttons))
+        {
+            // UP pressed, go one entry back
+            bselect--;
+            if (bselect < 0)
+            {
+                bselect = curr_cheat - 1;
+                bstart = curr_cheat - (curr_cheat % 10);
+            }
+            if (bselect < bstart)
+            {
+                bstart -= 10;
+                if (bstart < 0)
+                    bstart = 0;
+            }
+            delay(7);
+        }
+        if (DL_BUTTON(buttons))
+        {
+            // LEFT pressed, go one page back
+            bselect -= 10;
+            if (bselect < 0)
+            {
+                bselect = curr_cheat - 1;
+                bstart = curr_cheat - (curr_cheat % 10);
+            }
+            else
+            {
+                bstart -= 10;
+                if (bstart < 0)
+                    bstart = 0;
+            }
+            delay(15);
+        }
+        if (DD_BUTTON(buttons))
+        {
+            // DOWN pressed, go one entry forward
+            bselect++;
+            if (bselect == curr_cheat)
+            {
+                bselect = bstart = 0;
+            }
+            else if ((bselect - bstart) == 10)
+            {
+                bstart += 10;
+            }
+            delay(7);
+        }
+        if (DR_BUTTON(buttons))
+        {
+            // RIGHT pressed, go one page forward
+            bselect += 10;
+            if (bselect >= curr_cheat)
+            {
+                bselect = bstart = 0;
+            }
+            else
+            {
+                bstart += 10;
+            }
+            delay(15);
+        }
+
+        if (A_BUTTON(buttons ^ previous))
+        {
+            // A changed
+            if (!A_BUTTON(buttons))
+            {
+                // A just released - return
+                return;
+            }
+        }
+        if (B_BUTTON(buttons ^ previous))
+        {
+            // B changed
+            if (!B_BUTTON(buttons))
+            {
+                // B just released - cheat off
+                gGSCodes[bselect].state = 0;
+            }
+        }
+
+        if (gGSCodes[bselect].mask && gGSCodes[bselect].state)
+        {
+            u16 prev = gGSCodes[bselect].value;
+            if (CR_BUTTON(buttons ^ previous))
+            {
+                u16 mask = gGSCodes[bselect].mask & 0x000F;
+                // CR changed
+                if (!CR_BUTTON(buttons))
+                    gGSCodes[bselect].value = ((prev + 0x0001) & mask) | (prev & ~mask);
+            }
+            if (CL_BUTTON(buttons ^ previous))
+            {
+                u16 mask = gGSCodes[bselect].mask & 0xF000;
+                // CL changed
+                if (!CL_BUTTON(buttons))
+                    gGSCodes[bselect].value = ((prev + 0x1000) & mask) | (prev & ~mask);
+            }
+            if (CU_BUTTON(buttons ^ previous))
+            {
+                u16 mask = gGSCodes[bselect].mask & 0x0F00;
+                // CU changed
+                if (!CU_BUTTON(buttons))
+                    gGSCodes[bselect].value = ((prev + 0x0100) & mask) | (prev & ~mask);
+            }
+            if (CD_BUTTON(buttons ^ previous))
+            {
+                u16 mask = gGSCodes[bselect].mask & 0x00F0;
+                // CD changed
+                if (!CD_BUTTON(buttons))
+                    gGSCodes[bselect].value = ((prev + 0x0010) & mask) | (prev & ~mask);
+            }
+        }
+        else
+        {
+            if (CR_BUTTON(buttons ^ previous))
+            {
+                // CR changed
+                if (!CR_BUTTON(buttons))
+                    gGSCodes[bselect].state = 1;
+            }
+            if (CL_BUTTON(buttons ^ previous))
+            {
+                // CL changed
+                if (!CL_BUTTON(buttons))
+                    gGSCodes[bselect].state = 0;
+            }
+            if (CU_BUTTON(buttons ^ previous))
+            {
+                // CU changed
+                if (!CU_BUTTON(buttons))
+                    gGSCodes[bselect].state = 0;
+            }
+            if (CD_BUTTON(buttons ^ previous))
+            {
+                // CD changed
+                if (!CD_BUTTON(buttons))
+                    gGSCodes[bselect].state = 1;
+            }
+        }
+
+        previous = buttons;
+        delay(1);
+    }
+}
+
+void check_sd_cheats(int entry)
+{
+    FIL lSDFile;
+    XCHAR fpath[300];
+    int i = 0, j;
+
+    gTable[entry].cheats = 0;
+
+    c2wstrcpy(fpath, "/menu/n64/cheats/");
+    c2wstrcat(fpath, gTable[entry].name);
+    while (fpath[i] != 0x0000) i++;
+    j = i;
+    while (i && (fpath[i] != (XCHAR)'.')) i--;
+    if (!i) i = j; // no extension
+    c2wstrcpy(&fpath[i], ".gsc");
+
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+        return; // no code file
+    f_close(&lSDFile);
+
+    gTable[entry].cheats = 1;
+}
+
 void get_sd_info(int entry)
 {
     FIL lSDFile;
@@ -882,7 +1482,21 @@ void get_sd_info(int entry)
         gTable[entry].options[6] = 2;    // CIC 6102
         gTable[entry].options[7] = 0;
         gTable[entry].type = 254;
-
+        return;
+    }
+    // check for GG rom
+    if (!strncasecmp(&gTable[entry].name[strlen(gTable[entry].name)-3], ".GG", 3))
+    {
+        // GameGear rom
+        gTable[entry].options[0] = 0xFF; // game
+        gTable[entry].options[1] = 0;
+        gTable[entry].options[2] = 0;
+        gTable[entry].options[3] = 0;
+        gTable[entry].options[4] = 0x0F; // 64Mbit
+        gTable[entry].options[5] = 0x0F; // Save off
+        gTable[entry].options[6] = 2;    // CIC 6102
+        gTable[entry].options[7] = 0;
+        gTable[entry].type = 253;
         return;
     }
 
@@ -930,6 +1544,8 @@ void get_sd_info(int entry)
         gTable[entry].options[5] = save;
         gTable[entry].options[6] = cic;
     }
+
+    check_sd_cheats(entry);
 }
 
 int getSDInfo(int entry)
@@ -1164,7 +1780,7 @@ void copyGF2Psram(int bselect, int bfill)
     }
     gPsramMode = (gamelen > (16*1024*1024)) ? 1 : 0;
     neo_select_psram(); // make sure psram is in right mode for size of game
-	neo_psram_offset(0);
+    neo_psram_offset(0);
 
     strcpy(temp, gTable[bselect].name);
 
@@ -1214,12 +1830,12 @@ void sync_sd_stream(FIL* f,XCHAR* s)
 {
     char tmp[2048];
 
-	neo2_disable_sd();
-	neo2_enable_sd();
-	getSDInfo(-1);
-	memset(f,0,sizeof(FIL));
+    neo2_disable_sd();
+    neo2_enable_sd();
+    getSDInfo(-1);
+    memset(f,0,sizeof(FIL));
 
-	if(f_open(f,s,FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    if(f_open(f,s,FA_OPEN_EXISTING | FA_READ) != FR_OK)
     {
         w2cstrcpy(tmp,s);
         debugText("Couldn't open file: ", 2, 2, 0);
@@ -1229,24 +1845,24 @@ void sync_sd_stream(FIL* f,XCHAR* s)
 
 void copyfrom_sd_to_psram(FIL* f,int len,int disk_mode,int swap,int bfill,const char* msg,const char* fn)
 {
-	const int read = 256*1024;//1*1024*1024;
-	int i;
-	UINT ts;
+    const int read = 256*1024;//1*1024*1024;
+    int i;
+    UINT ts;
 
-	if(len <= 0)
-		return;
+    if(len <= 0)
+        return;
 
     progress_screen(msg,fn, 0, 100, bfill);
-    disk_io_set_mode(disk_mode,swap);				//Also resets PSRAM pointer
+    disk_io_set_mode(disk_mode,swap);               //Also resets PSRAM pointer
 
-	for(i = 0; i<len; i+=read)
-	{
-		progress_screen(NULL,NULL, 100*i/len, 100,-1);
-		f_read_psram(f,read,&ts);
-	}
+    for(i = 0; i<len; i+=read)
+    {
+        progress_screen(NULL,NULL, 100*i/len, 100,-1);
+        f_read_psram(f,read,&ts);
+    }
 
-	progress_screen(NULL,NULL,100,100,-1);
-	delay(5);
+    progress_screen(NULL,NULL,100,100,-1);
+    delay(5);
 }
 
 #ifdef __DEBUG_PSRAM__
@@ -1256,99 +1872,99 @@ void copyfrom_sd_to_psram(FIL* f,int len,int disk_mode,int swap,int bfill,const 
 
 void test_psram(int m,const char* s)
 {
-	char* p,*p2;
-	int l,k;
+    char* p,*p2;
+    int l,k;
 
-	l = strlen(s);
-	p2 = (char*)&tmpBuf[1024];
+    l = strlen(s);
+    p2 = (char*)&tmpBuf[1024];
 
-	if( l & 3 )
-	{
-		//align
-		k = (l + 4) & (~3);
-		p = (char*)tmpBuf;
-		memcpy(p,s,l);
-		memset(p + l,0,k-l);
-		l = k;
-	}
-	else
-		p = s;
+    if( l & 3 )
+    {
+        //align
+        k = (l + 4) & (~3);
+        p = (char*)tmpBuf;
+        memcpy(p,s,l);
+        memset(p + l,0,k-l);
+        l = k;
+    }
+    else
+        p = s;
 
-	neo_psram_offset((m*1024*1024) / (32*1024));
-	neo_copyto_psram(p,0,l);
-	neo_copyfrom_psram(p2,0,l);
-	debugText(p2,5,18,1);
-	while(1){}
+    neo_psram_offset((m*1024*1024) / (32*1024));
+    neo_copyto_psram(p,0,l);
+    neo_copyfrom_psram(p2,0,l);
+    debugText(p2,5,18,1);
+    while(1){}
 }
 
 void test_psram2(const char* s)
 {
-	char* p,*p2;
-	int l,k;
- 	int m = 48;
-	display_context_t ctx;
+    char* p,*p2;
+    int l,k;
+    int m = 48;
+    display_context_t ctx;
 
-	l = strlen(s);
-	p2 = (char*)&tmpBuf[1024];
+    l = strlen(s);
+    p2 = (char*)&tmpBuf[1024];
 
-	if( l & 3 )
-	{
-		//align
-		k = (l + 4) & (~3);
-		p = (char*)tmpBuf;
-		memcpy(p,s,l);
-		memset(p + l,0,k-l);
-		l = k;
-	}
-	else
-		p = s;
+    if( l & 3 )
+    {
+        //align
+        k = (l + 4) & (~3);
+        p = (char*)tmpBuf;
+        memcpy(p,s,l);
+        memset(p + l,0,k-l);
+        l = k;
+    }
+    else
+        p = s;
 
-	ctx = lockVideo(1);
-	graphics_fill_screen(ctx,0);
-	unlockVideo(ctx);
+    ctx = lockVideo(1);
+    graphics_fill_screen(ctx,0);
+    unlockVideo(ctx);
 
-	neo_psram_offset((48*1024*1024) / (32*1024));
-	neo_copyto_psram(p,0,l);
-	neo_copyfrom_psram(p2,0,l);
-	debugText(p2,4,4,1);
+    neo_psram_offset((48*1024*1024) / (32*1024));
+    neo_copyto_psram(p,0,l);
+    neo_copyfrom_psram(p2,0,l);
+    debugText(p2,4,4,1);
 
-	//Now check to see if its getting "mirrored" (caused by range wrapping)
-	neo_psram_offset(0);
-	neo_copyfrom_psram(p2,0,l);
-	debugText(p2,4,5,1);
+    //Now check to see if its getting "mirrored" (caused by range wrapping)
+    neo_psram_offset(0);
+    neo_copyfrom_psram(p2,0,l);
+    debugText(p2,4,5,1);
 
-	neo_psram_offset((32*1024*1024) / (32*1024));
-	neo_copyfrom_psram(p2,0,l);
-	debugText(p2,4,6,1);
+    neo_psram_offset((32*1024*1024) / (32*1024));
+    neo_copyfrom_psram(p2,0,l);
+    debugText(p2,4,6,1);
 
-	neo_psram_offset((16*1024*1024) / (32*1024));
-	neo_copyfrom_psram(p2,0,l);
-	debugText(p2,4,7,1);
+    neo_psram_offset((16*1024*1024) / (32*1024));
+    neo_copyfrom_psram(p2,0,l);
+    debugText(p2,4,7,1);
 
-	while(1){}
+    while(1){}
 }
 
 const char* align_text(char* s,char* back_buff,int* dl)
 {
-	int l,k;
-	char* p;
+    int l,k;
+    char* p;
 
-	l = strlen(s);
+    l = strlen(s);
 
-	if( l & 3 )
-	{
-		//align
-		k = (l + 4) & (~3);
-		p = (char*)back_buff;
-		memcpy(p,s,l);
-		memset(p + l,0,k-l);
+    if( l & 3 )
+    {
+        //align
+        k = (l + 4) & (~3);
+        p = (char*)back_buff;
+        memcpy(p,s,l);
+        memset(p + l,0,k-l);
 
-		*dl = k;
-		return p;
-	}
+        *dl = k;
+        return p;
+    }
 
-	*dl = l;
-	return s;
+    *dl = l;
+    return s;
 }
 
 #define MYTH_IO_BASE (0xA8040000)
@@ -1356,104 +1972,104 @@ const char* align_text(char* s,char* back_buff,int* dl)
 
 void test_psram3(const char* a,const char* b,const char* c,const char* d)
 {
-	display_context_t	ctx;
-	int 				ia,ib,ic,id;
-	const char			*pa,*pb,*pc,*pd,*pe;
-	char				*pf;
+    display_context_t   ctx;
+    int                 ia,ib,ic,id;
+    const char          *pa,*pb,*pc,*pd,*pe;
+    char                *pf;
 
-	//set up strings
-	pa = align_text(a,&tmpBuf[0],&ia);
-	pb = align_text(b,&tmpBuf[128],&ib);
-	pc = align_text(c,&tmpBuf[256],&ic);
-	pd = align_text(d,&tmpBuf[384],&id);
-	pf = &tmpBuf[512];
+    //set up strings
+    pa = align_text(a,&tmpBuf[0],&ia);
+    pb = align_text(b,&tmpBuf[128],&ib);
+    pc = align_text(c,&tmpBuf[256],&ic);
+    pd = align_text(d,&tmpBuf[384],&id);
+    pf = &tmpBuf[512];
 
-	//Write each to its own region:bank
-	ROM_BANK = 0; neo_sync_bus();
-	neo_psram_offset(0);
-	neo_copyto_psram(pa,0,ia);
-	neo_psram_offset((16*1024*1024) / (32*1024));
-	neo_copyto_psram(pb,0,ib);
+    //Write each to its own region:bank
+    ROM_BANK = 0; neo_sync_bus();
+    neo_psram_offset(0);
+    neo_copyto_psram(pa,0,ia);
+    neo_psram_offset((16*1024*1024) / (32*1024));
+    neo_copyto_psram(pb,0,ib);
 
-	ROM_BANK = 0x00010001; neo_sync_bus();
-	neo_psram_offset(0);
-	neo_copyto_psram(pc,0,ic);
-	neo_psram_offset((16*1024*1024) / (32*1024));
-	neo_copyto_psram(pd,0,id);
+    ROM_BANK = 0x00010001; neo_sync_bus();
+    neo_psram_offset(0);
+    neo_copyto_psram(pc,0,ic);
+    neo_psram_offset((16*1024*1024) / (32*1024));
+    neo_copyto_psram(pd,0,id);
 
-	//clean up framebuffer
-	ctx = lockVideo(1);
-	graphics_fill_screen(ctx,0);
-	unlockVideo(ctx);
+    //clean up framebuffer
+    ctx = lockVideo(1);
+    graphics_fill_screen(ctx,0);
+    unlockVideo(ctx);
 
-	//Read each one and print it
-	ROM_BANK = 0; neo_sync_bus();
-	neo_psram_offset(0);
-	neo_copyfrom_psram(pf,0,ia);
-	debugText(pf,4,4,1);
-	neo_psram_offset((16*1024*1024) / (32*1024));
-	neo_copyfrom_psram(pf,0,ib);
-	debugText(pf,4,5,1);
+    //Read each one and print it
+    ROM_BANK = 0; neo_sync_bus();
+    neo_psram_offset(0);
+    neo_copyfrom_psram(pf,0,ia);
+    debugText(pf,4,4,1);
+    neo_psram_offset((16*1024*1024) / (32*1024));
+    neo_copyfrom_psram(pf,0,ib);
+    debugText(pf,4,5,1);
 
-	ROM_BANK = 0x00010001; neo_sync_bus();
-	neo_psram_offset(0);
-	neo_copyfrom_psram(pf,0,ic);
-	debugText(pf,4,6,1);
-	neo_psram_offset((16*1024*1024) / (32*1024));
-	neo_copyfrom_psram(pf,0,id);
-	debugText(pf,4,7,1);
+    ROM_BANK = 0x00010001; neo_sync_bus();
+    neo_psram_offset(0);
+    neo_copyfrom_psram(pf,0,ic);
+    debugText(pf,4,6,1);
+    neo_psram_offset((16*1024*1024) / (32*1024));
+    neo_copyfrom_psram(pf,0,id);
+    debugText(pf,4,7,1);
 
-	while(1){}
+    while(1){}
 }
 
-int last_psram_addr = -1; 				//to avoid wasting cycles with asic ops
+int last_psram_addr = -1;               //to avoid wasting cycles with asic ops
 
 int neo_psram_offset_addr(unsigned int addr,int force)
 {
-	const int mb = 1024*1024;
+    const int mb = 1024*1024;
 
-	last_psram_addr = (force) ? -1 : last_psram_addr;
+    last_psram_addr = (force) ? -1 : last_psram_addr;
 
 
-	if(addr <= (16*mb))//0..16MB
-	{
-		if(last_psram_addr == 0)
-			return 0;
+    if(addr <= (16*mb))//0..16MB
+    {
+        if(last_psram_addr == 0)
+            return 0;
 
-		last_psram_addr = 0;
-		neo_psram_offset(0);
+        last_psram_addr = 0;
+        neo_psram_offset(0);
 
-		return 0;	//special case
-	}
-	else if(addr <= (32*mb))//16..32MB
-	{
-		if(last_psram_addr == 16)
-			return 0;
+        return 0;   //special case
+    }
+    else if(addr <= (32*mb))//16..32MB
+    {
+        if(last_psram_addr == 16)
+            return 0;
 
-		last_psram_addr = 16;
-	}
-	else if(addr <= (48*mb))//32..48MB
-	{
-		if(last_psram_addr == 32)
-			return 0;
+        last_psram_addr = 16;
+    }
+    else if(addr <= (48*mb))//32..48MB
+    {
+        if(last_psram_addr == 32)
+            return 0;
 
-		last_psram_addr = 32;
-	}
-	else if(addr <= (64*mb))//48..64MB
-	{
-		if(last_psram_addr == 48)
-			return 0;
+        last_psram_addr = 32;
+    }
+    else if(addr <= (64*mb))//48..64MB
+    {
+        if(last_psram_addr == 48)
+            return 0;
 
-		last_psram_addr = 48;
-	}
-	else
-		return 0;
+        last_psram_addr = 48;
+    }
+    else
+        return 0;
 
-	neo_psram_offset((last_psram_addr*mb) >> 15);
+    neo_psram_offset((last_psram_addr*mb) >> 15);
 
-	//Yeah! we've just updated flash offset
-	//The result returned allows you to decide when to reset PSRAM address :)
-	return 1;
+    //Yeah! we've just updated flash offset
+    //The result returned allows you to decide when to reset PSRAM address :)
+    return 1;
 }
 #endif
 
@@ -1463,19 +2079,19 @@ void fastCopySD2Psram(int bselect,int bfill)
     u32 gamelen;
     XCHAR fpath[1280];
     char temp[256];
-	int swp;
-	int unit;
+    int swp;
+    int unit;
 
-	#ifdef __DEBUG_PSRAM__
-	test_psram3("Haha","Hehe","Hihi","Hoho");
-	test_psram2("Can you see this ???");
-	#endif
+    #ifdef __DEBUG_PSRAM__
+    test_psram3("Haha","Hehe","Hihi","Hoho");
+    test_psram2("Can you see this ???");
+    #endif
     disk_io_set_mode(0,0);
 
     if (gTable[bselect].type == 127)
         get_sd_info(bselect);
 
-	swp = gTable[bselect].swap;
+    swp = gTable[bselect].swap;
     strcpy(temp, gTable[bselect].name);
     c2wstrcpy(fpath, path);
 
@@ -1495,96 +2111,96 @@ void fastCopySD2Psram(int bselect,int bfill)
         return;
     }
 
-	gamelen = f.fsize;
+    gamelen = f.fsize;
     gPsramMode = (gamelen > (16*1024*1024)) ? 1 : 0;
     neo_select_psram(); // make sure psram is in right mode for size of game
-	neo_psram_offset(0);
+    neo_psram_offset(0);
 
-	#if 1
-	unit = 16*1024*1024;
+    #if 1
+    unit = 16*1024*1024;
 
-	#if 0
+    #if 0
 
-	//Just to make sure
-	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp); 		//0-16
-	neo_psram_offset((16*1024*1024) / (32*1024));
-	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);		//16-32
-	neo_psram_offset((32*1024*1024) / (32*1024));
-	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);		//32-48
-	neo_psram_offset((48*1024*1024) / (32*1024));
-	copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);		//48-64
+    //Just to make sure
+    copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);       //0-16
+    neo_psram_offset((16*1024*1024) / (32*1024));
+    copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);       //16-32
+    neo_psram_offset((32*1024*1024) / (32*1024));
+    copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);       //32-48
+    neo_psram_offset((48*1024*1024) / (32*1024));
+    copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);       //48-64
 
-	#else
-	if(gamelen > (32 * 1024 * 1024))//Up to 512Mbit --- XXX READ XXX:DOES NOT WORK YET. The core wraps around anything > 32MB
-	{
-		//Write 1/2
-		copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);
+    #else
+    if(gamelen > (32 * 1024 * 1024))//Up to 512Mbit --- XXX READ XXX:DOES NOT WORK YET. The core wraps around anything > 32MB
+    {
+        //Write 1/2
+        copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);
 
-		//Switch offset
-		neo_psram_offset((16*1024*1024) / (32*1024));
+        //Switch offset
+        neo_psram_offset((16*1024*1024) / (32*1024));
 
-		//Write 2/2
-		copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);
+        //Write 2/2
+        copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);
 
-		//Switch offset
-		neo_psram_offset((32*1024*1024) / (32*1024));
+        //Switch offset
+        neo_psram_offset((32*1024*1024) / (32*1024));
 
-		//Subtract 32MB from count
-		gamelen -= 32*1024*1024;
+        //Subtract 32MB from count
+        gamelen -= 32*1024*1024;
 
-		if(gamelen <= unit)//Just up to 48MB ?
-			copyfrom_sd_to_psram(&f,gamelen,1,swp,bfill,"Loading",temp);
-		else//Image contains at least 1x16MB block
-		{
-			//Write 1/2
-			copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);
+        if(gamelen <= unit)//Just up to 48MB ?
+            copyfrom_sd_to_psram(&f,gamelen,1,swp,bfill,"Loading",temp);
+        else//Image contains at least 1x16MB block
+        {
+            //Write 1/2
+            copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading",temp);
 
-			//Switch offset
-			neo_psram_offset((48*1024*1024) / (32*1024));
+            //Switch offset
+            neo_psram_offset((48*1024*1024) / (32*1024));
 
-			//Write 2/2 and subtract unit from count
-			copyfrom_sd_to_psram(&f,gamelen-unit,1,swp,bfill,"Loading",temp);
-		}
-	}
-	else//Up to 256Mbit
-	{
-		if(gamelen <= unit)
-			copyfrom_sd_to_psram(&f,gamelen,1,swp,bfill,"Loading",temp);
-		else
-		{
-			//Write 1/2
-			copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading 1/2",temp);
+            //Write 2/2 and subtract unit from count
+            copyfrom_sd_to_psram(&f,gamelen-unit,1,swp,bfill,"Loading",temp);
+        }
+    }
+    else//Up to 256Mbit
+    {
+        if(gamelen <= unit)
+            copyfrom_sd_to_psram(&f,gamelen,1,swp,bfill,"Loading",temp);
+        else
+        {
+            //Write 1/2
+            copyfrom_sd_to_psram(&f,unit,1,swp,bfill,"Loading 1/2",temp);
 
-			//Switch offset
-			neo_psram_offset((16*1024*1024) / (32*1024));
+            //Switch offset
+            neo_psram_offset((16*1024*1024) / (32*1024));
 
-			//Write 2/2 and subtract unit from count
-			copyfrom_sd_to_psram(&f,gamelen-unit,1,swp,bfill,"Loading 2/2",temp);
-		}
-	}
-	#endif
-	#else
-	disk_io_set_mode(1,swp);
-	u32 i;
-	UINT ts;
+            //Write 2/2 and subtract unit from count
+            copyfrom_sd_to_psram(&f,gamelen-unit,1,swp,bfill,"Loading 2/2",temp);
+        }
+    }
+    #endif
+    #else
+    disk_io_set_mode(1,swp);
+    u32 i;
+    UINT ts;
 
-	neo_psram_offset_addr(0,1);
+    neo_psram_offset_addr(0,1);
 
-	for(i = 0;i<gamelen;i+=ONCE_SIZE)
-	{
-		if(neo_psram_offset_addr(i,0))
-		{
-			//reset psram addr
-			disk_io_set_mode(1,swp);
-		}
+    for(i = 0;i<gamelen;i+=ONCE_SIZE)
+    {
+        if(neo_psram_offset_addr(i,0))
+        {
+            //reset psram addr
+            disk_io_set_mode(1,swp);
+        }
 
-		progress_screen(NULL,NULL, 100*i/gamelen, 100,-1);
-		f_read_dummy(&f,ONCE_SIZE,&ts);
-	}
+        progress_screen(NULL,NULL, 100*i/gamelen, 100,-1);
+        f_read_dummy(&f,ONCE_SIZE,&ts);
+    }
 
-	#endif
-	neo_psram_offset(0);
-	disk_io_set_mode(0,0);
+    #endif
+    neo_psram_offset(0);
+    disk_io_set_mode(0,0);
     f_close(&f);
 }
 
@@ -1665,6 +2281,90 @@ void loadNES2Psram(int bselect, int bfill)
     delay(5);
 }
 
+/* Load UltraSMS emulator and patch with GG file in psram */
+void loadGG2Psram(int bselect, int bfill)
+{
+    FIL lSDFile;
+    UINT ts, emusize;
+    u32 gamelen;
+    XCHAR fpath[1280];
+    char temp[256];
+
+    disk_io_set_mode(0,0);
+
+    progress_screen("Loading", "UltraSMS emulator", 0, 100, bfill);
+
+    // clear psram
+    memset(tmpBuf, 0, ONCE_SIZE);
+    for(int ix=0; ix<1280*1024; ix+=ONCE_SIZE)
+        neo_xferto_psram(tmpBuf, ix, ONCE_SIZE);
+
+    c2wstrcpy(fpath, "/menu/n64/UltraSMS/UltraSMS.z64");
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    {
+        char temp[1536];
+        // couldn't open file
+        w2cstrcpy(temp, fpath);
+        debugText("Couldn't open file: ", 2, 2, 0);
+        debugText(temp, 22, 2, 180);
+        return;
+    }
+    // copy the emu from file to ram, then ram to psram
+    gamelen = lSDFile.fsize;
+    for(int ic=0; ic<gamelen; ic+=ONCE_SIZE)
+    {
+        memset(tmpBuf, 0, ONCE_SIZE);
+        f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
+        neo_xferto_psram(tmpBuf, ic, ONCE_SIZE);
+    }
+    f_close(&lSDFile);
+    emusize = 0x1B410; // offset to GG rom from start of emulator rom
+
+    strcpy(temp, gTable[bselect].name);
+    progress_screen("Loading", temp, 33, 100, bfill);
+
+    c2wstrcpy(fpath, path);
+    if (path[strlen(path)-1] != '/')
+        c2wstrcat(fpath, "/");
+
+    c2wstrcat(fpath, gTable[bselect].name);
+    if (f_open(&lSDFile, fpath, FA_OPEN_EXISTING | FA_READ) != FR_OK)
+    {
+        char temp[1536];
+        // couldn't open file
+        w2cstrcpy(temp, fpath);
+        debugText("Couldn't open file: ", 2, 2, 0);
+        debugText(temp, 22, 2, 180);
+        return;
+    }
+
+    // copy the rom from file to ram, then ram to psram
+    gamelen = lSDFile.fsize;
+    for(int ic=0; ic<gamelen; ic+=ONCE_SIZE)
+    {
+        memset(tmpBuf, 0, ONCE_SIZE);
+        f_read(&lSDFile, tmpBuf, ONCE_SIZE, &ts);
+        neo_xferto_psram(tmpBuf, ic + emusize, ONCE_SIZE);
+    }
+    f_close(&lSDFile);
+
+    progress_screen("Checksumming", "...", 66, 100, bfill);
+    checksum_psram();
+#if 0
+    {
+        char temp[40];
+        unsigned int cs1, cs2;
+        debugText("checksum = ", 2, 2, 2);
+        cs1 = *(unsigned int *)0xB0000010;
+        cs2 = *(unsigned int *)0xB0000014;
+        sprintf(temp, "%08X %08X", cs1, cs2);
+        debugText(temp, 13, 2, 1200);
+    }
+#endif
+    progress_screen(NULL,NULL,100,100,-1);
+    delay(5);
+}
+
 /* Copy data from file to gba psram */
 void copySD2Psram(int bselect, int bfill)
 {
@@ -1692,7 +2392,7 @@ void copySD2Psram(int bselect, int bfill)
     gamelen = romsize*128*1024;
     gPsramMode = (gamelen > (16*1024*1024)) ? 1 : 0;
     neo_select_psram(); // make sure psram is in right mode for size of game
-	neo_psram_offset(0);
+    neo_psram_offset(0);
 
     strcpy(temp, gTable[bselect].name);
 
@@ -2024,24 +2724,24 @@ void loadSaveState(int bsel, int bfill) //cleanup later
     neo2_enable_sd();
     ix = getSDInfo(-1);             // try to get root
 
-	flags = 0xAA550100LL | entry.options[5];
+    flags = 0xAA550100LL | entry.options[5];
 
-	if(ix)
-	{
+    if(ix)
+    {
         c2wstrcpy(wname, "/menu/n64/save/last.run");
         f_force_open(&lSDFile,wname,FA_CREATE_ALWAYS | FA_WRITE,64);//f_open(&lSDFile, wname, FA_CREATE_ALWAYS | FA_WRITE);
-		f_write(&lSDFile,&flags,8,&ts);
+        f_write(&lSDFile,&flags,8,&ts);
         c2wstrcpy(wname, "/menu/n64/save/");
         c2wstrcat(wname, temp);
         f_write(&lSDFile,wname,280*2,&ts); //waste space for alignment porpuses
         f_close(&lSDFile);
-		memset(&lSDFile,0,sizeof(FIL));
-	}
-	else
-	{
-		neo_copyto_sram(temp, 0x3FE00, 256);
-		neo_copyto_sram(&flags, 0x3FF00, 8);
-	}
+        memset(&lSDFile,0,sizeof(FIL));
+    }
+    else
+    {
+        neo_copyto_sram(temp, 0x3FE00, 256);
+        neo_copyto_sram(&flags, 0x3FF00, 8);
+    }
 
     if (!ix)
     {
@@ -2106,22 +2806,22 @@ void loadSaveState(int bsel, int bfill) //cleanup later
         case 3:
             byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
             neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]], 8);
-		break;
+        break;
 
         case 4:
             byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
             neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]], 8);
-		break;
+        break;
 
         case 5:
         case 6:
             neo_copyto_eeprom(tmpBuf, 0, ssize[entry.options[5]], entry.options[5]);
-		break;
+        break;
 
         case 8:
             byte_swap_buf(tmpBuf, ssize[entry.options[5]]);
             neo_copyto_nsram(tmpBuf, 0, ssize[entry.options[5]], 8);
-		break;
+        break;
     }
 
     memcpy(&gTable[bsel], &entry, sizeof(selEntry_t)); // restore the entry
@@ -2132,43 +2832,43 @@ void saveSaveState()
     int ssize[16] = { 0, 32768, 65536, 131072, 131072, 512, 2048, 0, 262144, 0, 0, 0, 0, 0, 0, 0 };
     char temp[256];
     XCHAR wname[280];
-	XCHAR wname2[280];
+    XCHAR wname2[280];
     u64 flags;
     FIL in,out;
     UINT ts;
 
     flags = 0;
 
-	if(gSdMounted)
-	{
+    if(gSdMounted)
+    {
         c2wstrcpy(wname2, "/menu/n64/save/last.run");
         if(f_open(&in, wname2, FA_OPEN_EXISTING | FA_READ) == FR_OK)
-		{
-			f_read(&in,&flags,8,&ts);
+        {
+            f_read(&in,&flags,8,&ts);
             f_read(&in,wname,280*2,&ts);
-			f_close(&in);
+            f_close(&in);
             neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
-		}
-		else
-		{
-			//oops
-			return;
-		}
-	}
-	else
-	{
-		neo_copyfrom_sram(temp, 0x3FE00, 256);
-		neo_copyfrom_sram(&flags, 0x3FF00, 8);
-		neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
+        }
+        else
+        {
+            //oops
+            return;
+        }
+    }
+    else
+    {
+        neo_copyfrom_sram(temp, 0x3FE00, 256);
+        neo_copyfrom_sram(&flags, 0x3FF00, 8);
+        neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
 
-		if ((flags & 0xFFFFFF00) != 0xAA550100)
-		{
-		    neo2_enable_sd();
-		    getSDInfo(-1);
-		    neo2_disable_sd();
-		    return; // auto-save sram not needed
-		}
-	}
+        if ((flags & 0xFFFFFF00) != 0xAA550100)
+        {
+            neo2_enable_sd();
+            getSDInfo(-1);
+            neo2_disable_sd();
+            return; // auto-save sram not needed
+        }
+    }
 
     switch(flags & 15)
     {
@@ -2195,23 +2895,23 @@ void saveSaveState()
     if(gSdMounted)
     {
         if(f_force_open(&out,wname,FA_CREATE_ALWAYS | FA_WRITE,64) == 0)
-		{
-		    char temp[512];
+        {
+            char temp[512];
 
-			w2cstrcpy(temp,wname);
-			debugText("Couldn't open file: ", 2, 2, 0);
-			debugText(temp, 4, 8, 500);
-			return;
-		}
+            w2cstrcpy(temp,wname);
+            debugText("Couldn't open file: ", 2, 2, 0);
+            debugText(temp, 4, 8, 500);
+            return;
+        }
 
         f_write(&out,tmpBuf,ssize[flags & 15], &ts);
         f_close(&out);
-		f_unlink(wname2);
+        f_unlink(wname2);
         neo2_disable_sd();
         neo2_enable_sd();
         getSDInfo(-1);
     }
-	else
+    else
     {
         // no SD card, use GBA SRAM
         u8 blk[32];
@@ -2249,9 +2949,9 @@ void saveSaveState()
         else
             neo_copyto_sram(tmpBuf, soffs[ix], ssize[flags & 15]);
 
-		// turn off auto-save
-		flags = 0;
-		neo_copyto_sram(&flags, 0x3FF00, 8);
+        // turn off auto-save
+        flags = 0;
+        neo_copyto_sram(&flags, 0x3FF00, 8);
     }
 }
 
@@ -2865,7 +3565,7 @@ int main(void)
 
     gPsramMode = 0;
     gSdMounted = 0;
-	disk_io_force_wdl = 0;
+    disk_io_force_wdl = 0;
 
     gBootCic = get_cic((unsigned char *)0xB0000040);
     gCpldVers = neo_get_cpld();         // get Myth CPLD ID
@@ -2910,7 +3610,7 @@ int main(void)
 #endif
 #endif
 
-	disk_io_set_mode(0,0);
+    disk_io_set_mode(0,0);
 
 #ifndef RUN_FROM_SD
     // check for boot rom on SD card
@@ -2982,37 +3682,37 @@ int main(void)
 #endif
 
 #ifdef HW_SELF_TEST
-	{
-		srand(0);
-		int i,j;
+    {
+        srand(0);
+        int i,j;
 
-		for(i = 0;i<384;i++)
-		{
-			buttons = getButtons(0);
+        for(i = 0;i<384;i++)
+        {
+            buttons = getButtons(0);
 
-			if( (TL_BUTTON(buttons)) && (TR_BUTTON(buttons)) && (Z_BUTTON(buttons)) )
-			{
-				hw_self_test();
-				break;
-			}
+            if( (TL_BUTTON(buttons)) && (TR_BUTTON(buttons)) && (Z_BUTTON(buttons)) )
+            {
+                hw_self_test();
+                break;
+            }
 
-			for(j = 0;j<32;j++)
-			{
-				asm("nop\n");
-			}
-		}
-	}
+            for(j = 0;j<32;j++)
+            {
+                asm("nop\n");
+            }
+        }
+    }
 #endif
 
-	if(gSdMounted == 0)
-	{
-		neo2_enable_sd();
-		bmax = getSDInfo(-1);
-	}
-	else
-	{
-		bmax = 0;
-	}
+    if(gSdMounted == 0)
+    {
+        neo2_enable_sd();
+        bmax = getSDInfo(-1);
+    }
+    else
+    {
+        bmax = 0;
+    }
 
     if (bmax)
     {
@@ -3058,7 +3758,7 @@ int main(void)
         delay(120);
     }
 
-	saveSaveState();
+    saveSaveState();
     neo_select_game();
 
     if ((back_flags & 0xFFFFF000) == 0xAA550000)
@@ -3207,18 +3907,32 @@ int main(void)
                 printText(dcon, temp, 4, 14);
                 sprintf(temp, "Size: %3d", (gTable[bselect].options[3]<<8) | gTable[bselect].options[4]);
                 printText(dcon, temp, 4, 15);
-                graphics_set_color(osel ? gTextColors.usel_option : gTextColors.sel_option, 0);
+                graphics_set_color((osel == 0) ? gTextColors.sel_option : gTextColors.usel_option, 0);
                 sprintf(temp, "Save: %s", ostr[0][gTable[bselect].options[5]]);
                 printText(dcon, temp, 4, 16);
-                graphics_set_color(osel ? gTextColors.sel_option : gTextColors.usel_option, 0);
+                graphics_set_color((osel == 1) ? gTextColors.sel_option : gTextColors.usel_option, 0);
                 sprintf(temp, "CIC: %s", ostr[1][gTable[bselect].options[6]]);
                 printText(dcon, temp, 4, 17);
+                graphics_set_color((osel == 2) ? gTextColors.sel_option : gTextColors.usel_option, 0);
+                if (gTable[bselect].cheats)
+                {
+                    sprintf(temp, "Cheats: %s", !gCheats ? "Off" : (gCheats == 1) ? "Select" : "All");
+                    printText(dcon, temp, 4, 18);
+                }
 
                 // do boxart
                 if (boxes[ix] != cart)
                     get_boxart(brwsr, bselect);
                 graphics_draw_sprite(dcon, 184, 112, (sprite_t*)&boxart[ix*14984]);
             }
+
+            if ((gTable[bselect].type == 254) || (gTable[bselect].type == 253))
+            {
+                graphics_set_color(gTextColors.usel_option, 0);
+                sprintf(temp, "Emulated Game: %s", (gTable[bselect].type == 254) ? "NES" : (gTable[bselect].type == 253) ? "GameGear" : "Unknown" );
+                printText(dcon, temp, 4, 14);
+            }
+
         }
 
         // show cart info help messages
@@ -3255,6 +3969,7 @@ int main(void)
                 if (bstart < 0)
                     bstart = 0;
             }
+            gCheats = 0;
             btout = 60;
             delay(7);
         }
@@ -3273,6 +3988,7 @@ int main(void)
                 if (bstart < 0)
                     bstart = 0;
             }
+            gCheats = 0;
             btout = 60;
             delay(15);
         }
@@ -3288,6 +4004,7 @@ int main(void)
             {
                 bstart += 10;
             }
+            gCheats = 0;
             btout = 60;
             delay(7);
         }
@@ -3303,6 +4020,7 @@ int main(void)
             {
                 bstart += 10;
             }
+            gCheats = 0;
             btout = 60;
             delay(15);
         }
@@ -3330,6 +4048,7 @@ int main(void)
                 }
                 saveBrowserFlags(brwsr, bopt, bfill);
             }
+            gCheats = 0;
             btout = 60;
         }
 
@@ -3357,6 +4076,7 @@ int main(void)
                         // enter sub-directory
                         bmax = getSDInfo(bselect);
                         bselect = bstart = 0;
+                        gCheats = 0;
                     }
                     else
                     {
@@ -3367,8 +4087,11 @@ int main(void)
                         }
                         if (gTable[bselect].type == 254)
                             loadNES2Psram(bselect, bfill);
+                        else if (gTable[bselect].type == 253)
+                            loadGG2Psram(bselect, bfill);
                         else
                             copySD2Psram(bselect, bfill);
+                        get_sd_cheats(bselect, bfill);
                         loadSaveState(bselect, bfill);
                         neo_run_psram(gTable[bselect].options, 1);
                     }
@@ -3402,6 +4125,7 @@ int main(void)
                         // enter sub-directory
                         bmax = getSDInfo(bselect);
                         bselect = bstart = 0;
+                        gCheats = 0;
                     }
                     else
                     {
@@ -3412,8 +4136,11 @@ int main(void)
                         }
                         if (gTable[bselect].type == 254)
                             loadNES2Psram(bselect, bfill);
+                        else if (gTable[bselect].type == 253)
+                            loadGG2Psram(bselect, bfill);
                         else
                             copySD2Psram(bselect, bfill);
+                        get_sd_cheats(bselect, bfill);
                         loadSaveState(bselect, bfill);
                         neo_run_psram(gTable[bselect].options, 0);
                     }
@@ -3437,29 +4164,59 @@ int main(void)
 
         if (bopt == 1)
         {
-            if (CR_BUTTON(buttons ^ previous))
+            if (osel < 2)
             {
-                // CR changed
-                if (!CR_BUTTON(buttons))
-                    gTable[bselect].options[5+osel] = onext[osel][gTable[bselect].options[5+osel]];
+                if (CR_BUTTON(buttons ^ previous))
+                {
+                    // CR changed
+                    if (!CR_BUTTON(buttons))
+                        gTable[bselect].options[5+osel] = onext[osel][gTable[bselect].options[5+osel]];
+                }
+                if (CL_BUTTON(buttons ^ previous))
+                {
+                    // CL changed
+                    if (!CL_BUTTON(buttons))
+                        gTable[bselect].options[5+osel] = oprev[osel][gTable[bselect].options[5+osel]];
+                }
+                if (CU_BUTTON(buttons ^ previous))
+                {
+                    // CU changed
+                    if (!CU_BUTTON(buttons))
+                        osel = (osel > 0) ? osel - 1 : 2;
+                }
+                if (CD_BUTTON(buttons ^ previous))
+                {
+                    // CD changed
+                    if (!CD_BUTTON(buttons))
+                        osel += 1;
+                }
             }
-            if (CL_BUTTON(buttons ^ previous))
+            else
             {
-                // CL changed
-                if (!CL_BUTTON(buttons))
-                    gTable[bselect].options[5+osel] = oprev[osel][gTable[bselect].options[5+osel]];
-            }
-            if (CU_BUTTON(buttons ^ previous))
-            {
-                // CU changed
-                if (!CU_BUTTON(buttons))
-                    osel ^=1;
-            }
-            if (CD_BUTTON(buttons ^ previous))
-            {
-                // CD changed
-                if (!CD_BUTTON(buttons))
-                    osel ^=1;
+                if (CR_BUTTON(buttons ^ previous))
+                {
+                    // CR changed
+                    if (!CR_BUTTON(buttons))
+                        gCheats = (gCheats < 2) ? gCheats + 1 : 0;
+                }
+                if (CL_BUTTON(buttons ^ previous))
+                {
+                    // CL changed
+                    if (!CL_BUTTON(buttons))
+                        gCheats = (gCheats > 0) ? gCheats - 1 : 2;
+                }
+                if (CU_BUTTON(buttons ^ previous))
+                {
+                    // CU changed
+                    if (!CU_BUTTON(buttons))
+                        osel = 1;
+                }
+                if (CD_BUTTON(buttons ^ previous))
+                {
+                    // CD changed
+                    if (!CD_BUTTON(buttons))
+                        osel = 0;
+                }
             }
         }
 
@@ -3510,30 +4267,30 @@ const int hw_self_test_dbg_scr_y_max = 240/8;
 
 void hw_self_test_follow(const char* msg,int dl)
 {
-	hw_self_test_dbg_scr_y = (hw_self_test_dbg_scr_y > hw_self_test_dbg_scr_y_max) ? 0 : hw_self_test_dbg_scr_y;
-	debugText(msg,hw_self_test_dbg_scr_x,hw_self_test_dbg_scr_y++,dl);
+    hw_self_test_dbg_scr_y = (hw_self_test_dbg_scr_y > hw_self_test_dbg_scr_y_max) ? 0 : hw_self_test_dbg_scr_y;
+    debugText(msg,hw_self_test_dbg_scr_x,hw_self_test_dbg_scr_y++,dl);
 }
 
 void hw_self_test_gen_pattern32(unsigned char* dst,int size,int* dir)
 {
-	int f = *dir;
-	unsigned char m;
+    int f = *dir;
+    unsigned char m;
 
-	m = (f) ? 0x80 : 0;
+    m = (f) ? 0x80 : 0;
 
-	while(--size)
-	{
-		if(f)
-			dst[0]++;
-		else
-			dst[0]--;
+    while(--size)
+    {
+        if(f)
+            dst[0]++;
+        else
+            dst[0]--;
 
-		dst[0] |= (m--);
-		f ^= 1;
-		++dst;
-	}
+        dst[0] |= (m--);
+        f ^= 1;
+        ++dst;
+    }
 
-	*dir = f;
+    *dir = f;
 }
 
 //http://en.literateprograms.org/Mersenne_twister_%28C%29
@@ -3550,9 +4307,9 @@ void mt_init(unsigned int* mt_buffer,int* mt_index)
 {
     int i;
     for (i = 0; i < MT_LEN; i++)
-	{
+    {
         mt_buffer[i] = (unsigned int)rand();
-	}
+    }
     *mt_index = 0;
 }
 
@@ -3583,292 +4340,292 @@ unsigned int mt_random(unsigned int* mt_buffer,int* mt_index)
     return *(unsigned int *)((unsigned char *)b + idx);
 }
 
-void hw_self_test_sram_read(int onboard)											//compare previous write
+void hw_self_test_sram_read(int onboard)                                            //compare previous write
 {
-	int sram_size = (1+onboard) * (128 * 1024);
-	const int block_size = 128 * 1024;
-	unsigned char* a = &tmpBuf[0];
-	unsigned char* b = &tmpBuf[block_size];
-	int dir;
-	int addr;
+    int sram_size = (1+onboard) * (128 * 1024);
+    const int block_size = 128 * 1024;
+    unsigned char* a = &tmpBuf[0];
+    unsigned char* b = &tmpBuf[block_size];
+    int dir;
+    int addr;
 
-	hw_self_test_follow((onboard) ? "Checking ONBOARD SRAM..." : "Checking NEO2 SRAM..." ,0);
-	hw_self_test_follow(" ",0);
+    hw_self_test_follow((onboard) ? "Checking ONBOARD SRAM..." : "Checking NEO2 SRAM..." ,0);
+    hw_self_test_follow(" ",0);
 
-	if(onboard)
-	{
-		for(dir = 0,addr = 0;addr < sram_size; addr += block_size)
-		{
-			hw_self_test_gen_pattern32(a,block_size,&dir);
-			neo_copyfrom_nsram((void*)b,addr,block_size,8);
+    if(onboard)
+    {
+        for(dir = 0,addr = 0;addr < sram_size; addr += block_size)
+        {
+            hw_self_test_gen_pattern32(a,block_size,&dir);
+            neo_copyfrom_nsram((void*)b,addr,block_size,8);
 
-			if(memcmp(a,b,block_size) != 0)
-			{
-				hw_self_test_follow("FAILED!",0);
-				return;
-			}
-		}
-	}
-	else
-	{
-		int error = 0;
-		dir = 0;
-		hw_self_test_gen_pattern32(a,128*1024,&dir);
-		neo_copyfrom_sram(b,0,65536);
-		if(memcmp(a,b,64*1024) != 0)
-		{
-			graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
-			hw_self_test_follow("1/2 BLOCK FAILED!",0);
-			error = 1;
-		}
-		else
-		{
-			graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
-			hw_self_test_follow("1/2 BLOCK PASSED!",0);
-		}
+            if(memcmp(a,b,block_size) != 0)
+            {
+                hw_self_test_follow("FAILED!",0);
+                return;
+            }
+        }
+    }
+    else
+    {
+        int error = 0;
+        dir = 0;
+        hw_self_test_gen_pattern32(a,128*1024,&dir);
+        neo_copyfrom_sram(b,0,65536);
+        if(memcmp(a,b,64*1024) != 0)
+        {
+            graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
+            hw_self_test_follow("1/2 BLOCK FAILED!",0);
+            error = 1;
+        }
+        else
+        {
+            graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+            hw_self_test_follow("1/2 BLOCK PASSED!",0);
+        }
 
-		neo_copyfrom_sram(&b[65536],65536,65536);
-		neo_copyfrom_sram(&b[(128*1024)-16],0x3FFF0,16); // "fix" for sram quirk
-		if(memcmp(&a[64*1024],&b[64*1024],64*1024) != 0)
-		{
-			graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
-			hw_self_test_follow("2/2 BLOCK FAILED!",0);
-			graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-			return;
-		}
-		else
-		{
-			graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
-			hw_self_test_follow("2/2 BLOCK PASSED!",0);
-		}
+        neo_copyfrom_sram(&b[65536],65536,65536);
+        neo_copyfrom_sram(&b[(128*1024)-16],0x3FFF0,16); // "fix" for sram quirk
+        if(memcmp(&a[64*1024],&b[64*1024],64*1024) != 0)
+        {
+            graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
+            hw_self_test_follow("2/2 BLOCK FAILED!",0);
+            graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+            return;
+        }
+        else
+        {
+            graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+            hw_self_test_follow("2/2 BLOCK PASSED!",0);
+        }
 
-		graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+        graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 
-		if(error)
-		{
-			return;
-		}
-	}
+        if(error)
+        {
+            return;
+        }
+    }
 
-	hw_self_test_follow("PASSED!",0);
+    hw_self_test_follow("PASSED!",0);
 }
 
-void hw_self_test_sram_write(int onboard)											//write and compare later (To test battery)
+void hw_self_test_sram_write(int onboard)                                           //write and compare later (To test battery)
 {
-	int sram_size = (1+onboard) * (128 * 1024);
-	const int block_size = 128 * 1024;
-	unsigned char* a = &tmpBuf[0];
-	int dir,addr;
+    int sram_size = (1+onboard) * (128 * 1024);
+    const int block_size = 128 * 1024;
+    unsigned char* a = &tmpBuf[0];
+    int dir,addr;
 
-	hw_self_test_follow((onboard) ? "Preparing ONBOARD SRAM..." : "Preparing NEO2 SRAM...",0);
-	hw_self_test_follow(" ",0);
+    hw_self_test_follow((onboard) ? "Preparing ONBOARD SRAM..." : "Preparing NEO2 SRAM...",0);
+    hw_self_test_follow(" ",0);
 
-	if(onboard)
-	{
-		for(dir = 0,addr = 0;addr < sram_size;addr += block_size)
-		{
-			hw_self_test_gen_pattern32(a,block_size,&dir);
-			neo_copyto_nsram((void*)a,addr,block_size,8);
-		}
-	}
-	else
-	{
-		dir = 0;
-		hw_self_test_gen_pattern32(a,128*1024,&dir);
-		neo_copyto_sram(a,0,65536);
-		neo_copyto_sram(&a[65536],65536,65536);
-		neo_copyto_sram(&a[(128*1024)-16],0x3FFF0,16); // "fix" for sram quirk
-	}
+    if(onboard)
+    {
+        for(dir = 0,addr = 0;addr < sram_size;addr += block_size)
+        {
+            hw_self_test_gen_pattern32(a,block_size,&dir);
+            neo_copyto_nsram((void*)a,addr,block_size,8);
+        }
+    }
+    else
+    {
+        dir = 0;
+        hw_self_test_gen_pattern32(a,128*1024,&dir);
+        neo_copyto_sram(a,0,65536);
+        neo_copyto_sram(&a[65536],65536,65536);
+        neo_copyto_sram(&a[(128*1024)-16],0x3FFF0,16); // "fix" for sram quirk
+    }
 
-	graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
-	hw_self_test_follow("FINISHED!",0);
-	graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+    graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+    hw_self_test_follow("FINISHED!",0);
+    graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 }
 
 volatile int hw_self_test_long_cmp(void* a,void* b,int c)
 {
-	asm(
-			".set	push\n"
-			".set	noreorder\n"
-			"addu	$t0,$a0,$a2\n"
-			"0:\n"
-			"lw		$t1,($a0)\n"
-			"lw		$t2,($a1)\n"
-			"bne	$t1,$t2,1f\n"
-			"addiu	$a0,$a0,4\n"
-			"bne	$a0,$t0,0b\n"
-			"addiu	$a1,$a1,4\n"
-			"jr		$ra\n"
-			"addi	$v0,$zero,1\n"
-			"1:\n"
-			"jr		$ra\n"
-			"add	$v0,$zero,$zero\n"
-			".set pop\n"
-		);
+    asm(
+            ".set   push\n"
+            ".set   noreorder\n"
+            "addu   $t0,$a0,$a2\n"
+            "0:\n"
+            "lw     $t1,($a0)\n"
+            "lw     $t2,($a1)\n"
+            "bne    $t1,$t2,1f\n"
+            "addiu  $a0,$a0,4\n"
+            "bne    $a0,$t0,0b\n"
+            "addiu  $a1,$a1,4\n"
+            "jr     $ra\n"
+            "addi   $v0,$zero,1\n"
+            "1:\n"
+            "jr     $ra\n"
+            "add    $v0,$zero,$zero\n"
+            ".set pop\n"
+        );
 
-	return 0;	//remove warnings
+    return 0;   //remove warnings
 }
 
 void hw_self_test_zipram_block(int* m_idx,unsigned int* stack,int check_top)
 {
-	unsigned char* a = &tmpBuf[0];
-	unsigned char* b = &tmpBuf[128*1024];
-	unsigned int* c;
-	int i,j;
+    unsigned char* a = &tmpBuf[0];
+    unsigned char* b = &tmpBuf[128*1024];
+    unsigned int* c;
+    int i,j;
 
-	for(j = 0;j < (16*1024*1024);j += 128*1024)
-	{
-		for(i = 0;i < 128 * 1024;i += 16)
-		{
-			c = (unsigned int*)&a[i];
-			c[0] = mt_random(stack,m_idx) + gTicks;
-			c[1] = mt_random(stack,m_idx) - gTicks;
-			c[2] = mt_random(stack,m_idx) + gTicks;
-			c[3] = mt_random(stack,m_idx) - gTicks;
-		}
+    for(j = 0;j < (16*1024*1024);j += 128*1024)
+    {
+        for(i = 0;i < 128 * 1024;i += 16)
+        {
+            c = (unsigned int*)&a[i];
+            c[0] = mt_random(stack,m_idx) + gTicks;
+            c[1] = mt_random(stack,m_idx) - gTicks;
+            c[2] = mt_random(stack,m_idx) + gTicks;
+            c[3] = mt_random(stack,m_idx) - gTicks;
+        }
 
-		neo_copyto_psram(a,j,128*1024);
-		neo_copyfrom_psram(b,j,128*1024);
+        neo_copyto_psram(a,j,128*1024);
+        neo_copyfrom_psram(b,j,128*1024);
 
-		if(!hw_self_test_long_cmp(a,b,128*1024))
-		{
-			graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
-			hw_self_test_follow("BLOCK FAILED!",0);
-			graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-			return;
-		}
+        if(!hw_self_test_long_cmp(a,b,128*1024))
+        {
+            graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
+            hw_self_test_follow("BLOCK FAILED!",0);
+            graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+            return;
+        }
 
-		if(!check_top)
-		{
-			continue;
-		}
+        if(!check_top)
+        {
+            continue;
+        }
 
-		neo_psram_offset(0);
-		neo_copyfrom_psram(b,j,128*1024);
-		if(hw_self_test_long_cmp(a,b,128*1024))
-		{
-			graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
-			hw_self_test_follow("MIRRORING DETECTED!",0);
-			graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-			return;
-		}
-		neo_psram_offset((16*1024*1024) / (32*1024));
-	}
+        neo_psram_offset(0);
+        neo_copyfrom_psram(b,j,128*1024);
+        if(hw_self_test_long_cmp(a,b,128*1024))
+        {
+            graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
+            hw_self_test_follow("MIRRORING DETECTED!",0);
+            graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+            return;
+        }
+        neo_psram_offset((16*1024*1024) / (32*1024));
+    }
 
-	graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
-	hw_self_test_follow("BLOCK PASSED!",0);
-	graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+    graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+    hw_self_test_follow("BLOCK PASSED!",0);
+    graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 }
 
 void hw_self_test()
 {
-	int tst,ix;
-	display_context_t ctx;
+    int tst,ix;
+    display_context_t ctx;
 
-	hw_self_test_dbg_scr_x = 5;
-	hw_self_test_dbg_scr_y = 20;
+    hw_self_test_dbg_scr_x = 5;
+    hw_self_test_dbg_scr_y = 20;
 
     neo2_enable_sd();
     ix = getSDInfo(-1);
-	if(!ix){delay(200);}
+    if(!ix){delay(200);}
 
-	ctx = lockVideo(1);
-	graphics_fill_screen(ctx,0);
-	unlockVideo(ctx);
+    ctx = lockVideo(1);
+    graphics_fill_screen(ctx,0);
+    unlockVideo(ctx);
 
-	graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
-	hw_self_test_follow("Would you like to test the cart?",0);
-	graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
-	hw_self_test_follow("A => YES , B => NO",0);
-	graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+    graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+    hw_self_test_follow("Would you like to test the cart?",0);
+    graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
+    hw_self_test_follow("A => YES , B => NO",0);
+    graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
 
-	if(0 == wait_confirm())
-	{
-		goto hw_self_test_finished;
-	}
+    if(0 == wait_confirm())
+    {
+        goto hw_self_test_finished;
+    }
 
-	ctx = lockVideo(1);
-	graphics_fill_screen(ctx,0);
-	unlockVideo(ctx);
+    ctx = lockVideo(1);
+    graphics_fill_screen(ctx,0);
+    unlockVideo(ctx);
 
-	graphics_set_color(graphics_make_color(0x33,0x66, 0xff, 0xff), 0);
-	hw_self_test_dbg_scr_x = 8;
-	hw_self_test_dbg_scr_y = 3;
-	hw_self_test_follow("**N64 MYTH HW SELF TEST**",0);
-	hw_self_test_dbg_scr_y = 5;
-	hw_self_test_dbg_scr_x = 4;
+    graphics_set_color(graphics_make_color(0x33,0x66, 0xff, 0xff), 0);
+    hw_self_test_dbg_scr_x = 8;
+    hw_self_test_dbg_scr_y = 3;
+    hw_self_test_follow("**N64 MYTH HW SELF TEST**",0);
+    hw_self_test_dbg_scr_y = 5;
+    hw_self_test_dbg_scr_x = 4;
 
-	graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
-	hw_self_test_follow("A => TEST ZIPRAM , B => TEST SRAM",0);
-	graphics_set_color(graphics_make_color(0x66,0xff, 0x33, 0xff), 0);
-	tst = wait_confirm();
-	hw_self_test_follow(" ",0);
+    graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
+    hw_self_test_follow("A => TEST ZIPRAM , B => TEST SRAM",0);
+    graphics_set_color(graphics_make_color(0x66,0xff, 0x33, 0xff), 0);
+    tst = wait_confirm();
+    hw_self_test_follow(" ",0);
 
-	if(0 == tst)
-	{
-		hw_self_test_follow(">>TEST SRAM",0);
-		hw_self_test_follow(" ",0);
-		graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
-		hw_self_test_follow("A => READ , B => WRITE",0);
-		hw_self_test_follow(" ",0);
-		tst = wait_confirm();
-		graphics_set_color(graphics_make_color(0x66,0xff, 0xff, 0xff), 0);
-		hw_self_test_follow("A => ONBOARD SRAM , B => NEO2 SRAM",0);
-		graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-		if(tst)
-		{
-		 	hw_self_test_sram_read(wait_confirm());
-		}
-		else
-		{
-			hw_self_test_sram_write(wait_confirm());
-		}
-	}
-	else
-	{
-		int m_idx;
-		unsigned int stack[MT_LEN];
+    if(0 == tst)
+    {
+        hw_self_test_follow(">>TEST SRAM",0);
+        hw_self_test_follow(" ",0);
+        graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
+        hw_self_test_follow("A => READ , B => WRITE",0);
+        hw_self_test_follow(" ",0);
+        tst = wait_confirm();
+        graphics_set_color(graphics_make_color(0x66,0xff, 0xff, 0xff), 0);
+        hw_self_test_follow("A => ONBOARD SRAM , B => NEO2 SRAM",0);
+        graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+        if(tst)
+        {
+            hw_self_test_sram_read(wait_confirm());
+        }
+        else
+        {
+            hw_self_test_sram_write(wait_confirm());
+        }
+    }
+    else
+    {
+        int m_idx;
+        unsigned int stack[MT_LEN];
 
-		hw_self_test_follow(">>TEST ZIP RAM",0);
-		hw_self_test_follow(" ",0);
-		mt_init(stack,&m_idx);
-		data_cache_writeback_invalidate(stack,MT_LEN);
-		graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-		hw_self_test_follow("TESTING BLOCK 0-16MB",0);
-		neo_psram_offset(0);
-		hw_self_test_zipram_block(&m_idx,stack,0);
-		hw_self_test_follow(" ",0);
-		hw_self_test_follow("TESTING BLOCK 16-32MB",0);
-		neo_psram_offset((16*1024*1024) / (32*1024));
-		hw_self_test_zipram_block(&m_idx,stack,1);
-		#if 0
-		hw_self_test_follow(" ",0);
-		hw_self_test_follow("TESTING BANK2..",0);
-		hw_self_test_follow(" ",0);
-		hw_self_test_follow("TESTING BLOCK 32-48MB",0);
-		neo_psram_offset((32*1024*1024) / (32*1024));
-		hw_self_test_zipram_block(&m_idx,stack);
-		hw_self_test_follow(" ",0);
-		hw_self_test_follow("TESTING BLOCK 48-64MB",0);
-		neo_psram_offset((48*1024*1024) / (32*1024));
-		hw_self_test_zipram_block(&m_idx,stack);
-		#endif
-		neo_psram_offset(0);
-	}
+        hw_self_test_follow(">>TEST ZIP RAM",0);
+        hw_self_test_follow(" ",0);
+        mt_init(stack,&m_idx);
+        data_cache_writeback_invalidate(stack,MT_LEN);
+        graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+        hw_self_test_follow("TESTING BLOCK 0-16MB",0);
+        neo_psram_offset(0);
+        hw_self_test_zipram_block(&m_idx,stack,0);
+        hw_self_test_follow(" ",0);
+        hw_self_test_follow("TESTING BLOCK 16-32MB",0);
+        neo_psram_offset((16*1024*1024) / (32*1024));
+        hw_self_test_zipram_block(&m_idx,stack,1);
+        #if 0
+        hw_self_test_follow(" ",0);
+        hw_self_test_follow("TESTING BANK2..",0);
+        hw_self_test_follow(" ",0);
+        hw_self_test_follow("TESTING BLOCK 32-48MB",0);
+        neo_psram_offset((32*1024*1024) / (32*1024));
+        hw_self_test_zipram_block(&m_idx,stack);
+        hw_self_test_follow(" ",0);
+        hw_self_test_follow("TESTING BLOCK 48-64MB",0);
+        neo_psram_offset((48*1024*1024) / (32*1024));
+        hw_self_test_zipram_block(&m_idx,stack);
+        #endif
+        neo_psram_offset(0);
+    }
 
-	hw_self_test_follow(" ",0);
-	hw_self_test_follow("Job finished!",0);
-	graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
-	hw_self_test_follow("Press B to exit",0);
-	while(wait_confirm()){}
+    hw_self_test_follow(" ",0);
+    hw_self_test_follow("Job finished!",0);
+    graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
+    hw_self_test_follow("Press B to exit",0);
+    while(wait_confirm()){}
 
-	hw_self_test_finished:
-	graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-	neo2_disable_sd();
-	gSdMounted = 0;
-	ctx = lockVideo(1);
-	graphics_fill_screen(ctx,0);
-	unlockVideo(ctx);
+    hw_self_test_finished:
+    graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+    neo2_disable_sd();
+    gSdMounted = 0;
+    ctx = lockVideo(1);
+    graphics_fill_screen(ctx,0);
+    unlockVideo(ctx);
 }
 #endif
 
