@@ -4592,10 +4592,14 @@ void hw_self_test()
         data_cache_writeback_invalidate(stack,MT_LEN);
         graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
         hw_self_test_follow("TESTING BLOCK 0-16MB",0);
+        gPsramMode = 0;
+        neo_select_psram(); // make sure psram is in right mode for test
         neo_psram_offset(0);
         hw_self_test_zipram_block(&m_idx,stack,0);
         hw_self_test_follow(" ",0);
         hw_self_test_follow("TESTING BLOCK 16-32MB",0);
+        gPsramMode = 1;
+        neo_select_psram(); // make sure psram is in right mode for test
         neo_psram_offset((16*1024*1024) / (32*1024));
         hw_self_test_zipram_block(&m_idx,stack,1);
         #if 0
@@ -4610,6 +4614,8 @@ void hw_self_test()
         neo_psram_offset((48*1024*1024) / (32*1024));
         hw_self_test_zipram_block(&m_idx,stack);
         #endif
+        gPsramMode = 0;
+        neo_select_psram();
         neo_psram_offset(0);
     }
 
@@ -4628,4 +4634,3 @@ void hw_self_test()
     unlockVideo(ctx);
 }
 #endif
-
