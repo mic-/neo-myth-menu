@@ -395,8 +395,6 @@ _neo_asic_cmd:
         bsr.b   _neo_asic_op
         /* do ASIC command */
         move.l  (sp)+,d0
-|       bsr.b   _neo_asic_op
-|       moveq   #0,d0
         /* fall into _neo_asic_op for last operation */
 
 | do a Neo Flash ASIC operation
@@ -418,13 +416,36 @@ _neo_asic_op:
         move.w  (a0),d0                 /* access the flash space to do the operation */
         rts
 
+| do a Neo Flash ASIC write operation
+| entry: d0 = address
+|        d1 = write data
+|        a1 = hardware base (0xA10000)
+_neo_asic_wop:
+        movea.l d1,a0                   /* save write data */
+        move.l  d0,d1
+        rol.l   #8,d1
+        andi.w  #0x000F,d1              /* keep b27-24 */
+        move.w  d1,GBAC_HIO(a1)         /* set high bank select reg (holds flash space A27-A24) */
+        rol.l   #8,d1
+        andi.w  #0x00F8,d1              /* keep b23-19, b18-16 = 0 */
+        move.w  d1,GBAC_LIO(a1)         /* set low bank select reg (holds flash space A23-A16) */
+        move.l  a0,d1                   /* restore write data */
+        andi.l  #0x0007FFFF,d0          /* b23-19 = 0, keep b18-b0 */
+        add.l   d0,d0                   /* 68000 A19-A1 = b18-b0 */
+        movea.l d0,a0
+        move.w  d1,(a0)                 /* write access to flash space */
+        rts
+
 | select Neo Flash Game Flash ROM
 | allows you to access the game flash via flash space
 | entry: a1 = hardware base (0xA10000)
 _neo_select_game:
+        tst.b   neo_3
+        bne     5f                      /* Neo3 */
         move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
 
         move.l  #0x00370203,d0
+        or.w    neo_mode,d0             /* enable/disable SD card interface */
         bsr     _neo_asic_cmd           /* set cr = select game flash */
         cmpi.b  #0,gCardType
         bne.b   1f
@@ -442,24 +463,23 @@ _neo_select_game:
 3:
         bsr     _neo_asic_cmd           /* set iosr = enable game flash */
 4:
-        .ifdef NEO3
-        move.l  #0x00AA55F0,d0
-        .else
         move.l  #0x00EE0630,d0
-        .endif
-
         bsr     _neo_asic_cmd           /* set cr1 = enable extended address bus */
+
         move.w  #0xFFFF,EXTM_ON(a1)     /* enable extended address bus */
         move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
         move.w  #0x00F0,PRAM_ZIO(a1)    /* psram bank size = 2MB */
         move.w  #0x0006,WE_IO(a1)       /* map bank 7, write enable myth psram */
         move.w  #0x0007,OPTION_IO(a1)   /* set mode 7 (copy mode) */
+5:
         rts
 
 | select Neo Flash PSRAM
 | allows you to access the flash card's psram via flash space
 | entry: a1 = hardware base (0xA10000)
 _neo_select_psram:
+        tst.b   neo_3
+        bne     1f                      /* no psram on Neo3! */
         move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
         move.w  #0x0707,WE_IO(a1)       /* map bank 7, write enable myth psram & flash psram, set SYS */
 
@@ -480,6 +500,7 @@ _neo_select_psram:
         move.w  #0x00F0,PRAM_ZIO(a1)    /* psram bank size = 2MB */
         move.w  #0x0707,WE_IO(a1)       /* map bank 7, write enable myth psram & flash psram, set SYS */
         move.w  #0x0707,OPTION_IO(a1)   /* set mode 7 (copy mode) */
+1:
         rts
 
 | select Neo Flash Menu Flash ROM
@@ -581,7 +602,7 @@ _neo_set_sram:
 
         cmpi.l  #0x02000,d1
         bhi.b   1f
-|        andi.w  #0x000F,d0              /* 16 banks per 64KB sram */
+|       andi.w  #0x000F,d0              /* 16 banks per 64KB sram */
         andi.w  #0x0007,d0              /* 8 banks since banks cannot be 4KB */
         move.w  #0x001F,d1              /* 64 Kbit space */
         lsr.w   #3,d2                   /* 64 KB bank # */
@@ -624,7 +645,7 @@ _neo_set_sram:
         move.w  #0x00E0,d0
         swap    d0
         move.w  d2,d0
-|        beq.b   8f
+|       beq.b   8f
         bsr     _neo_asic_cmd           /* set sram bank offset */
         move.w  #0x0000,GBAC_LIO(a1)    /* clear low bank select reg */
         move.w  #0x0000,GBAC_HIO(a1)    /* clear high bank select reg */
@@ -641,6 +662,8 @@ _neo_enable_id:
         move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
         move.l  #0x00903500,d0
         bsr     _neo_asic_cmd           /* enable ID */
+        move.w  #0x0000,GBAS_BIO(a1)    /* set the neo myth sram bank register */
+        move.w  #0x0010,GBAS_ZIO(a1)    /* set the neo myth sram bank size to 1Mb */
         move.w  #0x0001,OPTION_IO(a1)   /* mode 1 - 16Mbit PSRAM + sram */
         rts
 
@@ -706,6 +729,7 @@ neo_check_card:
         lea     0xA10000,a1
         bsr     _neo_enable_id
         lea     0x200000,a0             /* sram space */
+
         /* check for MAGIC signature */
         cmp.b   #0x34,1(a0)
         bne.b   1f                      /* error, Neo2/3 GBA flash card not found */
@@ -717,6 +741,10 @@ neo_check_card:
         bne.b   1f                      /* error, Neo2/3 GBA flash card not found */
 |       cmp.b   #0xF6,9(a0)
 |       bne.b   1f                      /* error, Neo2/3 GBA flash card not found */
+
+|        move.l  #0x8080*2,d0
+|        move.b  1(a0,d0.l),neo_3        /* Neo3 flag for local use */
+
         bsr     _neo_disable_id
         bsr     _neo_select_menu
         moveq   #0,d0                   /* Neo2/3 GBA flash card found! */
@@ -747,6 +775,94 @@ neo_check_cpld:
         move.w  d0,-(sp)
         bsr     _neo_select_menu
         move.w  (sp)+,d0
+        rts
+
+
+| void neo_hw_info(hwinfo *ptr);
+        .global neo_hw_info
+neo_hw_info:
+        move.l  a2,-(sp)
+        movea.l 8(sp),a2                /* hardware info struct */
+        lea     0xA10000,a1
+
+        bsr     _neo_enable_id
+        lea     0x200000,a0             /* sram space */
+        /* get MAGIC signature */
+        move.b  1(a0),0(a2)
+        move.b  3(a0),1(a2)
+        move.b  5(a0),2(a2)
+        move.b  7(a0),3(a2)
+        move.b  9(a0),4(a2)
+        /* get PCB flags */
+        move.l  #0x8001*2,d0
+        move.b  1(a0,d0.l),5(a2)
+        move.l  #0x8080*2,d0
+        move.b  1(a0,d0.l),6(a2)
+        bsr     _neo_disable_id
+
+        move.w  #0x0000,OPTION_IO(a1)   /* set mode 0 */
+        /* get CPLD version */
+        moveq   #3,d0
+        move.w  #0x00FF,CPLD_ID(a1)
+        cmpi.b  #0x63,0x300002
+        bne.b   0f
+        cmpi.b  #0x63,0x30000A
+        bne.b   0f
+        move.b  0x300000,d0
+0:
+        move.w  #0x0000,CPLD_ID(a1)
+        move.b  d0,7(a2)
+
+        move.w  #0x0707,WE_IO(a1)       /* map bank 7, write enable myth psram & flash psram, set SYS */
+        move.l  #0x00E21500,d0
+        bsr     _neo_asic_cmd           /* set flash & psram write enable */
+
+        move.l  #0x00372002,d0
+        bsr     _neo_asic_cmd           /* set cr = flash & psram we, select menu flash */
+
+        /* get menu flash ID */
+        move.l  #0x00000055,d0
+        move.w  #0x0098,d1              /* ST CFI Query */
+        bsr     _neo_asic_wop
+        moveq   #0,d0
+        bsr     _neo_asic_op
+        ror.w   #8,d0
+        move.w  d0,8(a2)                /* menu flash man id */
+        moveq   #1,d0
+        bsr     _neo_asic_op
+        ror.w   #8,d0
+        move.w  d0,10(a2)               /* menu flash dev id */
+        moveq   #0,d0
+        move.w  #0x00F0,d1              /* ST Read Array/Reset */
+        bsr     _neo_asic_wop
+
+        move.l  #0x00372202,d0
+        bsr     _neo_asic_cmd           /* set cr = flash & psram we, select game flash */
+
+        /* get game flash ID */
+        moveq   #0,d0
+        move.w  #0x0098,d1              /* Intel CFI Query */
+        bsr     _neo_asic_wop
+        moveq   #0,d0
+        bsr     _neo_asic_op
+        ror.w   #8,d0
+        move.w  d0,12(a2)               /* game flash man id */
+        moveq   #1,d0
+        bsr     _neo_asic_op
+        ror.w   #8,d0
+        move.w  d0,14(a2)               /* game flash dev id */
+        moveq   #0,d0
+        move.w  #0x00FF,d1              /* Intel Read Array/Reset */
+        bsr     _neo_asic_wop
+
+        tst.w   12(a2)
+        bne.b   1f
+        move.b  #0x80,neo_3             /* no game flash means Neo3 */
+1:
+        move.l  #0x00E2D200,d0
+        bsr     _neo_asic_cmd           /* flash-psram write disable */
+        bsr     _neo_select_menu
+        movea.l (sp)+,a2
         rts
 
 
@@ -847,9 +963,6 @@ set_usb:
 neo_run_game:
         lea     0xA10000,a1
         bsr     _neo_select_game        /* select Game Flash */
-        .ifdef NEO3
-        bsr     _neo_enable_id
-        .endif
         bra.b   neo_chk_mahb
 
 | void neo_run_psram(int pstart, int psize, int bbank, int bsize, int run);
@@ -859,9 +972,6 @@ neo_run_psram:
         lea     0xA10000,a1
         bsr     _neo_select_psram       /* select flash cart PSRAM */
 
-        .ifdef NEO3
-        bsr     _neo_enable_id
-        .endif
 |        move.w  #0x0000,WE_IO(a1)       /* write-protect psram */
 |        move.l  #0x00E2D200,d0
 |        bsr     _neo_asic_cmd           /* write-protect flash cart psram */
@@ -915,9 +1025,7 @@ neo_run_sms:
 neo_run_myth_psram:
         lea     0xA10000,a1
         bsr     _neo_select_menu        /* select Neo Myth menu flash */
-        .ifdef NEO3
-        bsr     _neo_enable_id
-        .endif
+
         move.l  16(sp),d0               /* run */
         bclr    #5,d0
         bne.w   9f                      /* EBIOS or MA-Homebrew */
@@ -1129,11 +1237,12 @@ neo_copyfrom_myth_psram:
         .global neo_copyto_sram
 neo_copyto_sram:
         lea     0xA10000,a1
-        bsr     _neo_select_game        /* select Game Flash */
+        bsr     _neo_select_menu        /* select Neo Myth menu flash */
 
         move.w  #0x0000,GBAC_LIO(a1)    /* clear low bank select reg */
         move.w  #0x0000,GBAC_HIO(a1)    /* clear high bank select reg */
-        move.w  #0x00F8,GBAC_ZIO(a1)    /* bank size = 1MB */
+        move.w  #0x0000,GBAC_ZIO(a1)    /* clear bank size reg */
+|        move.w  #0x00F8,GBAC_ZIO(a1)    /* bank size = 1MB */
 
         move.l  #0x00E00000,d0
         move.l  8(sp),d1                /* sstart */
@@ -1167,11 +1276,12 @@ neo_copyto_sram:
         .global neo_copyfrom_sram
 neo_copyfrom_sram:
         lea     0xA10000,a1
-        bsr     _neo_select_game        /* select Game Flash */
+        bsr     _neo_select_menu        /* select Neo Myth menu flash */
 
         move.w  #0x0000,GBAC_LIO(a1)    /* clear low bank select reg */
         move.w  #0x0000,GBAC_HIO(a1)    /* clear high bank select reg */
-        move.w  #0x00F8,GBAC_ZIO(a1)    /* bank size = 1MB */
+        move.w  #0x0000,GBAC_ZIO(a1)    /* clear bank size reg */
+|        move.w  #0x00F8,GBAC_ZIO(a1)    /* bank size = 1MB */
 
         move.l  #0x00E00000,d0
         move.l  8(sp),d1                /* sstart */
@@ -1181,7 +1291,7 @@ neo_copyfrom_sram:
         bsr     _neo_asic_cmd           /* set the sram bank offset */
 
         move.w  #0x0000,GBAS_BIO(a1)    /* set the neo myth sram bank register */
-        move.w  #0x0010,GBAS_ZIO(a1)    /* set the neo myth psram bank size to 1Mb */
+        move.w  #0x0010,GBAS_ZIO(a1)    /* set the neo myth sram bank size to 1Mb */
 
         move.w  #0x0001,OPTION_IO(a1)   /* set mode 1 */
 
@@ -1532,7 +1642,7 @@ neo_test_psram:
         move.w  #0xFFFF,d1
         move.w  d1,(a0)
         move.w  (a0)+,d1
-        addq.w	#1,d1
+        addq.w  #1,d1
         dbne    d0,0b
 1:
         move.l  d1,-(sp)                /* save test pattern result */
@@ -1600,7 +1710,7 @@ neo_test_myth_psram:
         move.w  #0xFFFF,d1
         move.w  d1,(a0)
         move.w  (a0)+,d1
-        addq.w	#1,d1
+        addq.w  #1,d1
         dbne    d0,0b
 1:
         move.l  d1,d2                   /* save test pattern result */
@@ -1630,6 +1740,9 @@ neo_test_myth_psram:
 | local variables
 neo_mode:
         .word   0
+neo_3:
+        .byte   0
 
+        .align  4
 
         .text

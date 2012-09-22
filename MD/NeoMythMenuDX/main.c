@@ -105,6 +105,7 @@ enum
     /*Save manager service mode*/
     SMGR_MODE_MD32X,
     SMGR_MODE_SMS,
+    SMGR_MODE_BRAM
 };
 
 /*For the GG/Hex cheats*/
@@ -175,9 +176,9 @@ static short int gSRAMgrServiceStatus = SMGR_STATUS_NULL;
 static short int gSRAMgrServiceMode = 0x0000;
 
 #ifndef RUN_IN_PSRAM
-static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.8";
+static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.9";
 #else
-static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.8";
+static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.9";
 #endif
 
 #define MB (0x20000)
@@ -248,6 +249,24 @@ typedef struct {
     void* userData;                     /* added for cheat support*/
     short exclusiveFCall;               /* required for the new exclusive function calls */
 } optionEntry;
+
+typedef struct {
+    unsigned char Magic[5];
+    unsigned char Neo2;
+    unsigned char Neo3;
+    unsigned char Cpld;
+    unsigned short MenuMan;
+    unsigned short MenuDev;
+    unsigned short GameMan;
+    unsigned short GameDev;
+} hwinfo;
+
+hwinfo gCart;
+
+#define IS_FLASH (gCart.MenuMan == 0x0089)
+#define IS_NEO2SD (gCart.GameDev == 0x880D)
+#define IS_NEO2PRO (gCart.GameDev == 0x8810)
+#define IS_NEO3 (gCart.GameMan == 0x0000)
 
 #define WORK_RAM_SIZE (XFER_SIZE*2)
 
@@ -1707,12 +1726,33 @@ void update_display(void)
 //  put_str(temp, 0);
 
     {
-        char *flash_type[4] = { "C ", "B ", "A ", "? " };
+#if 1
         utility_strcpy(temp, " CPLD V");
         UTIL_IntegerToString(&temp[7], gCpldVers, 10);
-        utility_strcat(temp, " / Flash Type ");
-        utility_strcat(temp, flash_type[gCardType & 3]);
-
+        if (IS_FLASH)
+        {
+            if (gCart.GameDev == 0x8810)
+                utility_strcat(temp, " / 256Kb Type A ");
+            else if (gCart.GameDev == 0x8815)
+                utility_strcat(temp, " / 256Kb Type B ");
+            else if (gCart.GameDev == 0x880D)
+                utility_strcat(temp, " / 512Kb Type C ");
+            else
+                sprintf(temp[strlen(temp)], " / %04X:%04X ", gCart.GameMan, gCart.GameDev);
+        }
+        else if (IS_NEO2SD)
+            utility_strcat(temp, " / Neo2-SD ");
+        else if (IS_NEO2PRO)
+            utility_strcat(temp, " / Neo2-Pro ");
+        else if (IS_NEO3)
+            utility_strcat(temp, " / Neo3-SD ");
+        else
+            sprintf(temp[strlen(temp)], " / %04X:%04X ", gCart.GameMan, gCart.GameDev);
+#else
+        sprintf(temp, "%02X%02X%02X%02X%02X:%02X:%02X:V%d:%04X/%04X:%04X/%04X",
+                gCart.Magic[0], gCart.Magic[1], gCart.Magic[2], gCart.Magic[3], gCart.Magic[4], gCart.Neo2,
+                gCart.Neo3, gCart.Cpld, gCart.MenuMan, gCart.MenuDev, gCart.GameMan, gCart.GameDev);
+#endif
         //batch print
         gCursorX = 1;
         gCursorY = 18;
@@ -1725,7 +1765,6 @@ void update_display(void)
         gCursorX = 20 - (utility_strlen(temp) >> 1);
         put_str(temp, 0);
     }
-
 
     // info area
     gCursorX = 1;
@@ -3018,7 +3057,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     if(gSRAMBank)
         sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
     else
-        sramBankOffs = max(sramLength,8192);
+        sramBankOffs = 0;
 
     utility_c2wstrcpy(fnbuf,"/");
     utility_c2wstrcat(fnbuf,SAVES_DIR);
@@ -3037,9 +3076,9 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     if(*fnew == (WCHAR)'.')
         *fnew = 0;
 
-    if(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)
+    if((gSRAMgrServiceMode==SMGR_MODE_SMS) || (gSRAMgrServiceMode==SMGR_MODE_BRAM))
     {
-        STEP_INTO("(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
+        STEP_INTO("(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMgrServiceMode==SMGR_MODE_BRAM)");
         //sms or bram
         if(gSRAMgrServiceMode==SMGR_MODE_SMS)
         {
@@ -3052,7 +3091,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     }
     else
     {
-        STEP_INTO("NOT (gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
+        STEP_INTO("NOT (gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMgrServiceMode==SMGR_MODE_BRAM)");
         utility_c2wstrcat(fnbuf,MD_32X_SAVE_EXT);
     }
 
@@ -3072,9 +3111,9 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 
     setStatusMessage("Backing up GAME sram...");
 
-    if(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)
+    if((gSRAMgrServiceMode==SMGR_MODE_SMS) || (gSRAMgrServiceMode==SMGR_MODE_BRAM))
     {
-        STEP_INTO("(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMSize==16)");
+        STEP_INTO("(gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMgrServiceMode==SMGR_MODE_BRAM)");
         gSRAMgrServiceMode = 0x0000;
 
         //sms or bram - direct copy
@@ -3094,6 +3133,9 @@ void sram_mgr_saveGamePA(WCHAR* sss)
     }
     else
     {
+        STEP_INTO("NOT (gSRAMgrServiceMode==SMGR_MODE_SMS||gSRAMgrServiceMode==SMGR_MODE_BRAM)");
+        gSRAMgrServiceMode = 0x0000;
+
         //md or 32x - store even bytes
         k=0;
         while(sramLength)
@@ -3125,7 +3167,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 
 void sram_mgr_saveGame(int index)
 {
-    gSRAMgrServiceMode = (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X;
+    gSRAMgrServiceMode = (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].type < 2) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM;
     sram_mgr_saveGamePA(gSelections[gCurEntry].name);
     gSRAMgrServiceMode = 0x0000;
 }
@@ -3148,22 +3190,22 @@ void sram_mgr_restoreGame(int index)
     utility_c2wstrcat(fnbuf,SAVES_DIR);
 
     utility_c2wstrcat(fnbuf,"/");
-    utility_wstrcat(fnbuf,gSelections[index].name);
+    utility_wstrcat(fnbuf,gSelections[gCurEntry].name);
 
     sramLength = gSRAMSize * 4096;//actual myth space occupied, not counting even bytes
     if(gSRAMBank)
         sramBankOffs = gSRAMBank * max(sramLength,8192);//minimum bank size is 8KB, not 4KB
     else
-        sramBankOffs = max(sramLength,8192);//minimum bank size is 8KB, not 4KB
+        sramBankOffs = 0;
 
     fnew = get_file_ext(fnbuf);
     if(*fnew == (WCHAR)'.')
         *fnew = 0;
 
-    if(gSelections[index].type==2||gSRAMSize==16)
+    if((gSelections[gCurEntry].run >= 9) && (gSelections[gCurEntry].run <= 13))
     {
         //sms or bram
-        if(gSelections[index].type==2)
+        if(gSelections[gCurEntry].type==2)
         {
             utility_c2wstrcat(fnbuf,SMS_SAVE_EXT);
         }
@@ -3194,7 +3236,7 @@ void sram_mgr_restoreGame(int index)
 
     setStatusMessage("Restoring GAME sram...");
 
-    if(gSelections[index].type==2||gSRAMSize==16)
+    if((gSelections[gCurEntry].run >= 9) && (gSelections[gCurEntry].run <= 13))
     {
         //sms or bram - direct copy
         sramLength = min(sramLength,gSDFile.fsize);
@@ -4035,7 +4077,7 @@ void do_options(void)
         gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
         maxOptions++;
     }
-    else if ((gSelections[gCurEntry].run == 9) || (gSelections[gCurEntry].run == 10) || (gSelections[gCurEntry].run == 2))
+    else if ((gSelections[gCurEntry].run == 9) || (gSelections[gCurEntry].run == 10))
     {
         // options for BRAM or CDBIOS+BRAM
         gOptions[maxOptions].exclusiveFCall = 0;
@@ -4457,12 +4499,12 @@ void do_options(void)
                             utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                             config_push("romName",p);
 
-                            UTIL_IntegerToString(p, (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X, 10);
+                            UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].type < 2) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
                             config_push("romType",p);
 
                             updateConfig();
 
-                            sram_mgr_restoreGame(gCurEntry);
+                            sram_mgr_restoreGame(-1);
                         }
                         else
                             cache_sync(0);
@@ -4515,12 +4557,12 @@ void do_options(void)
                             utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                             config_push("romName",p);
 
-                            UTIL_IntegerToString(p, (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X, 10);
+                            UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].type < 2) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
                             config_push("romType",p);
 
                             updateConfig();
 
-                            sram_mgr_restoreGame(gCurEntry);
+                            sram_mgr_restoreGame(-1);
                         }
 
                         ints_on();
@@ -4908,12 +4950,12 @@ void run_rom(int reset_mode)
                 utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                 config_push("romName",p);
 
-                UTIL_IntegerToString(p, (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X, 10);
+                UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].type < 2) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
                 config_push("romType",p);
 
                 updateConfig();
 
-                sram_mgr_restoreGame(gCurEntry);
+                sram_mgr_restoreGame(-1);
             }
             else
                 cache_sync(0);
@@ -4957,12 +4999,12 @@ void run_rom(int reset_mode)
                 utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                 config_push("romName",p);
 
-                UTIL_IntegerToString(p, (gSelections[gCurEntry].run == 2) ? SMGR_MODE_SMS : SMGR_MODE_MD32X, 10);
+                UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].type < 2) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
                 config_push("romType",p);
 
                 updateConfig();
 
-                sram_mgr_restoreGame(gCurEntry);
+                sram_mgr_restoreGame(-1);
             }
             else
                 cache_sync(0);
@@ -5531,6 +5573,8 @@ int main(void)
     gCpldVers = neo_check_cpld();       /* get CPLD version */
     gCardType = *(short int *)0x00FFF0; /* get flash card type from menu flash */
 
+    neo_hw_info(&gCart);
+
     //ints_on();                          /* allow interrupts */
 
     // set long file name pointers
@@ -5688,17 +5732,20 @@ int main(void)
     }
     else
     {
-        neo2_disable_sd();
+        if (!IS_NEO3)
+        {
+            neo2_disable_sd();
 
-        ints_on();
-        clearStatusMessage();
+            ints_on();
+            clearStatusMessage();
 
-        /* starts in flash mode, so set gSelections from menu flash */
-        gCurEntry = 0;
-        gStartEntry = 0;
-        gMaxEntry = 0;
-        gCurMode = MODE_FLASH;
-        get_menu_flash();
+            /* starts in flash mode, so set gSelections from menu flash */
+            gCurEntry = 0;
+            gStartEntry = 0;
+            gMaxEntry = 0;
+            gCurMode = MODE_FLASH;
+            get_menu_flash();
+        }
     }
 
     unsigned short maxDL;
@@ -5715,8 +5762,6 @@ int main(void)
     utility_memset(gProgressBarStaticBuffer,0x87,36);
     gProgressBarStaticBuffer[32] = '\0';
     gCacheOutOfSync = 0;
-
-
 
     while(1)
     {
@@ -5900,20 +5945,44 @@ int main(void)
 
             if ((changed & SEGA_CTRL_START) && !(buttons & SEGA_CTRL_START))
             {
-                // START released, change mode
-                gCurEntry = 0;
-                gStartEntry = 0;
-                gMaxEntry = 0;
+                // START released, change mode (unless Neo3-SD)
+                if (!IS_NEO3)
+                {
+                    gCurEntry = 0;
+                    gStartEntry = 0;
+                    gMaxEntry = 0;
 
-                gCurMode++;
-                if (gCurMode == MODE_END)
-                {
-                    neo2_disable_sd();
-                    gCurMode = MODE_FLASH;
-                    get_menu_flash();
+                    gCurMode++;
+                    if (gCurMode == MODE_END)
+                    {
+                        neo2_disable_sd();
+                        gCurMode = MODE_FLASH;
+                        get_menu_flash();
+                    }
+                    if (gCurMode == MODE_SD)
+                    {
+                        if (IS_FLASH)
+                        {
+                            neo2_disable_sd();
+                            gCurMode = MODE_FLASH;
+                            get_menu_flash();
+                        }
+                        else
+                        {
+                            gCursorY = 0;
+                            neo2_enable_sd();
+                            get_sd_directory(-1);   /* get root directory of sd card */
+                            loadConfig();
+                        }
+                    }
                 }
-                if (gCurMode == MODE_SD)
+                else
                 {
+                    gCurEntry = 0;
+                    gStartEntry = 0;
+                    gMaxEntry = 0;
+
+                    // reload root dir on Neo3
                     gCursorY = 0;
                     neo2_enable_sd();
                     get_sd_directory(-1);   /* get root directory of sd card */
