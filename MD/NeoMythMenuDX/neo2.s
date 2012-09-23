@@ -15,10 +15,10 @@
         .equ    LED_ON,     0x3016
         .equ    RST_IO,     0x3018
         .equ    ID_ON,      0x301A
-        .equ    CPLD_ID,    0x301E      /* on V4 Neo Myth */
+        .equ    CPLD_ID,    0x301E  /* on V4+ Neo Myth */
         .equ    WE_IO,      0x3020
-        .equ    RST_SEL,    0x3024      /* on V4 Neo Myth */
-    .equ    DAT_SWAP,   0x3026  /* on V5 Neo Myth */
+        .equ    RST_SEL,    0x3024  /* on V4+ Neo Myth */
+        .equ    DAT_SWAP,   0x3026  /* on V5+ Neo Myth */
         .equ    EXTM_ON,    0x3028
 
 | Neo2/3 Flash Cart equates (the useful ones)
@@ -32,8 +32,8 @@
 | MD support code goes in the code segment
 
 | Support equates
-                .equ    CMD_INTS_OFF,   0x2700
-                .equ    CMD_INTS_ON,    0x2000
+        .equ    CMD_INTS_OFF,   0x2700
+        .equ    CMD_INTS_ON,    0x2000
 
         .text
 
@@ -53,13 +53,13 @@ set_sr:
 | void ints_on();
         .global ints_on
 ints_on:
-                move.w #CMD_INTS_ON,sr
+        move.w #CMD_INTS_ON,sr
         rts
 
 | void ints_off();
         .global ints_off
 ints_off:
-                move.w #CMD_INTS_OFF,sr
+        move.w #CMD_INTS_OFF,sr
         rts
 
 | buttons = get_pad(pad)
