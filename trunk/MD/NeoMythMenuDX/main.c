@@ -221,6 +221,7 @@ typedef struct selEntry selEntry_t;
 static unsigned int gSelectionSize;
 static short int gPSRAM;                /* 0 = gba psram, 1 = myth psram */
 static short int gShortenMode = 0;      /* 0 = show left side, 1 = show right side, 2 = try to show important parts */
+static short int gHelp = 1;             /* 0 = show hardware info, 1 = show help messages */
 
 short int gCpldVers;                    /* 3 = V11 hardware, 4 = V12 hardware, 5 = V5 hardware */
 short int gCardType;                    /* 0 = 512 Mbit Neo2 Flash, 1 = other */
@@ -2115,43 +2116,61 @@ void update_display(void)
     put_str(gLine, 0x2000);
 
     // help area
-    gCursorY = 25;
-    gCursorX = 1;
-    put_str("A", 0x4000);
-    gCursorX = 2;
-    put_str((gCurMode == MODE_USB) ? "=Toggle USB" : "=Options", 0);
-    gCursorX = 14;
-    put_str("B", 0x4000);
-    gCursorX = 15;
-    put_str("=Run", 0);
-    gCursorX = 20;
-    put_str("C", 0x4000);
-    gCursorX = 21;
-    put_str("=Run2", 0);
-    gCursorX = 28;
-    put_str("St", 0x4000);
-    gCursorX = 30;
-    put_str((gCurMode == MODE_FLASH) ? "=USB Mode" : (gCurMode == MODE_USB) ? "=SDC Mode" : "=Flash Md", 0);
-
-    if (gCurMode != MODE_USB)
+    printToScreen(gEmptyLine, 1, 25, 0x0000);
+    printToScreen(gEmptyLine, 1, 26, 0x0000);
+    if (gHelp)
     {
+        gCursorY = 25;
+        gCursorX = 1;
+        put_str("A", 0x4000);
+        gCursorX = 2;
+        put_str((gCurMode == MODE_USB) ? "=Toggle USB" : "=Options", 0);
+        gCursorX = 14;
+        put_str("B", 0x4000);
+        gCursorX = 15;
+        put_str("=Run", 0);
+        gCursorX = 20;
+        put_str("C", 0x4000);
+        gCursorX = 21;
+        put_str("=Run2", 0);
+        gCursorX = 28;
+        put_str("St", 0x4000);
+        gCursorX = 30;
+        put_str((gCurMode == MODE_FLASH) ? "=USB Mode" : (gCurMode == MODE_USB) ? "=SDC Mode" : "=Flash Md", 0);
+
+        if (gCurMode != MODE_USB)
+        {
+            gCursorY = 26;
+            gCursorX = 1;
+            put_str("Up", 0x4000);
+            gCursorX = 3;
+            put_str("=Prev", 0);
+            gCursorX = 9;
+            put_str("Dn", 0x4000);
+            gCursorX = 11;
+            put_str("=Next", 0);
+            gCursorX = 18;
+            put_str("Lt", 0x4000);
+            gCursorX = 20;
+            put_str("=Prev Pg", 0);
+            gCursorX = 29;
+            put_str("Rt", 0x4000);
+            gCursorX = 31;
+            put_str("=Next Pg", 0);
+        }
+    }
+    else
+    {
+        sprintf(temp, "ASIC Magic: %02X%02X%02X%02X%02X PCB Type: %02X %02X",
+                gCart.Magic[0], gCart.Magic[1], gCart.Magic[2], gCart.Magic[3], gCart.Magic[4],
+                gCart.Neo2, gCart.Neo3);
+        gCursorY = 25;
+        gCursorX = 1;
+        put_str(temp, 0x0000);
+        sprintf(temp, "Flash: Menu[%04X/%04X] Game[%04X/%04X]", gCart.MenuMan, gCart.MenuDev, gCart.GameMan, gCart.GameDev);
         gCursorY = 26;
         gCursorX = 1;
-        put_str("Up", 0x4000);
-        gCursorX = 3;
-        put_str("=Prev", 0);
-        gCursorX = 9;
-        put_str("Dn", 0x4000);
-        gCursorX = 11;
-        put_str("=Next", 0);
-        gCursorX = 18;
-        put_str("Lt", 0x4000);
-        gCursorX = 20;
-        put_str("=Prev Pg", 0);
-        gCursorX = 29;
-        put_str("Rt", 0x4000);
-        gCursorX = 31;
-        put_str("=Next Pg", 0);
+        put_str(temp, 0x0000);
     }
 }
 
@@ -6092,6 +6111,13 @@ int main(void)
 
                 run_rom(0x00FF);
             }
+            if ((changed & SEGA_CTRL_Z) && !(buttons & SEGA_CTRL_Z))
+            {
+                // Z released
+                gHelp ^= 1;
+                gUpdate = 1;
+            }
+
         }
     }
 
