@@ -1385,7 +1385,7 @@ void get_sd_info(int entry)
     {
         // not MD or 32X binary image
         gSelections[entry].type = 0; // MD
-        if ((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04))
+        if (((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04)) || ((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x03)))
         {
             // CD BRAM
             gSelections[entry].run = 9;
@@ -2680,7 +2680,7 @@ int cache_process()
             gSRAMgrServiceStatus = SMGR_STATUS_NULL;
         }
 
-        if((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04))
+        if (((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x04)) || ((rom_hdr[0] == 0xFF) && (rom_hdr[1] == 0x03)))
             gSRAMSize = 16; // BRAM file
 
         gSRAMType = 0x0000;
@@ -3169,7 +3169,7 @@ void sram_mgr_saveGamePA(WCHAR* sss)
 
 void sram_mgr_saveGame(int index)
 {
-    gSRAMgrServiceMode = (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].type < 2) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM;
+    gSRAMgrServiceMode = (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].run < 8) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM;
     sram_mgr_saveGamePA(gSelections[gCurEntry].name);
     gSRAMgrServiceMode = 0x0000;
 }
@@ -4501,7 +4501,7 @@ void do_options(void)
                             utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                             config_push("romName",p);
 
-                            UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].type < 2) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
+                            UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].run < 8) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
                             config_push("romType",p);
 
                             updateConfig();
@@ -4559,7 +4559,7 @@ void do_options(void)
                             utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                             config_push("romName",p);
 
-                            UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].type < 2) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
+                            UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].run < 8) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
                             config_push("romType",p);
 
                             updateConfig();
@@ -4952,7 +4952,7 @@ void run_rom(int reset_mode)
                 utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                 config_push("romName",p);
 
-                UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].type < 2) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
+                UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].run < 8) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
                 config_push("romType",p);
 
                 updateConfig();
@@ -5001,7 +5001,7 @@ void run_rom(int reset_mode)
                 utility_w2cstrcpy(p,gSelections[gCurEntry].name);
                 config_push("romName",p);
 
-                UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].type < 2) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
+                UTIL_IntegerToString(p, (gSelections[gCurEntry].type == 2) ? SMGR_MODE_SMS : (gSelections[gCurEntry].run < 8) ? SMGR_MODE_MD32X : SMGR_MODE_BRAM, 10);
                 config_push("romType",p);
 
                 updateConfig();
