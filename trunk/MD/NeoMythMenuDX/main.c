@@ -2158,11 +2158,13 @@ void update_display(void)
 void gen_bram(unsigned char *dest, int fstart, int len)
 {
     int ix;
+    ints_on();          /* enable interrupts */
     for (ix=0; ix<len; ix+=2)
     {
         dest[ix] = 0xFF;
         dest[ix+1] = 0x03;
     }
+    ints_off();         /* disable interrupts */
 }
 
 void update_progress(char *str1, char *str2, int curr, int total)
