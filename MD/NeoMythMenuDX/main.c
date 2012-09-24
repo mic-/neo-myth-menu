@@ -971,7 +971,7 @@ void get_menu_flash(void)
         }
 
         // check for consistent run mode when sram enabled
-        if (gSelections[gMaxEntry].type == 0 && gSelections[gMaxEntry].bsize && gSelections[gMaxEntry].run != 5)
+        if (gSelections[gMaxEntry].type == 0 && gSelections[gMaxEntry].bsize && gSelections[gMaxEntry].run != 5  && gSelections[gMaxEntry].run != 9 && gSelections[gMaxEntry].run != 10)
         {
             if (gSelections[gMaxEntry].length <= 0x200000)
                 gSelections[gMaxEntry].run = 1; // 16 Mbit + SRAM
