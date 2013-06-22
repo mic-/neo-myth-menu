@@ -1,5 +1,5 @@
 ; Assembly optimized pff routines
-; /Mic, 2010-2011
+; /Mic, 2010-2012
 
 .include "hdr.asm"
 .include "snes_io.inc"
@@ -195,10 +195,11 @@ pf_read_1mbit_to_psram_asm:
 +:
 
 	sep		#$20
-lda.l cpID
-cmp #3
-bcc +
-	lda		#$01
+	lda.l   cpID
+	cmp     #4
+	bcc     +
+    ; Enable FastROM timing for PSRAM on firmware versions >= 4
+	lda.l	sdLoaderMemSel
 	sta.l	REG_MEMSEL
 +:
 	rep		#$20
@@ -224,6 +225,13 @@ bcc +
 	lda.w	FatFs+2
 	sta		tcc__r2h
 
+    lda     #$FFFF
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst+2
+    lda     #0
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_contiguousSectors
+
+    ; Read 256 sectors == 128 kByte
 	lda		#256
 	sta.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_numSects
 	
@@ -381,7 +389,23 @@ _pr1pa_not_at_clust_start:
 	rep		#$20
 	
 _pr1pa_no_recalc:
-	lda		#0
+    ; if (prevClst == 0xFFFFFFFF) firstSector = fs->dsect
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst
+    cmp     #$FFFF
+    bne     +
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst+2
+    cmp     #$FFFF
+    bne     +
+    ldy     #FATFS_dsect
+    lda     [tcc__r2],y
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_firstSector
+    iny
+    iny
+    lda     [tcc__r2],y
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_firstSector+2
++:
+
+    lda		#0
 	sep		#$20
 	ldy		#FATFS_csize
 	lda		[tcc__r2],y
@@ -402,15 +426,15 @@ _pr1pa_no_recalc:
 	sta		tcc__r1
 	
 	lda		_pf_read_1mbit_to_psram_asm_prbank,s
-	cmp		#$DF 
+	cmp		#$DE
 	bcc		+
-	lda		_pf_read_1mbit_to_psram_asm_proffs,s
-	cmp		#$8000
-	bcc		+
+	;lda		_pf_read_1mbit_to_psram_asm_proffs,s
+	;cmp		#$8000
+	;bcc		+
 	;jmp.w	_pr1pa_read_single_sector
 	sep		#$20
 	; Make the diskio / transfer loop code execute from WRAM instead of from PSRAM
-	; for the last 32 kB of the current MByte, since we'll be overwriting that
+	; for the last Mbit of the current MByte, since we'll be overwriting that
 	; memory with file data now.
 	lda		#$7E
 	sta.l	$7d0000+_disk_readprm_jump_to_psram+3
@@ -420,11 +444,11 @@ _pr1pa_no_recalc:
 	stz		tcc__r1
 +:
 
-	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
-	cmp		#3
-	bcs		+
-	jmp.w	_pr1pa_read_single_sector
-+:
+;	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
+;	cmp		#3
+;	bcs		+
+;	jmp.w	_pr1pa_read_single_sector
+;+:
 
 	; if (remSectInClust > numSects) remSectInClust = numSects
 	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_numSects
@@ -437,65 +461,51 @@ _pr1pa_no_recalc:
 	sta.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
 +:
 
-	; Will we cross a 1 MByte PSRAM boundary by doing this read?
-	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
-	sta		tcc__r0
-	stz		tcc__r0h
-	.rept 9
-	asl		tcc__r0
-	rol		tcc__r0h
-	.endr
-	clc
-	lda		_pf_read_1mbit_to_psram_asm_proffs,s
-	adc		tcc__r0
-	sta		tcc__r0
-	lda		_pf_read_1mbit_to_psram_asm_prbank,s
-	adc		tcc__r0h
-	sta		tcc__r0h
-	cmp		tcc__r1h ;#$DF 
-	bcc		+
-	lda		tcc__r0
-	cmp		tcc__r1
-	bcc		+
-	; remSectInClust = (end_address - 0xDF8000) / 512
-	sec
-	;lda		tcc__r0
-	sbc		tcc__r1 ;#$8000
-	sta		tcc__r0
-	lda		tcc__r0h
-	sbc		tcc__r1h ;#$DF ;5F
-  	bmi +
-	sta		tcc__r0h
-	.rept 9
-	lsr		tcc__r0h
-	ror		tcc__r0
-	.endr
-	sec
-	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
-	sbc		tcc__r0
-	bpl		++
-	jmp.w	_pr1pa_read_single_sector
-++:
-	bne		++
-	jmp.w	_pr1pa_read_single_sector
-++:
-	sta.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
-+:
-	; disk_read_psram_multi(prbank, proffs, fs->dsect, remSectInClust);
-	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
+    ; prevClst+1 == fs->curr_clust ?
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst
+    clc
+    adc     #1
+    sta     tcc__r0
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst+2
+    adc     #0
+    sta     tcc__r0h
+    ldy     #FATFS_curr_clust
+    lda     [tcc__r2],y
+    cmp     tcc__r0
+    bne     +
+    ldy     #FATFS_curr_clust+2
+    lda     [tcc__r2],y
+    cmp     tcc__r0h
+    bne     +
+    
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
+    clc
+    adc.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_contiguousSectors
+    cmp     #$100
+    bcs     +
+    jmp.w   _pr1pa_skip_read
++:    
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst
+    cmp     #$FFFF
+    bne     +
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst+2
+    cmp     #$FFFF
+    bne     +
+    jmp.w   _pr1pa_skip_read
++:    
+    
+	; disk_read_psram_multi(prbank, proffs, firstSector, contiguousSectors);
+	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_contiguousSectors
 	pha
-	ldy		#FATFS_dsect+2
-	lda		[tcc__r2],y
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_firstSector+2
 	pha
-	dey
-	dey
-	lda		[tcc__r2],y
-	pha
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_firstSector
+    pha
 	lda		_pf_read_1mbit_to_psram_asm_proffs+6,s
 	pha
 	lda		_pf_read_1mbit_to_psram_asm_prbank+8,s
 	pha
-	jsl 	$7d0000+disk_read_psram_multi_asm  ;7d
+	jsl 	$7d0000+disk_read_psram_multi_asm  
 	pla
 	pla
 	pla
@@ -524,6 +534,51 @@ _pr1pa_no_recalc:
 	jmp		_pr1pa_return
 +:
 
+    ; firstSector = fs->dsect
+    ldy     #FATFS_dsect
+    lda     [tcc__r2],y
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_firstSector
+    iny
+    iny
+    lda     [tcc__r2],y
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_firstSector+2
+
+    ; prbank:proffs += contiguousSectors << 9
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_contiguousSectors
+    sta     tcc__r0
+    stz     tcc__r0h
+    .rept 9
+    asl     tcc__r0
+    rol     tcc__r0h
+    .endr
+    lda     _pf_read_1mbit_to_psram_asm_proffs,s
+    clc
+    adc     tcc__r0
+    sta     tcc__r0
+    sta     _pf_read_1mbit_to_psram_asm_proffs,s
+    lda     _pf_read_1mbit_to_psram_asm_prbank,s
+    adc     tcc__r0h
+    sta     tcc__r0h
+    sta     _pf_read_1mbit_to_psram_asm_prbank,s
+    
+    lda     #0
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_contiguousSectors
+_pr1pa_skip_read:
+
+    ; prevClst = fs->curr_clust
+    ldy     #FATFS_curr_clust
+    lda     [tcc__r2],y
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst
+    ldy     #FATFS_curr_clust+2
+    lda     [tcc__r2],y
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst+2
+    
+    ; contiguousSectors += remSectInClust
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_contiguousSectors
+    clc
+    adc.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
+    sta.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_contiguousSectors
+    
 	; numSects -= remSectInClust
 	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_numSects
 	sec
@@ -542,6 +597,7 @@ _pr1pa_no_recalc:
 	sta		[tcc__r2],y
 	rep		#$20
 
+    ; fs->fptr += remSectInClust << 9
 	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust
 	sta		tcc__r0
 	stz		tcc__r0h
@@ -550,7 +606,6 @@ _pr1pa_no_recalc:
 	rol		tcc__r0h
 	.endr
 	clc
-	; fs->fptr += remSectInClust << 9
 	ldy		#FATFS_fptr
 	lda		[tcc__r2],y
 	adc		tcc__r0
@@ -561,137 +616,60 @@ _pr1pa_no_recalc:
 	adc		tcc__r0h
 	sta		[tcc__r2],y
 	
-	; prbank:proffs += remSectInClust << 9
-	lda		_pf_read_1mbit_to_psram_asm_proffs,s
-	clc
-	adc		tcc__r0
-	sta		tcc__r0
-	sta		_pf_read_1mbit_to_psram_asm_proffs,s
-	lda		_pf_read_1mbit_to_psram_asm_prbank,s
-	adc		tcc__r0h
-	sta		tcc__r0h
-	sta		_pf_read_1mbit_to_psram_asm_prbank,s
+	;;jmp		_pr1pa_while_numSects_next
 
-.IFDEF PFF_CHECK_WRAP
-	; Did we wrap around a 1 MByte PSRAM boundary?
-	cmp		#$60
-	bne		+
-	lda		#$50
-	sta		_pf_read_1mbit_to_psram_asm_prbank,s
-	sep		#$20
-	lda		_pf_read_1mbit_to_psram_asm_mythprbank,s
-	ina
-	sta		_pf_read_1mbit_to_psram_asm_mythprbank,s
-	
-	;psram_write((char*)0x7E9000, (mythprbank<<4)|0x0F, 0x9000, 0x2800);
-	rep		#$20
-	pea.w	$2800
-	pea.w	$9000
-	lda		_pf_read_1mbit_to_psram_asm_mythprbank,s
-	asl		a
-	asl		a
-	asl		a
-	asl		a
-	ora		#$0F
-	pha
-	pea.w	$007E
-	pea.w	$9000
-	jsl		neo2_myth_psram_write
-	pla
-	pla
-	pla
-	pla
-	pla
-	sep		#$20
-	lda		_pf_read_1mbit_to_psram_asm_mythprbank,s
-	sta.l	MYTH_PRAM_BIO
-	rep		#$20
-+:
-.ENDIF
-	jmp		_pr1pa_while_numSects_next
-
-_pr1pa_read_single_sector:
-
-	; disk_readsect_psram(prbank, proffs, fs->dsect)
-	ldy		#FATFS_dsect+2
-	lda		[tcc__r2],y
-	pha
-	dey
-	dey
-	lda		[tcc__r2],y
-	pha
-	lda		_pf_read_1mbit_to_psram_asm_proffs+4,s
-	pha
-	lda		_pf_read_1mbit_to_psram_asm_prbank+6,s
-	pha
-	jsl 	$7d0000+disk_readsect_psram_asm
-	pla
-	pla
-	pla
-	pla
-	lda.w	FatFs
-	sta		tcc__r2
-	lda.w	FatFs+2
-	sta		tcc__r2h
-	lda		tcc__r0
-	beq		+
-	cmp		#2						; RES_WRPRT
-	bne		++
-	lda		#6						; FR_STREAM_ERR
-	bra		+++
-++:
-	lda		#1						; FR_DISK_ERR
-+++:
-	sta		tcc__r0
-	sep		#$20
-	ldy		#FATFS_flag
-	lda		#0
-	sta		[tcc__r2],y
-	rep		#$20
-	jmp		_pr1pa_return
-+:
-
-	dec.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_numSects
-	
-	clc
-	; fs->fptr += 512
-	ldy		#FATFS_fptr
-	lda		[tcc__r2],y
-	adc		#512
-	sta		[tcc__r2],y
-	iny
-	iny
-	lda		[tcc__r2],y
-	adc		#0
-	sta		[tcc__r2],y
-	
-	; prbank:proffs += 512
-	lda		_pf_read_1mbit_to_psram_asm_proffs,s
-	clc
-	adc		#512
-	sta		_pf_read_1mbit_to_psram_asm_proffs,s
-	lda		_pf_read_1mbit_to_psram_asm_prbank,s
-	adc		#0
-	sta		_pf_read_1mbit_to_psram_asm_prbank,s
-
-	; Did we wrap around a 1 MByte PSRAM boundary?
-	cmp		#$60
-	bne		+
-	lda		#$50
-	sta		_pf_read_1mbit_to_psram_asm_prbank,s
-	sep		#$20
-	lda		_pf_read_1mbit_to_psram_asm_mythprbank,s
-	ina
-	sta		_pf_read_1mbit_to_psram_asm_mythprbank,s
-	sta.l	MYTH_PRAM_BIO
-	rep		#$20
-+:
-	jmp		_pr1pa_while_numSects_next
-	
 _pr1pa_while_numSects_next:
 	lda.w	__tccs__FUNC_pf_read_1mbit_to_psram_asm_numSects
 	beq		+
 	jmp.w	_pr1pa_while_numSects
++:
+
+    sep     #$20
+    lda     #$7E
+    sta.l   $7d0000+_disk_readprm_jump_to_psram+3
+    rep     #$20
+    ; Perform any pending read that needs to be done
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_contiguousSectors
+    beq     +
+
+    ; disk_read_psram_multi(prbank, proffs, firstSector, contiguousSectors);
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_contiguousSectors
+    pha
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_firstSector+2
+    pha
+    lda.w   __tccs__FUNC_pf_read_1mbit_to_psram_asm_firstSector
+    pha
+    lda     _pf_read_1mbit_to_psram_asm_proffs+6,s
+    pha
+    lda     _pf_read_1mbit_to_psram_asm_prbank+8,s
+    pha
+    jsl     $7d0000+disk_read_psram_multi_asm  
+    pla
+    pla
+    pla
+    pla
+    pla
+    lda.w   FatFs
+    sta     tcc__r2
+    lda.w   FatFs+2
+    sta     tcc__r2h
+    
+    lda     tcc__r0
+    beq     +
+    cmp     #2                      ; RES_WRPRT
+    bne     ++
+    lda     #6                      ; FR_STREAM_ERR
+    bra     +++
+++:
+    lda     #1                      ; FR_DISK_ERR
++++:
+    sta     tcc__r0
+    sep     #$20
+    ldy     #FATFS_flag
+    lda     #0
+    sta     [tcc__r2],y
+    rep     #$20
+    jmp     _pr1pa_return
 +:
 
 	stz		tcc__r0			; FR_OK
@@ -720,4 +698,7 @@ __tccs__FUNC_pf_read_1mbit_to_psram_asm_sect dsb 4
 __tccs__FUNC_pf_read_1mbit_to_psram_asm_remain dsb 4
 __tccs__FUNC_pf_read_1mbit_to_psram_asm_numSects dsb 2
 __tccs__FUNC_pf_read_1mbit_to_psram_asm_remSectInClust dsb 2
+__tccs__FUNC_pf_read_1mbit_to_psram_asm_contiguousSectors dsb 2
+__tccs__FUNC_pf_read_1mbit_to_psram_asm_prevClst dsb 4
+__tccs__FUNC_pf_read_1mbit_to_psram_asm_firstSector dsb 4
 .ends

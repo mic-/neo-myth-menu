@@ -38,7 +38,7 @@ tools\stripcom myth_io.ps myth_io.ps2
 tools\stripcom pff.ps pff.ps2
 tools\stripcom u_strings.ps u_strings.ps2
 tools\stripcom cheat_db.ps cheat_db.s
-del *.ps 
+REM del *.ps 
 
 ..\bin\816-opt.py main.ps2 > main.s
 ..\bin\816-opt.py navigation.ps2 > navigation.s
@@ -70,8 +70,8 @@ tools\constify navigation.c navigopt.s navigopt2.s
 tools\constify cheats\cheat_database.c cheat_db.s cheat_db2.s
 @echo on
 
-wla-spc700 -vo vgmplay_spc700_ext.asm vgmplay.o
-wlalink -vb vgmplay.link assets\vgmplay.bin
+..\bin\wla-spc700 -vo vgmplay_spc700_ext.asm vgmplay.o
+assets\wlalink -vb vgmplay.link assets\vgmplay.bin
 
 REM ASM -> OBJ
 ..\bin\wla-65816.exe -io assets\data.asm data.obj
@@ -110,7 +110,7 @@ REM OBJ -> SMC
 @echo off
 REM Delete files
 del *.ps2
-del *.s
+REM del *.s
 del *.obj
 REM del *.sym
 @echo on

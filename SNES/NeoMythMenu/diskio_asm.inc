@@ -666,20 +666,20 @@ sdReadStartMulti:
 	pha
 	lda		_sdReadStartMulti_addr+2,s	; addr offset (the last pha pushed it 2 bytes further away)
 	pha
-	pea.w		READ_MULTIPLE_BLOCK				
+	pea.w	READ_MULTIPLE_BLOCK				
 	jsr		sendMmcCmd
 	pla
 	pla
 	pla
 
-	lda.l		cardType
+	lda.l	cardType
 	and		#$8000
 	bne		+
 	RECV_MMC_CMD_RESP diskioResp,R1_LEN,0
 	lda		tcc__r0
 	beq		++
 	sep		#$20
-	lda.l		diskioResp
+	lda.l	diskioResp
 	cmp		#READ_MULTIPLE_BLOCK
 	beq		+
 ++:
@@ -704,14 +704,14 @@ sdReadStopMulti:
 	phx
 	SEND_MMC_CMD STOP_TRANSMISSION,0
 
-	lda.l		cardType
+	lda.l	cardType
 	and		#$8000
 	bne		+
 	RECV_MMC_CMD_RESP diskioResp,R1_LEN,0
 	lda		tcc__r0
 	beq		++
 	sep		#$20
-	lda.l		diskioResp
+	lda.l	diskioResp
 	cmp		#STOP_TRANSMISSION
 	beq		+
 ++:
@@ -753,8 +753,8 @@ sdCrc16:
 	; Backup some of the TCC zeropage vars (tcc__r4/r4h, tcc__r5/r5h, tcc__r9/r9h)
    	ldx		#12
 -:
-	lda.b		tcc__r4,x
-   	sta.l		diskioRegBackup,x
+	lda.b	tcc__r4,x
+   	sta.l	diskioRegBackup,x
 	dex
 	bne		-
 
@@ -764,7 +764,6 @@ sdCrc16:
 	sta		tcc__r9
 	lda		_sdCrc16_data+2,s
 	sta		tcc__r9h
-
 
 	; for (i = 0; i < len; i++)
 	ldy		#0
@@ -777,13 +776,13 @@ sdCrc16:
 
 	tyx						; save Y
 	tay
-	lda 		#0				; clear A (to get proper indexes in X after TAXing with 8-bit A)
+	lda 	#0				; clear A (to get proper indexes in X after TAXing with 8-bit A)
 	sep		#$20
-	lda		[tcc__r9],y			; data[i]
+	lda		[tcc__r9],y		; data[i]
 	txy						; restore Y
 
 	; n_crc = (crc >> 56)
-	eor		tcc__r2+7			; crc d63:56
+	eor		tcc__r2+7		; crc d63:56
 	tax						; x = data[i] ^ n_crc
 	
     	; crc <<= 8;
@@ -813,15 +812,15 @@ sdCrc16:
 	eor		tcc__r2+6
 	sta		tcc__r2+6
 
-	lda.l		sec_buf,x
+	lda.l	sec_buf,x
 	eor		tcc__r2+2
 	sta		tcc__r2+2
 	
-	lda.l		sec_buf+$100,x
+	lda.l	sec_buf+$100,x
 	eor		tcc__r2+3
 	sta		tcc__r2+3
 
-	rep 		#$20
+	rep 	#$20
 	iny
 	jmp		-
 _sdCrc16_loop_end:
@@ -844,10 +843,10 @@ _sdCrc16_loop_end:
 	rep		#$20				; 16-bit A
 
 	; restore the TCC zeropage vars
-    	ldx		#12
+    ldx		#12
 -:
-    	lda.l		diskioRegBackup,x
-	sta.b		tcc__r4,x
+    lda.l	diskioRegBackup,x
+	sta.b	tcc__r4,x
 	dex
 	bne		-
 
@@ -885,33 +884,33 @@ sendSdWriteBlock4:
 -:
 	lda		[tcc__r1],y
 	iny
-	;and		#$FF
+	;and	#$FF
 	;pha
-	;jsr		wrMmcDatByte4		; wrMmcDatByte4( buf[i] )
+	;jsr	wrMmcDatByte4		; wrMmcDatByte4( buf[i] )
 	;pla
     
 	pha
 	; Write high nybble
-	lsr    		a
-	lsr    		a
-	lsr    		a
-	lsr    		a
-	and    		#15
+	lsr    	a
+	lsr    	a
+	lsr    	a
+	lsr    	a
+	and    	#15
 	asl	   	a
 	xba							; A = (dat & 15) << 9
 	tax
-	sep		#$20					; 8-bit A
-	lda.l  		MYTH_NEO2_WR_DAT4,x
-	rep		#$20					; 16-bit A
+	sep		#$20				; 8-bit A
+	lda.l  	MYTH_NEO2_WR_DAT4,x
+	rep		#$20				; 16-bit A
 	pla
 	; Write low nybble
-	and    		#15
+	and    	#15
 	asl	   	a
 	xba							; A = (dat & 15) << 9
 	tax
-	sep		#$20					; 8-bit A
-	lda.l  		MYTH_NEO2_WR_DAT4,x
-	rep		#$20					; 16-bit A
+	sep		#$20				; 8-bit A
+	lda.l  	MYTH_NEO2_WR_DAT4,x
+	rep		#$20				; 16-bit A
     
 	cpy		#512
 	bne		-
@@ -931,7 +930,7 @@ sendSdWriteBlock4:
 	cpy		#8
 	bne		-
 
-	pea.w		15
+	pea.w	15
 	jsr		wrMmcDatBit4		; write end bit
 	pla
 
@@ -996,7 +995,7 @@ sendSdWriteBlock4:
 	rts
 +:
 
-	pea.w		$FF
+	pea.w	$FF
 	jsr		wrMmcCmdByte
 	pla
 
@@ -1101,25 +1100,25 @@ sdInit:
 	jsr		wrMmcCmdByte
 	pla
 
-	SEND_MMC_CMD SEND_IF_COND,$1AA				; Check if the card can operate on the given voltage (2.7-3.6 V)
+	SEND_MMC_CMD SEND_IF_COND,$1AA		; Check if the card can operate on the given voltage (2.7-3.6 V)
 
 	RECV_MMC_CMD_RESP diskioResp,R7_LEN,1
 	lda		tcc__r0
 	beq		+
 	sep		#$20					; 8-bit A
-	lda.l		diskioResp
+	lda.l	diskioResp
 	cmp		#8
 	bne		++
-	lda.l		diskioResp+3
-	cmp		#1					; if successul, the card should've echoed back the voltage and check pattern we specified in the command
+	lda.l	diskioResp+3
+	cmp		#1					    ; if successul, the card should've echoed back the voltage and check pattern we specified in the command
 	bne		++
-	lda.l		diskioResp+4
+	lda.l	diskioResp+4
 	cmp		#$AA
 	bne		++
 	rep		#$20					; 16-bit A
-	lda.l		cardType
+	lda.l	cardType
 	ora		#2
-	sta.l		cardType				; V2 and/or HC card
+	sta.l	cardType				; V2 and/or HC card
 	bra		+	
 ++:
 	jmp		_sdInit_failed
@@ -1130,23 +1129,23 @@ sdInit:
 	SEND_MMC_CMD APP_CMD,$FFFF				
 	RECV_MMC_CMD_RESP diskioResp,R1_LEN,1
 	lda		tcc__r0
-	beq		+
-	lda.l		diskioResp+4
+    beq     _sdInit_appcmd_failed ;+
+	lda.l	diskioResp+4
 	and		#$20
 	beq		+
 
 	; sendMmcCmd(41, (cardType & 2) ? 0x40300000 : 0x00300000)
 	stx		tcc__r1						; save X
 	ldx		#$0030
-	lda.l		cardType
+	lda.l	cardType
 	and		#2
 	beq		++
 	ldx		#$4030
 ++:
 	phx
 	ldx		tcc__r1						; restore X
-	pea.w		0
-	pea.w		SD_SEND_OP_COND
+	pea.w	0
+	pea.w	SD_SEND_OP_COND
 	jsr		sendMmcCmd					
 	pla
 	pla
@@ -1156,19 +1155,19 @@ sdInit:
 	lda		tcc__r0
 	beq		++
 	sep		#$20						; 8-bit A
-	lda.l		diskioResp
+	lda.l	diskioResp
 	cmp		#$3F						; diskioResp[0] == 0x3F ?
 	bne		++
-	lda.l		diskioResp+1				
+	lda.l	diskioResp+1				
 	bpl		++							; diskioResp[1] & 0x80 ?
 
 	and		#$40						; diskioResp[1] & 0x40 ?
 	beq		+++
-	lda.l		cardType
+	lda.l	cardType
 	ora		#1
-	sta.l		cardType					; HC card
+	sta.l	cardType					; HC card
 +++:
-	lda.l		diskioResp+2
+	lda.l	diskioResp+2
 	and		#$30
 	bne		+++
 	rep		#$20						; 16-bit A
@@ -1188,6 +1187,7 @@ _sdInit_loop_end:
 
 	cpx		#0
 	bne		+
+_sdInit_appcmd_failed:    
 	; timed out
 	jmp		_sdInit_failed
 +:
@@ -1219,24 +1219,24 @@ _sdInit_loop_end:
 ++:
 
 	; rca = (resp[1]<<8) | resp[2]
-	lda.w		diskioResp+1
+	lda.w	diskioResp+1
 	xba
-	sta.w		diskioTemp
+	sta.w	diskioTemp
 
-;	lda.w		diskioTemp
+;	lda.w	diskioTemp
 	pha
-	pea.w		$FFFF
-	pea.w		9
+	pea.w	$FFFF
+	pea.w	9
 	jsr		sendMmcCmd					; SEND_CSD
 	pla
 	pla
 	pla	
 	RECV_MMC_CMD_RESP sd_csd,R2_LEN,1	
 
-	lda.w		diskioTemp
+	lda.w	diskioTemp
  	pha
-	pea.w		$FFFF
-	pea.w		7
+	pea.w	$FFFF
+	pea.w	7
 	jsr		sendMmcCmd					; SELECT_DESELECT_CARD
 	pla
 	pla
@@ -1278,13 +1278,13 @@ _sdInit_loop_end:
 	rep		#$20
 	bne		_sdInit_failed
 
-  ;SEND_MMC_CMD 6,$80FFFF01			; Set high-speed mode
-  ;RECV_MMC_CMD_RESP diskioResp,R1_LEN,1
-  ;ldx #512
-  ;-:
-  ;jsr		rdMmcDatBit
-  ;dex
-  ;bne -
+  SEND_MMC_CMD 6,$80FFFF01			; Set high-speed mode
+  RECV_MMC_CMD_RESP diskioResp,R1_LEN,1
+  ldx #512
+  -:
+  jsr		rdMmcDatBit
+  dex
+  bne -
   
 	plx
 	lda		#1
@@ -2039,7 +2039,6 @@ sdReadSingleBlockPsram:
 	stz		tcc__r0				; if (i-- < 0) return FALSE (timeout on start bit)
 	rts
 +:
-
 	lda		7,s					; proffs
 ;sta.l pfmountbuf
 	pha
@@ -2129,9 +2128,9 @@ disk_readsect_psram_asm:
 	pla
 	pla
 	jsr		neo2_post_sd
-	;lda		_disk_readp_sector,s
+	;lda	_disk_readp_sector,s
 	;sta.l	sec_last
-	;lda		_disk_readp_sector+2,s
+	;lda	_disk_readp_sector+2,s
 	;sta.l	sec_last+2
 ++:									; end if (sec_last != sector)
 	rep		#$20
@@ -2159,7 +2158,7 @@ _disk_readrsp_calc_sector:
 	sta		tcc__r1
 	lda		_disk_readrsp_sector+4,s
 	sta		tcc__r1h
-	lda.l		cardType
+	lda.l	cardType
 	and		#1
 	bne		+
 	; sector << 9
@@ -2191,12 +2190,12 @@ disk_writesect_asm:
 	rep		#$30
 	phx
 	phy
-	lda		tcc__r9					; save tcc__r9/r9h
+	lda		tcc__r9					        ; save tcc__r9/r9h
 	pha
 	lda		tcc__r9h
 	pha
 
-	lda.l		useGbacPsram
+	lda.l	useGbacPsram
 	beq		+
 	jsr		_neo_select_psram
 +:
@@ -2211,7 +2210,7 @@ disk_writesect_asm:
 	pha
 	lda		_disk_writes_src+6,s			; src offs. 
 	pha
-	jsr		sdWriteSingleBlock			; sdWriteSingleBlock(src, sector << ((cardType & 1) ? 0 : 9))
+	jsr		sdWriteSingleBlock			    ; sdWriteSingleBlock(src, sector << ((cardType & 1) ? 0 : 9))
 	lda		tcc__r0
 	bne		+++
 	; write failed, retry once
@@ -2224,9 +2223,9 @@ disk_writesect_asm:
 	pla
 	pla
 	jsr		neo2_post_sd
-	;lda		#$FFFF
-	;sta.l		sec_last
-	;sta.l		sec_last+2
+	; lda	#$FFFF
+	; sta.l	sec_last
+	; sta.l	sec_last+2
 	lda		#RES_ERROR
 	jmp		_disk_writes_return
 +++:
@@ -2235,13 +2234,13 @@ disk_writesect_asm:
 	pla
 	pla
 	jsr		neo2_post_sd
-++:								; end if (sec_last != sector)
+++:								            ; end if (sec_last != sector)
 	rep		#$20
 
 	lda		#RES_OK
 _disk_writes_return:
 	sta		tcc__r0
-	lda.l		useGbacPsram
+	lda.l	useGbacPsram
 	beq		+
 	jsr		_neo_select_menu
 +:
@@ -2438,7 +2437,7 @@ jsr.w jsr_r10
 	pla
 
 _disk_readprm_return:
-jml bbbbb+$7d0000
+jml bbbbb+$7d0000  ; Jump back to WRAM
 bbbbb:
 	jsr		sdReadStopMulti
 	lda.l	useGbacPsram

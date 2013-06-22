@@ -20,6 +20,8 @@
 .DEFINE PSRAM_ADDR $500000
 .ENDIF
 
+;;.DEFINE CART_TESTS
+
 
 copy_ram_code:
 	php
@@ -216,38 +218,38 @@ run_3800:
 ; EXT RAM  $003800~003FFF
 ;===============================================================================
 CPLD_RAM:
-    REP	#$30        ; A,8 & X,Y 16 BIT
-    LDX     #$0000
-    LDA     #$0000
+    	REP	#$30        ; A,8 & X,Y 16 BIT
+    	LDX    	#$0000
+    	LDA    	#$0000
 	; Clear RAM
 -:
-    STA.L   $7E0000,X
-    INX
-    INX
-    BNE     -
-    SEP		#$20
+    	STA.L   $7E0000,X
+    	INX
+    	INX
+    	BNE     -
+    	SEP	#$20
 
-    LDA     #$80                 ;
-    STA.L   REG_DISPCNT
-    lda		#$00
+    	LDA     #$80                 ;
+    	STA.L   REG_DISPCNT
+    	lda	#$00
 
 	; Clear VRAM
 	sta.l	REG_VRAM_ADDR_L
 	sta.l	REG_VRAM_ADDR_H
-	lda		#VRAM_WORD_ACCESS
+	lda	#VRAM_WORD_ACCESS
 	sta.l	REG_VRAM_INC
-	ldx		#0
-	lda		#0
+	ldx	#0
+	lda	#0
 -:
 	sta.l	REG_VRAM_DATAW1
 	sta.l	REG_VRAM_DATAW2
 	inx
-	bne		-
-	sep		#$30
+	bne	-
+	sep	#$30
 	
-    STA.L   REG_MDMAEN
-    STA.L   REG_HDMAEN
-    STA.L   REG_NMI_TIMEN
+    	STA.L   REG_MDMAEN
+    	STA.L   REG_HDMAEN
+	STA.L   REG_NMI_TIMEN
 	STA.L	REG_BG0MAP
 	STA.L	REG_BG1MAP
 	STA.L	REG_CHRBASE_L
@@ -256,11 +258,11 @@ CPLD_RAM:
 	STA.L	REG_VRAM_ADDR_L
 	STA.L	REG_VRAM_ADDR_H
 	STA.L	REG_BGCNT
-	LDA		#$20
+	LDA	#$20
 	STA.L	REG_COLDATA
-	LDA		#$40
+	LDA	#$40
 	STA.L	REG_COLDATA
-	LDA		#$80
+	LDA	#$80
 	STA.L	REG_COLDATA
 
     SEI
@@ -524,19 +526,19 @@ run_secondary_cart:
 	rtl
 
 +:
-	lda.b		tcc__r0
+	lda.b	tcc__r0
 	and		#$8000
 	beq		+
 	; B was pressed
 	sep		#$20
 	lda		#$05
-	sta.l		MYTH_OPTION_IO
+	sta.l	MYTH_OPTION_IO
 	lda		#0
-	sta.l		$00c017
+	sta.l	$00c017
 	lda		#$05
-	sta.l		MYTH_OPTION_IO
+	sta.l	MYTH_OPTION_IO
 	plx
-	jmp.w		run_3800 & $ffff
+	jmp.w	run_3800 & $ffff
 
 +:
 	rep		#$30
@@ -704,17 +706,17 @@ fix_region_checks:
 	phx
 	phy
 
-	lda.l		doRegionPatch
+	lda.l	doRegionPatch
 	beq		++
 	dea
 	bne		+
-	cmp.b		tcc__r3			; make sure that ((doRegionPatch == 2) || (banksCopied == 0)) is true
+	cmp.b	tcc__r3			; make sure that ((doRegionPatch == 2) || (banksCopied == 0)) is true
 	bne		++
 +:
-	lda.b		tcc__r2
-	sta.b		tcc__r4
+	lda.b	tcc__r2
+	sta.b	tcc__r4
 	jsr		_fix_region_checks
-	inc.b		tcc__r4
+	inc.b	tcc__r4
 	jsr		_fix_region_checks
 ++:
 	sep		#$30			; 8-bit A/X/Y
@@ -736,13 +738,13 @@ _fix_region_checks:
 	pha
 	plb						; DBR = $5x (PSRAM)
 
-	lda.l		REG_STAT78
+	lda.l	REG_STAT78
 	and		#$10
 	beq		_frc_ppu_is_60hz
 	rep		#$30			; 16-bit A/X/Y
 	ldx		#0
 -:
-	lda.w		PSRAM_OFFS,x
+	lda.w	PSRAM_OFFS,x
 	phx		; psram position
 	tay
 	and		#$ff
@@ -1166,6 +1168,8 @@ neo2_myth_bootcart_rom_read:
 	sta.l		$C017
 	lda		#5
 	sta.l		MYTH_OPTION_IO
+lda		#0
+sta.l		$C017
 
 	lda		12,s			; dest bank
 	sta		tcc__r2h
@@ -1196,7 +1200,7 @@ neo2_myth_bootcart_rom_read:
 	
 	sep		#$20
 
-	lda		#MAP_MENU_FLASH_TO_ROM ;GBAC_TO_PSRAM_COPY_MODE
+	lda		#MAP_MENU_FLASH_TO_ROM 
 	sta.l		MYTH_OPTION_IO
 	lda		#0
 	sta.l		$C017
@@ -1640,7 +1644,119 @@ neo2_gbac_psram_read_op:
 	rtl
 
 
-       
+
+neo2_enable_id:
+	sep	#$20
+	rep	#$10
+	
+	lda	#0
+	sta.l	MYTH_OPTION_IO	; set mode 0
+	lda	#$20
+	sta.l	MYTH_GBAC_ZIO	; A21 off
+	
+ 	ldx	#$00E2		; GBA WE on
+ 	ldy	#$1500	
+	jsr	_neo_asic_cmd	
+ 	ldx	#$0037		; Select menu flash
+ 	ldy	#$2003
+	jsr	_neo_asic_cmd	
+ 	ldx	#$00EE		; Enable extended address bus
+ 	ldy	#$0630
+	jsr	_neo_asic_cmd	
+
+ 	ldx	#$0090		; Enable ID
+ 	ldy	#$3500
+	jsr	_neo_asic_cmd	
+
+        lda     #$00
+        sta.l   MYTH_GBAC_ZIO   ; SET A16~A23
+        sta.l   MYTH_GBAC_HIO   ; SET A24,A25
+        lda     #$01
+        sta.l   MYTH_EXTM_ON   	; A25,A24 ON
+        lda     #$04
+        sta.l   MYTH_SRAM_TYPE  ; SET SRAM SAVE TYPE
+        lda     #$0F
+        sta.l   MYTH_SRAM_MAP  	; Map SRAM to $700000
+        lda     #$01
+        sta.l   MYTH_SRAM_WE  ; SRAM ON !  
+	rts
+	
+
+neo2_disable_id:
+	sep 	#$20
+	rep	#$10
+
+	lda	#0
+	sta.l	MYTH_OPTION_IO				; set mode 0
+	lda	#$20
+	sta.l	MYTH_GBAC_ZIO	
+	
+ 	ldx	#$0090
+ 	ldy	#$4900
+	jsr	_neo_asic_cmd	
+
+	lda 	#0
+        sta.l 	MYTH_SRAM_TYPE
+        sta.l 	MYTH_SRAM_TYPE
+        sta.l   MYTH_SRAM_WE
+         
+    	jsr	_neo_select_menu
+    	jsr	neo2_post_sd
+    	rts
+
+
+; u16 neo2_read_id()
+neo2_read_id:
+	php
+	rep	#$30
+	phx
+	phy
+	lda	#0
+	sta	tcc__r0
+	jsr	neo2_enable_id
+	sep	#$20
+	; Check signature
+	ldx	#0
+	lda.l	$700000,x
+	cmp	#$34
+	bne	+
+	inx
+	lda.l	$700000,x
+	cmp	#$16
+	bne	+
+	inx
+	lda.l	$700000,x
+	cmp	#$96
+	bne	+
+	inx
+	lda.l	$700000,x
+	cmp	#$24
+	bne	+
+	lda	#1
+	sta	tcc__r0
+	; Check cart type
+	lda.l	$708001
+	bpl	++
+	lda	#2	; Neo2
+	sta	tcc__r0+1
+	bra	+
+++:
+	lda.l	$708080
+	bpl	+
+	lda	#3	; Neo3
+	sta	tcc__r0+1
++:
+	sep 	#$10
+	stx 	tcc__r0
+	rep 	#$10
+	jsr	neo2_disable_id
+	rep	#$30
+	ply
+	plx
+	plp
+	rtl
+	
+	  
          
 ; void neo2_sram_read(char *dest, u16 sramBank, u16 sramOffset, u16 length)
 neo2_sram_read:
@@ -2544,7 +2660,7 @@ RUN_M01:
 _neo_asic_cmd:
 	php
 	sep 	#$20
-	rep		#$10
+	rep	#$10
 
     	jsr    SET_NEOCM5
 
@@ -2574,34 +2690,34 @@ _neo_asic_cmd:
 ; select Neo Flash Menu Flash ROM
 ; allows you to access the menu flash via flash space
 _neo_select_menu:
-	sep		#$20
-	rep		#$10
+	sep	#$20
+	rep	#$10
 	phx
 	phy
 
-	lda		#0
+	lda	#0
 	sta.l	MYTH_OPTION_IO				; set mode 0
-	lda		#$20
+	lda	#$20
 	sta.l	MYTH_GBAC_ZIO				; A21 off
 
-	ldx		#$0037
-	rep		#$20
+	ldx	#$0037
+	rep	#$20
 	lda.l 	neo_mode					; enable/disable SD card interface
-	ora		#$0003
+	ora	#$0003
 	tay
-	jsr		_neo_asic_cmd				; set cr = select menu flash
+	jsr	_neo_asic_cmd				; set cr = select menu flash
 
-	ldx		#$00DA
-	ldy		#$0044
-	jsr		_neo_asic_cmd				; set iosr = disable game flash
+	ldx	#$00DA
+	ldy	#$0044
+	jsr	_neo_asic_cmd				; set iosr = disable game flash
 
-	sep		#$20
-	lda		#0
+	sep	#$20
+	lda	#0
 	sta.l	MYTH_GBAC_LIO				; clear low bank select reg
 	sta.l	MYTH_GBAC_HIO				; clear high bank select reg
 	;sta.l	MYTH_GBAC_ZIO
 
-	rep		#$30
+	rep	#$30
 	ply
 	plx
 	rts
@@ -2843,6 +2959,7 @@ _nrsdp_write:
 	
 
 
+nop
 
 ; void neo2_recv_sd_psram_multi(WORD prbank, WORD proffs, WORD count)
 ;
@@ -2921,7 +3038,7 @@ _nrsdpm_loop_inner:
 	xba
 	rep		#$20
 
-; THIS LABEL MUST BE LOCATED AT AN ODD ADDRESS
+; *** THIS LABEL MUST BE LOCATED AT AN ODD ADDRESS ***
 _nrsdpm_write:
 	sta.l $500000,x					; Write 16 bits to PSRAM
 	inx
@@ -2993,8 +3110,6 @@ neo2_recv_sd_psram_multi_hwaccel:
 	lda		_neo2_recv_sd_psram_multi_hwaccel_count,s
 	tay
 	sep		#$20
-	;lda		#$01
-	;sta.l	REG_MEMSEL	
 _nrsdpmhw_selfmod_bank1:	
 	lda.l	$7d0000+_disk_readprm_jump_to_psram+3 
 	pha
