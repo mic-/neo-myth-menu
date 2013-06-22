@@ -1,12 +1,14 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "common.h"
 #include "diskio.h"
 #include "snes.h"
-#include "common.h"
 
 
 typedef volatile unsigned short int vu16;
+
+//#define MAKE_RAM_FPTR(fptr, fun) fptr = fun & 0x7fff; add_full_pointer((void**)&fptr, RAM_CODE_BANK-1, RAM_CODE_OFFSET)
 
 
 /* global variables and arrays */

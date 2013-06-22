@@ -11,6 +11,8 @@ extern void neo2_myth_bootcart_rom_read(char *dest, u16 romBank, u16 romOffset, 
 
 //extern void neo2_check_gbac_psram();
 
+extern u16 neo2_read_id();
+
 extern void neo2_myth_psram_read(char *dest, u16 psramBank, u16 psramOffset, u16 length);
 extern void neo2_myth_psram_write(char *src, u16 psramBank, u16 psramOffset, u16 length);
 extern void neo2_myth_psram_write_test_data(char *src, u16 psramBank, u16 psramOffset, u16 length);
