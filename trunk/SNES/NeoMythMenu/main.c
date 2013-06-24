@@ -1,5 +1,5 @@
 // SNES Myth Shell
-// C version 0.60
+// C version 0.65
 //
 // Mic, 2010-2013
 
@@ -865,7 +865,7 @@ void dump_to_sd()
 		sectors = 1 << (neoSramDumpSize + 1);
 		// The neoSramDumpAddr is in 8 kB steps
 		romOffs = neoSramDumpAddr;
-		romBank = neoSramDumpSize & 0x18;
+		romBank = neoSramDumpAddr & 0x18;
 		romOffs <<= 13;
 		romBank >>= 3;
 	}
@@ -961,6 +961,7 @@ void dump_to_sd()
 }
 
 
+
 void save_last_played_game_info(lastPlayedGame_t *info)
 {
 	void (*sram_write)(char*, u16, u16, u16);
@@ -984,6 +985,109 @@ int restore_last_played_game_info(lastPlayedGame_t *info)
 	}
 	return 0;
 }
+
+
+void save_neo_sram_to_sd()
+{
+	int     i;
+	void    (*sram_read)(char *, u16, u16, u16);
+	DWORD   sectors;
+	u16     ramBank,ramOffs,ramOffsReset;
+	char    *dumpFileName;
+
+	if (lastPlayedGame.sramStatus != LAST_GAME_SRAM_BACKUP_PENDING ||
+	    lastPlayedGame.sramSize == 0)
+	{
+		return;
+	}
+
+	strcpy(tempString, "/SNES/SAVES/");
+
+	switch (lastPlayedGame.sramSize)
+	{
+		case 1:	 	// 2 kB
+			sectors = 4;
+			break;
+		case 2:		// 8 kB
+			sectors = 16;
+			break;
+		case 3:		// 32 kB
+			sectors = 64;
+			break;
+		case 4:		// 64 kB
+			sectors = 128;
+			break;
+		case 5:		// 128 kB
+			sectors = 256;
+			break;
+	}
+
+	// Neo cart SRAM
+	dumpFileName = (char*)(ramDumpNames[neoSramDumpSize-1]);
+	strcpy(&tempString[12], dumpFileName);
+	tempString[17+strlen(dumpFileName)] = 0;
+
+	ramOffs = 0;
+	ramBank = lastPlayedGame.sramBank;
+
+	clear_status_window();
+	hide_games_list();
+	update_screen();
+
+	if ((lastSdError = pf_open(tempString)) != FR_OK)
+	{
+		// Fail silently
+		return;
+	}
+
+	printxy("Backing up SRAM..", 3, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	printxy("PLEASE DO NOT REMOVE THE", 3, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	printxy("SD CARD OR TURN OFF THE ", 3, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	printxy("SNES UNTIL THE BACKUP IS", 3, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	printxy("COMPLETE",                 3, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	update_screen();
+
+	// Write the CRC LUTs to RAM
+	for (i=0; i<256; i++)
+	{
+		sec_buf[i]     = (i & 0x0F) << 4;
+		sec_buf[i+256] = (i & 0xF0) >> 4;
+	}
+
+	printxy("Saving   ", 3, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
+	print_hex(sectors>>8, 10, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	print_hex(sectors, 12, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+	update_screen();
+
+	// Neo cart SRAM
+	MAKE_RAM_FPTR(sram_read, neo2_sram_read);
+	while (sectors)
+	{
+		sram_read((char*)gbaCardAlphabeticalIdx, ramBank, ramOffs, 512);
+		if ((lastSdError = pf_write(gbaCardAlphabeticalIdx, 512, &i)) != FR_OK)
+		{
+			lastSdOperation = SD_OP_WRITE_FILE;
+			switch_to_menu(MID_SD_ERROR_MENU, 0);
+			return;
+		}
+		sectors--;
+		ramOffs += 512;
+		if (ramOffs == 0)
+		{
+			ramBank++;
+			ramOffs = 0;
+			print_hex(sectors>>8, 11, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+			print_hex(sectors, 13, 21, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+			update_screen();
+		}
+	}
+
+
+	lastPlayedGame.sramStatus = LAST_GAME_SRAM_BACKUP_DONE;
+	save_last_played_game_info(&lastPlayedGame);
+	clear_screen();
+}
+
 
 
 void run_game_from_sd_card_c(int whichGame)
@@ -1657,7 +1761,6 @@ int main()
 	update_screen();
 	REG_BGCNT = 3;			// Enable BG0 and BG1
 
-	//set_source_medium(SOURCE_SD, 1);
 	if (set_source_medium(SOURCE_SD, 1) != SOURCE_SD)
 	{
 		clear_screen();
@@ -1671,8 +1774,6 @@ int main()
 		// ~160-175 kB/s
 		MAKE_RAM_FPTR(recv_sd_psram_multi, neo2_recv_sd_psram_multi_hwaccel);
 	}
-
-	//REG_BGCNT = 3;			// Enable BG0 and BG1
 
 	keys = keysLast = 0;
     keyUpReptDelay   = KEY_REPEAT_INITIAL_DELAY;

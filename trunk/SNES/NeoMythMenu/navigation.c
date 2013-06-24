@@ -92,6 +92,14 @@ const char * const countryCodeStrings[] =
 	"(Australia)",
 };
 
+const char * const sdManufacturerStrings[] =
+{
+	"Unknown",
+	"Panasonic",
+	"Toshiba",
+	"SanDisk",
+};
+
 const char * const romRamSizeStrings[] =
 {
 	"(None)    ", "(16 kbit) ", "(32 kbit) ",
@@ -1017,6 +1025,7 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			printxy("Compressed size:", 2, i+1, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 32);
 			print_dec(compressedVgmSize, 21, i+1, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 			break;
+
 		case MID_SD_INFO_MENU:
 			keypress_handler = sd_error_menu_process_keypress;
 			print_meta_string(MS_SD_INFO_MENU_INSTRUCTIONS);
@@ -1031,31 +1040,41 @@ void switch_to_menu(u8 newMenu, u8 reusePrevScreen)
 			printxy("Card type:", 2, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
             print_hex(cardType>>8, 13, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
             print_hex(cardType, 15, 10, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-			printxy("Sectors:", 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
-            print_hex(num_sectors>>24, 11, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-            print_hex(num_sectors>>16, 13, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-            print_hex(num_sectors>>8, 15, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-            print_hex(num_sectors, 17, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
-			printxy("File system:", 2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
-			printxy("Cluster size:", 2, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			//printxy("Speed class:", 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+            //print_hex(sdSpeedClass, 15, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+			printxy("Manufacturer:", 2, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+            print_hex(sdManufId, 16, 11, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+			printxy("Manufactured: 2000/", 2, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			print_dec((sdManufDate >> 4)+2000, 16, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+			print_dec(sdManufDate & 0x0F, 21, 12, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+
+			printxy("Sectors:", 2, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+            print_hex(num_sectors>>24, 11, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+            print_hex(num_sectors>>16, 13, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+            print_hex(num_sectors>>8, 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+            print_hex(num_sectors, 17, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+			printxy("File system:", 2, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+			printxy("Cluster size:", 2, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 			if (FatFs)
 			{
 				if (FatFs->fs_type == FS_FAT12)
-					printxy("FAT12", 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+					printxy("FAT12", 15, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 				else if (FatFs->fs_type == FS_FAT16)
-					printxy("FAT16", 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+					printxy("FAT16", 15, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 				else if (FatFs->fs_type == FS_FAT32)
-					printxy("FAT32", 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+					printxy("FAT32", 15, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 				else
-					printxy("??? ", 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
-	            print_hex(FatFs->csize, 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
+					printxy("??? ", 15, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+	            print_hex(FatFs->csize, 16, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE));
 			}
 			else
 			{
-				printxy("??? ", 15, 13, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
-				printxy("??? ", 16, 14, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+				printxy("??? ", 15, 15, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
+				printxy("??? ", 16, 16, TILE_ATTRIBUTE_PAL(SHELL_BGPAL_WHITE), 21);
 			}
 			break;
+
 		case MID_SD_ERROR_MENU:
 			keypress_handler = sd_error_menu_process_keypress;
 			print_meta_string(MS_SD_ERROR_MENU_INSTRUCTIONS);

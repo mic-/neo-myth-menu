@@ -1,5 +1,5 @@
 ; Assembly optimized pff routines
-; /Mic, 2010-2012
+; /Mic, 2010-2013
 
 .include "hdr.asm"
 .include "snes_io.inc"

@@ -12,6 +12,11 @@ extern char sdRootDir[200];
 extern u16 sdRootDirLength;
 extern int lastSdError, lastSdOperation;
 extern char *lastSdParam;
+extern u8 sdManufId;
+extern u16 sdManufDate;
+extern u16 sdOemId;
+extern u8 sdSpeedClass;
+
 
 int init_sd();
 void change_directory(char *path);

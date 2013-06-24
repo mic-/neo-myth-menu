@@ -38,7 +38,7 @@ tools\stripcom myth_io.ps myth_io.ps2
 tools\stripcom pff.ps pff.ps2
 tools\stripcom u_strings.ps u_strings.ps2
 tools\stripcom cheat_db.ps cheat_db.s
-REM del *.ps 
+del *.ps 
 
 ..\bin\816-opt.py main.ps2 > main.s
 ..\bin\816-opt.py navigation.ps2 > navigation.s

@@ -1,5 +1,5 @@
 ; SNES specific implementation of diskio 
-; /Mic, 2010-2011
+; /Mic, 2010-2013
 
 
 ; Fixed bugs:
@@ -40,8 +40,11 @@
 
 ; MMC commands
 .EQU GO_IDLE_STATE 0
+.EQU ALL_SEND_CID 2
 .EQU SET_BUS_WIDTH 6
 .EQU SEND_IF_COND 8
+.EQU SEND_CSD 9
+.EQU SEND_CID 10
 .EQU STOP_TRANSMISSION 12
 .EQU READ_SINGLE_BLOCK 17
 .EQU READ_MULTIPLE_BLOCK 18
@@ -1159,7 +1162,7 @@ sdInit:
 	cmp		#$3F						; diskioResp[0] == 0x3F ?
 	bne		++
 	lda.l	diskioResp+1				
-	bpl		++							; diskioResp[1] & 0x80 ?
+	bpl		++							; diskioResp[1] & 0x80 ? (card ready)
 
 	and		#$40						; diskioResp[1] & 0x40 ?
 	beq		+++
@@ -1192,11 +1195,22 @@ _sdInit_appcmd_failed:
 	jmp		_sdInit_failed
 +:
 
-	SEND_MMC_CMD 2,$FFFFFFFF			; ALL_SEND_CID
+	SEND_MMC_CMD ALL_SEND_CID,$FFFFFFFF	; ALL_SEND_CID
 	RECV_MMC_CMD_RESP diskioResp,R2_LEN,1
 	lda		tcc__r0
 	beq		+
 	sep		#$20						; 8-bit A
+ lda.l diskioResp+1
+ sta.l sdManufId
+ lda.l diskioResp+2
+ sta.l sdOemId
+ lda.l diskioResp+3
+ sta.l sdOemId+1
+ lda.l diskioResp+14
+ and #$0F
+ sta.l sdManufDate+1
+ lda.l diskioResp+15
+ sta.l sdManufDate
 	lda.l	diskioResp
 	cmp		#$3F						; diskioResp[0] == 0x3F ?
 	rep		#$20						; 16-bit A
@@ -1226,13 +1240,36 @@ _sdInit_appcmd_failed:
 ;	lda.w	diskioTemp
 	pha
 	pea.w	$FFFF
-	pea.w	9
+	pea.w	SEND_CSD
 	jsr		sendMmcCmd					; SEND_CSD
 	pla
 	pla
 	pla	
 	RECV_MMC_CMD_RESP sd_csd,R2_LEN,1	
 
+    ;lda.w   diskioTemp
+    ;pha
+    ;pea.w   $FFFF
+    ;pea.w   SEND_CID                    ; SEND_CID
+    ;jsr     sendMmcCmd                  
+    ;pla
+    ;pla
+    ;pla 
+    ;RECV_MMC_CMD_RESP diskioResp,R2_LEN,1   
+    ;sep     #$20                        ; 8-bit A
+    ;lda.l   diskioResp+0
+    ;sta.l   sdManufId
+    ;lda.l   diskioResp+14
+    ;sta.l   sdManufDate
+    ;lda.l   diskioResp+13
+    ;and     #$0F
+    ;sta.l   sdManufDate+1
+    ;lda.l   diskioResp+2
+    ;sta.l   sdOemId
+    ;lda.l   diskioResp+1
+    ;sta.l   sdOemId
+    ;rep     #$20
+    
 	lda.w	diskioTemp
  	pha
 	pea.w	$FFFF
@@ -1245,7 +1282,7 @@ _sdInit_appcmd_failed:
 	lda		tcc__r0
 	beq		+
 	sep		#$20						; 8-bit A
-	lda.l		diskioResp
+	lda.l	diskioResp
 	cmp		#7
 	rep		#$20						; 16-bit A
 	beq		++
@@ -1253,18 +1290,19 @@ _sdInit_appcmd_failed:
 	jmp		_sdInit_failed
 ++:
 
-	lda.w		diskioTemp
+    lda.w  diskioTemp
  	pha
-	pea.w		$FFFF
-	pea.w		APP_CMD
+	pea.w	$FFFF
+	pea.w	APP_CMD
 	jsr		sendMmcCmd					; APP_CMD
 	pla
 	pla
 	pla
+    ;SEND_MMC_CMD APP_CMD,$FFFF
 	RECV_MMC_CMD_RESP diskioResp,R1_LEN,1	
 	lda		tcc__r0
 	beq		_sdInit_failed
-	lda.l		diskioResp
+	lda.l	diskioResp
 	and		#$20	
 	beq		_sdInit_failed
 
@@ -1278,18 +1316,7 @@ _sdInit_appcmd_failed:
 	rep		#$20
 	bne		_sdInit_failed
 
-  SEND_MMC_CMD 6,$80FFFF01			; Set high-speed mode
-  RECV_MMC_CMD_RESP diskioResp,R1_LEN,1
-  ldx #512
-  -:
-  jsr		rdMmcDatBit
-  dex
-  bne -
-  
-	plx
-	lda		#1
-	sta		tcc__r0						; return TRUE
-	rts
+    bra _sdInit_return
 
 _sdInit_failed:
 	rep		#$20
@@ -1298,6 +1325,39 @@ _sdInit_failed:
 	stz		tcc__r0						; return FALSE
 	rts
 
+_sdInit_return:
+    ; Get SD Status
+    ;SEND_MMC_CMD APP_CMD,$FFFF              
+    ;RECV_MMC_CMD_RESP diskioResp,R1_LEN,1
+    ;lda     tcc__r0
+    ;beq     _sdInit_failed
+    ;SEND_MMC_CMD 13,0               ; ACMD13 (Send SD Status)
+    ;RECV_MMC_CMD_RESP diskioResp,R1_LEN,1
+    ;ldx #0
+    ;-:
+    ;    jsr rdMmcDatByte
+    ;    sta.l sec_buf,x
+    ;    inx
+    ;    cpx #66
+    ;    bne -
+    ;sep #$20
+    ;lda.l sec_buf+55
+    ;sta.l sdSpeedClass
+    ;rep #$20
+    
+    SEND_MMC_CMD 6,$80FFFF01          ; Set high-speed mode
+    RECV_MMC_CMD_RESP diskioResp,R1_LEN,1
+    ldx #512
+    -:
+    jsr       rdMmcDatBit
+    dex
+    bne -
+  
+    plx
+    lda     #1
+    sta     tcc__r0                     ; return TRUE
+    rts
+    
 ;**********************************************************************************************
 
 
