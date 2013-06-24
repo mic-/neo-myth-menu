@@ -11,6 +11,10 @@
 FATFS   sdFatFs;
 DIR     sdDir;
 FILINFO sdFileInfo;
+u8 		sdManufId = 0;
+u16		sdManufDate = 0;
+u16 	sdOemId = 0;
+u8		sdSpeedClass;
 int     lastSdError, lastSdOperation;
 char 	*lastSdParam = NULL;
 #ifdef _USE_LFN
@@ -18,6 +22,8 @@ char    sdLfnBuf[80];
 #endif
 char    sdRootDir[200] = "/SNES/ROMS";
 u16     sdRootDirLength = 10;
+
+extern void save_neo_sram_to_sd();
 
 
 int init_sd()
@@ -296,6 +302,9 @@ sourceMedium_t set_source_medium(sourceMedium_t newSource, u16 silent)
 				gamesList.firstShown = gamesList.highlighted = 0;
 				MS4[0xd] = '1'; MS4[0xc] = MS4[0xb] = '0';	// Reset the "Game (001)" string
 				clear_screen();
+				/*if (firstSdMount && silent) {
+					save_neo_sram_to_sd();
+				}*/
 				switch_to_menu(MID_MAIN_MENU, 0);
 				firstSdMount = 0;
 			}
