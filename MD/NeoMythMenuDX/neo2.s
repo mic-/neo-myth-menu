@@ -563,6 +563,10 @@ _neo_set_fsize:
 | entry: d0 = neo myth psram bank size
 |        a1 = hardware base (0xA10000)
 _neo_set_myth_psize:
+        move.w  #0x00E0,d1              /* no bank aliasing => 32Mbit */
+        tst.w   gNoAlias
+        bne.b   1f
+        /* set psram bank size */
         swap    d0
         move.w  #0x00FF,d1
         cmpi.w  #0x0002,d0
@@ -1003,15 +1007,25 @@ neo_run_sms:
         bsr     _neo_set_fsize          /* set the flash space bank size */
 
         bsr     _clear_hw
+        move.w  #0x8910,0xC00004
+        move.w  #0x8C00,0xC00004
+        move.w  #0x8F00,0xC00004
+        move.w  #0x9000,0xC00004
+
         move.l  20(sp),d0               /* run */
         move.w  gYM2413,d1              /* 0x0000 = YM2413 disabled, 0x0001 = YM2413 enabled */
         ori.w   #0x00FE,d1
         and.w   d1,d0
         move.w  d0,OPTION_IO(a1)        /* set run mode for game */
 
+        lea     0xFF8000,a0
+        move.w  #0xAB,(a0)+
         moveq   #0,d0
-        move.w  d0,0xFF8000
-        move.w  d0,0xFF8002
+        move.w  #8190,d1
+0:
+        move.w  d0,(a0)+
+        dbra    d1,0b
+
         move.w  #0x00FF,d0
         move.w  d0,RST_IO(a1)
         move.w  d0,RUN_IO(a1)

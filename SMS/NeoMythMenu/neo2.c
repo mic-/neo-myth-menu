@@ -164,8 +164,8 @@ void neo2_disable_psram()
     neo2_asic_cmd(0x37,0x2003|neoMode_); // select menu flash
     neo2_asic_cmd(0xDA,0x0044); // deselect psram
     neo2_asic_end();
-}    
-    
+}
+
 void neo2_ram_to_sram(BYTE dsthi, WORD dstlo, BYTE* src, WORD len) __naked
 {
     dsthi, dstlo, src, len; // suppress warning
@@ -383,7 +383,7 @@ BYTE neo2_test_psram()
     char test[] = "Test1234";
     char *pRam = (char *)0xDC00;
     BYTE i;
-    
+
     for (i=0; i<8; i++)
         pRam[i] = test[i];
     neo2_ram_to_psram(0, 0x0000, pRam, 8);
@@ -400,7 +400,7 @@ BYTE neo2_test_psram()
     }
     return i;
 }
-    
+
 /*void neo2_debug_dump_hex(WORD addr)
 {
     BYTE *p = (BYTE*)addr;
@@ -456,10 +456,10 @@ void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu,WORD jump_addr)
     else
     {
         // run from psram
-		wtemp = 0xAF44; // select psram (works for both Neo2-SD and Pro)
+        wtemp = 0xAF4E; // select psram (works for both Neo2-SD and Pro)
     }
     neo2_asic_begin();
-    neo2_asic_cmd(0x37, 0x2203); // enable game flash
+    neo2_asic_cmd(0x37, 0x2202); // enable game flash
     neo2_asic_cmd(0xDA, wtemp);
     neo2_asic_end();
 
@@ -504,7 +504,7 @@ void neo2_run_game_gbac(BYTE fm_enabled,BYTE reset_to_menu,WORD jump_addr)
 
     Frame1 = 1;
     Frame2 = 2;
-	wtemp = jump_addr;
+    wtemp = jump_addr;
 
     ((void (*)())wtemp)(); // RESET => jump to address
 }

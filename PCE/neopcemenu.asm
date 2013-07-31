@@ -152,14 +152,14 @@ fontPtr		ds 2
 .org $1FF0
  .dw 1,0,0
 ; Interrupt vectors
- .dw vdc_irq                    
- .dw vdc_irq                   
- .dw timer_irq               
- .dw vdc_irq               
- .dw start     
+ .dw vdc_irq
+ .dw vdc_irq
+ .dw timer_irq
+ .dw vdc_irq
+ .dw start
 
 
- 
+
 .bank 0 slot 7
 .org $0000
 .section "text"
@@ -167,7 +167,7 @@ fontPtr		ds 2
 ; The font data needs to be placed on an even page boundary
 font_data:
 	.incbin "assets\pcefont.bin"
-	
+
 
 ram_code:
 	lda		<NEO_MAGIC1
@@ -178,7 +178,7 @@ ram_code:
 	sta		$FFF0
 	lda		<GAME_BANK
 	sta		$FFF0
-	
+
 	lda		<NEO_MAGIC1
 	sta		$FFF0
 	lda		<NEO_MAGIC2
@@ -187,7 +187,7 @@ ram_code:
 	sta		$FFF0
 	lda		<GAME_SRAM
 	sta		$FFF0
-	
+
 	lda		<NEO_MAGIC1
 	sta		$FFF0
 	lda		<NEO_MAGIC2
@@ -200,8 +200,8 @@ ram_code:
 
     ; Jump to the game's reset vector
 	jmp		($FFFE)
-ram_code_end:	
-	
+ram_code_end:
+
 
 
 setup_video:
@@ -222,7 +222,7 @@ setup_video:
 	bcc		-
 
 	jsr		clear_bat
-	
+
 	sti16	fontPtr,font_data
 	set_mawri $1000		; set VRAM address $1000 (byte address $2000)
 	st0		#2			; select VDC register 2 (VWR)
@@ -246,7 +246,7 @@ setup_video:
 	; TGX
 	tia		bg_patterns2,VDC_DATA_L,48*32
 	tia		bg_patterns+48*32,VDC_DATA_L,85*32
-++:		
+++:
 
 	stz.w	VCE_INDEX_L
 	stz.w	VCE_INDEX_H
@@ -254,9 +254,9 @@ setup_video:
 	rts
 
 
-load_font:	
+load_font:
 	cly
---:	
+--:
 	ldx		#7
 	sty		<tempw
 -:
@@ -290,10 +290,10 @@ load_font:
 
 ; Clear the Block Attribute Table (actually fills it with the tile indices need to display all the
 ; background graphics except for the text labels).
-clear_bat:	
+clear_bat:
 	; The BAT is located at VRAM address $0000
 	set_mawri $0000
-	
+
 	st0		#2				; select VDC register 2 (VWR)
 	lda.w	$FFF0
 	cmp		#1
@@ -330,13 +330,13 @@ clear_bat:
 	rts
 
 
-delay:	
+delay:
 	pha
 	lda		#$08
-	sta		<tempw+1 
+	sta		<tempw+1
 -:
 	lda		#0
-	sta		<tempw 
+	sta		<tempw
 --:
 	dec		<tempw
 	lda		<tempw
@@ -348,16 +348,16 @@ delay:
 	bne 	-
 	pla
 	rts
-	
-	
-wait_keyrelease: 
+
+
+wait_keyrelease:
 	jsr 	read_joypad
 	lda		<joyData
 	bne		wait_keyrelease
 	rts
-	
 
-read_joypad:	
+
+read_joypad:
 	lda		#3
 	sta		GAMEPAD_IO
 	lda		#1
@@ -377,14 +377,14 @@ read_joypad:
 	sta		<joyData
 	jsr		delay
 	rts
-	
 
 
-start:		
+
+start:
 	sei
 	cld
 	csl				; run the CPU at low speed
-	
+
 	; Setup banking. RAM at $0000 and $2000, I/O registers at $4000
 	lda		#$F8
 	tam		#$01
@@ -397,16 +397,16 @@ start:
 	tam		#$20
 	lda		#$03
 	tam		#$10
-	
+
 	ldx		#$FF
 	txs
-	
+
 	tii		ram_code,$2800,ram_code_end-ram_code
 
 	cly
 	jsr		setup_video
 
-	; Count the number of games on the card	
+	; Count the number of games on the card
 	ldx		#$FF
 	cly
 	sty		<$98
@@ -447,10 +447,10 @@ main_menu:
 	sta		<stringTbl
 	lda		#>main_menu_string_table
 	sta		<stringTbl+1
-	
+
 	lda		#$11				; $11 = solid white text
 	sta		<textColor
-	
+
 	cly
 	jsr 	print_strings
 	jsr		print_i_ii
@@ -511,7 +511,7 @@ print_game_info:
 
 	lda		#$11
 	sta		<textColor
-	
+
 	jsr		print_game_num_game_size
 	bra		menu_loop
 
@@ -582,10 +582,10 @@ sram_manager:
 	sta		<stringTbl
 	lda		#>sram_manager_string_table
 	sta		<stringTbl+1
-	
+
 	lda		#$11				; $11 = solid white text
 	sta		<textColor
-	
+
 	cly
 	jsr 	print_strings
 	jsr		print_i_ii
@@ -618,9 +618,9 @@ sram_manager_key_up:
 	jsr		move_to_previous_game
 	jsr		print_games_list
 	bra 	sram_manager_loop
-	
-	
-reverse_byte:	
+
+
+reverse_byte:
 	ror		a
 	rol 	<temp
 	ror		a
@@ -637,9 +637,9 @@ reverse_byte:
 	rol 	<temp
 	ror		a
 	rol 	<temp
-	lda		<temp 
+	lda		<temp
 	rts
-	
+
 
 
 move_to_next_game:
@@ -673,7 +673,7 @@ move_to_next_game:
 _mtng_done:
 	rts
 
-        
+
 move_to_previous_game:
 	; if (highlighted != 0)
 	;   highlighted--;
@@ -726,10 +726,10 @@ print_i_ii:
 	lda		#$11
 	sta		<textColor
 	rts
-	
-	
+
+
 print_strings:
-	stz		<tempw 
+	stz		<tempw
 -:
 	ldy		<tempw
 	lda		(<stringTbl),y
@@ -747,13 +747,13 @@ print_strings:
 	ldy		#1
 	lda		(<indPtr),y
 	sta		<vramAddr
-	iny	
+	iny
 	lda		(<indPtr),y
 	sta		<vramAddr+1
 	jsr		print_meta_string
 	jmp		-
-	
-	
+
+
 print_games_list:
 	sti16	tempw,$0124			; VRAM address $0124 = screen pixel 32,72
 	stz		<count1
@@ -790,19 +790,19 @@ print_games_list:
 	sta 	<indPtr+1
 	ldy		#4
 	jsr		print_meta_string
-	
+
 	; Move to the next exntry in the table
 	addi16	tempw,$20
-	
+
 	inc		<count1
 	lda		<count1
 	cmp		#GAMES_TO_SHOW
 	bne		-
 _pgl_done:
 	rts
-	
-	
-print_meta_string: 
+
+
+print_meta_string:
 	st0		#0
 	lda		<vramAddr
 	sta.w	VDC_DATA_L
@@ -825,7 +825,7 @@ print_meta_string:
 	rts
 
 
-print_game_num_game_size:   
+print_game_num_game_size:
 	ldy 	<highlighted
 	iny
 	lda 	binary_to_decimal,y
@@ -853,7 +853,7 @@ print_game_num_game_size:
 	lda.w 	hex_to_ascii,y
 	sta 	<charCode
 	sti16	vramAddr,$0293
-	jsr		write_char	
+	jsr		write_char
 	lda		<GAME_SIZE
 	ror		a
 	ror		a
@@ -866,9 +866,9 @@ print_game_num_game_size:
 	dec		<vramAddr
 	jsr		write_char
 	rts
-	
 
-write_char:		
+
+write_char:
 	st0		#0
 	lda		<vramAddr
 	sta.w	VDC_DATA_L
@@ -888,13 +888,13 @@ timer_irq:
 
 
 
-vdc_reg_table: 
+vdc_reg_table:
 	.db $05
 	.dw $0080
 	.db $06
 	.dw $0000
 	.db $07
-	.dw $0000 
+	.dw $0000
 	.db $08
 	.dw $0000
 	.db $09
@@ -902,53 +902,53 @@ vdc_reg_table:
 	.db $0A
 	.dw $0202
 	.db $0B
-	.dw $031F	
+	.dw $031F
 	.db $0C
-	.dw $0F02 	
+	.dw $0F02
 	.db $0D
 	.dw $00EF
 	.db $0E
 	.dw $0003
 	.db $0F
 	.dw $0000
-	
-	
+
+
 plane1_gradient:
 	.db $FF,$00,$FF,$00,$FF,$00,$FF,$00
 plane2_gradient:
 	.db $FF,$FF,$00,$00,$FF,$FF,$00,$00
 plane3_gradient:
 	.db $FF,$FF,$FF,$FF,$00,$00,$00,$00
-	
-	
+
+
 key_bits_lo:
 	.db $0F,$07,$0E,$06,$0B,$03,$0A,$02
 	.db $0D,$05,$0C,$04,$09,$01,$08,$00
 key_bits_hi:
 	.db $F0,$70,$B0,$30,$D0,$50,$90,$10
 	.db $E0,$60,$A0,$20,$C0,$40,$80,$00
-	
 
-main_menu_string_table:	
+
+main_menu_string_table:
 	.dw string1,string2,string3,string4
-	.dw string5 
+	.dw string5
 
 main_menu_strings:
 string1: .db $A8,$C4,$00,"MENU V1.11, NEOTEAM 2011",$FF
 string2: .db $A8,$C0,$00,$FF
-string3: .db $A8,$44,$02,"[ ] : LOAD (SAVE ON)",$FF 
+string3: .db $A8,$44,$02,"[ ] : LOAD (SAVE ON)",$FF
 string4: .db $A8,$64,$02,"[  ]: LOAD (SAVE OFF)",$FF
 string5: .db $A8,$84,$02,"GAME 00, SIZE 00M",$FF
 .db $A0
 
-sram_manager_string_table:	
+sram_manager_string_table:
 	.dw string6,string7,string8,string9
-	.dw stringA 
-	
+	.dw stringA
+
 sram_manager_strings:
 string6: .db $A8,$C4,$00,"MENU V1.11, NEOTEAM 2011",$FF
 string7: .db $A8,$C0,$00,$FF
-string8: .db $A8,$44,$02,"[ ] : OK             ",$FF 
+string8: .db $A8,$44,$02,"[ ] : OK             ",$FF
 string9: .db $A8,$64,$02,"[  ]: CANCEL         ",$FF
 stringA: .db $A8,$84,$02,"                 ",$FF
 .db $A0
@@ -963,10 +963,10 @@ sram_manager_options:
 .db $8A,$04,$87,$00,$01,"CLEAR                     ",$FF
 
 
-hex_to_ascii:  
+hex_to_ascii:
 .db "0123456789ABCDEF"
 
-binary_to_decimal: 
+binary_to_decimal:
 .db $00,$01,$02,$03,$04,$05,$06,$07,$08,$09
 .db $10,$11,$12,$13,$14,$15,$16,$17,$18,$19
 .db $20,$21,$22,$23,$24,$25,$26,$27,$28,$29
@@ -976,7 +976,7 @@ binary_to_decimal:
 .db $60,$61,$62,$63,$64,$65,$66,$67,$68,$69
 
 
-game_table_pointers:	
+game_table_pointers:
 .dw $F800,$F820,$F840,$F860,$F880,$F8A0,$F8C0,$F8E0
 .dw $F900,$F920,$F940,$F960,$F980,$F9A0,$F9C0,$F9E0
 .dw $FA00,$FA20,$FA40,$FA60,$FA80,$FAA0,$FAC0,$FAE0
@@ -991,7 +991,7 @@ sram_manager_options_pointers:
 .dw sram_manager_options+$60, sram_manager_options+$80, sram_manager_options+$A0
 .dw sram_manager_options+$C0
 
-	
+
 palette:
 	.incbin "assets\menu_bg3.pal"
 	.dw 0
@@ -1010,8 +1010,8 @@ palette_end:
 
 bg_nametable:
  	.incbin "assets\menu_bg3.nam"
-	
-	
+
+
 .ends
 
 
@@ -1019,10 +1019,10 @@ bg_nametable:
 .bank 1 slot 6
 .section "data"
 
-	
+
 bg_nametable2:
 	.incbin "assets\menu_bg4.nam"
-	
+
 bg_patterns:
 	.incbin "assets\menu_bg3.chr"
 

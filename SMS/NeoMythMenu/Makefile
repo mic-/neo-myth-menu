@@ -1,5 +1,5 @@
 ifndef $(SDCC_HOME)
-SDCC_HOME = /opt/toolchains/sega/sdcc
+SDCC_HOME = /opt/toolchains/sdcc
 endif
 SDCC_INCLUDE = $(SDCC_HOME)/share/sdcc/include
 SDCC_LIB = $(SDCC_HOME)/share/sdcc/lib

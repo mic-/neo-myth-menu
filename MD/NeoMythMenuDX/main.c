@@ -131,6 +131,8 @@ struct CheatEntry
     unsigned char _pad0_;
 };
 
+#define CACHEBLK_VERS 2
+
 typedef struct CacheBlock CacheBlock;
 struct CacheBlock
 {
@@ -144,6 +146,7 @@ struct CacheBlock
     short int sramSize;/*what's the sram size if type == sram?*/
     short int YM2413; /*fm on?*/
     short int resetMode;/*reset to menu or game?*/
+    short int aliasMode;/*bank aliasing?*/
 };
 
 static CacheBlock gCacheBlock;/*common cache block*/
@@ -176,9 +179,9 @@ static short int gSRAMgrServiceStatus = SMGR_STATUS_NULL;
 static short int gSRAMgrServiceMode = 0x0000;
 
 #ifndef RUN_IN_PSRAM
-static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v2.9";
+static const char gAppTitle[] = "Neo Super 32X/MD/SMS Menu v3.0";
 #else
-static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v2.9";
+static const char gAppTitle[] = "NEO Super 32X/MD/SMS Menu v3.0";
 #endif
 
 #define MB (0x20000)
@@ -279,6 +282,8 @@ short int gSRAMType;                    /* 0x0000 = sram, 0x0001 = eeprom */
 short int gSRAMBank;                    /* sram bank = 0 to 15, constrained by size of sram */
 short int gSRAMSize;                    /* size of sram in 8KB units */
 
+short int gNoAlias = 0x0000;            /* 0x0000 = normal Myth PSRAM banks, 0x00FF = full size bank padded with 0xFF */
+
 short int gYM2413 = 0x0001;             /* 0x0000 = YM2413 disabled, 0x0001 = YM2413 enabled */
 short int gImportIPS = 0;
 static int gLastEntryIndex = -1;
@@ -350,6 +355,7 @@ extern void put_str(const char *str, int fcolor);
 extern void set_usb(void);
 extern short int neo_check_cpld(void);
 extern short int neo_check_card(void);
+extern void neo_hw_info(hwinfo *ptr);
 extern void neo_run_game(int fstart, int fsize, int bbank, int bsize, int run);
 extern void neo_run_psram(int pstart, int psize, int bbank, int bsize, int run);
 extern void neo_run_myth_psram(int psize, int bbank, int bsize, int run);
@@ -939,7 +945,7 @@ void get_menu_flash(void)
         }
 
         // check if SCD BRAM should be enabled
-        if ((gSelections[gMaxEntry].run == 9) || (gSelections[gMaxEntry].run == 10))
+        if (((gSelections[gMaxEntry].run & 63) == 9) || (gSelections[gMaxEntry].run == 10))
         {
             if (gSelections[gMaxEntry].bsize != 16)
             {
@@ -1303,6 +1309,16 @@ void get_sd_info(int entry)
     gSelections[entry].length = gSDFile.fsize;
 
     f_lseek_zip(&gSDFile, 0x7FF0);
+    f_read_zip(&gSDFile, rom_hdr, 16, &ts);
+    utility_w2cstrcpy(extension, &gSelections[entry].name[utility_wstrlen(gSelections[entry].name) - 4]);
+    if (!utility_memcmp(rom_hdr, "TMR SEGA", 8))
+    {
+        // SMS ROM header
+        gSelections[entry].type = 2; // SMS
+        gSelections[entry].run = 0x13; // run mode = SMS + FM
+        return;
+    }
+    f_lseek_zip(&gSDFile, 0x7FF0 + 0x0200); // skip possible header
     f_read_zip(&gSDFile, rom_hdr, 16, &ts);
     utility_w2cstrcpy(extension, &gSelections[entry].name[utility_wstrlen(gSelections[entry].name) - 4]);
     if (!utility_memcmp(rom_hdr, "TMR SEGA", 8) || !utility_memcmp(extension, ".sms", 4) || !utility_memcmp(extension, ".SMS", 4))
@@ -2267,6 +2283,13 @@ void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(u
         for (iy=length; iy<(length + 0x020000); iy+=XFER_SIZE)
             neo_copyto_myth_psram(buffer, doffset + iy, XFER_SIZE);
     }
+    else if (gNoAlias && (length < 0x400000) && ((dst == &neo_copyto_myth_psram) || (dst == &neo_sd_to_myth_psram)))
+    {
+        // pad rom to 4M with 0xFF
+        utility_memset(buffer, 0xFF, XFER_SIZE);
+        for (iy=length; iy<0x400000; iy+=XFER_SIZE)
+            neo_copyto_myth_psram(buffer, doffset + iy, XFER_SIZE);
+    }
 }
 
 void toggleResetMode(int index)
@@ -2280,6 +2303,22 @@ void toggleResetMode(int index)
     {
         gResetMode = 0x00FF;
         gOptions[index].value = "Reset to Game";
+    }
+
+    gCacheOutOfSync = 1;
+}
+
+void toggleBankAlias(int index)
+{
+    if (gNoAlias)
+    {
+        gNoAlias = 0x0000;
+        gOptions[index].value = "ON";
+    }
+    else
+    {
+        gNoAlias = 0x00FF;
+        gOptions[index].value = "OFF";
     }
 
     gCacheOutOfSync = 1;
@@ -2614,7 +2653,7 @@ int patchesNeeded(void)
     */
 void cache_invalidate_pointers()
 {
-    gSRAMBank = gSRAMSize = gResetMode = 0x0000;
+    gSRAMBank = gSRAMSize = gResetMode = gNoAlias = 0x0000;
     gYM2413 = 0x0001;
     gManageSaves = gSRAMgrServiceStatus = 0;
 
@@ -2877,10 +2916,20 @@ void cache_loadPA(WCHAR* sss,int skip_check)
     //changed it to block r/w
     f_read(&gSDFile,(char*)&gCacheBlock,sizeof(CacheBlock),&fbr);
 
+    if(gCacheBlock.version != CACHEBLK_VERS)
+    {
+        STEP_INTO("Cache Block version mismatch");
+        clearStatusMessage();
+        f_close(&gSDFile);
+        gWStrOffs -= 512;
+        return;
+    }
+
     gSRAMBank = (short int)gCacheBlock.sramBank;
     gSRAMSize = gCacheBlock.sramSize;
     gYM2413 = gCacheBlock.YM2413;
     gResetMode =  gCacheBlock.resetMode;
+    gNoAlias =  gCacheBlock.aliasMode;
     gSRAMType = (short int)gCacheBlock.sramType;
     gManageSaves = (short int)gCacheBlock.autoManageSaves;
     gSRAMgrServiceStatus = (short int)gCacheBlock.autoManageSavesServiceStatus;
@@ -2998,6 +3047,7 @@ void cache_sync(int root)
     gCacheBlock.sramSize = gSRAMSize;
     gCacheBlock.YM2413 = gYM2413;
     gCacheBlock.resetMode = gResetMode;
+    gCacheBlock.aliasMode = gNoAlias;
     gCacheBlock.sramType = (unsigned char)gSRAMType;
 
     f_write(&gSDFile,(char*)&gCacheBlock,sizeof(CacheBlock),&fbr);
@@ -4063,19 +4113,23 @@ void do_options(void)
         // options for MD/32X
         gOptions[maxOptions].exclusiveFCall = 0;
         gOptions[maxOptions].name = "Reset Mode";
-
         if(gResetMode == 0x0000)
             gOptions[maxOptions].value = "Reset to Menu";
         else
             gOptions[maxOptions].value = "Reset to Game";
-
         gOptions[maxOptions].callback = &toggleResetMode;
+        gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
+        maxOptions++;
+
+        gOptions[maxOptions].exclusiveFCall = 0;
+        gOptions[maxOptions].name = "Bank Aliasing";
+        gOptions[maxOptions].value = gNoAlias ? "OFF" : "ON";
+        gOptions[maxOptions].callback = &toggleBankAlias;
         gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
         maxOptions++;
 
         if(!gSRAMType)
             gSRAMType = (gSelections[gCurEntry].run == 5);
-
         gOptions[maxOptions].exclusiveFCall = 0;
         gOptions[maxOptions].name = "Save RAM Type";
         gOptions[maxOptions].value = gSRAMType ? "EEPROM" : "SRAM";
@@ -4098,7 +4152,7 @@ void do_options(void)
         gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
         maxOptions++;
     }
-    else if ((gSelections[gCurEntry].run == 9) || (gSelections[gCurEntry].run == 10))
+    else if (((gSelections[gCurEntry].run & 63) == 9) || (gSelections[gCurEntry].run == 10))
     {
         // options for BRAM or CDBIOS+BRAM
         gOptions[maxOptions].exclusiveFCall = 0;
@@ -4402,6 +4456,13 @@ void do_options(void)
                 //strncpy(temp, (const char *)buffer, 30);
                 //temp[30] = '\0';
                 shortenName(temp, (char *)buffer, 30);
+
+                // check for write-enable psram flag
+                if (gSelections[gCurEntry].run & 64)
+                {
+                    gSelections[gCurEntry].run &= 63;
+                    gWriteMode = 0x0002; // write-enable psram when run
+                }
 
                 if (gCurMode == MODE_FLASH)
                 {
@@ -4891,8 +4952,8 @@ void run_rom(int reset_mode)
 
         fsize = gSDFile.fsize;
 
-        if (gFileType)
-            f_read_zip(&gSDFile, buffer, 0x200, &ts); // skip header on SMD file
+        if (gFileType || (((runmode == 0x12) || (runmode == 0x13)) && ((fsize & 0xFFF) == 0x200)))
+            f_read_zip(&gSDFile, buffer, 0x200, &ts); // skip header on SMD file and (some) SMS files
 
         // Look for special file types
         if (gSelections[gCurEntry].type == 4)
@@ -5693,7 +5754,7 @@ int main(void)
     cache_invalidate_pointers();
     utility_memcpy(gCacheBlock.sig,"DXCS",4);
     gCacheBlock.processed = 0;
-    gCacheBlock.version = 1;
+    gCacheBlock.version = CACHEBLK_VERS;
 
     if(gSdDetected)
     {
@@ -6083,6 +6144,13 @@ int main(void)
                     continue;
                 }
 
+                // check for write-enable psram flag
+                if (gSelections[gCurEntry].run & 64)
+                {
+                    gSelections[gCurEntry].run &= 63;
+                    gWriteMode = 0x0002; // write-enable psram when run
+                }
+
                 run_rom(0x0000);
             }
             if ((changed & SEGA_CTRL_C) && !(buttons & SEGA_CTRL_C))
@@ -6107,6 +6175,13 @@ int main(void)
                     loadConfig();
                     gUpdate = -1;           /* clear screen for major screen update */
                     continue;
+                }
+
+                // check for write-enable psram flag
+                if (gSelections[gCurEntry].run & 64)
+                {
+                    gSelections[gCurEntry].run &= 63;
+                    gWriteMode = 0x0002; // write-enable psram when run
                 }
 
                 run_rom(0x00FF);
