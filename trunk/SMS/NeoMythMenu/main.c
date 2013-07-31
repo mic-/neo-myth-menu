@@ -25,7 +25,7 @@
 #define LEFT_MARGIN 3
 #define INSTRUCTIONS_Y 20
 
-extern FATFS sdFatFs; 
+extern FATFS sdFatFs;
 extern unsigned char pfmountbuf[36];
 extern WCHAR LfnBuf[_MAX_LFN + 1];
 void option_cb_inc_sram_bank();
@@ -36,17 +36,17 @@ void option_cb_restore_sram();
 
 BYTE bank1_call(WORD task,char* user_data)
 {
-	BYTE f0,f1,r;
-	BYTE (*dispatch)(WORD,char*) = (BYTE (*)(WORD,char*))0x4000;
+    BYTE f0,f1,r;
+    BYTE (*dispatch)(WORD,char*) = (BYTE (*)(WORD,char*))0x4000;
 
-	f0 = Frame1;
-	f1 = Frame2;
+    f0 = Frame1;
+    f1 = Frame2;
     Frame1 = BANK_BG_GFX;
     Frame2 = BANK_RAM_CODE;
-	r = dispatch(task,user_data);
+    r = dispatch(task,user_data);
     Frame1 = f0;
-    Frame2 = f1;	
-	return r;
+    Frame2 = f1;
+    return r;
 }
 
 void mute_sound()
@@ -142,16 +142,16 @@ void setup_vdp()
  * Prints the value val in hexadecimal form at position x,y
  */
 
-void print_hex(BYTE val, BYTE x, BYTE y) 
+void print_hex(BYTE val, BYTE x, BYTE y)
 {
-	val=val,x=x,y=y;
-	bank1_call(TASK_PRINT_HEX,&val); 
+    val=val,x=x,y=y;
+    bank1_call(TASK_PRINT_HEX,&val);
 }
 
 void dump_hex(WORD addr)
 {
-	addr=addr;
-	bank1_call(TASK_DUMP_HEX,(char*)&addr);
+    addr=addr;
+    bank1_call(TASK_DUMP_HEX,(char*)&addr);
 }
 
 void vdp_delay(BYTE count)
@@ -227,9 +227,9 @@ void cls()
 {
     clear_list_surface();
     present_list_surface();
-	vdp_wait_vblank();
+    vdp_wait_vblank();
 }
-    
+
 void puts_active_list()
 {
     BYTE* temp = generic_list_buffer;
@@ -239,7 +239,7 @@ void puts_active_list()
     DWORD praddr;
     uint16_t prbank, proffs;
     FileInfoEntry *fi;
-    
+
     puts("                          ", 3, 7, PALETTE1);
 
     if(MENU_STATE_GAME_GBAC == menu_state)
@@ -292,28 +292,28 @@ void puts_active_list()
         row = 0;
         show = games.count - games.firstShown;
         show = (show < NUMBER_OF_GAMES_TO_SHOW) ? show : NUMBER_OF_GAMES_TO_SHOW;
-    
- 		praddr = games.firstShown;
-		praddr <<= 6;
-		proffs = praddr & 0xFFFF;
-		prbank = praddr >> 16;
-		prbank += 0x20;
+
+        praddr = games.firstShown;
+        praddr <<= 6;
+        proffs = praddr & 0xFFFF;
+        prbank = praddr >> 16;
+        prbank += 0x20;
         fi = (FileInfoEntry*)0xDA20;
         highlightedIsDir = 0;
-        
+
         while (show)
         {
             offs = row*32*2;
             pfn_neo2_psram_to_ram((BYTE *)fi, prbank, proffs, 64);
             p = fi->sfn;
-            
+
             if (games.highlighted == (games.firstShown + row))
             {
                 memcpy_asm(highlightedFileName, fi->sfn, 13);
                 p = fi->lfn;
             }
             if (fi->fattrib & AM_DIR)
-			{
+            {
                 temp[offs + 2] = '[' - 32;
                 if (games.highlighted == (games.firstShown + row))
                 {
@@ -325,7 +325,7 @@ void puts_active_list()
                     temp[offs + 3] = PALETTE1<<1;
                 }
                 offs += 2;
-			}  
+            }
             for (col=0; col<25; col++)
             {
                 if (!p[col])
@@ -334,14 +334,14 @@ void puts_active_list()
                 temp[offs + col*2 + 3] = (games.highlighted == (games.firstShown + row)) ? PALETTE0<<1 : PALETTE1<<1;
             }
             if (fi->fattrib & AM_DIR)
-			{
+            {
                 temp[offs + col*2 + 2] = ']' - 32;
                 if (games.highlighted == (games.firstShown + row))
                     temp[offs + col*2 + 3] = PALETTE0<<1;
                 else
                     temp[offs + col*2 + 3] = PALETTE1<<1;
-			}  
- 
+            }
+
             row++;
             show--;
             proffs += 64;
@@ -374,28 +374,28 @@ void puts_active_list()
                 ix++;
             }
 
-			if(OPTION_TYPE_ROUTINE == options_get_type(&options[show]))
-			{
-				if(OPTION_CB_SET_SRAM_BANK == options[show].user_data)
-				{
-		            temp[offs + col*2 + 2] = ('0'+(options_sram_bank+1))-32;
-		            temp[offs + col*2 + 3] = attr;
-		            col++;
-				}
-				else if(OPTION_CB_CHEAT_MGR == options[show].user_data)
-				{
-					//col+=4;
-		            temp[offs + col*2 + 2] = '('-32;
-		            temp[offs + col*2 + 3] = attr;
-		            col++;
-		            temp[offs + col*2 + 2] = ('0'+(MAX_CHEATS-options_cheat_ptr))-32;
-		            temp[offs + col*2 + 3] = attr;
-		            col++;
-		            temp[offs + col*2 + 2] = ')'-32;
-		            temp[offs + col*2 + 3] = attr;
-		            col++;
-				}
-			}
+            if(OPTION_TYPE_ROUTINE == options_get_type(&options[show]))
+            {
+                if(OPTION_CB_SET_SRAM_BANK == options[show].user_data)
+                {
+                    temp[offs + col*2 + 2] = ('0'+(options_sram_bank+1))-32;
+                    temp[offs + col*2 + 3] = attr;
+                    col++;
+                }
+                else if(OPTION_CB_CHEAT_MGR == options[show].user_data)
+                {
+                    //col+=4;
+                    temp[offs + col*2 + 2] = '('-32;
+                    temp[offs + col*2 + 3] = attr;
+                    col++;
+                    temp[offs + col*2 + 2] = ('0'+(MAX_CHEATS-options_cheat_ptr))-32;
+                    temp[offs + col*2 + 3] = attr;
+                    col++;
+                    temp[offs + col*2 + 2] = ')'-32;
+                    temp[offs + col*2 + 3] = attr;
+                    col++;
+                }
+            }
             else if(OPTION_TYPE_SETTING == options_get_type(&options[show]))
             {
                 if(0 == options_get_state(&options[show]))
@@ -638,27 +638,27 @@ void test_strings()
 
 void sync_state()
 {
-	switch (menu_state)
-	{
-		case MENU_STATE_GAME_GBAC:
-			games.highlighted = 0;
-			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-			puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
-		break;
-		case MENU_STATE_OPTIONS:
-			options_highlighted = 0;
-			puts("[L/R] Change option ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-			puts("[I] Run [II] Back   ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
-		break;
-		case MENU_STATE_GAME_SD:
-			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-			puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
-		break;
-		case MENU_STATE_MEDIA_PLAYER:
-			puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-			puts("[I] Play [II] Flash ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
-		break;
-	}
+    switch (menu_state)
+    {
+        case MENU_STATE_GAME_GBAC:
+            games.highlighted = 0;
+            puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+            puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
+        break;
+        case MENU_STATE_OPTIONS:
+            options_highlighted = 0;
+            puts("[L/R] Change option ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+            puts("[I] Run [II] Back   ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
+        break;
+        case MENU_STATE_GAME_SD:
+            puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+            puts("[I] Run [II] Options", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
+        break;
+        case MENU_STATE_MEDIA_PLAYER:
+            puts("[L/R/U/D] Navigate  ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
+            puts("[I] Play [II] Flash ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
+        break;
+    }
 }
 
 void handle_action_button(BYTE button)
@@ -683,10 +683,10 @@ void handle_action_button(BYTE button)
         {
             if(options_highlighted < options_count)//sanity check
             {
-				BYTE type;
-				options_sync = 1;
-				option = &options[options_highlighted];
-				type = options_get_type(option);
+                BYTE type;
+                options_sync = 1;
+                option = &options[options_highlighted];
+                type = options_get_type(option);
 
                 if(OPTION_TYPE_SETTING == type)
                 {
@@ -697,56 +697,56 @@ void handle_action_button(BYTE button)
                 }
                 else if(OPTION_TYPE_ROUTINE == type)
                 {
-					switch(option->user_data)
-					{
-						case OPTION_CB_SET_SRAM_BANK:
-							if(button == PAD_LEFT)
-								{option_cb_dec_sram_bank();}
-							else	
-								{option_cb_inc_sram_bank();}
-						break;
-					}
+                    switch(option->user_data)
+                    {
+                        case OPTION_CB_SET_SRAM_BANK:
+                            if(button == PAD_LEFT)
+                                {option_cb_dec_sram_bank();}
+                            else
+                                {option_cb_inc_sram_bank();}
+                        break;
+                    }
                 }
                 puts_active_list();
             }
         }
-		else if(button == PAD_SW1)
-		{
-			if(options_highlighted >= options_count){return;}
-			option = &options[options_highlighted];
+        else if(button == PAD_SW1)
+        {
+            if(options_highlighted >= options_count){return;}
+            option = &options[options_highlighted];
 
-			if(OPTION_TYPE_ROUTINE == options_get_type(option))
-			{
-				cls();
+            if(OPTION_TYPE_ROUTINE == options_get_type(option))
+            {
+                cls();
 
-				switch(option->user_data)
-				{
-					case OPTION_CB_SRAM_TO_SD:
-						option_cb_dump_sram();
-					break;
+                switch(option->user_data)
+                {
+                    case OPTION_CB_SRAM_TO_SD:
+                        option_cb_dump_sram();
+                    break;
 
-					case OPTION_CB_SD_TO_SRAM:
-						option_cb_restore_sram();
-					break;
+                    case OPTION_CB_SD_TO_SRAM:
+                        option_cb_restore_sram();
+                    break;
 
-					case OPTION_CB_CHEAT_MGR:
-						option_cb_add_cheat();
-					break;
-	
-					case OPTION_CB_CLEAR_SRAM:
-						sdutils_sram_cls();
-					break;
+                    case OPTION_CB_CHEAT_MGR:
+                        option_cb_add_cheat();
+                    break;
 
-					case OPTION_CB_IMPORT_IPS:
-					break; //TODO
-				}
+                    case OPTION_CB_CLEAR_SRAM:
+                        sdutils_sram_cls();
+                    break;
 
-				cls();
-				sync_state();
-				puts_active_list();
-				return;
-			}
-		}
+                    case OPTION_CB_IMPORT_IPS:
+                    break; //TODO
+                }
+
+                cls();
+                sync_state();
+                puts_active_list();
+                return;
+            }
+        }
 
     }
 #if 0
@@ -787,7 +787,7 @@ void handle_action_button(BYTE button)
             gameData->cheat[1] = p[6];
             gameData->cheat[2] = p[7];
             pfn_neo2_run_game_gbac(fm,reset,0x0000); // never returns
-        } 
+        }
         else if (MENU_STATE_GAME_SD == menu_state)
         {
             if (highlightedIsDir)
@@ -797,15 +797,15 @@ void handle_action_button(BYTE button)
                 puts_active_list();
                 return;
             }
-            
+
             // The highlighted entry is not a directory
-            
+
             // Retrieve the file info struct for the highlighted file
             fi = (FileInfoEntry*)0xDA20;
             praddr = games.highlighted;
             praddr <<= 6;
             proffs = praddr & 0xFFFF;
-            prbank = praddr >> 16;            
+            prbank = praddr >> 16;
             pfn_neo2_psram_to_ram((BYTE *)fi, prbank+0x20, proffs, 64);
 
             if (GAME_MODE_NORMAL_ROM == fi->ftype)
@@ -814,14 +814,14 @@ void handle_action_button(BYTE button)
                 Frame2 = BANK_RAM_CODE;
                 // Copy the game info data to somewhere in RAM
                 gameData = (volatile GbacGameData*)0xDC00;
- 
+
                 gameData->mode = GDF_RUN_FROM_PSRAM;
                 gameData->type = flash_mem_type;
                 gameData->size = fi->fsize >> 17;
                 if (fi->fsize & 0x1FFFF)
                     gameData->size <<= 1;
                 else if (!gameData->size)
-					gameData->size = 1;
+                    gameData->size = 1;
                 gameData->bankHi = 0;
                 gameData->bankLo = 0;
                 gameData->sramBank = 0;
@@ -833,14 +833,14 @@ void handle_action_button(BYTE button)
             }
             else if (GAME_MODE_VGM == fi->ftype)
             {
-                read_file_to_psram(fi, 0x00, 0x0000);             
+                read_file_to_psram(fi, 0x00, 0x0000);
                 cls();
                 puts("Now playing: ", LEFT_MARGIN, 9, PALETTE1);
                 pfn_neo2_psram_to_ram(0xDD00, 0, 0x0000, 0x20);
-                
+
                 if ((*(DWORD *)0xDD10) != 0)
                     Neo2FmOn = 0x00;        // enable FM if the YM2413 clock is non-zero
-                    
+
                 praddr = *(DWORD *)0xDD14;  // GD3 offset field in the VGM header
                 if (praddr == 0)
                 {
@@ -870,7 +870,7 @@ void handle_action_button(BYTE button)
                         if (col < 25)
                             puts((char*)&gd3[i], col, 12, PALETTE1);  // english game name
                         col++;
-                    }                    
+                    }
                     for (i=i+1; gd3[i]!=0; i++) ; // skip the japanese game name
                     for (i=i+1; gd3[i]!=0; i++) ; // skip the english system name
                     for (i=i+1; gd3[i]!=0; i++) ; // skip the japanese system name
@@ -880,19 +880,19 @@ void handle_action_button(BYTE button)
                         if (col < 25)
                             puts((char*)&gd3[i], col, 13, PALETTE1);  // english author name
                         col++;
-                    }                    
-                }           
- 
+                    }
+                }
+
                 Frame1 = BANK_VGM_PLAYER;
                 Frame2 = BANK_RAM_CODE;
- 
+
                 puts("[II] Back           ", LEFT_MARGIN, INSTRUCTIONS_Y, PALETTE1);
-                puts("                    ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);                
+                puts("                    ", LEFT_MARGIN, INSTRUCTIONS_Y+1, PALETTE1);
                 memcpy_asm(0xDD00, 0x4000, 0x240); // copy the vgm player code to ram
                 pfn_vgm_play();                     // the player will return when the user presses SW2
-                
+
                 mute_sound();
-                
+
                 Frame1 = BANK_BG_GFX;
                 Frame2 = BANK_RAM_CODE;
                 // SW2 being pressed is what causes the vgm player
@@ -900,149 +900,150 @@ void handle_action_button(BYTE button)
                 padLast |= PAD_SW2;
                 sync_state();       // print SD browser instructions again
                 puts_active_list();
-            }         
+            }
         }
     }
     else if(button == PAD_SW2)
     {
-		BYTE state = menu_state;
+        BYTE state = menu_state;
 
         //++menu_state;
         if (MENU_STATE_OPTIONS != menu_state)
         {
             menu_state = MENU_STATE_OPTIONS;
-
-			if(hasZipram)
-			{
-				//Save
-				pfn_neo2_ram_to_psram(0x00,2048, (BYTE*)0xDA00,256);
-				pfn_neo2_psram_to_ram((BYTE*)0xDA00,0x00,1024,256);
-			}
+            if(hasZipram)
+            {
+                //Save
+                pfn_neo2_ram_to_psram(0x00,2048, (BYTE*)0xDA00,256);
+                pfn_neo2_psram_to_ram((BYTE*)0xDA00,0x00,1024,256);
+            }
         }
         else if (neoMode == 0x480)
         {
             menu_state = MENU_STATE_GAME_SD;
-			if(state == MENU_STATE_OPTIONS)
-			{
-				if(hasZipram)
-				{
-					//Restore
-					pfn_neo2_ram_to_psram(0x00,1024, (BYTE*)0xDA00,256);
-					pfn_neo2_psram_to_ram((BYTE*)0xDA00,0x00,2048,256);
-				}
-			}
+            if(state == MENU_STATE_OPTIONS)
+            {
+                if(hasZipram)
+                {
+                    //Restore
+                    pfn_neo2_ram_to_psram(0x00,1024, (BYTE*)0xDA00,256);
+                    pfn_neo2_psram_to_ram((BYTE*)0xDA00,0x00,2048,256);
+                }
+            }
         }
         else
         {
             menu_state = MENU_STATE_GAME_GBAC;
         }
-        
+
         if(menu_state > MENU_STATES-1)
             menu_state = MENU_STATE_TOP;
 
-		sync_state();
+        sync_state();
         puts_active_list();
     }
 }
 
 void import_std_options()
 {
-	Option* opt;
+    Option* opt;
 
-	if(hasZipram)
-	{
-		pfn_neo2_ram_to_psram(0x00,2048, (BYTE*)0xDA00,256);
-	}
+    if(hasZipram)
+    {
+        pfn_neo2_ram_to_psram(0x00,2048, (BYTE*)0xDA00,256);
+    }
 
     options_init();
-	
+
     fm_enabled_option_idx = options_count;
     options_add("FM              : ","off","on",OPTION_TYPE_SETTING,1);
     reset_to_menu_option_idx = options_count;
     options_add("Reset to menu   : ","off","on",OPTION_TYPE_SETTING,1);
     import_ips_option_idx = options_count;
 
-	if(hasZipram)
-	{
+    if(hasZipram)
+    {
 #if 0
-		options_add("Import .ips     : ","off","on",OPTION_TYPE_SETTING,0);
+        options_add("Import .ips     : ","off","on",OPTION_TYPE_SETTING,0);
 #endif
-		sram_set_option_idx = options_count;
-		opt = options_add("SRAM Bank       : ","\0","\0",OPTION_TYPE_ROUTINE,0);
-		opt->user_data = OPTION_CB_SET_SRAM_BANK;
-		sram_cls_option_idx = options_count; 
-		opt = options_add("Cheat manager","\0","\0",OPTION_TYPE_ROUTINE,0);
-		opt->user_data = OPTION_CB_CHEAT_MGR;
-		opt = options_add("Dump SRAM to SD  ","\0","\0",OPTION_TYPE_ROUTINE,0);
-		opt->user_data = OPTION_CB_SRAM_TO_SD;
-		opt = options_add("Restore SRAM from SD","\0","\0",OPTION_TYPE_ROUTINE,0);
-		opt->user_data = OPTION_CB_SD_TO_SRAM;
-	}
-	else
-	{
-		opt = options_add("SRAM Bank       : ","\0","\0",OPTION_TYPE_ROUTINE,0);
-		opt->user_data = OPTION_CB_SET_SRAM_BANK;
-	}
+        sram_set_option_idx = options_count;
+        opt = options_add("SRAM Bank       : ","\0","\0",OPTION_TYPE_ROUTINE,0);
+        opt->user_data = OPTION_CB_SET_SRAM_BANK;
+        sram_cls_option_idx = options_count;
+        opt = options_add("Cheat manager","\0","\0",OPTION_TYPE_ROUTINE,0);
+        opt->user_data = OPTION_CB_CHEAT_MGR;
+        opt = options_add("Dump SRAM to SD  ","\0","\0",OPTION_TYPE_ROUTINE,0);
+        opt->user_data = OPTION_CB_SRAM_TO_SD;
+        opt = options_add("Restore SRAM from SD","\0","\0",OPTION_TYPE_ROUTINE,0);
+        opt->user_data = OPTION_CB_SD_TO_SRAM;
+    }
+    else
+    {
+        opt = options_add("SRAM Bank       : ","\0","\0",OPTION_TYPE_ROUTINE,0);
+        opt->user_data = OPTION_CB_SET_SRAM_BANK;
+    }
 
-	opt = options_add("SRAM Clear","\0","\0",OPTION_TYPE_ROUTINE,0);
-	opt->user_data = OPTION_CB_CLEAR_SRAM;
+    opt = options_add("SRAM Clear","\0","\0",OPTION_TYPE_ROUTINE,0);
+    opt->user_data = OPTION_CB_CLEAR_SRAM;
 
-	if(hasZipram)
-	{
-		pfn_neo2_ram_to_psram(0x00,1024, (BYTE*)0xDA00,256);
-		pfn_neo2_psram_to_ram((BYTE*)0xDA00,0x00,2048,256);
-	}
+    if(hasZipram)
+    {
+        pfn_neo2_ram_to_psram(0x00,1024, (BYTE*)0xDA00,256);
+        pfn_neo2_psram_to_ram((BYTE*)0xDA00,0x00,2048,256);
+    }
 }
 
 #ifdef TEST_SD_BLOCK_WRITE
 void test_w_mode()
 {
-	#if 0
-	FRESULT (*f_write)(void*) = pfn_pf_write_sector;
-	FRESULT (*f_open)(const char*) = pfn_pf_open;
-	unsigned char* p = (unsigned char*)0xdb00;
-	FRESULT r;
+        #if 0
+        FRESULT (*f_write)(void*) = pfn_pf_write_sector;
+        FRESULT (*f_open)(const char*) = pfn_pf_open;
+        unsigned char* p = (unsigned char*)0xdb00;
+        FRESULT r;
 
-	cls();
+        cls();
 
-	Frame2 = BANK_PFF;
+        Frame2 = BANK_PFF;
 
-	r = f_open("/DUMMY.BIN");
+        r = f_open("/DUMMY.BIN");
 
-	if(r != FR_OK)
-	{
-		puts("Failed to open /DUMMY.BIN", 2, 8, PALETTE1);
-		while(1){}
-	}
-	else
-		{puts("Openned /DUMMY.BIN", 2, 8, PALETTE1);}
-		
-	memset_asm(p,'A',512);
-	strcpy_asm(p,"Neo SMS Myth Menu...");
-	//memset_asm(p,'A',256);
-	//memset_asm(p+256,'B',256);
-	puts("WRITE BEGIN", 2, 9, PALETTE1);
-	Frame2 = BANK_PFF;
+        if(r != FR_OK)
+        {
+            puts("Failed to open /DUMMY.BIN", 2, 8, PALETTE1);
+            while(1){}
+        }
+        else
+        {
+            puts("Openned /DUMMY.BIN", 2, 8, PALETTE1);
+        }
 
-	r = f_write((void*)p);
+        memset_asm(p,'A',512);
+        strcpy_asm(p,"Neo SMS Myth Menu...");
+        //memset_asm(p,'A',256);
+        //memset_asm(p+256,'B',256);
+        puts("WRITE BEGIN", 2, 9, PALETTE1);
+        Frame2 = BANK_PFF;
 
-	if(r == FR_OK)
-		puts("WRITE : PASSED!", 2, 10, PALETTE1);
-	else
-	{
-		puts("WRITE : FAILED!", 2, 10, PALETTE1);
-		if(0x0002 == r){puts("CRC ERROR!", 2, 11, PALETTE1);}
-		if(0x0003 == r){puts("START BIT ERROR!", 2, 11, PALETTE1);}
-		//print_hex((r>>8)&0xff,2,12);
-		print_hex(r&0xff,4,12);
-		print_hex(diskioResp[0],6,12);
-	}
+        r = f_write((void*)p);
 
-	puts("WRITE END", 2, 13, PALETTE1);
-	while(1){}
-	#else
-	sdutils_sram_to_sd("/DUMMY.BIN");
-	#endif
+        if(r == FR_OK)
+            puts("WRITE : PASSED!", 2, 10, PALETTE1);
+        else
+        {
+            puts("WRITE : FAILED!", 2, 10, PALETTE1);
+            if(0x0002 == r){puts("CRC ERROR!", 2, 11, PALETTE1);}
+            if(0x0003 == r){puts("START BIT ERROR!", 2, 11, PALETTE1);}
+            //print_hex((r>>8)&0xff,2,12);
+            print_hex(r&0xff,4,12);
+            print_hex(diskioResp[0],6,12);
+        }
+
+        puts("WRITE END", 2, 13, PALETTE1);
+        while(1){}
+        #else
+        sdutils_sram_to_sd("/DUMMY.BIN");
+        #endif
 }
 #endif
 
@@ -1065,7 +1066,7 @@ void main()
 
     temp = pfn_neo2_check_card();
     hasZipram = pfn_neo2_test_psram();
-    
+
     Frm2Ctrl = FRAME2_AS_ROM;
 
     Frame1 = 3;
@@ -1160,7 +1161,7 @@ void main()
         Frame1 = BANK_BG_GFX;
         Frame2 = BANK_RAM_CODE;
     }
-    
+
     puts_active_list();
 
     pad = padLast = 0;
@@ -1168,9 +1169,10 @@ void main()
     padDownReptDelay = KEY_REPEAT_INITIAL_DELAY;
 
     import_std_options();
-	#ifdef TEST_SD_BLOCK_WRITE
-	test_w_mode();
-	#endif
+
+    #ifdef TEST_SD_BLOCK_WRITE
+    test_w_mode();
+    #endif
 
     while (1)
     {
@@ -1280,59 +1282,59 @@ Option* options_add(const char* name,const char* cond0_bhv,const char* cond1_bhv
 
 void options_init()
 {
-	options = (Option*)0xDA18;
+    options = (Option*)0xDA18;
     options_highlighted = 0;
     options_count = 0;
-	options_sync = 0;
-	options_cheat_ptr = 0;
-	options_sram_bank = 0;
+    options_sync = 0;
+    options_cheat_ptr = 0;
+    options_sram_bank = 0;
 }
 
 void options_add_cheat(BYTE data,BYTE addr_hi,WORD addr_lo)
 {
-	BYTE* base;
+    BYTE* base;
 
-	if(options_cheat_ptr >= MAX_CHEATS){return;}
-	
-	base = (BYTE*)0xDACC;
-	base += options_cheat_ptr << 2;
-	base[0] = data;
-	base[1] = addr_hi;
-	*(volatile unsigned short*)&base[2] = addr_lo;
+    if(options_cheat_ptr >= MAX_CHEATS){return;}
 
-	++options_cheat_ptr;
+    base = (BYTE*)0xDACC;
+    base += options_cheat_ptr << 2;
+    base[0] = data;
+    base[1] = addr_hi;
+    *(volatile unsigned short*)&base[2] = addr_lo;
+
+    ++options_cheat_ptr;
 }
 
 void option_cb_inc_sram_bank()//Up to 64KB
 {
-	if(options_sram_bank < 7){++options_sram_bank;}	
+    if(options_sram_bank < 7){++options_sram_bank;}
 }
 
 void option_cb_dec_sram_bank()
 {
-	if(options_sram_bank > 0){--options_sram_bank;}
+    if(options_sram_bank > 0){--options_sram_bank;}
 }
 
 void option_cb_add_cheat()
 {
-	BYTE tmp[8];
+    BYTE tmp[8];
 
-	if(options_cheat_ptr >= MAX_CHEATS){return;}
+    if(options_cheat_ptr >= MAX_CHEATS){return;}
 
-	tmp[0] = 8; //field count
-	if (bank1_call(TASK_EXEC_CHEAT_INPUTBOX,&tmp[0]))
-	{
-		options_add_cheat(tmp[0],tmp[1],*(volatile unsigned short*)&tmp[2]);
-	}
+    tmp[0] = 8; //field count
+    if (bank1_call(TASK_EXEC_CHEAT_INPUTBOX,&tmp[0]))
+    {
+        options_add_cheat(tmp[0],tmp[1],*(volatile unsigned short*)&tmp[2]);
+    }
 }
 
 void option_cb_dump_sram()
 {
-	sdutils_xfer_sram_to_sd(sram_bank_binary[options_sram_bank]);
+    sdutils_xfer_sram_to_sd(sram_bank_binary[options_sram_bank]);
 }
 
 void option_cb_restore_sram()
 {
-	sdutils_xfer_sd_to_sram(sram_bank_binary[options_sram_bank]);
+    sdutils_xfer_sd_to_sram(sram_bank_binary[options_sram_bank]);
 }
 

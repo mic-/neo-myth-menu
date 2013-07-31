@@ -46,13 +46,14 @@ typedef uint64_t u64;
 #define NEO_IO    *(vu32*)(MYTH_IO_BASE | 0x28*2) // 0xFFFFFFFF = 16 bit mode - read long from 0xB2000000 to 0xB3FFFFFF returns word
 #define ROMC_IO   *(vu32*)(MYTH_IO_BASE | 0x30*2) // 0xFFFFFFFF = run card
 #define ROMSW_IO  *(vu32*)(MYTH_IO_BASE | 0x34*2) // 0x00000000 = n64 menu at 0xB0000000 to 0xB1FFFFFF and gba card at 0xB2000000 to 0xB3FFFFFF
-#define SRAM2C_I0 *(vu32*)(MYTH_IO_BASE | 0x36*2) // 0xFFFFFFFF = gba sram at 0xA8000000 to 0xA803FFFF (only when SAVE_IO = 5 or 6)
+#define SRAM2C_I0 *(vu32*)(MYTH_IO_BASE | 0x36*2) // 0xFFFFFFFF = gba sram at 0xA8000000 to 0xA803FFFF (only when SAVE_IO = F)
 #define RST_IO    *(vu32*)(MYTH_IO_BASE | 0x38*2) // 0x00000000 = RESET to game, 0xFFFFFFFF = RESET to menu
 #define CIC_EN    *(vu32*)(MYTH_IO_BASE | 0x3C*2) // 0x00000000 = CIC use default, 0xFFFFFFFF = CIC open
 #define CPID_IO   *(vu32*)(MYTH_IO_BASE | 0x40*2) // 0x00000000 = CPLD ID off, 0xFFFFFFFF = CPLD ID one (0x81 = V1.2, 0x82 = V2.0, 0x83 = V3.0)
 
 // V2.0 hardware
-#define SRAM2C_IO *(vu32*)(MYTH_IO_BASE | 0x2C*2) // 0xFFFFFFFF = gba sram at 0xA8000000 to 0xA803FFFF (only when SAVE_IO = 5 or 6)
+#define SRAM2C_IO *(vu32*)(MYTH_IO_BASE | 0x2C*2) // 0xFFFFFFFF = gba sram at 0xA8000000 to 0xA803FFFF (only when SAVE_IO = F)
+
 #define NEO2_RTC_OFFS (0x4000)
 #define NEO2_GTC_OFFS (0x4800)
 #define NEO2_CACHE_OFFS (0xC000)          // offset of NEO2 inner cache into SRAM
@@ -170,7 +171,7 @@ unsigned int neo_id_card(void)
     _neo_asic_cmd(0x00903500, 1);       // ID enabled
 
     // map GBA save ram into sram space
-    SAVE_IO = 0x00050005;               // save off
+    SAVE_IO = 0x000F000F;               // save off
     neo_sync_bus();
     if ((gCpldVers & 0x0F) == 1)
         SRAM2C_I0 = 0xFFFFFFFF;         // enable gba sram
@@ -326,22 +327,22 @@ void neo_copyfrom_game(void *dest, int fstart, int len)
     if ((u32)dest & 7)
     {
         // not properly aligned - DMA sram space to buffer, then copy it
-        data_cache_writeback_invalidate(dmaBuf, len);
+        data_cache_hit_writeback_invalidate(dmaBuf, len);
         while (dma_busy()) ;
         PI_STATUS_REG = 3;
         dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xB0000000 + fstart, len);
-        data_cache_writeback_invalidate(dmaBuf, len);
+        data_cache_hit_invalidate(dmaBuf, len);
         // copy DMA buffer to dst
         memcpy(dest, dmaBuf, len);
     }
     else
     {
         // destination is aligned - DMA sram space directly to dst
-        data_cache_writeback_invalidate(dest, len);
+        data_cache_hit_writeback_invalidate(dest, len);
         while (dma_busy()) ;
         PI_STATUS_REG = 3;
         dma_read((void *)((u32)dest & 0x1FFFFFFF), 0xB0000000 + fstart, len);
-        data_cache_writeback_invalidate(dest, len);
+        data_cache_hit_invalidate(dest, len);
     }
 #endif
 }
@@ -357,22 +358,22 @@ void neo_copyfrom_menu(void *dest, int fstart, int len)
     if ((u32)dest & 7)
     {
         // not properly aligned - DMA sram space to buffer, then copy it
-        data_cache_writeback_invalidate(dmaBuf, len);
+        data_cache_hit_writeback_invalidate(dmaBuf, len);
         while (dma_busy()) ;
         PI_STATUS_REG = 3;
         dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xB0000000 + fstart, len);
-        data_cache_writeback_invalidate(dmaBuf, len);
+        data_cache_hit_invalidate(dmaBuf, len);
         // copy DMA buffer to dst
         memcpy(dest, dmaBuf, len);
     }
     else
     {
         // destination is aligned - DMA sram space directly to dst
-        data_cache_writeback_invalidate(dest, len);
+        data_cache_hit_writeback_invalidate(dest, len);
         while (dma_busy()) ;
         PI_STATUS_REG = 3;
         dma_read((void *)((u32)dest & 0x1FFFFFFF), 0xB0000000 + fstart, len);
-        data_cache_writeback_invalidate(dest, len);
+        data_cache_hit_invalidate(dest, len);
     }
 #endif
 }
@@ -396,21 +397,20 @@ void neo_copyto_sram(void *src, int sstart, int len)
 {
     u32 temp;
 
+    temp = (sstart & 0x00030000) >> 13;
+    _neo_asic_cmd(0x00E00000|temp, 1);  // set gba sram offset
+
     //neo_select_menu();
     neo_select_game();
     neo_sync_bus();
 
-    temp = (sstart & 0x00030000) >> 13;
-    _neo_asic_cmd(0x00E00000|temp, 1);  // set gba sram offset
-
     // map GBA save ram into sram space
-    SAVE_IO = 0x00050005;               // save off
+    SAVE_IO = 0x000F000F;               // save off
     neo_sync_bus();
     if ((gCpldVers & 0x0F) == 1)
         SRAM2C_I0 = 0xFFFFFFFF;         // enable gba sram
     else
         SRAM2C_IO = 0xFFFFFFFF;         // enable gba sram
-    neo_sync_bus();
     neo_sync_bus();
 
     // Init the PI for sram
@@ -418,7 +418,6 @@ void neo_copyto_sram(void *src, int sstart, int len)
     vu32 piPwdReg = PI_BSD_DOM2_PWD_REG;
     vu32 piPgsReg = PI_BSD_DOM2_PGS_REG;
     vu32 piRlsReg = PI_BSD_DOM2_RLS_REG;
-
     PI_BSD_DOM2_LAT_REG = 0x00000005;
     PI_BSD_DOM2_PWD_REG = 0x0000000C;
     PI_BSD_DOM2_PGS_REG = 0x0000000D;
@@ -426,14 +425,15 @@ void neo_copyto_sram(void *src, int sstart, int len)
 
     // copy src to DMA buffer
     for (int ix=0; ix<len; ix++)
+    {
+        dmaBuf[ix*2 + 0] = ~(*(u8*)(src + ix));
         dmaBuf[ix*2 + 1] = *(u8*)(src + ix);
+    }
     // DMA buffer to sram space
-    data_cache_writeback_invalidate(dmaBuf, len*2);
+    data_cache_hit_writeback_invalidate(dmaBuf, len*2);
     while (dma_busy()) ;
     PI_STATUS_REG = 2;
     dma_write((void *)((u32)dmaBuf & 0x1FFFFFF8), 0xA8000000 + (sstart & 0xFFFF)*2, len*2);
-
-    _neo_asic_cmd(0x00E00000, 1);       // clear gba sram offset
 
     if ((gCpldVers & 0x0F) == 1)
         SRAM2C_I0 = 0x00000000;         // disable gba sram
@@ -446,28 +446,28 @@ void neo_copyto_sram(void *src, int sstart, int len)
     PI_BSD_DOM2_PGS_REG = piPgsReg;
     PI_BSD_DOM2_RLS_REG = piRlsReg;
     neo_sync_bus();
-    //neo_select_menu();
+
+    _neo_asic_cmd(0x00E00000, 1);       // clear gba sram offset
 }
 
 void neo_copyfrom_sram(void *dst, int sstart, int len)
 {
     u32 temp;
 
-    neo_select_game();
-    neo_sync_bus();
-
     temp = (sstart & 0x00030000) >> 13;
     _neo_asic_cmd(0x00E00000|temp, 1);  // set gba sram offset
 
-    // map GBA save ram into sram space
-    SAVE_IO = 0x00050005;               // save off
+    //neo_select_menu();
+    neo_select_game();
     neo_sync_bus();
+
+    // map GBA save ram into sram space
+    SAVE_IO = 0x000F000F;               // save off
     neo_sync_bus();
     if ((gCpldVers & 0x0F) == 1)
         SRAM2C_I0 = 0xFFFFFFFF;         // enable gba sram
     else
         SRAM2C_IO = 0xFFFFFFFF;         // enable gba sram
-    neo_sync_bus();
     neo_sync_bus();
 
     // Init the PI for sram
@@ -481,16 +481,14 @@ void neo_copyfrom_sram(void *dst, int sstart, int len)
     PI_BSD_DOM2_RLS_REG = 0x00000002;
 
     // DMA sram space to buffer
-    data_cache_writeback_invalidate(dmaBuf, len*2);
+    data_cache_hit_writeback_invalidate(dmaBuf, len*2);
     while (dma_busy()) ;
     PI_STATUS_REG = 3;
     dma_read((void *)((u32)dmaBuf & 0x1FFFFFF8), 0xA8000000 + (sstart & 0xFFFF)*2, len*2);
-    data_cache_writeback_invalidate(dmaBuf, len*2);
+    data_cache_hit_invalidate(dmaBuf, len*2);
     // copy DMA buffer to dst
     for (int ix=0; ix<len; ix++)
         *(u8*)(dst + ix) = dmaBuf[ix*2 + 1];
-
-    _neo_asic_cmd(0x00E00000, 1);       // clear gba sram offset
 
     if ((gCpldVers & 0x0F) == 1)
         SRAM2C_I0 = 0x00000000;         // disable gba sram
@@ -503,6 +501,8 @@ void neo_copyfrom_sram(void *dst, int sstart, int len)
     PI_BSD_DOM2_PGS_REG = piPgsReg;
     PI_BSD_DOM2_RLS_REG = piRlsReg;
     neo_sync_bus();
+
+    _neo_asic_cmd(0x00E00000, 1);       // clear gba sram offset
 }
 
 void neo_copyto_nsram(void *src, int sstart, int len, int mode)
@@ -535,7 +535,7 @@ void neo_copyto_nsram(void *src, int sstart, int len, int mode)
         // source not properly aligned, copy src to DMA buffer, then DMA it
         memcpy(dmaBuf, src, len);
         // DMA buffer to sram space
-        data_cache_writeback_invalidate(dmaBuf, len);
+        data_cache_hit_writeback_invalidate(dmaBuf, len);
         while (dma_busy()) ;
         PI_STATUS_REG = 2;
         dma_write((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart, len);
@@ -543,13 +543,13 @@ void neo_copyto_nsram(void *src, int sstart, int len, int mode)
     else
     {
         // source is aligned, DMA src directly to sram space
-        data_cache_writeback_invalidate(src, len);
+        data_cache_hit_writeback_invalidate(src, len);
         while (dma_busy()) ;
         PI_STATUS_REG = 2;
         dma_write((void *)((u32)src & 0x1FFFFFFF), 0xA8000000 + sstart, len);
     }
 
-    SAVE_IO = 0x00050005;               // save off
+    SAVE_IO = 0x000F000F;               // save off
     neo_sync_bus();
 
     PI_BSD_DOM2_LAT_REG = piLatReg;
@@ -585,23 +585,25 @@ void neo_copyfrom_nsram(void *dst, int sstart, int len, int mode)
     if ((u32)dst & 7)
     {
         // not properly aligned - DMA sram space to buffer, then copy it
-        data_cache_writeback_invalidate(dmaBuf, len);
+        data_cache_hit_writeback_invalidate(dmaBuf, len);
         while (dma_busy()) ;
         PI_STATUS_REG = 3;
         dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart, len);
+        data_cache_hit_invalidate(dmaBuf, len);
         // copy DMA buffer to dst
         memcpy(dst, dmaBuf, len);
     }
     else
     {
         // destination is aligned - DMA sram space directly to dst
-        data_cache_writeback_invalidate(dst, len);
+        data_cache_hit_writeback_invalidate(dst, len);
         while (dma_busy()) ;
         PI_STATUS_REG = 3;
         dma_read((void *)((u32)dst & 0x1FFFFFFF), 0xA8000000 + sstart, len);
+        data_cache_hit_invalidate(dst, len);
     }
 
-    SAVE_IO = 0x00050005;               // save off
+    SAVE_IO = 0x000F000F;               // save off
     neo_sync_bus();
 
     PI_BSD_DOM2_LAT_REG = piLatReg;
@@ -628,10 +630,10 @@ void neo_copyto_eeprom(void *src, int sstart, int len, int mode)
     {
         unsigned long long data;
         memcpy((void*)&data, (void*)((u32)src + ix), 8);
-        eeprom_write((sstart + ix)>>3, data);
+        eeprom_write((sstart + ix)>>3, (uint8_t*)&data);
     }
 
-    SAVE_IO = 0x00050005;               // save off
+    SAVE_IO = 0x000F000F;               // save off
     neo_sync_bus();
 
     //neo_select_menu();
@@ -653,11 +655,11 @@ void neo_copyfrom_eeprom(void *dst, int sstart, int len, int mode)
     for (int ix=0; ix<len; ix+=8)
     {
         unsigned long long data;
-        data = eeprom_read((sstart + ix)>>3);
+        eeprom_read((sstart + ix)>>3, (uint8_t*)&data);
         memcpy((void*)((u32)dst + ix), (void*)&data, 8);
     }
 
-    SAVE_IO = 0x00050005;               // save off
+    SAVE_IO = 0x000F000F;               // save off
     neo_sync_bus();
 
     //neo_select_menu();
@@ -704,20 +706,22 @@ void neo_copyfrom_fram(void *dst, int sstart, int len, int mode)
         if ((u32)dst & 7)
         {
             // not properly aligned - DMA sram space to buffer, then copy it
-            data_cache_writeback_invalidate(dmaBuf, 128);
+            data_cache_hit_writeback_invalidate(dmaBuf, 128);
             while (dma_busy()) ;
             PI_STATUS_REG = 3;
             dma_read((void *)((u32)dmaBuf & 0x1FFFFFFF), 0xA8000000 + sstart/2, 128);
+            data_cache_hit_invalidate(dmaBuf, 128);
             // copy DMA buffer to dst
             memcpy(dst, dmaBuf, 128);
         }
         else
         {
             // destination is aligned - DMA sram space directly to dst
-            data_cache_writeback_invalidate(dst, 128);
+            data_cache_hit_writeback_invalidate(dst, 128);
             while (dma_busy()) ;
             PI_STATUS_REG = 3;
             dma_read((void *)((u32)dst & 0x1FFFFFFF), 0xA8000000 + sstart/2, 128);
+            data_cache_hit_invalidate(dst, 128);
         }
 
         dst += 128;
@@ -725,7 +729,7 @@ void neo_copyfrom_fram(void *dst, int sstart, int len, int mode)
         len -= 128;
     }
 
-    SAVE_IO = 0x00050005;               // save off
+    SAVE_IO = 0x000F000F;               // save off
     neo_sync_bus();
 
     PI_BSD_DOM2_LAT_REG = piLatReg;
@@ -1361,15 +1365,15 @@ void simulate_pif_boot(u32 cic_chip)
         *codes++ = 0x00000000;  // nop
 
         // flush general int handler memory
-        data_cache_writeback_invalidate((void *)0x80000120, 0x2E0);
-        inst_cache_invalidate((void *)0x80000120, 0x2E0);
+        data_cache_hit_writeback_invalidate((void *)0x80000120, 0x2E0);
+        inst_cache_hit_invalidate((void *)0x80000120, 0x2E0);
 
         // flush os boot segment
-        data_cache_writeback_invalidate((void *)0x802A0000, 0x100000);
+        data_cache_hit_writeback_invalidate((void *)0x802A0000, 0x100000);
 
         // flush os boot segment memory
-        data_cache_writeback_invalidate((void *)bootAddr, 0x100000);
-        inst_cache_invalidate((void *)bootAddr, 0x100000);
+        data_cache_hit_writeback_invalidate((void *)bootAddr, 0x100000);
+        inst_cache_hit_invalidate((void *)bootAddr, 0x100000);
     }
 
     // Copy low 0x1000 bytes to DMEM

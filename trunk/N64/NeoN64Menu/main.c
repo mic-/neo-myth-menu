@@ -547,7 +547,7 @@ void get_boxart(int brwsr, int entry)
         f_close(&lSDFile);
     }
     /* Invalidate data associated with sprite in cache */
-    data_cache_writeback_invalidate( &boxart[ix*14984], 14984 );
+    data_cache_hit_writeback_invalidate( &boxart[ix*14984], 14984 );
 }
 
 void sort_entries(int max)
@@ -2839,6 +2839,10 @@ void saveSaveState()
 
     flags = 0;
 
+    neo2_disable_sd();
+    neo2_enable_sd();
+    getSDInfo(-1);
+
     if(gSdMounted)
     {
         c2wstrcpy(wname2, "/menu/n64/save/last.run");
@@ -2857,6 +2861,7 @@ void saveSaveState()
     }
     else
     {
+        neo2_disable_sd();
         neo_copyfrom_sram(temp, 0x3FE00, 256);
         neo_copyfrom_sram(&flags, 0x3FF00, 8);
         neo_copyfrom_sram(&back_flags, 0x3FF08, 8);
@@ -3476,8 +3481,8 @@ void setTextColors(int bfill)
 /* initialize console hardware */
 void init_n64(void)
 {
-    // enable MI interrupts (on the CPU)
-    set_MI_interrupt(1,1);
+    // enable interrupts (on the CPU)
+    init_interrupts();
 
     // Initialize display
     display_init(RESOLUTION_320x240, DEPTH_16_BPP, 2, GAMMA_NONE, ANTIALIAS_RESAMPLE);
@@ -3496,19 +3501,19 @@ void init_n64(void)
         pattern[0] = malloc(dfs_size(fp));
         dfs_read(pattern[0], 1, dfs_size(fp), fp);
         /* Invalidate data associated with sprite in cache */
-        data_cache_writeback_invalidate( pattern[0], dfs_size(fp) );
+        data_cache_hit_writeback_invalidate( pattern[0], dfs_size(fp) );
         dfs_close(fp);
         fp = dfs_open("/pattern1.sprite");
         pattern[1] = malloc(dfs_size(fp));
         dfs_read(pattern[1], 1, dfs_size(fp), fp);
         /* Invalidate data associated with sprite in cache */
-        data_cache_writeback_invalidate( pattern[1], dfs_size(fp) );
+        data_cache_hit_writeback_invalidate( pattern[1], dfs_size(fp) );
         dfs_close(fp);
         fp = dfs_open("/pattern2.sprite");
         pattern[2] = malloc(dfs_size(fp));
         dfs_read(pattern[2], 1, dfs_size(fp), fp);
         /* Invalidate data associated with sprite in cache */
-        data_cache_writeback_invalidate( pattern[2], dfs_size(fp) );
+        data_cache_hit_writeback_invalidate( pattern[2], dfs_size(fp) );
         dfs_close(fp);
         // load unknown boxart sprite
         fp = dfs_open("/unknown.sprite");
@@ -4271,250 +4276,192 @@ void hw_self_test_follow(const char* msg,int dl)
     debugText(msg,hw_self_test_dbg_scr_x,hw_self_test_dbg_scr_y++,dl);
 }
 
-void hw_self_test_gen_pattern32(unsigned char* dst,int size,int* dir)
+int hw_self_test_sram(int blkoff, int blksz)
 {
-    int f = *dir;
-    unsigned char m;
-
-    m = (f) ? 0x80 : 0;
-
-    while(--size)
-    {
-        if(f)
-            dst[0]++;
-        else
-            dst[0]--;
-
-        dst[0] |= (m--);
-        f ^= 1;
-        ++dst;
-    }
-
-    *dir = f;
-}
-
-//http://en.literateprograms.org/Mersenne_twister_%28C%29
-#define MT_LEN 624
-#define MT_IA           397
-#define MT_IB           (MT_LEN - MT_IA)
-#define UPPER_MASK      (0x80000000)
-#define LOWER_MASK      (0x7FFFFFFF)
-#define MATRIX_A        (0x9908B0DF)
-#define TWIST(b,i,j)    ((b)[i] & UPPER_MASK) | ((b)[j] & LOWER_MASK)
-#define MAGIC(s)        (((s)&1)*MATRIX_A)
-
-void mt_init(unsigned int* mt_buffer,int* mt_index)
-{
-    int i;
-    for (i = 0; i < MT_LEN; i++)
-    {
-        mt_buffer[i] = (unsigned int)rand();
-    }
-    *mt_index = 0;
-}
-
-unsigned int mt_random(unsigned int* mt_buffer,int* mt_index)
-{
-    unsigned int * b = mt_buffer;
-    int idx = *mt_index;
-    unsigned int s;
-    int i;
-
-    if (idx == (MT_LEN*sizeof(unsigned int)) )
-    {
-        idx = 0;
-        i = 0;
-        for (; i < MT_IB; i++) {
-            s = TWIST(b, i, i+1);
-            b[i] = b[i + MT_IA] ^ (s >> 1) ^ MAGIC(s);
-        }
-        for (; i < MT_LEN-1; i++) {
-            s = TWIST(b, i, i+1);
-            b[i] = b[i - MT_IB] ^ (s >> 1) ^ MAGIC(s);
-        }
-
-        s = TWIST(b, MT_LEN-1, 0);
-        b[MT_LEN-1] = b[MT_IA-1] ^ (s >> 1) ^ MAGIC(s);
-    }
-    *mt_index = idx + sizeof(unsigned int);
-    return *(unsigned int *)((unsigned char *)b + idx);
-}
-
-void hw_self_test_sram_read(int onboard)                                            //compare previous write
-{
-    int sram_size = (1+onboard) * (128 * 1024);
-    const int block_size = 128 * 1024;
     unsigned char* a = &tmpBuf[0];
-    unsigned char* b = &tmpBuf[block_size];
-    int dir;
-    int addr;
+    unsigned char* b = &tmpBuf[128*1024];
+
+    memset(a, 0x55, blksz);
+    neo_copyto_sram(a, blkoff, blksz);
+    neo_copyfrom_sram(b, blkoff, blksz);
+    if(memcmp(a, b, blksz) != 0)
+        return 1; // error
+
+    memset(a, 0xaa, blksz);
+    neo_copyto_sram(a, blkoff, blksz);
+    neo_copyfrom_sram(b, blkoff, blksz);
+    if(memcmp(a, b, blksz) != 0)
+        return 2; // error
+
+    memset(a, 0x00, blksz);
+    neo_copyto_sram(a, blkoff, blksz);
+    neo_copyfrom_sram(b, blkoff, blksz);
+    if(memcmp(a, b, blksz) != 0)
+        return 4; // error
+
+    memset(a, 0xff, blksz);
+    neo_copyto_sram(a, blkoff, blksz);
+    neo_copyfrom_sram(b, blkoff, blksz);
+    if(memcmp(a, b, blksz) != 0)
+        return 3; // error
+
+    return 0; // passed!
+}
+
+int hw_self_test_nsram(int blkoff, int blksz)
+{
+    unsigned char* a = &tmpBuf[0];
+    unsigned char* b = &tmpBuf[128*1024];
+
+    memset(a, 0x55, blksz);
+    neo_copyto_nsram(a, blkoff, blksz, 8);
+    neo_copyfrom_nsram(b, blkoff, blksz, 8);
+    if(memcmp(a, b, blksz) != 0)
+        return 1; // error
+
+    memset(a, 0xaa, blksz);
+    neo_copyto_nsram(a, blkoff, blksz, 8);
+    neo_copyfrom_nsram(b, blkoff, blksz, 8);
+    if(memcmp(a, b, blksz) != 0)
+        return 2; // error
+
+    memset(a, 0xff, blksz);
+    neo_copyto_nsram(a, blkoff, blksz, 8);
+    neo_copyfrom_nsram(b, blkoff, blksz, 8);
+    if(memcmp(a, b, blksz) != 0)
+        return 3; // error
+
+    memset(a, 0x00, blksz);
+    neo_copyto_nsram(a, blkoff, blksz, 8);
+    neo_copyfrom_nsram(b, blkoff, blksz, 8);
+    if(memcmp(a, b, blksz) != 0)
+        return 4; // error
+
+    return 0; // passed!
+}
+
+int hw_self_test_psram(int blkoff, int blksz)
+{
+    unsigned char* a = &tmpBuf[0];
+    unsigned char* b = &tmpBuf[128*1024];
+
+    memset(a, 0x55, blksz);
+    neo_copyto_psram(a, blkoff, blksz);
+    neo_copyfrom_psram(b, blkoff, blksz);
+    if(memcmp(a, b, blksz) != 0)
+        return 1; // error
+
+    memset(a, 0xaa, blksz);
+    neo_copyto_psram(a, blkoff, blksz);
+    neo_copyfrom_psram(b, blkoff, blksz);
+    if(memcmp(a, b, blksz) != 0)
+        return 2; // error
+
+    memset(a, 0xff, blksz);
+    neo_copyto_psram(a, blkoff, blksz);
+    neo_copyfrom_psram(b, blkoff, blksz);
+    if(memcmp(a, b, blksz) != 0)
+        return 3; // error
+
+    memset(a, 0x00, blksz);
+    neo_copyto_psram(a, blkoff, blksz);
+    neo_copyfrom_psram(b, blkoff, blksz);
+    if(memcmp(a, b, blksz) != 0)
+        return 4; // error
+
+    return 0; // passed!
+}
+
+void hw_self_test_saveram(int onboard)
+{
+    int i, err, blksz;
+    int tstpat[5] = { 0x00, 0x55, 0xAA, 0xFF, 0x00 };
 
     hw_self_test_follow((onboard) ? "Checking ONBOARD SRAM..." : "Checking NEO2 SRAM..." ,0);
     hw_self_test_follow(" ",0);
 
-    if(onboard)
+    blksz = 64*1024;
+    for (i=0; i<(256/64); i++)
     {
-        for(dir = 0,addr = 0;addr < sram_size; addr += block_size)
+        err = onboard ? hw_self_test_nsram(i*blksz, blksz) : hw_self_test_sram(i*blksz, blksz);
+        if (err)
         {
-            hw_self_test_gen_pattern32(a,block_size,&dir);
-            neo_copyfrom_nsram((void*)b,addr,block_size,8);
-
-            if(memcmp(a,b,block_size) != 0)
-            {
-                hw_self_test_follow("FAILED!",0);
-                return;
-            }
-        }
-    }
-    else
-    {
-        int error = 0;
-        dir = 0;
-        hw_self_test_gen_pattern32(a,128*1024,&dir);
-        neo_copyfrom_sram(b,0,65536);
-        if(memcmp(a,b,64*1024) != 0)
-        {
+            char temp[40];
+            sprintf(temp, "Block %d failed on pattern 0x%02X!", i, tstpat[err]);
             graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
-            hw_self_test_follow("1/2 BLOCK FAILED!",0);
-            error = 1;
+            hw_self_test_follow(temp,0);
         }
         else
         {
+            char temp[40];
+            sprintf(temp, "Block %d passed!", i);
             graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
-            hw_self_test_follow("1/2 BLOCK PASSED!",0);
-        }
-
-        neo_copyfrom_sram(&b[65536],65536,65536);
-        neo_copyfrom_sram(&b[(128*1024)-16],0x3FFF0,16); // "fix" for sram quirk
-        if(memcmp(&a[64*1024],&b[64*1024],64*1024) != 0)
-        {
-            graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
-            hw_self_test_follow("2/2 BLOCK FAILED!",0);
-            graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-            return;
-        }
-        else
-        {
-            graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
-            hw_self_test_follow("2/2 BLOCK PASSED!",0);
-        }
-
-        graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-
-        if(error)
-        {
-            return;
+            hw_self_test_follow(temp,0);
         }
     }
 
-    hw_self_test_follow("PASSED!",0);
-}
-
-void hw_self_test_sram_write(int onboard)                                           //write and compare later (To test battery)
-{
-    int sram_size = (1+onboard) * (128 * 1024);
-    const int block_size = 128 * 1024;
-    unsigned char* a = &tmpBuf[0];
-    int dir,addr;
-
-    hw_self_test_follow((onboard) ? "Preparing ONBOARD SRAM..." : "Preparing NEO2 SRAM...",0);
+    graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
     hw_self_test_follow(" ",0);
-
-    if(onboard)
-    {
-        for(dir = 0,addr = 0;addr < sram_size;addr += block_size)
-        {
-            hw_self_test_gen_pattern32(a,block_size,&dir);
-            neo_copyto_nsram((void*)a,addr,block_size,8);
-        }
-    }
-    else
-    {
-        dir = 0;
-        hw_self_test_gen_pattern32(a,128*1024,&dir);
-        neo_copyto_sram(a,0,65536);
-        neo_copyto_sram(&a[65536],65536,65536);
-        neo_copyto_sram(&a[(128*1024)-16],0x3FFF0,16); // "fix" for sram quirk
-    }
-
-    graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
-    hw_self_test_follow("FINISHED!",0);
-    graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+    hw_self_test_follow("SRAM test done",0);
 }
 
-volatile int hw_self_test_long_cmp(void* a,void* b,int c)
+void hw_self_test_zipram(void)
 {
-    asm(
-            ".set   push\n"
-            ".set   noreorder\n"
-            "addu   $t0,$a0,$a2\n"
-            "0:\n"
-            "lw     $t1,($a0)\n"
-            "lw     $t2,($a1)\n"
-            "bne    $t1,$t2,1f\n"
-            "addiu  $a0,$a0,4\n"
-            "bne    $a0,$t0,0b\n"
-            "addiu  $a1,$a1,4\n"
-            "jr     $ra\n"
-            "addi   $v0,$zero,1\n"
-            "1:\n"
-            "jr     $ra\n"
-            "add    $v0,$zero,$zero\n"
-            ".set pop\n"
-        );
+    int i, err, errs, blksz;
+    int tstpat[5] = { 0x00, 0x55, 0xAA, 0xFF, 0x00 };
 
-    return 0;   //remove warnings
-}
-
-void hw_self_test_zipram_block(int* m_idx,unsigned int* stack,int check_top)
-{
-    unsigned char* a = &tmpBuf[0];
-    unsigned char* b = &tmpBuf[128*1024];
-    unsigned int* c;
-    int i,j;
-
-    for(j = 0;j < (16*1024*1024);j += 128*1024)
+    blksz = 128*1024;
+    graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+    hw_self_test_follow("Checking NEO2 PSRAM..." ,0);
+    hw_self_test_follow(" ",0);
+    hw_self_test_follow("TESTING BLOCK 0-16MB",0);
+    gPsramMode = 0;
+    neo_select_psram(); // make sure psram is in right mode for test
+    neo_psram_offset(0);
+    for (i=0, errs=0; i<(16384/128); i++)
     {
-        for(i = 0;i < 128 * 1024;i += 16)
+        err = hw_self_test_psram(i*blksz, blksz);
+        if (err)
         {
-            c = (unsigned int*)&a[i];
-            c[0] = mt_random(stack,m_idx) + gTicks;
-            c[1] = mt_random(stack,m_idx) - gTicks;
-            c[2] = mt_random(stack,m_idx) + gTicks;
-            c[3] = mt_random(stack,m_idx) - gTicks;
-        }
-
-        neo_copyto_psram(a,j,128*1024);
-        neo_copyfrom_psram(b,j,128*1024);
-
-        if(!hw_self_test_long_cmp(a,b,128*1024))
-        {
+            char temp[40];
+            sprintf(temp, "Block %d failed on pattern 0x%02X!", i, tstpat[err]);
             graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
-            hw_self_test_follow("BLOCK FAILED!",0);
-            graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-            return;
+            hw_self_test_follow(temp,0);
+            errs = 1;
         }
-
-        if(!check_top)
+    }
+    if (!errs)
+    {
+        graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+        hw_self_test_follow("All blocks passed!",0);
+    }
+    graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+    hw_self_test_follow(" ",0);
+    hw_self_test_follow("TESTING BLOCK 16-32MB",0);
+    gPsramMode = 1;
+    neo_select_psram(); // make sure psram is in right mode for test
+    neo_psram_offset((16*1024*1024) / (32*1024));
+    for (i=0, errs=0; i<(16384/128); i++)
+    {
+        err = hw_self_test_psram(i*blksz, blksz);
+        if (err)
         {
-            continue;
-        }
-
-        neo_psram_offset(0);
-        neo_copyfrom_psram(b,j,128*1024);
-        if(hw_self_test_long_cmp(a,b,128*1024))
-        {
+            char temp[40];
+            sprintf(temp, "Block %d failed on pattern 0x%02X!", i+256, tstpat[err]);
             graphics_set_color(graphics_make_color(0xff,0x00, 0x00, 0xff), 0);
-            hw_self_test_follow("MIRRORING DETECTED!",0);
-            graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-            return;
+            hw_self_test_follow(temp,0);
+            errs = 1;
         }
-        neo_psram_offset((16*1024*1024) / (32*1024));
+    }
+    if (!errs)
+    {
+        graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
+        hw_self_test_follow("All blocks passed!",0);
     }
 
-    graphics_set_color(graphics_make_color(0x00,0xff, 0x00, 0xff), 0);
-    hw_self_test_follow("BLOCK PASSED!",0);
     graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
+    hw_self_test_follow(" ",0);
+    hw_self_test_follow("PSRAM test done",0);
 }
 
 void hw_self_test()
@@ -4524,10 +4471,6 @@ void hw_self_test()
 
     hw_self_test_dbg_scr_x = 5;
     hw_self_test_dbg_scr_y = 20;
-
-    neo2_enable_sd();
-    ix = getSDInfo(-1);
-    if(!ix){delay(200);}
 
     ctx = lockVideo(1);
     graphics_fill_screen(ctx,0);
@@ -4565,55 +4508,16 @@ void hw_self_test()
     {
         hw_self_test_follow(">>TEST SRAM",0);
         hw_self_test_follow(" ",0);
-        graphics_set_color(graphics_make_color(0x99,0xff, 0xff, 0xff), 0);
-        hw_self_test_follow("A => READ , B => WRITE",0);
-        hw_self_test_follow(" ",0);
-        tst = wait_confirm();
         graphics_set_color(graphics_make_color(0x66,0xff, 0xff, 0xff), 0);
         hw_self_test_follow("A => ONBOARD SRAM , B => NEO2 SRAM",0);
         graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-        if(tst)
-        {
-            hw_self_test_sram_read(wait_confirm());
-        }
-        else
-        {
-            hw_self_test_sram_write(wait_confirm());
-        }
+        hw_self_test_saveram(wait_confirm());
     }
     else
     {
-        int m_idx;
-        unsigned int stack[MT_LEN];
-
         hw_self_test_follow(">>TEST ZIP RAM",0);
         hw_self_test_follow(" ",0);
-        mt_init(stack,&m_idx);
-        data_cache_writeback_invalidate(stack,MT_LEN);
-        graphics_set_color(graphics_make_color(0xff,0xff, 0xff, 0xff), 0);
-        hw_self_test_follow("TESTING BLOCK 0-16MB",0);
-        gPsramMode = 0;
-        neo_select_psram(); // make sure psram is in right mode for test
-        neo_psram_offset(0);
-        hw_self_test_zipram_block(&m_idx,stack,0);
-        hw_self_test_follow(" ",0);
-        hw_self_test_follow("TESTING BLOCK 16-32MB",0);
-        gPsramMode = 1;
-        neo_select_psram(); // make sure psram is in right mode for test
-        neo_psram_offset((16*1024*1024) / (32*1024));
-        hw_self_test_zipram_block(&m_idx,stack,1);
-        #if 0
-        hw_self_test_follow(" ",0);
-        hw_self_test_follow("TESTING BANK2..",0);
-        hw_self_test_follow(" ",0);
-        hw_self_test_follow("TESTING BLOCK 32-48MB",0);
-        neo_psram_offset((32*1024*1024) / (32*1024));
-        hw_self_test_zipram_block(&m_idx,stack);
-        hw_self_test_follow(" ",0);
-        hw_self_test_follow("TESTING BLOCK 48-64MB",0);
-        neo_psram_offset((48*1024*1024) / (32*1024));
-        hw_self_test_zipram_block(&m_idx,stack);
-        #endif
+        hw_self_test_zipram();
         gPsramMode = 0;
         neo_select_psram();
         neo_psram_offset(0);

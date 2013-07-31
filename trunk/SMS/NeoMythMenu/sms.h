@@ -101,6 +101,13 @@ __sfr __at 0xF2 FMDetect; /* in/out */
 #define CMFrm2Ctrl (*(volatile BYTE *)(0x8000))
 
 /*
+ * Korean Frame Page Number
+ * The Korean mapper uses a 16KB bank at 0x8000. Write a byte to 0xA000
+ * to set the page of the bank.
+ */
+#define KMFrm2Ctrl (*(volatile BYTE *)(0xA000))
+
+/*
  * BIOS shadow variable for MemCtrl
  */
 #define MemCtrlShdw (*(volatile BYTE *)(0xC000))

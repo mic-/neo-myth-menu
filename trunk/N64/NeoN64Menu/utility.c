@@ -189,7 +189,7 @@ sprite_t *loadImageDFS(char *fname)
         for (int i=0; i<x; i++)
             dst[i + j*x] = graphics_convert_color(src[i + j*x]) & 0x0000FFFF;
     /* Invalidate data associated with sprite in cache */
-    data_cache_writeback_invalidate( sbuf->data, sbuf->width * sbuf->height * sbuf->bitdepth );
+    data_cache_hit_writeback_invalidate( sbuf->data, sbuf->width * sbuf->height * sbuf->bitdepth );
 
     stbi_image_free(ibuf);
     return sbuf;
@@ -249,7 +249,7 @@ sprite_t *loadImageSD(char *fname, int *w, int *h)
         for (int i=0; i<x; i++)
             dst[i + j*x] = graphics_convert_color(src[i + j*x]) & 0x0000FFFF;
     /* Invalidate data associated with sprite in cache */
-    data_cache_writeback_invalidate( sbuf->data, sbuf->width * sbuf->height * sbuf->bitdepth );
+    data_cache_hit_writeback_invalidate( sbuf->data, sbuf->width * sbuf->height * sbuf->bitdepth );
 
     stbi_image_free(ibuf);
     return sbuf;

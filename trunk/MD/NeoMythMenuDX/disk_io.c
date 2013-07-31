@@ -46,12 +46,12 @@ static int respTime = RESP_TIME_R;
 void sd_op_delay() __attribute__ ((section (".data")));
 void sd_op_delay()
 {
-	short i;
+    short i;
 
-	for (i=0; i<16; i++)
+    for (i=0; i<16; i++)
     {
-		asm("nop\n");
-	}
+        asm("nop\n");
+    }
 }
 
 void wrMmcCmdBit( unsigned int bit ) __attribute__ ((section (".data")));
@@ -72,7 +72,7 @@ void wrMmcCmdBit( unsigned int bit )
         ( 1<<10 ) |            // d1 value
         ( 1<<9 );            // d0 value
     data = *(vu16*)(addr);
-	if (do_init) sd_op_delay();
+    if (do_init) sd_op_delay();
 }
 
 void wrMmcCmdByte( unsigned int byte ) __attribute__ ((section (".data")));
@@ -102,7 +102,7 @@ void wrMmcDatBit( unsigned int bit )
         ( 1<<10 ) |            // d1 value
         ( (bit&1)<<9 );        // d0 value
     data = *(vu16*)(addr);
-	if (do_init) sd_op_delay();
+    if (do_init) sd_op_delay();
 }
 
 void wrMmcDatByte( unsigned int byte ) __attribute__ ((section (".data")));
@@ -133,7 +133,7 @@ unsigned int rdMmcCmdBit()
         ( 1<<9 ) |            // d0
         ( 1<<7 );            // cmd input mode
     data = *(vu16*)(addr);
-	if (do_init) sd_op_delay();
+    if (do_init) sd_op_delay();
     return (data>>4) & 1;
 }
 
@@ -175,7 +175,7 @@ unsigned int rdMmcDatBit()
         //( 1<<6 ) |        // d3-d1 input (only needed in 4 bit mode)
         ( 1<<5);            // d0 input
     data = *(vu16*)(addr);
-	if (do_init) sd_op_delay();
+    if (do_init) sd_op_delay();
     return data & 1;
 }
 
@@ -605,7 +605,7 @@ BOOL sdInit(void)
     unsigned short rca;
     unsigned char resp[R2_LEN];         // R2 is largest response
 
-	do_init = 1;
+    do_init = 1;
 
     for( i = 0; i < 64; i++ )
         wrMmcCmdBit(1);
@@ -677,7 +677,7 @@ BOOL sdInit(void)
     if (!recvMmcCmdResp(resp, R1_LEN, 1) || (resp[0] != 6))
         return FALSE;                   // unusable
 
-	do_init = 0;
+    do_init = 0;
     return TRUE;
 }
 
