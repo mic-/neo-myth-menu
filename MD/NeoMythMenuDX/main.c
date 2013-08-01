@@ -282,7 +282,7 @@ short int gSRAMType;                    /* 0x0000 = sram, 0x0001 = eeprom */
 short int gSRAMBank;                    /* sram bank = 0 to 15, constrained by size of sram */
 short int gSRAMSize;                    /* size of sram in 8KB units */
 
-short int gNoAlias = 0x0000;            /* 0x0000 = normal Myth PSRAM banks, 0x00FF = full size bank padded with 0xFF */
+short int gBnkAlias = 0x0000;            /* 0x0000 = normal Myth PSRAM banks, 0x00FF = full size bank padded with 0xFF */
 
 short int gYM2413 = 0x0001;             /* 0x0000 = YM2413 disabled, 0x0001 = YM2413 enabled */
 short int gImportIPS = 0;
@@ -2243,14 +2243,15 @@ void update_progress(char *str1, char *str2, int curr, int total)
 
 void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(unsigned char *buff, int offs, int len), int doffset, int soffset, int length, char *str1, char *str2)
 {
-    int ix, iy;
+    int ix, iy, xs;
 
-    for (iy=0; iy<length; iy+=XFER_SIZE)
+    xs = gFileType ? XFER_SIZE : XFER_SIZE*2;
+    for (iy=0; iy<length; iy+=xs)
     {
         // fetch data data from source
         if (src)
         {
-            (src)(buffer, soffset + iy + (gFileType ? 512 : 0), XFER_SIZE);
+            (src)(buffer, soffset + iy + (gFileType ? 512 : 0), xs);
             switch (gFileType)
             {
                 case 1:
@@ -2272,7 +2273,7 @@ void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(u
             }
         }
         // store data to destination
-        (dst)(&buffer[gFileType ? XFER_SIZE : 0], doffset + iy, XFER_SIZE);
+        (dst)(&buffer[gFileType ? XFER_SIZE : 0], doffset + iy, xs);
         update_progress(str1, str2, iy, length);
     }
 
@@ -2283,12 +2284,27 @@ void copyGame(void (*dst)(unsigned char *buff, int offs, int len), void (*src)(u
         for (iy=length; iy<(length + 0x020000); iy+=XFER_SIZE)
             neo_copyto_myth_psram(buffer, doffset + iy, XFER_SIZE);
     }
-    else if (gNoAlias && (length < 0x400000) && ((dst == &neo_copyto_myth_psram) || (dst == &neo_sd_to_myth_psram)))
+    else if (gBnkAlias && (length < 0x400000) && ((dst == &neo_copyto_myth_psram) || (dst == &neo_sd_to_myth_psram)))
     {
-        // pad rom to 4M with 0xFF
-        utility_memset(buffer, 0xFF, XFER_SIZE);
-        for (iy=length; iy<0x400000; iy+=XFER_SIZE)
-            neo_copyto_myth_psram(buffer, doffset + iy, XFER_SIZE);
+        if (gBnkAlias == 1)
+        {
+            ix = 0;
+            // copy rom up to 4M
+            for (iy=length; iy<0x400000; iy+=XFER_SIZE)
+            {
+                neo_copyfrom_myth_psram(buffer, ix, XFER_SIZE);
+                ix += XFER_SIZE;
+                if (ix >= length) ix = 0;
+                neo_copyto_myth_psram(buffer, doffset + iy, XFER_SIZE);
+            }
+        }
+        else if (gBnkAlias == 2)
+        {
+            // pad rom to 4M with 0xFF
+            utility_memset(buffer, 0xFF, XFER_SIZE);
+            for (iy=length; iy<0x400000; iy+=XFER_SIZE)
+                neo_copyto_myth_psram(buffer, doffset + iy, XFER_SIZE);
+        }
     }
 }
 
@@ -2310,15 +2326,20 @@ void toggleResetMode(int index)
 
 void toggleBankAlias(int index)
 {
-    if (gNoAlias)
+    if (gBnkAlias == 0)
     {
-        gNoAlias = 0x0000;
-        gOptions[index].value = "ON";
+        gBnkAlias = 0x0001;
+        gOptions[index].value = "FORCE";
+    }
+    else if (gBnkAlias == 1)
+    {
+        gBnkAlias = 0x0002;
+        gOptions[index].value = "OFF";
     }
     else
     {
-        gNoAlias = 0x00FF;
-        gOptions[index].value = "OFF";
+        gBnkAlias = 0x0000;
+        gOptions[index].value = "HW";
     }
 
     gCacheOutOfSync = 1;
@@ -2653,7 +2674,7 @@ int patchesNeeded(void)
     */
 void cache_invalidate_pointers()
 {
-    gSRAMBank = gSRAMSize = gResetMode = gNoAlias = 0x0000;
+    gSRAMBank = gSRAMSize = gResetMode = gBnkAlias = 0x0000;
     gYM2413 = 0x0001;
     gManageSaves = gSRAMgrServiceStatus = 0;
 
@@ -2929,7 +2950,7 @@ void cache_loadPA(WCHAR* sss,int skip_check)
     gSRAMSize = gCacheBlock.sramSize;
     gYM2413 = gCacheBlock.YM2413;
     gResetMode =  gCacheBlock.resetMode;
-    gNoAlias =  gCacheBlock.aliasMode;
+    gBnkAlias =  gCacheBlock.aliasMode;
     gSRAMType = (short int)gCacheBlock.sramType;
     gManageSaves = (short int)gCacheBlock.autoManageSaves;
     gSRAMgrServiceStatus = (short int)gCacheBlock.autoManageSavesServiceStatus;
@@ -3047,7 +3068,7 @@ void cache_sync(int root)
     gCacheBlock.sramSize = gSRAMSize;
     gCacheBlock.YM2413 = gYM2413;
     gCacheBlock.resetMode = gResetMode;
-    gCacheBlock.aliasMode = gNoAlias;
+    gCacheBlock.aliasMode = gBnkAlias;
     gCacheBlock.sramType = (unsigned char)gSRAMType;
 
     f_write(&gSDFile,(char*)&gCacheBlock,sizeof(CacheBlock),&fbr);
@@ -4122,8 +4143,8 @@ void do_options(void)
         maxOptions++;
 
         gOptions[maxOptions].exclusiveFCall = 0;
-        gOptions[maxOptions].name = "Bank Aliasing";
-        gOptions[maxOptions].value = gNoAlias ? "OFF" : "ON";
+        gOptions[maxOptions].name = "ROM Aliasing";
+        gOptions[maxOptions].value = (gBnkAlias == 0) ? "HW" : (gBnkAlias == 1) ? "FORCE" : "OFF";
         gOptions[maxOptions].callback = &toggleBankAlias;
         gOptions[maxOptions].patch = gOptions[maxOptions].userData = NULL;
         maxOptions++;
