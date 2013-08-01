@@ -563,8 +563,8 @@ _neo_set_fsize:
 | entry: d0 = neo myth psram bank size
 |        a1 = hardware base (0xA10000)
 _neo_set_myth_psize:
-        move.w  #0x00E0,d1              /* no bank aliasing => 32Mbit */
-        tst.w   gNoAlias
+        move.w  #0x00E0,d1              /* bank aliasing forced or off => 32Mbit */
+        tst.w   gBnkAlias
         bne.b   1f
         /* set psram bank size */
         swap    d0
@@ -1521,6 +1521,7 @@ multi_sd_to_myth_psram:
         move.w  #20,d1
         lsr.l   d1,d0                   /* bank = pstart / 1MB  */
         move.w  d0,PRAM_BIO(a1)         /* set the neo myth psram bank register */
+        move.w  #0x00F8,PRAM_ZIO(a1)    /* set the neo myth psram bank size to 1MB */
 
         move.l  12(sp),d0               /* buf */
         andi.l  #0x0FFFFE,d0            /* offset inside sram space (bank was set to closest 1MB) */
@@ -1606,6 +1607,7 @@ multi_sd_to_myth_psram:
         lea     0xA10000,a1
         move.w  #0x0080,GBAC_LIO(a1)
         move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
+        move.w  #0x00F0,PRAM_ZIO(a1)    /* psram bank size = 2MB */
         movem.l (sp)+,d2-d3
         moveq   #1,d0                   /* TRUE */
         rts
@@ -1613,6 +1615,7 @@ multi_sd_to_myth_psram:
         lea     0xA10000,a1
         move.w  #0x0080,GBAC_LIO(a1)
         move.w  #0x0000,PRAM_BIO(a1)    /* set psram to bank 0 */
+        move.w  #0x00F0,PRAM_ZIO(a1)    /* psram bank size = 2MB */
         movem.l (sp)+,d2-d3
         moveq   #0,d0                   /* FALSE */
         rts
