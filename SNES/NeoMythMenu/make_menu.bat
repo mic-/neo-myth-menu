@@ -4,23 +4,24 @@ tools\sixpack -image -target snes -format p1 -bg 6,0 -o assets\font.chr assets\a
 tools\sixpack -image -target snes -format p4 -opt -codec aplib -o assets\menu_bg.lzs -pack assets\menu_bg2.bmp
 tools\sixpack -image -target snes -format p4 -opt -o assets\menu_bg.pat assets\menu_bg2.bmp
 
+SET SNES_SDK=C:\snes\SNES_SDK_r67_Win32
 
 REM C -> ASM / S
-..\bin\816-tcc.exe -Wall -I../include -o main.ps -c main.c
-..\bin\816-tcc.exe -Wall -I../include -o navigation.ps -c navigation.c
-..\bin\816-tcc.exe -Wall -I../include -o game_genie.ps -c game_genie.c
-..\bin\816-tcc.exe -Wall -I../include -o action_replay.ps -c action_replay.c
-..\bin\816-tcc.exe -Wall -I../include -o ppuc.ps -c ppuc.c
-..\bin\816-tcc.exe -Wall -I../include -o bg_buffer.ps -c bg_buffer.c
-..\bin\816-tcc.exe -Wall -I../include -o common.ps -c common.c
-..\bin\816-tcc.exe -Wall -I../include -o sd_utils.ps -c sd_utils.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o main.ps -c main.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o navigation.ps -c navigation.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o game_genie.ps -c game_genie.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o action_replay.ps -c action_replay.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o ppuc.ps -c ppuc.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o bg_buffer.ps -c bg_buffer.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o common.ps -c common.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o sd_utils.ps -c sd_utils.c
 
-..\bin\816-tcc.exe -Wall -I../include -o cheat_db.ps -c cheats\cheat_database.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o cheat_db.ps -c cheats\cheat_database.c
 
-..\bin\816-tcc.exe -Wall -I../include -o pff.ps -c pff.c
-..\bin\816-tcc.exe -Wall -I../include -o u_strings.ps -c u_strings.c
-..\bin\816-tcc.exe -Wall -I../include -o diskio.ps -c diskio.c
-..\bin\816-tcc.exe -Wall -I../include -o myth_io.ps -c myth_io.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o pff.ps -c pff.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o u_strings.ps -c u_strings.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o diskio.ps -c diskio.c
+%SNES_SDK%\bin\816-tcc.exe -Wall -I%SNES_SDK%/include -o myth_io.ps -c myth_io.c
 
 
 REM Optimize ASM files
@@ -40,17 +41,17 @@ tools\stripcom u_strings.ps u_strings.ps2
 tools\stripcom cheat_db.ps cheat_db.s
 del *.ps 
 
-..\bin\816-opt.py main.ps2 > main.s
-..\bin\816-opt.py navigation.ps2 > navigation.s
-..\bin\816-opt.py game_genie.ps2 > game_genie.s
-..\bin\816-opt.py action_replay.ps2 > action_replay.s
-..\bin\816-opt.py ppuc.ps2 > ppuc.s
-..\bin\816-opt.py bg_buffer.ps2 > bg_buffer.s
-..\bin\816-opt.py sd_utils.ps2 > sd_utils.s
-..\bin\816-opt.py diskio.ps2 > diskio.s
-..\bin\816-opt.py myth_io.ps2 > myth_io.s
-..\bin\816-opt.py pff.ps2 > pff.s
-..\bin\816-opt.py u_strings.ps2 > u_strings.s
+%SNES_SDK%\bin\816-opt.py main.ps2 > main.s
+%SNES_SDK%\bin\816-opt.py navigation.ps2 > navigation.s
+%SNES_SDK%\bin\816-opt.py game_genie.ps2 > game_genie.s
+%SNES_SDK%\bin\816-opt.py action_replay.ps2 > action_replay.s
+%SNES_SDK%\bin\816-opt.py ppuc.ps2 > ppuc.s
+%SNES_SDK%\bin\816-opt.py bg_buffer.ps2 > bg_buffer.s
+%SNES_SDK%\bin\816-opt.py sd_utils.ps2 > sd_utils.s
+%SNES_SDK%\bin\816-opt.py diskio.ps2 > diskio.s
+%SNES_SDK%\bin\816-opt.py myth_io.ps2 > myth_io.s
+%SNES_SDK%\bin\816-opt.py pff.ps2 > pff.s
+%SNES_SDK%\bin\816-opt.py u_strings.ps2 > u_strings.s
 
 tools\optimore-816 main.s mainopt.s
 tools\optimore-816 navigation.s navigopt.s
@@ -70,42 +71,42 @@ tools\constify navigation.c navigopt.s navigopt2.s
 tools\constify cheats\cheat_database.c cheat_db.s cheat_db2.s
 @echo on
 
-..\bin\wla-spc700 -vo vgmplay_spc700_ext.asm vgmplay.o
+%SNES_SDK%\bin\wla-spc700 -vo vgmplay_spc700_ext.asm vgmplay.o
 assets\wlalink -vb vgmplay.link assets\vgmplay.bin
 
 REM ASM -> OBJ
-..\bin\wla-65816.exe -io assets\data.asm data.obj
-..\bin\wla-65816.exe -io dma.asm dma.obj
-..\bin\wla-65816.exe -io hw_math.asm hw_math.obj
+%SNES_SDK%\bin\wla-65816.exe -io assets\data.asm data.obj
+%SNES_SDK%\bin\wla-65816.exe -io dma.asm dma.obj
+%SNES_SDK%\bin\wla-65816.exe -io hw_math.asm hw_math.obj
 REM ..\bin\wla-65816.exe -io lzss_decode.asm lzss_decode.obj
-..\bin\wla-65816.exe -io neo2.asm neo2.obj
-..\bin\wla-65816.exe -io neo2_spc.asm neo2_spc.obj
-..\bin\wla-65816.exe -io neo2_vgm.asm neo2_vgm.obj
-..\bin\wla-65816.exe -io ppu.asm ppu.obj
-..\bin\wla-65816.exe -io inflate.asm inflate.obj
-..\bin\wla-65816.exe -io inflate_game.asm inflate_game.obj
-..\bin\wla-65816.exe -io pff_asm.asm pff_asm.obj
-..\bin\wla-65816.exe -io dummy_games_list.asm dummy_games_list.obj
-..\bin\wla-65816.exe -io cheat_db2.s cheat_db.obj
+%SNES_SDK%\bin\wla-65816.exe -io neo2.asm neo2.obj
+%SNES_SDK%\bin\wla-65816.exe -io neo2_spc.asm neo2_spc.obj
+%SNES_SDK%\bin\wla-65816.exe -io neo2_vgm.asm neo2_vgm.obj
+%SNES_SDK%\bin\wla-65816.exe -io ppu.asm ppu.obj
+%SNES_SDK%\bin\wla-65816.exe -io inflate.asm inflate.obj
+%SNES_SDK%\bin\wla-65816.exe -io inflate_game.asm inflate_game.obj
+%SNES_SDK%\bin\wla-65816.exe -io pff_asm.asm pff_asm.obj
+%SNES_SDK%\bin\wla-65816.exe -io dummy_games_list.asm dummy_games_list.obj
+%SNES_SDK%\bin\wla-65816.exe -io cheat_db2.s cheat_db.obj
 
-..\bin\wla-65816.exe -io mainopt2.s main.obj
-..\bin\wla-65816.exe -io navigopt2.s navigation.obj
-..\bin\wla-65816.exe -io ggopt.s game_genie.obj
-..\bin\wla-65816.exe -io aropt.s action_replay.obj
-..\bin\wla-65816.exe -io ppucopt.s ppuc.obj
-..\bin\wla-65816.exe -io common.s common.obj
-..\bin\wla-65816.exe -io bg_bufferopt.s bg_buffer.obj
-..\bin\wla-65816.exe -io sd_utilsopt.s sd_utils.obj
+%SNES_SDK%\bin\wla-65816.exe -io mainopt2.s main.obj
+%SNES_SDK%\bin\wla-65816.exe -io navigopt2.s navigation.obj
+%SNES_SDK%\bin\wla-65816.exe -io ggopt.s game_genie.obj
+%SNES_SDK%\bin\wla-65816.exe -io aropt.s action_replay.obj
+%SNES_SDK%\bin\wla-65816.exe -io ppucopt.s ppuc.obj
+%SNES_SDK%\bin\wla-65816.exe -io common.s common.obj
+%SNES_SDK%\bin\wla-65816.exe -io bg_bufferopt.s bg_buffer.obj
+%SNES_SDK%\bin\wla-65816.exe -io sd_utilsopt.s sd_utils.obj
 
-..\bin\wla-65816.exe -io diskioopt.s diskio.obj
-..\bin\wla-65816.exe -io myth_ioopt.s myth_io.obj
-..\bin\wla-65816.exe -io pffopt.s pff.obj
-..\bin\wla-65816.exe -io u_stringsopt.s u_strings.obj
+%SNES_SDK%\bin\wla-65816.exe -io diskioopt.s diskio.obj
+%SNES_SDK%\bin\wla-65816.exe -io myth_ioopt.s myth_io.obj
+%SNES_SDK%\bin\wla-65816.exe -io pffopt.s pff.obj
+%SNES_SDK%\bin\wla-65816.exe -io u_stringsopt.s u_strings.obj
 
-..\bin\wla-65816.exe -io aplib_decrunch.asm aplib_decrunch.obj
+%SNES_SDK%\bin\wla-65816.exe -io aplib_decrunch.asm aplib_decrunch.obj
 
 REM OBJ -> SMC
-..\bin\wlalink.exe -dvso main.obj navigation.obj dummy_games_list.obj inflate.obj inflate_game.obj aplib_decrunch.obj neo2.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj neo2_spc.obj neo2_vgm.obj ppu.obj cheat_db.obj diskio.obj myth_io.obj pff_asm.obj pff.obj bg_buffer.obj sd_utils.obj common.obj u_strings.obj NEOSNES.BIN
+%SNES_SDK%\bin\wlalink.exe -dvso main.obj navigation.obj dummy_games_list.obj inflate.obj inflate_game.obj aplib_decrunch.obj neo2.obj ppuc.obj data.obj dma.obj game_genie.obj action_replay.obj hw_math.obj neo2_spc.obj neo2_vgm.obj ppu.obj cheat_db.obj diskio.obj myth_io.obj pff_asm.obj pff.obj bg_buffer.obj sd_utils.obj common.obj u_strings.obj NEOSNES.BIN
 
 @echo off
 REM Delete files
