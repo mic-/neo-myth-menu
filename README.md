@@ -28,20 +28,20 @@ This is the menu the console will show when you boot the Neo Myth flash cart. Co
 * 2010-05-12: v0.25 of the SNES menu has been released.
 
 
-# Usage
+## Usage
 
-## SNES menu
+### SNES menu
 
-### Using NEO2 Ultra Menu / NEO2 Manager
+#### Using NEO2 Ultra Menu / NEO2 Manager
 
 * Unzip the downloaded archive and copy the file NEOSNES.BIN to your NEO2 Manager or NEO2 Ultra Menu directory (e.g. c:\NEO2 Ultra Menu\).
 * Start the NEO2 Manager / Ultra Menu with the SNES Myth attached.
 * The menu is updated by either burning one or more games to the cart, or by doing a Menu Write on the Memory tab.
 
 
-# Build instructions
+## Build instructions
 
-## SNES menu
+### SNES menu
 
 * First get the snes-sdk (see [this topic](http://www.neoflash.com/forum/index.php/topic,6025.0.html) for Linux, and [this topic](http://www.neoflash.com/forum/index.php/topic,6108.0.html) for Windows.
 * On Linux you're also going to need Wine.
